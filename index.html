@@ -1,0 +1,979 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HYBRID - MANAŽÉR SCHOPNOSTÍ</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-paper: #e5e5e5; 
+            --hybrid-black: #000000;
+            --hybrid-red: #c62828;
+            --hybrid-green: #2e7d32;
+            --text-dark: #222222;
+            --border-heavy: 3px solid #000;
+        }
+
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: var(--bg-paper);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: hidden;
+        }
+
+        .stain {
+            position: fixed;
+            background-image: url("https://i.postimg.cc/tJmBn3jb/stain.png"); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.18;
+            mix-blend-mode: multiply;
+            width: 1050px; 
+            height: 1050px;
+        }
+
+        .stain-tl { top: -250px; left: -350px; transform: rotate(15deg); }
+        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
+        .stain-br { bottom: -300px; right: -250px; transform: rotate(-40deg); }
+
+        .logo-container { text-align: center; margin-bottom: 25px; position: relative; }
+        .logo-img { max-width: 320px; height: auto; display: block; margin: 0 auto; }
+
+        
+        .char-header {
+            width: 1100px;
+            background: var(--hybrid-black);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border-radius: 8px 8px 0 0;
+            z-index: 1;
+            border: var(--border-heavy);
+            border-bottom: none;    
+        }
+
+        .container {
+            width: 1100px;
+            background-color: #fff;
+            color: #000;
+            border: var(--border-heavy);
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
+            overflow: visible;
+            margin-top: -3px;
+            z-index: 1;
+            box-sizing: border-box;
+        }
+
+        .tabs { 
+            display: flex; 
+            background-color: var(--hybrid-black); 
+            padding: 10px 30px; 
+            gap: 5px;
+        }
+        
+        .tab-btn {
+            padding: 12px 35px;
+            border: none;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: 0.3s;
+            clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
+        }
+        
+        .tab-btn:hover {
+            background: #333;
+            color: #bbb;
+        }
+
+        .tab-btn.active { 
+            color: #fff; 
+            background-color: var(--hybrid-red); 
+        }
+
+        .tab-content { display: none; padding: 5px; height: 1100px; }
+        .tab-content.active { display: flex; gap: 5px; }
+
+        /* Upravený stats-panel pre presné zarovnanie s SVG */
+        .stats-panel {
+            flex: 3;
+            position: relative;
+            background-image: url("https://i.imgur.com/sEXxKIH.png");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: top-left;
+            width: 100%;
+            aspect-ratio: 210 / 297; /* Pomer strán A4 hárku */
+            border: none !important;
+            background-color: transparent !important;
+            overflow: hidden !important;
+        }
+
+        /* Štýl pre dynamické textové polia */
+        .sheet-field {
+            position: absolute;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-weight: bold;
+            color: #000;
+            pointer-events: none;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+
+        .skill-slot {
+            position: absolute;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+            font-size: 1.2rem; /* Mierne väčšie písmo */
+        }
+        .skill-slot:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .skill-slot.selected {
+            background: transparent !important;
+            outline: none !important;
+        }
+
+        .skill-slot.selected .skill-name-text {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .skill-node {
+            width: 160px; 
+            height: 48px;
+            background: white;
+            padding: 8px;
+            border: 2px solid #000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
+            box-sizing: border-box;
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
+        }
+        .skill-node.selected { background-color: var(--hybrid-black); color: white; }
+        .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
+
+        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 650px;}
+        .control-box { background: #000; color: white; padding: 20px; border-bottom: 5px solid var(--hybrid-red); }
+        
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; }
+        .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
+        .skill-list-item:hover { background: #f4f4f4; }
+        .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
+
+        .tag {
+            background: #222;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px;
+            text-transform: uppercase;
+        }
+        .tag-remove { color: var(--hybrid-red); cursor: pointer; font-weight: bold; }
+
+        input, select { border: 2px solid #000; padding: 8px; font-family: 'Roboto Condensed', sans-serif; font-weight: bold; text-transform: uppercase; }
+
+        .old-price-wrapper { position: relative; display: inline-block; margin-right: 20px; }
+        .old-price { 
+            font-size: 1.6rem; 
+            color: #444; 
+            font-family: 'Archivo Black', sans-serif;
+        }
+        .old-price::after { 
+            content: ""; position: absolute; left: -5%; top: 50%; width: 110%; height: 3px; 
+            background: var(--hybrid-red); transform: rotate(-15deg); 
+        }
+
+        .owned-rel { color: var(--hybrid-red); font-weight: bold; }
+
+        #sel-skill-rels span {
+            white-space: nowrap;
+            display: inline-block;
+        }
+    </style>
+</head>
+<body>
+
+<div class="stain stain-tl"></div>
+<div class="stain stain-tr"></div>
+<div class="stain stain-br"></div>
+
+<div class="logo-container">
+    <img src="https://i.postimg.cc/7hQKJ3kk/logo.png" alt="HYBRID" class="logo-img">
+</div>
+
+<div class="char-header">
+    <div>
+        <select id="char-selector" onchange="switchCharacter()"></select>
+        <button class="tab-btn" style="background: #444; color: white; margin-left: 10px; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()">+ NOVÝ HRDINA</button>
+        <button class="tab-btn" style="background: var(--hybrid-red); color: white; margin-left: 5px; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
+    </div>
+</div>
+
+<div class="container">
+    <div class="tabs">
+        <button class="tab-btn active" onclick="openTab('builder')">TVORBA POSTAVY</button>
+        <button class="tab-btn" onclick="openTab('editor')">UPRAVIŤ SCHOPNOSTI</button>
+        <button class="tab-btn" onclick="openTab('navod')">NÁVOD</button> <!-- Nové tlačidlo -->    
+    </div>
+
+    <div id="builder" class="tab-content active">
+        <div class="stats-panel" id="character-stats"></div>
+
+        <div class="info-panel">
+            <div class="control-box">
+                <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
+                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
+                <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
+                
+                <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
+                    <span id="cost-container" style="display:none;" class="old-price-wrapper">
+                        <span id="cost-orig" class="old-price"></span>
+                    </span>
+                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
+                </div>
+                <div style="display: flex; gap: 5px; margin-top: 15px;">
+                    <!-- Tlačidlo Zvýšiť úroveň - teraz zaberá väčšinu šírky -->
+                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 6; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">
+                        ZVÝŠIŤ ÚROVEŇ
+                    </button>
+                    
+                    <!-- Tlačidlo Späť so symbolom šípky -->
+                    <button class="tab-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.1; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">
+                        ⤺
+                    </button>
+                </div>
+            </div>
+            
+            <div style="display: flex; gap: 5px;">
+                <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()">
+                    <option value="">VŠETKY SKUPINY</option>
+                </select>
+                <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5;" onkeyup="filterBuilder()">
+            </div>
+            <div class="selection-list" id="builder-list"></div>
+        </div>
+    </div>
+
+    <div id="editor" class="tab-content">
+    <div class="info-panel" style="flex: 2.5;"> <!-- Mierne rozšírený hlavný panel -->
+        <!-- HLAVNÝ KONTAJNER: Širší pravý stĺpec -->
+        <div style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
+            
+            <!-- ĽAVÝ STĹPEC: Zmenšený flex, aby uvoľnil miesto -->
+            <div style="flex: 0.8;">
+                <label style="font-size:1rem; font-weight:bold;">NÁZOV SCHOPNOSTI</label>
+                <input type="text" id="edit-name" style="width:100%; margin-bottom:15px; box-sizing: border-box;" onkeyup="filterEditorList()">
+                
+                <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                    <div style="width: 100px;">
+                        <label style="font-size:1rem; font-weight:bold; white-space: nowrap;">KATEGÓRIA</label>
+                        <input type="number" id="edit-cat" min="1" max="4" style="width:50%; box-sizing: border-box;">
+                    </div>
+                    <div style="flex: 1;">
+                        <label style="font-size:1rem; font-weight:bold;">SKUPINA</label>
+                        <!-- Odstránená fixná výška, pridaný padding pre lepšiu čitateľnosť -->
+                        <select id="edit-group" style="width:100%; box-sizing: border-box; padding: 5px;"></select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- PRAVÝ STĹPEC: Rozšírený (flex: 1.2) -->
+            <div style="flex: 1.1;">
+                <label style="font-size:1rem; font-weight:bold;">PRÍBUZNÉ SCHOPNOSTI</label>
+                <div id="edit-rels-container" style="display: flex; flex-wrap: wrap; gap: 5px; min-height: 105px; border: 2px solid #000; padding: 8px; background: #fff; align-content: flex-start; box-sizing: border-box;"></div>
+            </div>
+        </div>
+
+        <!-- TMAVÝ PANEL: Oprava useknutého textu vo filtri -->
+        <div style="display: flex; gap: 15px; height: 180px; margin-top: 10px; align-items: flex-start; background-color: #333; padding: 15px; border: 2px solid #000; box-sizing: border-box; margin-left:15px;">
+            <div style="flex: 0.9; display: flex; flex-direction: column; gap: 10px;">
+                <label style="font-size:1rem; font-weight:bold; color: #ffffff;">PRIDAŤ PRÍBUZNÚ</label>
+                <div>
+                    <label style="font-size:0.8rem; font-weight:bold; color: #bbb;">HĽADAŤ NÁZOV</label>
+                    <input type="text" id="rel-search" placeholder="ZADAJTE NÁZOV..." onkeyup="filterRelSearch()" style="width: 100%; box-sizing: border-box; background: #eee;">
+                </div>
+                <div>
+                    <label style="font-size:0.8rem; font-weight:bold; color: #bbb;">FILTER SKUPINY</label>
+                    <!-- OPRAVA: Odstránená fixná výška (height), nahradená paddingom -->
+                    <select id="rel-group-filter" onchange="filterRelSearch()" style="width: 100%; box-sizing: border-box; background: #eee; padding: 5px; cursor: pointer;"></select>
+                </div>
+            </div>
+            <div class="selection-list" id="rel-add-list" style="flex: 1.5; height: 100%; margin-top: 0; background-color: #fff; border: 1px solid #000;"></div>
+        </div>
+
+        <!-- TLAČIDLÁ AKCIE -->
+        <div style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-start; margin-left:15px;">
+            <!-- Zúžené tlačidlo AKTUALIZOVAŤ (šírka 180px) -->
+            <button class="tab-btn" style="background:var(--hybrid-green); color:white; width: 180px; height: 45px; clip-path:none; margin: 0;" onclick="saveSkill()">
+                AKTUALIZOVAŤ
+            </button>
+            
+            <!-- Tlačidlo ZMAZAŤ zostáva podľa obsahu -->
+            <button class="tab-btn" style="background:var(--hybrid-red); color:white; height: 45px; clip-path:none; margin: 0; padding: 0 25px;" onclick="deleteSkill()">
+                ZMAZAŤ
+            </button>
+            <button class="tab-btn" style="background:#555; color:white; height: 45px; clip-path:none; margin: 0; padding: 0 20px; margin-left: auto;" onclick="exportSkills()">
+            EXPORTOVAŤ
+            </button>
+        </div>
+    </div>
+
+    <!-- BOČNÝ PANEL SO ZOZNAMOM -->
+    <div class="info-panel" style="flex: 1.1; margin-left:25px;margin-right:15px;">
+        <h3 style="font-family:'Archivo Black'; margin-top: 10px; margin-bottom:-10px;">ZOZNAM SCHOPNOSTÍ</h3>
+        <div class="selection-list" id="editor-list" style="height: calc(100% - 40px);"></div>
+    </div>
+    </div>   
+    <div id="navod" class="tab-content">
+        <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
+            <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
+            
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 20px;">
+                <div>
+                    <h2 style="color: var(--hybrid-red);">1. TVORBA NOVÉHO HRDINU</h2>
+                    <p>Kliknutím na tlačidlo <strong>+ NOVÝ HRDINA</strong> vytvoríte novú postavu. Každý hrdina prechádza dvoma fázami:</p>
+                    <ul>
+                        <li><strong>POČIATOČNÁ FÁZA:</strong> Máte k dispozícii <strong>40 bodov rastu (BR)</strong>. V zozname schopností vidíte <strong>iba DANOSTI</strong> (Sila, IQ, Obratnosť atď.).</li>
+                        <li><strong>ODOMKNUTIE:</strong> V momente, keď miniete všetkých 40 bodov na Danosti, postava sa odomkne. Získate <strong>bonusových 20 BR</strong> a prístup ku všetkým ostatným skupinám schopností.</li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h2 style="color: var(--hybrid-red);">2. SYSTÉM VYLEPŠOVANIA</h2>
+                    <p>Cena za novú úroveň schopnosti sa vypočítava dynamicky:</p>
+                    <p style="background: #eee; padding: 10px; border-left: 5px solid #000; font-family: monospace;">
+                        CENA = (Cieľová úroveň × Kategória 1-4) - ZĽAVA
+                    </p>
+                    <ul>
+                        <li><strong>Zľava:</strong> Súčet úrovní 3 najlepších príbuzných schopností, ktoré už postava ovláda.</li>
+                        <li><strong>Minimum:</strong> Cena za úroveň nikdy nemôže byť nižšia ako samotná cieľová úroveň.</li>
+                    </ul>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; background: #000; color: #fff; padding: 25px; border-radius: 4px;">
+                <h2 style="color: var(--hybrid-red); margin-top: 0;">3. EDITOR SCHOPNOSTÍ</h2>
+                <p>V záložke <strong>UPRAVIŤ SCHOPNOSTI</strong> môžete spravovať globálnu databázu:</p>
+                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Kategória 1-4</strong></td>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;">Určuje základnú náročnosť (cenu) schopnosti.</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Príbuzné schopnosti</strong></td>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;">Tu definujete, ktoré iné schopnosti znižujú cenu tejto schopnosti (napr. IQ pomáha Vede).</td>
+                    </tr>
+                    <tr>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Tmavosivý panel</strong></td>
+                        <td style="padding: 10px; border-bottom: 1px solid #444;">Slúži na rýchle pridávanie prepojení pomocou filtrov a vyhľadávania.</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+</div>
+
+<script>
+    let skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || {
+        "ŠOFÉROVANIE": [2, "VŠEOBECNÉ", ["ZRUČNOSŤ", "ZMYSLY", "IQ"]],
+        "IQ": [4, "DANOSTI", []],
+        "EQ": [4, "DANOSTI", []],
+        "ZRUČNOSŤ": [4, "DANOSTI", []],
+        "SILA": [4, "DANOSTI", []],
+        "OBRATNOSŤ": [4, "DANOSTI", []],
+        "ZMYSLY": [4, "DANOSTI", []],
+        "ODOLNOSŤ": [4, "DANOSTI", []],
+        "VEDA": [3, "VŠEOBECNÉ", ["IQ"]],
+        "PLÁVANIE": [2, "VŠEOBECNÉ", ["OBRATNOSŤ"]],
+        "UMENIE": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
+        "ŠPORT": [3, "VŠEOBECNÉ", ["ZRUČNOSŤ", "SILA", "OBRATNOSŤ", "ZMYSLY"]],
+        "REMESLO": [3, "VŠEOBECNÉ", ["ZRUČNOSŤ", "ZMYSLY"]],
+        "HOBBY": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
+        "POVOLANIE": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
+        "PRESVIEDČANIE": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "ZMYSLY"]],
+        "MANIPULÁCIA": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "ZMYSLY", "PREDSTIERANIE"]],
+        "ZASTRAŠOVANIE": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "MANIPULÁCIA"]],
+        "PREDSTIERANIE": [2, "SPOLOČENSKÉ", ["EQ"]],
+        "ZVÁDZANIE": [2, "SPOLOČENSKÉ", ["EQ", "ZMYSLY", "FEROMÓNY"]],
+        "VODCOVSTVO": [2, "SPOLOČENSKÉ", ["IQ", "EQ"]],
+        "RÉTORIKA": [2, "SPOLOČENSKÉ", ["IQ", "EQ"]],
+        "VRHANIE": [1, "BOJ Z DIAĽKY", ["ZRUČNOSŤ", "ZMYSLY"]],
+        "ŤAŽKÉ PREDMETY": [2, "BOJ Z DIAĽKY", ["VRHANIE", "SILA"]],
+        "STREĽBA": [2, "BOJ Z DIAĽKY", ["VRHANIE", "ZRUČNOSŤ", "ZMYSLY"]],
+        "ŤAŽKÉ STRELNÉ ZBRANE": [3, "BOJ Z DIAĽKY", ["VRHANIE", "STREĽBA", "ZRUČNOSŤ", "ZMYSLY"]],
+        "ŠPECIÁLNE STRELNÉ ZBRANE": [4, "BOJ Z DIAĽKY", ["ŤAŽKÉ STRELNÉ ZBRANE", "STREĽBA", "IQ", "ZMYSLY"]],
+        "BOJOVÉ STROJE": [4, "BOJ Z DIAĽKY", ["STREĽBA", "ŤAŽKÉ STRELNÉ ZBRANE", "ZRUČNOSŤ", "IQ"]],
+        "HROMADNÉ NIČENIE": [4, "BOJ Z DIAĽKY", ["ŠPECIÁLNE STRELNÉ ZBRANE", "BOJOVÉ STROJE", "IQ"]],
+        "ĽAHKÉ ZBRANE": [2, "BOJ ZBLÍZKA", ["OBRATNOSŤ", "ZRUČNOSŤ", "SILA", "ŤAŽKÉ ZBRANE", "ZMYSLY"]],
+        "ŤAŽKÉ ZBRANE": [3, "BOJ ZBLÍZKA", ["ĽAHKÉ ZBRANE", "OBRATNOSŤ", "SILA", "ZRUČNOSŤ"]],
+        "OMRÁČENIE": [2, "BOJ ZBLÍZKA", ["ZRUČNOSŤ", "SILA", "ĽAHKÉ ZBRANE", "ŤAŽKÉ ZBRANE"]],
+        "MUČENIE": [2, "BOJ ZBLÍZKA", ["ZASTRAŠOVANIE", "EQ", "ZRUČNOSŤ"]],
+        "TICHÁ ELIMINÁCIA": [4, "BOJ ZBLÍZKA", ["ĽAHKÉ ZBRANE", "PLÝŽENIE", "OBRATNOSŤ", "ZRUČNOSŤ", "SILA"]],
+        "ŠPEHOVANIE": [2, "INFILTRÁCIA", ["ZMYSLY"]],
+        "PLÝŽENIE": [2, "INFILTRÁCIA", ["ŠPEHOVANIE", "OBRATNOSŤ", "ZMYSLY"]],
+        "PASCE": [2, "INFILTRÁCIA", ["ŠPEHOVANIE", "VÝROBA", "OPRAVA", "ZRUČNOSŤ"]],
+        "INVESTIGATÍVA": [3, "INFILTRÁCIA", ["MANIPULÁCIA", "ZMYSLY", "PRESVIEDČANIE", "IQ", "EQ"]],
+        "ŠÍRENIE KLEBIET": [3, "INFILTRÁCIA", ["MANIPULÁCIA", "EQ", "IQ"]],
+        "POUŽÍVANIE VÝBUŠNÍN": [3, "INFILTRÁCIA", ["VÝROBA VÝBUŠNÍN", "ŠPECIÁLNE ZBRANE", "VRHANIE"]],
+        "MAPOVANIE POPULÁCIE": [3, "INFILTRÁCIA", ["ŠPEHOVANIE", "INVESTIGATÍVA", "IQ"]],
+        "PRVÁ POMOC": [1, "LIEČENIE", ["ZRUČNOSŤ", "ZMYSLY", "EQ"]],
+        "MEDICÍNA": [3, "LIEČENIE", ["PRVÁ POMOC", "IQ", "ZMYSLY", "EQ"]],
+        "TERAPIA": [2, "LIEČENIE", ["EMPATIA", "EQ", "PRESVIEDČANIE"]],
+        "CHIRURGIA": [4, "LIEČENIE", ["ZRUČNOSŤ", "IQ", "ZMYSLY"]],
+        "BIOCHÉMIA": [3, "LIEČENIE", ["MEDICÍNA", "IQ"]],
+        "SYNTÉZA FEROMÓNOV": [4, "LIEČENIE", ["BIOCHÉMIA", "MEDICÍNA"]],
+        "BIOLOGICKÉ ZBRANE": [4, "LIEČENIE", ["BIOCHÉMIA", "MEDICÍNA"]],
+        "OPRAVA": [1, "KUTILSTVO", ["ZRUČNOSŤ", "ZMYSLY"]],
+        "STAVBA": [1, "KUTILSTVO", ["SILA", "ZRUČNOSŤ", "ZMYSLY"]],
+        "BUDOVANIE": [2, "KUTILSTVO", ["STAVBA", "IQ", "ZMYSLY"]],
+        "VÝROBA": [2, "KUTILSTVO", ["OPRAVA", "ZRUČNOSŤ", "ZMYSLY"]],
+        "MECHANIKA": [4, "KUTILSTVO", ["OPRAVA", "VÝROBA", "ZRUČNOSŤ", "ZMYSLY", "IQ"]],
+        "ELEKTRONIKA": [3, "KUTILSTVO", ["OPRAVA", "VÝROBA", "ZRUČNOSŤ", "IQ"]],
+        "ŤAŽKÁ TECHNIKA": [4, "KUTILSTVO", ["MECHANIKA", "ŠOFÉROVANIE", "ZRUČNOSŤ"]],
+        "HRA NA GITARU": [1, "VŠEOBECNÉ", ["EQ", "ZRUČNOSŤ", "ZMYSLY"]],
+        "KRÍDLA": [1, "SOMORA", []],
+        "OPATROVANIE": [1, "SOMORA", []],
+        "MIMIKRY": [1, "SOMORA", []],
+        "FEROMÓNY": [1, "SOMORA", []],
+        "ŠPRINT": [1, "SOMORA", []],
+        "STRIDULÁCIA": [2, "SOMORA", ["KRÍDLA"]],
+        "RÝCHLA REGENERÁCIA": [3, "SOMORA", ["ODOLNOSŤ", "LIEČENIE"]],
+        "BIOKAMUFLÁŽ": [2, "SOMORA", ["FEROMÓNY"]],
+        "OSTNE": [2, "SOMORA", []],
+        "PANCIER": [2, "SOMORA", ["ODOLNOSŤ"]],
+        "LEZENIE": [2, "SOMORA", ["OBRATNOSŤ"]],
+        "LIEČENIE": [2, "SOMORA", ["OPATROVANIE"]],
+        "OVLÁDANIE SOMÔR": [3, "SOMORA", ["FEROMÓNY", "OPATROVANIE"]],
+        "KYSELINA": [2, "SOMORA", []],
+        "HRYZADLÁ": [3, "SOMORA", []],
+        "KLEPETÁ": [3, "SOMORA", []],
+        "METAMORFÓZA": [4, "SOMORA", ["RÝCHLA REGENERÁCIA", "LIEČENIE", "MIMIKRY"]],
+        "OVLÁDANIE ĽUDÍ": [4, "SOMORA", ["OVLÁDANIE SOMÔR", "FEROMÓNY"]],
+        "ZALOŽENIE HNIEZDA": [4, "SOMORA", ["OVLÁDANIE SOMÔR", "LIEČENIE", "FEROMÓNY", "OPATROVANIE"]],
+        "ŽIHADLO": [4, "SOMORA", ["OSTNE", "KYSELINA"]],
+        "ŠPLHANIE": [3, "VŠEOBECNÉ", ["OBRATNOSŤ", "SILA", "ZRUČNOSŤ", "ZMYSLY"]],
+        "KRADNUTIE": [3, "VŠEOBECNÉ", ["PLÝŽENIE", "ZRUČNOSŤ", "ZMYSLY", "PREDSTIERANIE", "MANIPULÁCIA"]],
+        "INFORMATIKA": [3, "VŠEOBECNÉ", ["IQ"]]
+    };
+
+    let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 100, skills: {} }];
+    let activeCharIdx = 0;
+    let upgradeHistory = []; // Sem budeme ukladať kroky na vrátenie späť
+    let selectedSkill = null;
+    let editingRels = [];
+
+    function init() {
+        renderCharSelector();
+        updateGroupDropdown();
+        filterBuilder();
+        renderStats();
+        renderEditorList();
+        filterRelSearch();
+    }
+
+    function updateGroupDropdown() {
+        const builderSelect = document.getElementById('builder-group-filter');
+        const editorSelect = document.getElementById('edit-group');
+        const relFilterSelect = document.getElementById('rel-group-filter'); // Nový filter v editore
+        
+        const groups = [...new Set(Object.values(skillsDB_new).map(s => s[1]))].sort();
+        const optionsHtml = groups.map(g => `<option value="${g}">${g}</option>`).join('');
+        
+        builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+        editorSelect.innerHTML = optionsHtml;
+        // Nový filter v editore má tiež možnosť "VŠETKY"
+        relFilterSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+    }
+
+    function renderEditorList() {
+        const list = document.getElementById('editor-list');
+        // Filter teraz berie text z políčka pre názov schopnosti
+        const search = document.getElementById('edit-name').value.toUpperCase();
+        list.innerHTML = '';
+        
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => name.includes(search)) // Toto zabezpečí filtrovanie podľa písania
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            if (skillsDB_new[name][1].toUpperCase() !== curG) {
+                curG = skillsDB_new[name][1].toUpperCase();
+                const d = document.createElement('div'); 
+                d.className = 'group-divider'; 
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            div.onclick = () => loadToEditor(name);
+            list.appendChild(div);
+        });
+    }
+
+    // Aby ti fungovalo prepojenie, pridaj aj tento alias (ak ho tvoj kód vyžaduje)
+    function filterEditorList() {
+        renderEditorList();
+    }
+
+    function loadToEditor(name) {
+        const data = skillsDB_new[name];
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-cat').value = data[0];
+        document.getElementById('edit-group').value = data[1];
+        editingRels = [...data[2]];
+        renderRelTags();
+        filterRelSearch();
+    }
+
+    function renderRelTags() {
+        const container = document.getElementById('edit-rels-container');
+        container.innerHTML = '';
+        editingRels.forEach(rel => {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.innerHTML = `${rel} <span class="tag-remove" onclick="removeRel('${rel}')">✕</span>`;
+            container.appendChild(span);
+        });
+    }
+
+    function filterRelSearch() {
+        const list = document.getElementById('rel-add-list');
+        const search = document.getElementById('rel-search').value.toUpperCase();
+        const groupFilter = document.getElementById('rel-group-filter').value; // Hodnota z nového filtra
+        list.innerHTML = '';
+        
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => {
+                const skillGroup = skillsDB_new[name][1];
+                const matchesSearch = name.includes(search);
+                const matchesGroup = !groupFilter || skillGroup === groupFilter; // Logika filtra skupín
+                const isNotAlreadyAdded = !editingRels.includes(name);
+                
+                return matchesSearch && matchesGroup && isNotAlreadyAdded;
+            })
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            const group = skillsDB_new[name][1].toUpperCase();
+            if (group !== curG) {
+                curG = group;
+                const d = document.createElement('div');
+                d.className = 'group-divider';
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            div.onclick = () => { 
+                editingRels.push(name); 
+                renderRelTags(); 
+                // Po pridaní nevymažeme filter, len vyhľadávanie
+                document.getElementById('rel-search').value = ''; 
+                filterRelSearch(); 
+            };
+            list.appendChild(div);
+        });
+    }
+    function removeRel(name) { editingRels = editingRels.filter(r => r !== name); renderRelTags(); }
+
+    function saveSkill() {
+        const name = document.getElementById('edit-name').value.trim().toUpperCase();
+        const cat = parseInt(document.getElementById('edit-cat').value);
+        let group = document.getElementById('edit-group').value;
+        if (!name || !group) return alert("VYPLŇTE NÁZOV A SKUPINU.");
+        skillsDB_new[name] = [cat, group, editingRels];
+        saveState();
+        renderEditorList();
+        updateGroupDropdown();
+        filterBuilder();
+        alert("SCHOPNOSŤ ULOŽENÁ.");
+    }
+
+    function exportSkills() {
+        // Príprava dát do formátu JSON (s odsadením 4 medzery pre lepšiu čitateľnosť)
+        const dataStr = JSON.stringify(skillsDB_new, null, 4);
+        
+        // Vytvorenie Blob objektu (súbor v pamäti)
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        // Vytvorenie dočasného odkazu na stiahnutie
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'skillsDB_new.json');
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Uvoľnenie pamäte
+        URL.revokeObjectURL(url);
+    }
+
+    function deleteSkill() {
+        const name = document.getElementById('edit-name').value.toUpperCase();
+        if (skillsDB_new[name] && confirm(`ZMAZAŤ SCHOPNOSŤ ${name}?`)) {
+            delete skillsDB_new[name];
+            saveState();
+            renderEditorList();
+            updateGroupDropdown();
+            filterBuilder();
+        }
+    }
+
+    function selectSkill(name) {
+        selectedSkill = name;
+        const char = characters[activeCharIdx];
+        const data = skillsDB_new[name];
+        const targetLvl = (char.skills[name] || 0) + 1;
+        const baseCost = targetLvl * data[0];
+        
+        let discount = 0;
+        let relDisplayStrings = [];
+
+        if (data[2] && data[2].length > 0) {
+            let relsWithLvls = data[2].map(r => ({ name: r, lvl: char.skills[r] || 0 }));
+            let sortedForDiscount = [...relsWithLvls].sort((a,b) => b.lvl - a.lvl);
+            discount = sortedForDiscount.slice(0, 3).reduce((sum, r) => sum + r.lvl, 0);
+
+            relDisplayStrings = relsWithLvls.map(r => {
+                const label = r.lvl > 0 ? `${r.name} (${r.lvl})` : r.name;
+                const cls = r.lvl > 0 ? 'owned-rel' : '';
+                return `<span class="${cls}">${label}</span>`;
+            });
+        }
+
+        const finalCost = Math.max(targetLvl, baseCost - discount);
+        document.getElementById('sel-skill-name').innerText = `${name} \u2192 ${targetLvl}`;
+        document.getElementById('sel-skill-cat').innerText = `KATEGÓRIA: ${data[0]} | SKUPINA: ${data[1]}`;
+        
+        const relsBox = document.getElementById('sel-skill-rels');
+        relsBox.innerHTML = relDisplayStrings.length ? "PRÍBUZNÉ SCHOPNOSTI: " + relDisplayStrings.join(", ") : "";
+        
+        const costCont = document.getElementById('cost-container');
+        if (discount > 0) {
+            costCont.style.display = 'inline-block';
+            document.getElementById('cost-orig').innerText = `${baseCost} BR`;
+        } else { costCont.style.display = 'none'; }
+        
+        document.getElementById('cost-disc').innerText = `${finalCost} BR`;
+        renderStats();
+    }
+
+    function upgradeSelected() {
+        if (!selectedSkill) return;
+        const char = characters[activeCharIdx];
+        const currentLvl = char.skills[selectedSkill] || 0;
+
+        // KONTROLA LIMITU 12 SCHOPNOSTÍ
+        // Ak je aktuálna úroveň 0, znamená to, že pridávame novú schopnosť do zoznamu
+        if (currentLvl === 0) {
+            const learnedSkillsCount = Object.values(char.skills).filter(lvl => lvl > 0).length;
+            if (learnedSkillsCount >= 12) {
+                alert("Nie je možné pridať ďalšiu schopnosť.");
+                return;
+            }
+        }
+
+        const data = skillsDB_new[selectedSkill];
+        const targetLvl = currentLvl + 1;
+        
+        let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+        let discount = relLevels.reduce((a, b) => a + b, 0);
+        
+        const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
+        
+        if (char.sp >= cost) {
+            // Kontrola prechodu do druhej fázy
+            if (char.isInitialPhase && (char.sp - cost) === 0) {
+                const potvrdenie = confirm("VÝBORNÉ! Danosti sú nastavené. Získavaš prístup k ostatným schopnostiam a bonusových 20 bodov.\n\nTýmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?");
+                
+                if (!potvrdenie) {
+                    return; // Ak hráč zvolí "Nie", funkcia sa tu ukončí a nič sa nezmení
+                }
+                
+                // Ak hráč zvolil "Áno"
+                char.isInitialPhase = false;
+                char.sp = (char.sp - cost) + 20;
+                char.skills[selectedSkill] = targetLvl;
+                upgradeHistory = []; // Vymazanie histórie zmien po uzavretí fázy
+            } else {
+                // Bežný upgrade počas fázy (ukladáme do histórie)
+                upgradeHistory.push({
+                    skill: selectedSkill,
+                    prevLvl: currentLvl,
+                    prevSP: char.sp,
+                    wasInitialPhase: char.isInitialPhase
+                });
+
+                char.sp -= cost;
+                char.skills[selectedSkill] = targetLvl;
+            }
+
+            saveState();
+            renderStats();
+            selectSkill(selectedSkill);
+            filterBuilder();
+        } else { 
+            alert("NEDOSTATOK BODOV RASTU!"); 
+        }
+    }
+
+    function undoUpgrade() {
+        if (upgradeHistory.length === 0) {
+            alert("ŽIADNE ĎALŠIE KROKY NA VRÁTENIE.");
+            return;
+        }
+
+        const lastAction = upgradeHistory.pop(); // Vyberieme posledný uložený krok
+        const char = characters[activeCharIdx];
+
+        // Vrátime hodnoty späť
+        char.skills[lastAction.skill] = lastAction.prevLvl;
+        char.sp = lastAction.prevSP;
+        char.isInitialPhase = lastAction.wasInitialPhase;
+
+        saveState();
+        renderStats();
+        filterBuilder();
+        if (selectedSkill) selectSkill(selectedSkill);
+        
+    }
+        
+    function renderStats() {
+        const container = document.getElementById('character-stats');
+        const char = characters[activeCharIdx];
+        container.innerHTML = '';
+
+        // 1. MENO - pozícia na hárku
+        addSheetText(container, char.name, "12.5%", "17.5%", "1.2rem", "380px", "left");
+
+        // 2. BODY RASTU - pozícia v sivom boxe
+        addSheetText(container, char.sp.toString(), "31.5%", "26.5%", "1.8rem", "60px", "center");
+
+        // 3. SCHOPNOSTI - Limit 6 na stĺpec
+        const learnedSkills = Object.entries(char.skills)
+            .filter(([_, lvl]) => lvl > 0)
+            .sort();
+
+        const slots = [];
+        const maxRows = 6; 
+        
+        for (let col = 0; col < 2; col++) {
+            for (let row = 0; row < maxRows; row++) {
+                slots.push({
+                    x: col === 0 ? 7.1 : 55.5,
+                    y: 44.2 + (row * 4.80) 
+                });
+            }
+        }
+
+        learnedSkills.forEach(([name, lvl], index) => {
+            if (index < slots.length) {
+                const slot = slots[index];
+                const data = skillsDB_new[name] || [0, ""];
+                
+                // SKRACOVANIE NÁZVU: limit 22 znakov (uprav podľa potreby)
+                const displayName = truncateString(name, 18);
+
+                const div = document.createElement('div');
+                div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
+                div.style.left = slot.x + "%";
+                div.style.top = slot.y + "%";
+                div.style.width = "42.5%"; 
+                div.style.height = "4.4%"; 
+                
+                div.onclick = () => selectSkill(name);
+
+                div.innerHTML = `
+                    <div style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
+                    <div class="skill-name-text" style="position:absolute; left:14%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                    <div style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                `;
+                container.appendChild(div);
+            }
+        });
+    }
+
+    function truncateString(str, maxLen) {
+        if (str.length > maxLen) {
+            // Odreže reťazec a namiesto posledného znaku, ktorý by sa zmestil, dá bodku
+            return str.substring(0, maxLen - 1) + "...";
+        }
+        return str;
+    }
+
+    // Pomocná funkcia zostáva, len pridávame lepšie centrovanie
+    function addSheetText(container, text, top, left, size, width, align) {
+        const div = document.createElement('div');
+        div.className = 'sheet-field';
+        div.style.top = top;
+        div.style.left = left;
+        div.style.width = width;
+        div.style.fontSize = size;
+        div.style.justifyContent = align === "left" ? "flex-start" : "center";
+        div.innerText = text;
+        container.appendChild(div);
+    }
+
+    // Rozšírená pomocná funkcia pre lepšie zarovnanie
+    function addSheetText(container, text, top, left, size, width, align) {
+        const div = document.createElement('div');
+        div.className = 'sheet-field';
+        div.style.top = top;
+        div.style.left = left;
+        div.style.width = width;
+        div.style.fontSize = size;
+        div.style.justifyContent = align === "left" ? "flex-start" : "center";
+        div.innerText = text;
+        container.appendChild(div);
+    }
+
+    function filterBuilder() {
+        const list = document.getElementById('builder-list');
+        const search = document.getElementById('builder-search').value.toUpperCase();
+        const groupFilter = document.getElementById('builder-group-filter').value;
+        const char = characters[activeCharIdx]; // Aktuálna postava
+        list.innerHTML = '';
+        
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => {
+                const skillGroup = skillsDB_new[name][1];
+                
+                // LOGIKA FÁZY: Ak je v prvej fáze, vidí len DANOSTI
+                if (char.isInitialPhase && skillGroup !== "DANOSTI") {
+                    return false;
+                }
+
+                const matchesSearch = name.includes(search);
+                const matchesGroup = !groupFilter || skillGroup === groupFilter;
+                return matchesSearch && matchesGroup;
+            })
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            const group = skillsDB_new[name][1].toUpperCase();
+            if (group !== curG) {
+                curG = group;
+                const d = document.createElement('div');
+                d.className = 'group-divider';
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            div.onclick = () => selectSkill(name);
+            list.appendChild(div);
+        });
+    }
+
+    function saveState() {
+        localStorage.setItem('skillsDB_new', JSON.stringify(skillsDB_new));
+        localStorage.setItem('characters', JSON.stringify(characters));
+    }
+    
+    
+    function renderCharSelector() {
+        const s = document.getElementById('char-selector');
+        s.innerHTML = characters.map((c, i) => `<option value="${i}" ${i === activeCharIdx ? 'selected' : ''}>${c.name}</option>`).join('');
+    }
+
+    function deleteCharacter() {
+        if (characters.length <= 1) {
+            alert("NEMÔŽETE ODSTRÁNIŤ POSLEDNÉHO HRDINU.");
+            return;
+        }
+        const charName = characters[activeCharIdx].name;
+        if (confirm(`NAOZAJ CHCETE ODSTRÁNIŤ HRDINU ${charName}?`)) {
+            characters.splice(activeCharIdx, 1);
+            activeCharIdx = 0; 
+            saveState();
+            renderCharSelector();
+            switchCharacter();
+        }
+    }
+
+    function switchCharacter() { 
+        activeCharIdx = parseInt(document.getElementById('char-selector').value); 
+        selectedSkill = null; 
+        upgradeHistory = []; // <--- TOTO PRIDAJ: Vymaže históriu pri zmene postavy
+        
+        document.getElementById('sel-skill-name').innerText = "VYBERTE SCHOPNOSŤ";
+        renderStats(); 
+        filterBuilder();
+    }
+
+    function openTab(id) {
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        if (event) event.currentTarget.classList.add('active');
+    }
+    
+    function createNewCharacter() {
+        const n = prompt("MENO POSTAVY:"); 
+        if(n) { 
+            characters.push({
+                name: n.toUpperCase(), 
+                sp: 40, // Začíname so 40 bodmi
+                skills: {}, 
+                isInitialPhase: true // Príznak počiatočnej fázy
+            }); 
+            activeCharIdx = characters.length - 1; 
+            saveState();
+            renderCharSelector(); 
+            switchCharacter(); 
+        }
+    }
+    init();
+</script>
+</body>
+</html>
