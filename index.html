@@ -189,6 +189,19 @@
             align-items: center;
         }
 
+        .share-btn-top {
+            background: #444; 
+            color: white; 
+            margin-left: auto; 
+            height: 38px; 
+            padding: 0 15px; 
+            clip-path: none;
+        }
+
+        .share-btn-top:hover {
+            background: #5865F2; /* Pekná modrá pri hoveri (Discord farba) */
+        }
+
         .skill-slot {
             position: absolute;
             cursor: pointer;
@@ -271,29 +284,115 @@
             white-space: nowrap;
             display: inline-block;
         }
+
         @media (max-width: 768px) {
-            .container, .char-header {
-                width: 100%; /* Zruší fixných 1100px */
-                margin: 0;
-            }
+                    body {
+                        padding: 10px;
+                    }
 
-            .tab-content.active {
-                flex-direction: column; /* Infopanel skočí pod denník */
-                height: auto; /* Dôležité pre scrollovanie */
-            }
+                    /* Oprava šírky pre hlavné kontajnery */
+                    .container, .char-header {
+                        width: 100%;
+                        max-width: 100vw;
+                        margin-left: 0;
+                        margin-right: 0;
+                        box-sizing: border-box;
+                        border-radius: 0;
+                    }
 
-            .stats-panel {
-                flex: none;
-                min-width: 600px; /* Zabráni extrémnej miniatúrnosti */
-                overflow-x: auto;
-            }
+                    /* Nová logika hlavičky: Prvky pod sebou */
+                    .char-header {
+                        flex-direction: column;
+                        gap: 15px;
+                        align-items: center;
+                        text-align: center;
+                        height: auto;
+                        padding: 15px;
+                    }
 
-            .info-panel {
-                position: static; /* Na mobile nechceme, aby "lepil" */
-                width: 100%;
-                height: auto;
-            }
-        }
+                    /* Kontajner so selektorom a tlačidlami */
+                    .char-header > div {
+                        flex-direction: column;
+                        width: 100%;
+                        gap: 10px;
+                    }
+
+                    /* Selektor a všetky tlačidlá v hlavičke na plnú šírku */
+                    #char-selector, 
+                    .char-header button, 
+                    .share-btn-top {
+                        width: 100% !important;
+                        margin-left: 0 !important;
+                        margin-right: 0 !important;
+                        box-sizing: border-box;
+                    }
+
+                    /* Úprava kariet (Tabs) pre dotykové displeje */
+                    .tabs {
+                        flex-wrap: wrap;
+                        padding: 10px;
+                        justify-content: center;
+                    }
+
+                    .tab-btn {
+                        padding: 10px 15px;
+                        font-size: 0.8rem;
+                        flex: 1 1 auto;
+                        text-align: center;
+                    }
+
+                    .tab-content.active {
+                        flex-direction: column;
+                        height: auto;
+                        padding: 10px;
+                    }
+
+                    /* --- OPRAVA PRE DENNÍK --- */
+                    .stats-panel {
+                        flex: none;
+                        width: 100%;
+                        overflow-x: auto; /* Umožní scrollovať papier do strán */
+                        -webkit-overflow-scrolling: touch;
+                        display: block;
+                        position: relative;
+                        border: 1px solid #ddd !important;
+                    }
+
+                    #character-stats {
+                        min-width: 700px; /* Šírka papiera, aby zostal čitateľný */
+                        margin: 0 auto;
+                    }
+
+                    .info-panel {
+                        position: static;
+                        width: 100%;
+                        height: auto;
+                        margin-top: 20px;
+                    }
+
+                    /* --- RESPONSIVITA PRE NÁVOD (GRIDY) --- */
+                    #navod div[style*="display: grid"] {
+                        grid-template-columns: 1fr !important; /* Všetky gridy na 1 stĺpec */
+                        gap: 20px !important;
+                    }
+
+                    /* --- RESPONSIVITA PRE EDITOR --- */
+                    #editor .info-panel {
+                        margin-left: 0 !important;
+                        margin-right: 0 !important;
+                        padding: 10px;
+                    }
+
+                    #editor div[style*="display: flex"] {
+                        flex-direction: column !important;
+                        gap: 15px !important;
+                        margin-left: 0 !important;
+                    }
+
+                    #edit-rels-container {
+                        min-height: 60px;
+                    }
+                }
     </style>
 </head>
 <body>
@@ -389,12 +488,13 @@
     </div>
 
     <div class="char-header">
-        <div>
+        <div style="display: flex; gap: 10px; align-items: center;">
             <select id="char-selector" onchange="switchCharacter()"></select>
-            <button class="tab-btn" style="background: #444; color: white; margin-left: 10px; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()">+ NOVÝ HRDINA</button>
-            <button class="tab-btn" style="background: var(--hybrid-red); color: white; margin-left: 5px; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
-            <button class="tab-btn" style="background: #444; color: white; margin-left: 550px; height: 38px; padding: 0 15px; clip-path: none;" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
+            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()">+ NOVÝ HRDINA</button>
+            <button class="tab-btn" style="background: var(--hybrid-red); color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
         </div>
+
+        <button class="tab-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
 
     <div class="container">
