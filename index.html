@@ -288,10 +288,12 @@
         @media (max-width: 768px) {
                     body { padding: 10px; }
 
+                    /* Oprava šírky a centrovania hlavných prvkov */
                     .container, .char-header {
                         width: 100%;
                         max-width: 100vw;
-                        margin: 0;
+                        margin-left: 0;
+                        margin-right: 0;
                         box-sizing: border-box;
                         border-radius: 0;
                     }
@@ -317,83 +319,78 @@
                     .tab-content.active {
                         flex-direction: column;
                         height: auto;
-                        padding: 10px;
+                        padding: 15px;
+                        box-sizing: border-box;
+                        width: 100%;
                     }
 
-                    /* --- OPRAVA EDITAČNEJ KARTY (BORDEL V SCHOPNOSTIACH) --- */
-                    #view-editor .tab-content.active {
+                    /* --- OPRAVA KARTY ÚVOD (VYCENTROVANIE) --- */
+                    #novinky, #o-projekte, #demo, #kontakt {
+                        padding: 20px !important; /* Zmenšíme padding na mobile */
+                        align-items: stretch !important;
+                    }
+
+                    #novinky p, #o-projekte p, #demo p, #kontakt p {
+                        margin-left: 0 !important;  /* Zrušíme fixných 30px, ktoré tlačili text doprava */
+                        margin-right: 0 !important;
+                        font-size: 1.1rem !important; /* Mierne zmenšíme písmo, aby sa nerozpadlo */
+                        text-align: left; /* Na mobile je čitateľnejšie zarovnanie doľava */
+                        width: 100%;
+                        box-sizing: border-box;
+                    }
+
+                    #novinky h2, #o-projekte h2, #demo h2, #kontakt h2 {
+                        font-size: 1.4rem !important;
+                        text-align: center;
+                    }
+
+                    /* --- OPRAVA KARTY UPRAVIŤ SCHOPNOSŤ --- */
+                    #editor {
                         display: flex !important;
                         flex-direction: column !important;
                     }
 
-                    /* Zoznam schopností vľavo v editore */
-                    #view-editor .info-panel:first-child {
+                    #editor .info-panel:last-child { 
+                        order: -1; 
                         width: 100% !important;
-                        max-height: 300px; /* Obmedzíme výšku zoznamu, aby sa dalo skrolovať k formuláru */
-                        margin-bottom: 20px;
+                        height: 180px !important;
+                        flex: none !important;
+                        margin: 0 0 20px 0 !important;
                     }
 
-                    /* Hlavný editačný formulár */
-                    #view-editor div[style*="flex: 2"] {
+                    #editor #editor-list { height: 140px !important; }
+
+                    #editor .info-panel:first-child {
                         width: 100% !important;
                         margin: 0 !important;
                         flex: none !important;
                     }
 
-                    /* OPRAVA PRE STLAČENÝ PREHLIADAČ (Tmavosivý panel) */
-                    #view-editor div[style*="background: #333"] {
+                    #editor div[style*="display: flex"] {
+                        flex-direction: column !important;
+                        gap: 15px !important;
+                    }
+
+                    #editor div[style*="background-color: #333"] {
                         width: 100% !important;
-                        margin-top: 20px !important;
                         margin-left: 0 !important;
-                        min-height: 400px !important; /* Dáme mu fixnú výšku, aby nebol stlačený */
-                        flex: none !important;
-                        padding: 15px !important;
-                        box-sizing: border-box;
+                        min-height: 350px !important;
                     }
 
-                    /* Kontajner s príbuznými schopnosťami (tie guličky/tagy) */
-                    #edit-rels-container {
-                        display: flex;
-                        flex-wrap: wrap;
-                        gap: 5px;
-                        min-height: 50px;
-                        background: rgba(255,255,255,0.1);
-                        padding: 10px;
-                        border-radius: 4px;
-                    }
-
-                    /* Vyhľadávacie pole v tmavom paneli */
-                    #view-editor input[type="text"] {
-                        width: 100% !important;
-                        height: 40px;
-                        font-size: 16px; /* Zabraňuje zoomovaniu na iPhone pri kliknutí */
-                    }
-
-                    /* --- OPRAVA PRE DENNÍK (BUILDER) --- */
+                    /* --- OSTATNÉ OPRAVY --- */
                     .stats-panel {
                         width: 100%;
                         overflow-x: auto;
                         -webkit-overflow-scrolling: touch;
                     }
 
-                    #character-stats {
-                        min-width: 650px;
-                        margin: 0 auto;
-                        transform-origin: top left;
-                    }
+                    #character-stats { min-width: 650px; margin: 0 auto; }
 
-                    /* --- OPRAVA PRE NÁVOD (GRIDY) --- */
                     #navod div[style*="display: grid"] {
                         grid-template-columns: 1fr !important;
                         gap: 20px !important;
                     }
-                    
-                    #navod div[style*="background-color: #ff9800"] {
-                        width: 100% !important;
-                        box-sizing: border-box;
-                    }
-                }
-                
+                }                
     </style>
 </head>
 <body>
@@ -575,7 +572,7 @@
             </div>
             <div class="info-panel" style="flex: 1.1; margin-left:25px;margin-right:15px;">
                 <h3 style="font-family:'Archivo Black'; margin-top: 10px; margin-bottom:-10px;">ZOZNAM SCHOPNOSTÍ</h3>
-                <div class="selection-list" id="editor-list" style="height: calc(100% - 40px);"></div>
+                <div class="selection-list" id="editor-list" style="height: calc(80% - 40px);"></div>
             </div>
         </div>
 
