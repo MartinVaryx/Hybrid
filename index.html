@@ -288,108 +288,95 @@
         @media (max-width: 768px) {
                     body { padding: 10px; }
 
-                    /* Oprava šírky a centrovania hlavných prvkov */
+                    /* HLAVNÝ KONTAJNER */
                     .container, .char-header {
-                        width: 100%;
-                        max-width: 100vw;
-                        margin-left: 0;
-                        margin-right: 0;
+                        width: 100% !important;
+                        max-width: 100vw !important;
+                        margin: 0 !important;
                         box-sizing: border-box;
                         border-radius: 0;
                     }
 
+                    /* HLAVIČKA */
                     .char-header {
-                        flex-direction: column;
-                        height: auto;
-                        padding: 15px;
-                        gap: 15px;
-                    }
-
-                    .char-header > div {
-                        flex-direction: column;
-                        width: 100%;
-                        gap: 10px;
-                    }
-
-                    #char-selector, .char-header button, .share-btn-top {
-                        width: 100% !important;
-                        margin: 0 !important;
-                    }
-
-                    .tab-content.active {
-                        flex-direction: column;
-                        height: auto;
-                        padding: 15px;
-                        box-sizing: border-box;
-                        width: 100%;
-                    }
-
-                    /* --- OPRAVA KARTY ÚVOD (VYCENTROVANIE) --- */
-                    #novinky, #o-projekte, #demo, #kontakt {
-                        padding: 20px !important; /* Zmenšíme padding na mobile */
-                        align-items: stretch !important;
-                    }
-
-                    #novinky p, #o-projekte p, #demo p, #kontakt p {
-                        margin-left: 0 !important;  /* Zrušíme fixných 30px, ktoré tlačili text doprava */
-                        margin-right: 0 !important;
-                        font-size: 1.1rem !important; /* Mierne zmenšíme písmo, aby sa nerozpadlo */
-                        text-align: left; /* Na mobile je čitateľnejšie zarovnanie doľava */
-                        width: 100%;
-                        box-sizing: border-box;
-                    }
-
-                    #novinky h2, #o-projekte h2, #demo h2, #kontakt h2 {
-                        font-size: 1.4rem !important;
-                        text-align: center;
-                    }
-
-                    /* --- OPRAVA KARTY UPRAVIŤ SCHOPNOSŤ --- */
-                    #editor {
-                        display: flex !important;
                         flex-direction: column !important;
-                    }
-
-                    #editor .info-panel:last-child { 
-                        order: -1; 
-                        width: 100% !important;
-                        height: 180px !important;
-                        flex: none !important;
-                        margin: 0 0 20px 0 !important;
-                    }
-
-                    #editor #editor-list { height: 140px !important; }
-
-                    #editor .info-panel:first-child {
-                        width: 100% !important;
-                        margin: 0 !important;
-                        flex: none !important;
-                    }
-
-                    #editor div[style*="display: flex"] {
-                        flex-direction: column !important;
+                        height: auto !important;
+                        padding: 15px !important;
                         gap: 15px !important;
                     }
+                    .char-header > div { flex-direction: column; width: 100%; gap: 10px; }
+                    #char-selector, .char-header button, .share-btn-top { width: 100% !important; margin: 0 !important; }
 
-                    #editor div[style*="background-color: #333"] {
-                        width: 100% !important;
-                        margin-left: 0 !important;
-                        min-height: 350px !important;
-                    }
-
-                    /* --- OSTATNÉ OPRAVY --- */
+                    /* --- KARTA BUILDER (TVORBA POSTAVY) --- */
+                    
+                    /* IGNOROVAŤ OBRÁZOK DENNÍKA */
                     .stats-panel {
-                        width: 100%;
-                        overflow-x: auto;
-                        -webkit-overflow-scrolling: touch;
+                        background-image: none !important; /* Odstráni obrázok */
+                        background-color: #f9f9f9 !important; /* Svetlé pozadie pre čitateľnosť */
+                        height: auto !important;
+                        min-height: 200px;
+                        aspect-ratio: auto !important; /* Zruší pomer A4 */
+                        border: 2px solid #000 !important;
+                        padding: 15px !important;
+                        overflow: visible !important;
                     }
 
-                    #character-stats { min-width: 650px; margin: 0 auto; }
-
-                    #navod div[style*="display: grid"] {
-                        grid-template-columns: 1fr !important;
-                        gap: 20px !important;
+                    /* Schopnosti v jednom stĺpci pod sebou */
+                    #character-stats {
+                        display: flex !important;
+                        flex-direction: column !important;
+                        gap: 8px !important;
+                        min-width: unset !important;
+                        width: 100% !important;
                     }
+
+                    /* Úprava slotov schopností na mobile */
+                    .skill-slot {
+                        position: static !important; /* Zrušíme absolútne pozície z PC */
+                        width: 100% !important;
+                        height: auto !important;
+                        background: white !important;
+                        border: 1px solid #ddd;
+                        padding: 10px !important;
+                        display: flex !important;
+                        justify-content: space-between !important;
+                        box-sizing: border-box;
+                    }
+
+                    /* Skrytie kategórie (ľavá časť slotu) */
+                    .skill-slot div:first-child {
+                        display: none !important;
+                    }
+
+                    /* Meno schopnosti a úroveň */
+                    .skill-name-text {
+                        position: static !important;
+                        width: auto !important;
+                        font-size: 1.1rem;
+                    }
+
+                    .skill-slot div:last-child {
+                        position: static !important;
+                        width: auto !important;
+                        background: var(--hybrid-red);
+                        color: white;
+                        padding: 2px 8px;
+                        border-radius: 4px;
+                    }
+
+                    /* Body rastu a meno na mobile */
+                    .sheet-field {
+                        position: static !important; /* Pod sebou navrchu */
+                        width: 100% !important;
+                        margin-bottom: 10px;
+                        justify-content: flex-start !important;
+                        height: auto !important;
+                    }
+
+                    /* --- OSTATNÉ KARTY (EDITOR, NÁVOD) --- */
+                    #view-editor .tab-content.active { display: flex !important; flex-direction: column !important; }
+                    #editor .info-panel:last-child { order: -1; width: 100% !important; height: 180px !important; margin-bottom: 20px !important; }
+                    #navod div[style*="display: grid"] { grid-template-columns: 1fr !important; }
                 }                
     </style>
 </head>
@@ -1027,8 +1014,8 @@
         addSheetText(container, char.name, "12.5%", "17.5%", "1.2rem", "380px", "left");
 
         // 2. BODY RASTU - pozícia v sivom boxe
-        addSheetText(container, char.sp.toString(), "31.5%", "26.5%", "1.8rem", "60px", "center");
-
+        addSheetText(container, char.sp.toString(), "31.5%", "26.5%", "1.8rem", "60px", "center", "br-field");
+        
         // 3. SCHOPNOSTI - Limit 6 na stĺpec
         const learnedSkills = Object.entries(char.skills)
             .filter(([_, lvl]) => lvl > 0)
@@ -1084,7 +1071,7 @@
     // Pomocná funkcia zostáva, len pridávame lepšie centrovanie
     function addSheetText(container, text, top, left, size, width, align) {
         const div = document.createElement('div');
-        div.className = 'sheet-field';
+        div.className = 'sheet-field' + extraClass;
         div.style.top = top;
         div.style.left = left;
         div.style.width = width;
