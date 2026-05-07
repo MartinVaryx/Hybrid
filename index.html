@@ -286,59 +286,32 @@
         }
 
         @media (max-width: 768px) {
-                    body {
-                        padding: 10px;
-                    }
+                    body { padding: 10px; }
 
-                    /* Oprava šírky pre hlavné kontajnery */
                     .container, .char-header {
                         width: 100%;
                         max-width: 100vw;
-                        margin-left: 0;
-                        margin-right: 0;
+                        margin: 0;
                         box-sizing: border-box;
                         border-radius: 0;
                     }
 
-                    /* Nová logika hlavičky: Prvky pod sebou */
                     .char-header {
                         flex-direction: column;
-                        gap: 15px;
-                        align-items: center;
-                        text-align: center;
                         height: auto;
                         padding: 15px;
+                        gap: 15px;
                     }
 
-                    /* Kontajner so selektorom a tlačidlami */
                     .char-header > div {
                         flex-direction: column;
                         width: 100%;
                         gap: 10px;
                     }
 
-                    /* Selektor a všetky tlačidlá v hlavičke na plnú šírku */
-                    #char-selector, 
-                    .char-header button, 
-                    .share-btn-top {
+                    #char-selector, .char-header button, .share-btn-top {
                         width: 100% !important;
-                        margin-left: 0 !important;
-                        margin-right: 0 !important;
-                        box-sizing: border-box;
-                    }
-
-                    /* Úprava kariet (Tabs) pre dotykové displeje */
-                    .tabs {
-                        flex-wrap: wrap;
-                        padding: 10px;
-                        justify-content: center;
-                    }
-
-                    .tab-btn {
-                        padding: 10px 15px;
-                        font-size: 0.8rem;
-                        flex: 1 1 auto;
-                        text-align: center;
+                        margin: 0 !important;
                     }
 
                     .tab-content.active {
@@ -347,52 +320,80 @@
                         padding: 10px;
                     }
 
-                    /* --- OPRAVA PRE DENNÍK --- */
+                    /* --- OPRAVA EDITAČNEJ KARTY (BORDEL V SCHOPNOSTIACH) --- */
+                    #view-editor .tab-content.active {
+                        display: flex !important;
+                        flex-direction: column !important;
+                    }
+
+                    /* Zoznam schopností vľavo v editore */
+                    #view-editor .info-panel:first-child {
+                        width: 100% !important;
+                        max-height: 300px; /* Obmedzíme výšku zoznamu, aby sa dalo skrolovať k formuláru */
+                        margin-bottom: 20px;
+                    }
+
+                    /* Hlavný editačný formulár */
+                    #view-editor div[style*="flex: 2"] {
+                        width: 100% !important;
+                        margin: 0 !important;
+                        flex: none !important;
+                    }
+
+                    /* OPRAVA PRE STLAČENÝ PREHLIADAČ (Tmavosivý panel) */
+                    #view-editor div[style*="background: #333"] {
+                        width: 100% !important;
+                        margin-top: 20px !important;
+                        margin-left: 0 !important;
+                        min-height: 400px !important; /* Dáme mu fixnú výšku, aby nebol stlačený */
+                        flex: none !important;
+                        padding: 15px !important;
+                        box-sizing: border-box;
+                    }
+
+                    /* Kontajner s príbuznými schopnosťami (tie guličky/tagy) */
+                    #edit-rels-container {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 5px;
+                        min-height: 50px;
+                        background: rgba(255,255,255,0.1);
+                        padding: 10px;
+                        border-radius: 4px;
+                    }
+
+                    /* Vyhľadávacie pole v tmavom paneli */
+                    #view-editor input[type="text"] {
+                        width: 100% !important;
+                        height: 40px;
+                        font-size: 16px; /* Zabraňuje zoomovaniu na iPhone pri kliknutí */
+                    }
+
+                    /* --- OPRAVA PRE DENNÍK (BUILDER) --- */
                     .stats-panel {
-                        flex: none;
                         width: 100%;
-                        overflow-x: auto; /* Umožní scrollovať papier do strán */
+                        overflow-x: auto;
                         -webkit-overflow-scrolling: touch;
-                        display: block;
-                        position: relative;
-                        border: 1px solid #ddd !important;
                     }
 
                     #character-stats {
-                        min-width: 700px; /* Šírka papiera, aby zostal čitateľný */
+                        min-width: 650px;
                         margin: 0 auto;
+                        transform-origin: top left;
                     }
 
-                    .info-panel {
-                        position: static;
-                        width: 100%;
-                        height: auto;
-                        margin-top: 20px;
-                    }
-
-                    /* --- RESPONSIVITA PRE NÁVOD (GRIDY) --- */
+                    /* --- OPRAVA PRE NÁVOD (GRIDY) --- */
                     #navod div[style*="display: grid"] {
-                        grid-template-columns: 1fr !important; /* Všetky gridy na 1 stĺpec */
+                        grid-template-columns: 1fr !important;
                         gap: 20px !important;
                     }
-
-                    /* --- RESPONSIVITA PRE EDITOR --- */
-                    #editor .info-panel {
-                        margin-left: 0 !important;
-                        margin-right: 0 !important;
-                        padding: 10px;
-                    }
-
-                    #editor div[style*="display: flex"] {
-                        flex-direction: column !important;
-                        gap: 15px !important;
-                        margin-left: 0 !important;
-                    }
-
-                    #edit-rels-container {
-                        min-height: 60px;
+                    
+                    #navod div[style*="background-color: #ff9800"] {
+                        width: 100% !important;
+                        box-sizing: border-box;
                     }
                 }
+                
     </style>
 </head>
 <body>
