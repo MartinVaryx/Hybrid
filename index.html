@@ -320,59 +320,73 @@
 
             .info-panel { order: 2 !important; width: 100% !important; position: static !important; height: auto !important; }
 
-            /* NÁVRH 2: KOMPAKTNÝ OVLÁDACÍ BOX */
+            /* OVLÁDACÍ PANEL (FIXNÝ) */
             .control-box {
                 position: fixed !important;
                 bottom: 0; left: 0; width: 100%;
                 z-index: 1001;
-                padding: 10px !important;
+                padding: 8px 12px !important;
                 box-sizing: border-box;
                 border-top: 4px solid var(--hybrid-red);
                 background: #000;
-                display: flex !important; /* Zmenené na flex pre horizontálne radenie */
+                display: flex !important;
                 flex-direction: column;
                 gap: 5px;
             }
 
-            #sel-skill-name { font-size: 1rem !important; }
-            #sel-skill-cat, #sel-skill-rels { margin: 0 !important; font-size: 0.75rem !important; }
+            #sel-skill-name { font-size: 0.95rem !important; }
+            #sel-skill-cat, #sel-skill-rels { margin: 0 !important; font-size: 0.7rem !important; }
 
-            /* Cena a tlačidlá v jednom riadku */
-            .control-box > div:nth-of-type(2), 
-            .control-box > div:nth-of-type(3) { 
+            /* RIADOK PRE CENU A TLAČIDLÁ (Zabezpečenie vedľa seba) */
+            .control-box > div:nth-last-of-type(2), 
+            .control-box > div:nth-last-of-type(1) { 
                 display: inline-flex !important; 
-                width: auto; 
-                margin: 0 !important; 
                 vertical-align: middle;
             }
 
-            /* Obal pre cenu (menšie písmo, vedľa tlačidiel) */
+            /* Obal pre cenu */
             .control-box div[style*="background:#111"] {
                 display: flex !important;
                 flex-direction: row !important;
                 align-items: center;
                 justify-content: center;
-                padding: 5px 10px !important;
-                gap: 10px;
+                padding: 5px !important;
+                margin-top: 0 !important;
                 flex: 1;
-                min-width: 100px;
+                min-width: 80px;
+                height: 45px;
+                box-sizing: border-box;
             }
             
-            #cost-disc { font-size: 1.2rem !important; } /* Zmenšená cena */
-            .old-price { font-size: 0.9rem !important; } /* Zmenšená pôvodná cena */
+            #cost-disc { font-size: 1.1rem !important; } /* Zmenšená cena */
+            .old-price { font-size: 0.8rem !important; } 
+            .old-price-wrapper { margin-right: 8px !important; }
 
-            /* Obal pre tlačidlá */
+            /* Obal pre tlačidlá (umiestnenie vedľa ceny) */
             .control-box div[style*="display: flex; gap: 5px"] {
                 margin-top: 0 !important;
-                flex: 2;
+                flex: 2.5;
+                height: 45px;
             }
-            .control-box .tab-btn { height: 40px !important; font-size: 0.8rem !important; }
+            .control-box .tab-btn { height: 100% !important; font-size: 0.75rem !important; padding: 0 5px !important; }
 
-            /* Spodný padding pre zoznam, aby ho panel nezakryl */
-            #builder-list { margin-bottom: 120px !important; }
+            /* Rodičovský flex pre cenu a tlačidlá, ak sú v HTML pod sebou */
+            .control-box { display: flex !important; flex-wrap: wrap !important; flex-direction: row !important; }
+            .control-box h3, .control-box p, .control-box #sel-skill-rels { flex: 1 0 100%; }
+
+            /* Medzera pod zoznamom schopností, aby ho panel nezakrýval */
+            #builder-list { margin-bottom: 110px !important; padding-bottom: 10px; }
 
             /* --- KARTA UPRAVIŤ SCHOPNOSTI --- */
             #editor.active { display: flex !important; flex-direction: column !important; }
+            
+            /* PRESUN ZOZNAMU NA VRCH */
+            #editor .info-panel:last-child { 
+                order: -1 !important; 
+                width: 100% !important; 
+                margin: 0 0 20px 0 !important; 
+                height: 300px !important;
+            }
 
             /* Tlačidlá AKTUALIZOVAŤ, ZMAZAŤ, EXPORT vedľa seba */
             #editor div[style*="justify-content: flex-start"] {
@@ -380,36 +394,44 @@
                 flex-direction: row !important;
                 gap: 5px !important;
                 margin-left: 0 !important;
+                width: 100% !important;
             }
             #editor div[style*="justify-content: flex-start"] .tab-btn {
                 flex: 1;
-                padding: 0 5px !important;
-                font-size: 0.7rem !important;
-                height: 40px !important;
+                padding: 0 2px !important;
+                font-size: 0.65rem !important;
+                height: 45px !important;
+                white-space: nowrap;
             }
 
-            /* Šírka okien v editore */
-            #edit-rels-container { width: 100% !important; min-height: 80px !important; }
+            /* OPRAVA ŠÍRKY OKIEN V EDITORE */
+            #editor .info-panel:first-child { width: 100% !important; margin: 0 !important; }
             #editor div[style*="display: flex; gap: 30px"] { flex-direction: column !important; gap: 10px !important; margin: 10px 0 !important; }
             
-            /* Zosúladenie šírky vyhľadávania a zoznamu */
-            #editor .info-panel:first-child > div:nth-child(2) {
+            /* Related skills box šírka */
+            #edit-rels-container { 
+                width: 100% !important; 
+                min-height: 80px !important; 
+                box-sizing: border-box !important;
+            }
+
+            /* Čierny box pod tým (Pridať príbuznú) */
+            #editor div[style*="background-color: #333"] {
                 width: 100% !important;
                 margin-left: 0 !important;
-                padding: 10px !important;
+                box-sizing: border-box !important;
+                flex-direction: column !important;
+                height: auto !important;
             }
+            #editor div[style*="background-color: #333"] > div:first-child { width: 100% !important; }
+            #rel-add-list { width: 100% !important; height: 150px !important; margin-top: 10px; }
 
             /* --- KARTA NÁVOD - OPRAVA PRETEKANIA --- */
             #navod { width: 100% !important; box-sizing: border-box; overflow-x: hidden; }
             #navod > div { padding: 10px !important; width: 100% !important; box-sizing: border-box; margin: 0 !important; }
             #navod h1 { font-size: 1.5rem; }
             #navod div[style*="display: grid"] { grid-template-columns: 1fr !important; gap: 20px !important; }
-            #navod table { font-size: 0.85rem; }
-            
-            /* Skrytie nepotrebných prvkov na papieri v mobile */
-            .skill-slot { position: static !important; width: 100% !important; padding: 8px !important; margin-bottom: 4px; border: 1px solid #ccc; }
-            .skill-slot div:first-child { display: none !important; } 
-            .sheet-field { position: static !important; width: 100% !important; height: auto !important; margin-bottom: 10px; }
+            #navod table { font-size: 0.85rem; display: block; overflow-x: auto; }
         }
 
     </style>
