@@ -307,80 +307,158 @@
             .char-header > div { flex-direction: column; width: 100%; gap: 10px; }
             #char-selector, .char-header button, .share-btn-top { width: 100% !important; margin: 0 !important; }
 
-            /* --- KARTA BUILDER (TVORBA POSTAVY) --- */
-            #builder {
-                display: flex !important;
+            /* KARTY (TABS) - Horizontálne skrolovanie */
+            .tabs {
+                overflow-x: auto;
+                white-space: nowrap;
+                -webkit-overflow-scrolling: touch;
+                padding: 10px 15px;
+                display: flex;
+            }
+            .tab-btn {
+                flex: 0 0 auto;
+                padding: 10px 20px;
+            }
+
+            .tab-content {
+                display: none !important; 
+                height: auto !important;
+                padding: 10px !important;
+            }
+
+            .tab-content.active {
+                display: flex !important; 
                 flex-direction: column !important;
             }
 
-            /* Zoznam schopností, ktoré hrdina MÁ (Denník) nad ovládacie prvky */
+            /* --- KARTA BUILDER (TVORBA POSTAVY) --- */
             .stats-panel {
-                order: 1 !important; /* Prvý v poradí */
+                order: 1 !important;
                 background-image: none !important;
                 background-color: #f9f9f9 !important;
                 height: auto !important;
                 min-height: 100px;
                 aspect-ratio: auto !important;
                 border: 2px solid #000 !important;
-                padding: 15px !important;
+                padding: 0 !important; /* Upravené kvôli sticky BR */
                 overflow: visible !important;
+            }
+
+            /* NÁVRH 1: STICKY STATUS BAR (BODY RASTU) */
+            .br-field {
+                position: sticky !important;
+                top: 0;
+                width: 100% !important;
+                background: var(--hybrid-black);
+                color: white !important;
+                z-index: 100;
+                padding: 15px !important;
+                margin: 0 !important;
+                border-bottom: 4px solid var(--hybrid-red);
+                box-sizing: border-box;
+                display: flex;
+                align-items: center;
+                justify-content: center !important;
+                font-size: 1.8rem !important;
+            }
+
+            .br-field::before {
+                content: "BODY RASTU: ";
+                font-size: 1rem;
+                margin-right: 10px;
+                color: #888;
             }
 
             #character-stats {
                 display: flex !important;
                 flex-direction: column !important;
                 gap: 8px !important;
-                min-width: unset !important;
-                width: 100% !important;
+                padding: 10px;
             }
 
             .info-panel {
-                order: 2 !important; /* Druhý v poradí (vyhľadávač a upgrade) */
+                order: 2 !important;
                 width: 100% !important;
                 position: static !important;
                 height: auto !important;
             }
 
+            /* NÁVRH 2: STICKY OVLÁDACÍ BOX */
+            .control-box {
+                position: fixed !important;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                z-index: 1001;
+                box-shadow: 0 -5px 20px rgba(0,0,0,0.4);
+                padding: 15px !important;
+                box-sizing: border-box;
+                border-bottom: none !important;
+                border-top: 5px solid var(--hybrid-red);
+                background: #000;
+                display: none; /* Skryté, kým JS nepridá .is-active */
+                transform: translateY(100%);
+                transition: transform 0.3s ease-out;
+            }
+
+            .control-box.is-active {
+                display: block;
+                transform: translateY(0);
+            }
+
+            /* Priestor na konci zoznamu, aby panel nič neprekrýval */
+            #builder-list {
+                margin-bottom: 230px !important; 
+            }
+
+            /* Úprava slotov v denníku pre mobil */
             .skill-slot {
                 position: static !important;
                 width: 100% !important;
                 height: auto !important;
                 background: white !important;
                 border: 1px solid #ddd;
-                padding: 10px !important;
+                padding: 12px !important;
                 display: flex !important;
                 justify-content: space-between !important;
                 box-sizing: border-box;
+                margin-bottom: 5px;
             }
 
-            .skill-slot div:first-child { display: none !important; }
+            .skill-slot div:first-child { display: none !important; } /* Skryje kategóriu na papieri */
             .skill-name-text { position: static !important; width: auto !important; font-size: 1.1rem; }
-            .skill-slot div:last-child { position: static !important; width: auto !important; background: var(--hybrid-red); color: white; padding: 2px 8px; border-radius: 4px; }
+            .skill-slot div:last-child { 
+                position: static !important; 
+                width: auto !important; 
+                background: var(--hybrid-red); 
+                color: white; 
+                padding: 2px 10px; 
+                border-radius: 4px; 
+            }
 
             .sheet-field {
                 position: static !important;
                 width: 100% !important;
                 margin-bottom: 10px;
+                padding: 10px;
                 justify-content: flex-start !important;
                 height: auto !important;
             }
 
-            /* --- KARTA EDITOR (UPRAVIŤ SCHOPNOSTI) --- */
-            #editor {
+            /* --- KARTA EDITOR --- */
+            #editor.active {
                 display: flex !important;
                 flex-direction: column !important;
             }
 
-            /* Zoznam všetkých schopností v DB nad formulár */
             #editor .info-panel:last-child {
                 order: 1 !important;
                 width: 100% !important;
-                height: 200px !important;
+                height: 250px !important;
                 margin: 0 0 20px 0 !important;
                 flex: none !important;
             }
 
-            /* Editačný formulár pod zoznam */
             #editor .info-panel:first-child {
                 order: 2 !important;
                 width: 100% !important;
@@ -391,26 +469,10 @@
             #editor div[style*="display: flex"] { flex-direction: column !important; gap: 15px !important; margin-left: 0 !important;}
             #editor div[style*="background-color: #333"] { width: 100% !important; margin-left: 0 !important; min-height: 350px !important; }
 
-            /* --- OSTATNÉ --- */
+            /* --- KARTA NÁVOD --- */
             #navod div[style*="display: grid"] { grid-template-columns: 1fr !important; }
-
-            .br-field::before {
-                content: "BODY RASTU: "; /* Tento text sa vloží pred číslo */
-                font-size: 1.1rem;
-                margin-right: 10px;
-                color: var(--hybrid-black);
-            }
-
-            .br-field {
-                position: static !important;
-                width: 100% !important;
-                justify-content: flex-start !important;
-                margin-bottom: 15px;
-                font-size: 1.8rem !important; /* Číslo zostane veľké */
-                display: flex;
-                align-items: center;
-            }
         }
+
     </style>
 </head>
 <body>
@@ -921,6 +983,7 @@
 
     function selectSkill(name) {
         selectedSkill = name;
+        document.querySelector('.control-box').classList.add('is-active');
         const char = characters[activeCharIdx];
         const data = skillsDB_new[name];
         const targetLvl = (char.skills[name] || 0) + 1;
@@ -1202,6 +1265,8 @@
         selectedSkill = null; 
         upgradeHistory = []; // <--- TOTO PRIDAJ: Vymaže históriu pri zmene postavy
         
+        document.querySelector('.control-box').classList.remove('is-active');
+
         document.getElementById('sel-skill-name').innerText = "VYBERTE SCHOPNOSŤ";
         renderStats(); 
         filterBuilder();
