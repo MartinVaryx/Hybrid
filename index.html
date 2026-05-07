@@ -355,6 +355,37 @@
             width: 100%;
         }
 
+        .modal-overlay {
+            display: none; /* JS zmení na flex pri showCustomAlert */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85); 
+            z-index: 10000; /* Musí byť vyššie ako .stain (1) a .main-menu (1000) */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border: 4px solid var(--hybrid-red);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.5);
+            color: black;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
         @media (max-width: 768px) {
                 
                 .logo-container {
@@ -763,6 +794,7 @@
 <div class="stain stain-br"></div>
 
 
+
 <div class="main-menu">
     <div class="menu-dropdown">
         <button class="menu-trigger">MENU ▼</button>
@@ -1032,6 +1064,15 @@
     </div>
 </div>
 
+<div id="custom-modal" class="modal-overlay">
+    <div class="modal-box">
+        <h3 id="modal-title" style="font-family:'Archivo Black'; margin-top:0;">UPOZORNENIE</h3>
+        <p id="modal-message" style="font-size: 1.1rem; margin: 20px 0;">Tu sa zobrazí správa...</p>
+        <div id="modal-buttons" class="modal-actions">
+            </div>
+    </div>
+</div>
+
 <script>
     let skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || {
         "ŠOFÉROVANIE": [2, "VŠEOBECNÉ", ["ZRUČNOSŤ", "ZMYSLY", "IQ"]],
@@ -1253,7 +1294,7 @@
         const name = document.getElementById('edit-name').value.trim().toUpperCase();
         const cat = parseInt(document.getElementById('edit-cat').value);
         let group = document.getElementById('edit-group').value;
-        if (!name || !group) return alert("VYPLŇTE NÁZOV A SKUPINU.");
+        if (!name || !group) return showCustomAlert("VYPLŇTE NÁZOV A SKUPINU.");
         skillsDB_new[name] = [cat, group, editingRels];
         saveState();
         renderEditorList();
@@ -1287,13 +1328,37 @@
 
     function deleteSkill() {
         const name = document.getElementById('edit-name').value.toUpperCase();
-        if (skillsDB_new[name] && confirm(`ZMAZAŤ SCHOPNOSŤ ${name}?`)) {
-            delete skillsDB_new[name];
-            saveState();
-            renderEditorList();
-            updateGroupDropdown();
-            filterBuilder();
+        
+        // Najprv overíme, či schopnosť vôbec v databáze je
+        if (!skillsDB_new[name]) {
+            showCustomAlert("Schopnosť nebola nájdená.", "CHYBA");
+            return;
         }
+
+        // Vyvoláme modálne okno s potvrdením
+        showCustomAlert(
+            `Naozaj chcete natrvalo ZMAZAŤ schopnosť ${name}?`, 
+            "POTVRDENIE ZMAZANIA", 
+            true, 
+            () => {
+                // Táto časť sa vykoná len po kliknutí na ÁNO
+                delete skillsDB_new[name];
+                
+                // Aktualizácia stavu a rozhrania
+                saveState();
+                renderEditorList();
+                updateGroupDropdown();
+                filterBuilder();
+                
+                // Vyčistíme políčka v editore po zmazaní
+                document.getElementById('edit-name').value = '';
+                document.getElementById('edit-cat').value = '';
+                editingRels = [];
+                renderRelTags();
+                
+                showCustomAlert(`Schopnosť ${name} bola odstránená.`, "ZMAZANÉ");
+            }
+        );
     }
 
     function selectSkill(name) {
@@ -1341,12 +1406,11 @@
         const char = characters[activeCharIdx];
         const currentLvl = char.skills[selectedSkill] || 0;
 
-        // KONTROLA LIMITU 12 SCHOPNOSTÍ
-        // Ak je aktuálna úroveň 0, znamená to, že pridávame novú schopnosť do zoznamu
+        // 1. KONTROLA LIMITU 12 SCHOPNOSTÍ
         if (currentLvl === 0) {
             const learnedSkillsCount = Object.values(char.skills).filter(lvl => lvl > 0).length;
             if (learnedSkillsCount >= 12) {
-                alert("Nie je možné pridať ďalšiu schopnosť.");
+                showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
                 return;
             }
         }
@@ -1359,45 +1423,56 @@
         
         const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
         
+        // 2. KONTROLA DOSTATKU BODOV
         if (char.sp >= cost) {
-            // Kontrola prechodu do druhej fázy
+            
+            // ŠPECIÁLNY PRÍPAD: Prechod do druhej fázy (vyžaduje potvrdenie)
             if (char.isInitialPhase && (char.sp - cost) === 0) {
-                const potvrdenie = confirm("VÝBORNÉ! Danosti sú nastavené. Získavaš prístup k ostatným schopnostiam a bonusových 20 bodov.\n\nTýmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?");
-                
-                if (!potvrdenie) {
-                    return; // Ak hráč zvolí "Nie", funkcia sa tu ukončí a nič sa nezmení
-                }
-                
-                // Ak hráč zvolil "Áno"
-                char.isInitialPhase = false;
-                char.sp = (char.sp - cost) + 20;
-                char.skills[selectedSkill] = targetLvl;
-                upgradeHistory = []; // Vymazanie histórie zmien po uzavretí fázy
-            } else {
-                // Bežný upgrade počas fázy (ukladáme do histórie)
-                upgradeHistory.push({
-                    skill: selectedSkill,
-                    prevLvl: currentLvl,
-                    prevSP: char.sp,
-                    wasInitialPhase: char.isInitialPhase
-                });
+                showCustomAlert(
+                    "Týmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?", 
+                    "POTVRDENIE FÁZY", 
+                    true, 
+                    () => {
+                        // Táto časť sa spustí až po kliknutí na ÁNO v tvojom modálnom okne
+                        char.isInitialPhase = false;
+                        char.sp = (char.sp - cost) + 20;
+                        char.skills[selectedSkill] = targetLvl;
+                        upgradeHistory = []; // Vymazanie histórie po uzavretí fázy
 
-                char.sp -= cost;
-                char.skills[selectedSkill] = targetLvl;
-            }
+                        finishUpgrade(); // Pomocná funkcia pre uloženie a prekreslenie
+                    }
+                );
+                return; // Zastavíme vykonávanie, čakáme na callback
+            } 
 
+            // BEŽNÝ PRÍPAD: Klasické vylepšenie
+            upgradeHistory.push({
+                skill: selectedSkill,
+                prevLvl: currentLvl,
+                prevSP: char.sp,
+                wasInitialPhase: char.isInitialPhase
+            });
+
+            char.sp -= cost;
+            char.skills[selectedSkill] = targetLvl;
+            
+            finishUpgrade();
+
+        } else { 
+            showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
+        }
+
+        // Vnútorná pomocná funkcia, aby sme neduplikovali kód uloženia
+        function finishUpgrade() {
             saveState();
             renderStats();
             selectSkill(selectedSkill);
             filterBuilder();
-        } else { 
-            alert("NEDOSTATOK BODOV RASTU!"); 
         }
     }
-
     function undoUpgrade() {
         if (upgradeHistory.length === 0) {
-            alert("ŽIADNE ĎALŠIE KROKY NA VRÁTENIE.");
+            showCustomAlert("ŽIADNE ĎALŠIE KROKY NA VRÁTENIE.");
             return;
         }
 
@@ -1562,18 +1637,18 @@
 
     function deleteCharacter() {
         if (characters.length <= 1) {
-            alert("NEMÔŽETE ODSTRÁNIŤ POSLEDNÉHO HRDINU.");
+            showCustomAlert("NEMÔŽETE ODSTRÁNIŤ POSLEDNÉHO HRDINU.");
             return;
         }
         const charName = characters[activeCharIdx].name;
-        if (confirm(`NAOZAJ CHCETE ODSTRÁNIŤ HRDINU ${charName}?`)) {
+        showCustomAlert("Naozaj chcete odstrániť hrdinu?", "POTVRDENIE", true, () => {
             characters.splice(activeCharIdx, 1);
             activeCharIdx = 0; 
             saveState();
             renderCharSelector();
             switchCharacter();
-        }
-    }
+        });        }
+
 
     function switchCharacter() { 
         activeCharIdx = parseInt(document.getElementById('char-selector').value); 
@@ -1634,7 +1709,7 @@
         const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1501887111031164998/Si6ykPBshCLeWvpRQYlGEMFvbeJfd0biK7J9n25ObslmH2Hcid7JT8Zj2_dGEGNrlePx";
         
         if (DISCORD_WEBHOOK_URL.includes("TVOJA_WEBHOOK")) {
-            alert("Chyba: Nie je nastavená URL adresa Webhooku.");
+            showCustomAlert("Chyba: Nie je nastavená URL adresa Webhooku.");
             return;
         }
 
@@ -1681,13 +1756,13 @@
             });
 
             if (response.ok) {
-                alert("Odoslané! Ak si robil zmeny v schopnostiach, odoslali sa len tie upravené.");
+                showCustomAlert("Odoslané! Vďaka, že nám pomáhaš vylepšiť Hybrid!");
             } else {
-                alert("Chyba pri komunikácii s Discordom.");
+                showCustomAlert("Chyba pri komunikácii s Discordom.");
             }
         } catch (error) {
             console.error("Chyba:", error);
-            alert("Nepodarilo sa odoslať dáta.");
+            showCustomAlert("Nepodarilo sa odoslať dáta.");
         }
     }
 
@@ -1748,6 +1823,48 @@
         msg.innerText = text;
         msg.style.display = 'block';
         setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+
+    let modalCallback = null;
+
+    function showCustomAlert(message, title = "UPOZORNENIE", isConfirm = false, callback = null) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-message').innerText = message;
+        
+        const btnContainer = document.getElementById('modal-buttons');
+        if (!btnContainer) return; // Bezpečnostná poistka
+        
+        btnContainer.innerHTML = ''; 
+
+        if (isConfirm) {
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'tab-btn';
+            yesBtn.style.cssText = 'clip-path:none; background:var(--hybrid-green); color:white; margin: 5px;';
+            yesBtn.innerText = 'ÁNO';
+            yesBtn.onclick = () => { if(callback) callback(); closeModal(); };
+            
+            const noBtn = document.createElement('button');
+            noBtn.className = 'tab-btn';
+            noBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white; margin: 5px;';
+            noBtn.innerText = 'NIE';
+            noBtn.onclick = closeModal;
+
+            btnContainer.appendChild(yesBtn);
+            btnContainer.appendChild(noBtn);
+        } else {
+            const okBtn = document.createElement('button');
+            okBtn.className = 'tab-btn';
+            okBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white;';
+            okBtn.innerText = 'OK';
+            okBtn.onclick = closeModal;
+            btnContainer.appendChild(okBtn);
+        }
+
+        document.getElementById('custom-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('custom-modal').style.display = 'none';
     }
 
 
