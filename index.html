@@ -271,6 +271,29 @@
             white-space: nowrap;
             display: inline-block;
         }
+        @media (max-width: 768px) {
+            .container, .char-header {
+                width: 100%; /* Zruší fixných 1100px */
+                margin: 0;
+            }
+
+            .tab-content.active {
+                flex-direction: column; /* Infopanel skočí pod denník */
+                height: auto; /* Dôležité pre scrollovanie */
+            }
+
+            .stats-panel {
+                flex: none;
+                min-width: 600px; /* Zabráni extrémnej miniatúrnosti */
+                overflow-x: auto;
+            }
+
+            .info-panel {
+                position: static; /* Na mobile nechceme, aby "lepil" */
+                width: 100%;
+                height: auto;
+            }
+        }
     </style>
 </head>
 <body>
@@ -370,6 +393,7 @@
             <select id="char-selector" onchange="switchCharacter()"></select>
             <button class="tab-btn" style="background: #444; color: white; margin-left: 10px; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()">+ NOVÝ HRDINA</button>
             <button class="tab-btn" style="background: var(--hybrid-red); color: white; margin-left: 5px; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
+            <button class="tab-btn" style="background: #444; color: white; margin-left: 550px; height: 38px; padding: 0 15px; clip-path: none;" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
         </div>
     </div>
 
@@ -458,18 +482,27 @@
             <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
                 <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
                 
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 20px;">
+                <div style="margin-top: 20px; background-color: var(--hybrid-red); padding: 25px; border-radius: 4px; color: #000;">
+                    <h2 style="color: #ffffff; margin-top: 0; font-family:'Archivo Black';">PODEĽ SA S NAMI!</h2>
+                    <p style="color: #ffffff; margin-bottom: 0; font-size: 1.1rem;">
+                        Kliknutím na tlačidlo <strong>PODELIŤ SA!</strong> nám pošlete hrdinu a schopnosti, ktoré ste vytvorili. 
+                        Veľmi nám tým pomôžete Hybrid vylepšiť.
+                    </p>
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; align-items: start;">
+                    
                     <div>
-                        <h2 style="color: var(--hybrid-red);">1. TVORBA NOVÉHO HRDINU</h2>
+                        <h2 style="color: var(--hybrid-red); margin-top: 0;">1. TVORBA NOVÉHO HRDINU</h2>
                         <p>Kliknutím na tlačidlo <strong>+ NOVÝ HRDINA</strong> vytvoríte novú postavu. Každý hrdina prechádza dvoma fázami:</p>
-                        <ul>
+                        <ul style="margin-bottom: 0;">
                             <li><strong>POČIATOČNÁ FÁZA:</strong> Máte k dispozícii <strong>40 bodov rastu (BR)</strong>. V zozname schopností vidíte <strong>iba DANOSTI</strong> (Sila, IQ, Obratnosť atď.).</li>
                             <li><strong>ODOMKNUTIE:</strong> V momente, keď miniete všetkých 40 bodov na Danosti, postava sa odomkne. Získate <strong>bonusových 20 BR</strong> a prístup ku všetkým ostatným skupinám schopností.</li>
                         </ul>
                     </div>
 
                     <div>
-                        <h2 style="color: var(--hybrid-red);">2. SYSTÉM VYLEPŠOVANIA</h2>
+                        <h2 style="color: var(--hybrid-red); margin-top: 0;">2. SYSTÉM VYLEPŠOVANIA</h2>
                         <p>Cena za novú úroveň schopnosti sa vypočítava dynamicky:</p>
                         <p style="background: #eee; padding: 10px; border-left: 5px solid #000; font-family: monospace;">
                             CENA = (Cieľová úroveň × Kategória 1-4) - ZĽAVA
@@ -479,25 +512,26 @@
                             <li><strong>Minimum:</strong> Cena za úroveň nikdy nemôže byť nižšia ako samotná cieľová úroveň.</li>
                         </ul>
                     </div>
-            </div>
+                </div>
 
-            <div style="margin-top: 30px; background: #000; color: #fff; padding: 25px; border-radius: 4px;">
-                <h2 style="color: var(--hybrid-red); margin-top: 0;">3. EDITOR SCHOPNOSTÍ</h2>
-                <p>V záložke <strong>UPRAVIŤ SCHOPNOSTI</strong> môžete spravovať globálnu databázu:</p>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                    <tr>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Kategória 1-4</strong></td>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;">Určuje základnú náročnosť (cenu) schopnosti.</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Príbuzné schopnosti</strong></td>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;">Tu definujete, ktoré iné schopnosti znižujú cenu tejto schopnosti (napr. IQ pomáha Vede).</td>
-                    </tr>
-                    <tr>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Tmavosivý panel</strong></td>
-                        <td style="padding: 10px; border-bottom: 1px solid #444;">Slúži na rýchle pridávanie prepojení pomocou filtrov a vyhľadávania.</td>
-                    </tr>
-                </table>
+                <div style="margin-top: 40px; background: #000; color: #fff; padding: 25px; border-radius: 4px;">
+                    <h2 style="color: var(--hybrid-red); margin-top: 0;">3. EDITOR SCHOPNOSTÍ</h2>
+                    <p>V záložke <strong>UPRAVIŤ SCHOPNOSTI</strong> môžete spravovať globálnu databázu:</p>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Kategória 1-4</strong></td>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;">Určuje základnú náročnosť (cenu) schopnosti.</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Príbuzné schopnosti</strong></td>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;">Tu definujete, ktoré iné schopnosti znižujú cenu tejto schopnosti (napr. IQ pomáha Vede).</td>
+                        </tr>
+                        <tr>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Tmavosivý panel</strong></td>
+                            <td style="padding: 10px; border-bottom: 1px solid #444;">Slúži na rýchle pridávanie prepojení pomocou filtrov a vyhľadávania.</td>
+                        </tr>
+                    </table>
+                </div>
             </div>
         </div>
     </div>
@@ -585,6 +619,7 @@
         "KRADNUTIE": [3, "VŠEOBECNÉ", ["PLÝŽENIE", "ZRUČNOSŤ", "ZMYSLY", "PREDSTIERANIE", "MANIPULÁCIA"]],
         "INFORMATIKA": [3, "VŠEOBECNÉ", ["IQ"]]
     };
+    const originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new)); // Kópia pôvodného stavu pre porovnanie
 
     let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true }];
     let activeCharIdx = 0;
@@ -1074,6 +1109,74 @@
             saveState();
             renderCharSelector(); 
             switchCharacter(); 
+        }
+    }
+
+    // Pomocná funkcia na porovnanie dvoch objektov (či sú databázy identické)
+    function suSchopnostiIdenticke(obj1, obj2) {
+        return JSON.stringify(obj1) === JSON.stringify(obj2);
+    }
+
+
+        
+    async function zdielatVsetkoDiscord() {
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1501887111031164998/Si6ykPBshCLeWvpRQYlGEMFvbeJfd0biK7J9n25ObslmH2Hcid7JT8Zj2_dGEGNrlePx";
+        
+        if (DISCORD_WEBHOOK_URL.includes("TVOJA_WEBHOOK")) {
+            alert("Chyba: Nie je nastavená URL adresa Webhooku.");
+            return;
+        }
+
+        const char = characters[activeCharIdx];
+        const senderName = char.name.replace(/\s+/g, '_');
+        const formData = new FormData();
+        
+        let sprava = `🚀 **Nový príspevok od:** ${char.name}\n`;
+        
+        // 1. PRÍPRAVA POSTAVY (posiela sa vždy)
+        const charData = JSON.stringify(char, null, 4);
+        const charBlob = new Blob([charData], { type: 'application/json' });
+        formData.append("file1", charBlob, `${senderName}.json`);
+        sprava += `✅ Priložený súbor s postavou.\n`;
+
+        // 2. FILTROVANIE LEN ZMENENÝCH SCHOPNOSTÍ
+        let zmeny = {};
+        let pocetZmien = 0;
+
+        for (let kľúč in skillsDB_new) {
+            // Ak schopnosť v pôvodnej DB neexistuje (nová) alebo sa líši (upravená)
+            if (!originalSkillsDB[kľúč] || JSON.stringify(skillsDB_new[kľúč]) !== JSON.stringify(originalSkillsDB[kľúč])) {
+                zmeny[kľúč] = skillsDB_new[kľúč];
+                pocetZmien++;
+            }
+        }
+
+        // 3. KONTROLA A PRÍPRAVA SÚBORU ZMIEN
+        if (pocetZmien > 0) {
+            const zmenyData = JSON.stringify(zmeny, null, 4);
+            const zmenyBlob = new Blob([zmenyData], { type: 'application/json' });
+            formData.append("file2", zmenyBlob, `${senderName}_ZMENY_SKILLS.json`);
+            sprava += `⚠️ **ZISTENÉ ZMENY (${pocetZmien}):** Priložený súbor s novými/upravenými schopnosťami.`;
+        } else {
+            sprava += `ℹ️ Žiadne zmeny v globálnej databáze (neposiela sa).`;
+        }
+
+        formData.append("content", sprava);
+
+        try {
+            const response = await fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                body: formData
+            });
+
+            if (response.ok) {
+                alert("Odoslané! Ak si robil zmeny v schopnostiach, odoslali sa len tie upravené.");
+            } else {
+                alert("Chyba pri komunikácii s Discordom.");
+            }
+        } catch (error) {
+            console.error("Chyba:", error);
+            alert("Nepodarilo sa odoslať dáta.");
         }
     }
 
