@@ -718,6 +718,24 @@
                     #navod div[style*="display: grid"] { grid-template-columns: 1fr !important; gap: 20px !important; }
                     #navod table { font-size: 0.85rem; display: block; overflow-x: auto; }
 
+                    .tab-content img {
+                        max-width: 100% !important; /* Vynúti zmenšenie aj pri inline štýloch */
+                        height: auto !important;
+                        display: block !important;
+                        margin: 10px auto !important; /* Vycentruje obrázok a pridá odstup */
+                    }
+
+                    /* Oprava pre obrázky v sekcii kontakt/o projekte, ktoré sú v flex-boxoch */
+                    .tab-content div[style*="display: flex"] {
+                        flex-direction: column !important; /* Na mobile naskladá text a obrázok pod seba */
+                        align-items: center !important;
+                    }
+
+                    .tab-content div[style*="flex: 1"] {
+                        width: 100% !important;
+                        min-width: 0 !important;
+                    }
+
                 }
 
     </style>
@@ -793,10 +811,10 @@
                 
                 <div style="flex: 1; min-width: 300px;">
                     <p style="font-size: 1.4rem; line-height: 1.6; margin: 0;">
-                    Hybrid ešte nie je hotový, no už teraz si ho môžete vyskúšať vďaka demo verzii, ktorá je k dispozícii zdarma. Obsahuje základné pravidlá, opis sveta, v ktorom sa Hybrid odohráva ako aj krátke dobrodružstvo. Kým sa pustíte do hry, odporúčame pozrieť si oneshot <a href="https://youtu.be/kcrJPERUp0U?si=5MFJ4Wosr1AykiIC">VOLANIE O POMOC</a><br>, ktorý sme odohrali s Kikom Baranom, Peťom Ondrejičkom a Katkou Novotkovou. Nehrali sme síce podľa najnovších pravidiel, no zo záznamu navnímate základné princípy hry. Všetko ostatné nájdete v DEME.
+                    Hybrid ešte nie je hotový, no už teraz si ho môžete vyskúšať vďaka demo verzii, ktorá je k dispozícii zdarma. Obsahuje základné pravidlá, opis sveta, v ktorom sa Hybrid odohráva ako aj krátke dobrodružstvo. Kým sa pustíte do hry, odporúčame pozrieť si oneshot <a href="https://youtu.be/kcrJPERUp0U?si=5MFJ4Wosr1AykiIC">VOLANIE O POMOC</a>, ktorý sme odohrali s Kikom Baranom, Peťom Ondrejičkom a Katkou Novotkovou. Nehrali sme síce podľa najnovších pravidiel, no zo záznamu navnímate základné princípy hry. Všetko ostatné nájdete v DEME.
                     </p>
                     <p style="margin-top: 15px; margin-left: 30px; margin-right: 30px; font-size: 1.4rem; line-height: 1.6;">
-                        <a href="https://drive.google.com/drive/folders/10dJ7hDcdpMRhZ0udPpsvDVdncRNR_STO?usp=drive_link">DEMO</a><br>
+                        <a href="https://drive.google.com/drive/folders/10dJ7hDcdpMRhZ0udPpsvDVdncRNR_STO?usp=drive_link">DEMO NÁJDEŠ TU</a><br>
                     </p>
                 </div>
 
