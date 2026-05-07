@@ -313,43 +313,43 @@
 
                     /* HLAVIČKA A KARTY */
                     .char-header {
-                            display: flex !important;
-                            flex-direction: row !important; /* Ponecháme riadok */
-                            flex-wrap: wrap !important;    /* Umožní skok do druhého riadku */
-                            height: auto !important;
-                            padding: 10px !important;
-                            gap: 5px !important;
-                            justify-content: space-between !important;
-                        }
-                        
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        height: auto !important;
+                        padding: 10px !important;
+                        gap: 5px !important;
+                        justify-content: space-between !important;
+                    }
+                    
                     .char-header > div:first-child {
-                            display: flex !important;
-                            flex: 1 1 auto !important; /* Roztiahne sa podľa potreby */
-                            gap: 5px !important;
-                            flex-wrap: wrap !important;
-                        }
+                        display: flex !important;
+                        flex: 1 1 auto !important;
+                        gap: 5px !important;
+                        flex-wrap: wrap !important;
+                    }
 
                     #char-selector {
-                            flex: 1 1 100px !important;
-                            min-width: 80px !important;
-                            margin: 0 !important;
-                            height: 40px !important;
-                        }
+                        flex: 1 1 100px !important;
+                        min-width: 80px !important;
+                        margin: 0 !important;
+                        height: 40px !important;
+                    }
 
                     .char-header button {
-                            flex: 1 1 auto !important;
-                            margin: 0 !important;
-                            height: 40px !important;
-                            font-size: 0.75rem !important;
-                            padding: 0 8px !important;
-                            white-space: nowrap !important;
-                        }
+                        flex: 1 1 auto !important;
+                        margin: 0 !important;
+                        height: 40px !important;
+                        font-size: 0.75rem !important;
+                        padding: 0 8px !important;
+                        white-space: nowrap !important;
+                    }
 
                     .share-btn-top {
-                            flex: 1 1 45% !important; /* Na mobile zaberie polovicu riadku alebo skočí pod */
-                            height: 40px !important;
-                            margin: 0 !important;
-                        }
+                        flex: 1 1 45% !important;
+                        height: 40px !important;
+                        margin: 0 !important;
+                    }
 
                     .tabs { overflow-x: auto; white-space: nowrap; padding: 5px 10px; display: flex; }
                     .tab-btn { flex: 0 0 auto; padding: 10px 15px; font-size: 0.8rem; }
@@ -367,7 +367,6 @@
                         padding: 5px !important;
                     }
 
-                    /* OPRAVA: Nápis BODY RASTU na mobile */
                     .br-field::before {
                         content: "BODY RASTU: ";
                         font-size: 1.1rem;
@@ -385,7 +384,6 @@
                         align-items: center;
                     }
 
-                    /* OPRAVA: Skrytie kategórie (čísla 1-4) v zozname schopností */
                     .skill-cat-box { display: none !important; }
 
                     .skill-slot {
@@ -418,21 +416,18 @@
                         display: flex !important;
                         flex-direction: column;
                         gap: 5px;
+                        transition: transform 0.3s ease-in-out;
                     }
-
-                    .control-box { transition: transform 0.3s ease-in-out; }
 
                     #sel-skill-name { font-size: 0.95rem !important; }
                     #sel-skill-cat, #sel-skill-rels { margin: 0 !important; font-size: 0.7rem !important; }
 
-                    /* RIADOK PRE CENU A TLAČIDLÁ (Zabezpečenie vedľa seba) */
                     .control-box > div:nth-last-of-type(2), 
                     .control-box > div:nth-last-of-type(1) { 
                         display: inline-flex !important; 
                         vertical-align: middle;
                     }
 
-                    /* Obal pre cenu */
                     .control-box div[style*="background:#111"] {
                         display: flex !important;
                         flex-direction: row !important;
@@ -446,11 +441,10 @@
                         box-sizing: border-box;
                     }
                     
-                    #cost-disc { font-size: 1.1rem !important; } /* Zmenšená cena */
+                    #cost-disc { font-size: 1.1rem !important; }
                     .old-price { font-size: 0.8rem !important; } 
                     .old-price-wrapper { margin-right: 8px !important; }
 
-                    /* Obal pre tlačidlá (umiestnenie vedľa ceny) */
                     .control-box div[style*="display: flex; gap: 5px"] {
                         margin-top: 0 !important;
                         flex: 2.5;
@@ -458,25 +452,29 @@
                     }
                     .control-box .tab-btn { height: 100% !important; font-size: 0.75rem !important; padding: 0 5px !important; }
 
-                    /* Rodičovský flex pre cenu a tlačidlá, ak sú v HTML pod sebou */
                     .control-box { display: flex !important; flex-wrap: wrap !important; flex-direction: row !important; }
                     .control-box h3, .control-box p, .control-box #sel-skill-rels { flex: 1 0 100%; }
 
-                    /* Medzera pod zoznamom schopností, aby ho panel nezakrýval */
                     #builder-list { margin-bottom: 110px !important; padding-bottom: 10px; }
 
                     /* --- KARTA UPRAVIŤ SCHOPNOSTI --- */
                     #editor.active { display: flex !important; flex-direction: column !important; }
                     
-                    /* PRESUN ZOZNAMU NA VRCH */
                     #editor .info-panel:last-child { 
                         order: -1 !important; 
                         width: 100% !important; 
                         margin: 0 0 20px 0 !important; 
-                        height: 300px !important;
+                        height: auto !important; 
+                        flex: none !important;
                     }
 
-                    /* Tlačidlá AKTUALIZOVAŤ, ZMAZAŤ, EXPORT vedľa seba */
+                    /* SCROLLOVATEĽNÝ ZOZNAM V EDITORE (150px) */
+                    #editor-list {
+                        height: 150px !important;
+                        overflow-y: auto !important;
+                        border: 1px solid #444;
+                    }
+
                     #editor div[style*="justify-content: flex-start"] {
                         display: flex !important;
                         flex-direction: row !important;
@@ -492,18 +490,15 @@
                         white-space: nowrap;
                     }
 
-                    /* OPRAVA ŠÍRKY OKIEN V EDITORE */
                     #editor .info-panel:first-child { width: 100% !important; margin: 0 !important; }
                     #editor div[style*="display: flex; gap: 30px"] { flex-direction: column !important; gap: 10px !important; margin: 10px 0 !important; }
                     
-                    /* Related skills box šírka */
                     #edit-rels-container { 
                         width: 100% !important; 
                         min-height: 80px !important; 
                         box-sizing: border-box !important;
                     }
 
-                    /* Čierny box pod tým (Pridať príbuznú) */
                     #editor div[style*="background-color: #333"] {
                         width: 100% !important;
                         margin-left: 0 !important;
@@ -512,9 +507,17 @@
                         height: auto !important;
                     }
                     #editor div[style*="background-color: #333"] > div:first-child { width: 100% !important; }
-                    #rel-add-list { width: 100% !important; height: 150px !important; margin-top: 10px; }
 
-                    /* --- KARTA NÁVOD - OPRAVA PRETEKANIA --- */
+                    /* SCROLLOVATEĽNÝ ZOZNAM PRÍBUZNÝCH (150px) */
+                    #rel-add-list { 
+                        width: 100% !important; 
+                        height: 150px !important; 
+                        margin-top: 10px; 
+                        overflow-y: auto !important;
+                        background: #000 !important;
+                    }
+
+                    /* --- KARTA NÁVOD --- */
                     #navod { width: 100% !important; box-sizing: border-box; overflow-x: hidden; }
                     #navod > div { padding: 10px !important; width: 100% !important; box-sizing: border-box; margin: 0 !important; }
                     #navod h1 { font-size: 1.5rem; }
@@ -620,7 +623,7 @@
         <div style="display: flex; gap: 10px; align-items: center;">
             <select id="char-selector" onchange="switchCharacter()"></select>
             <button class="tab-btn" style="background: var(--hybrid-red); color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
-            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()">+ NOVÝ HRDINA</button>
+            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()"> + </button>
 
         </div>
 
