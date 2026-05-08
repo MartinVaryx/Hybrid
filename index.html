@@ -85,9 +85,10 @@
             position: absolute;
             right: 0;
             background-color: var(--hybrid-black);
-            min-width: 160px;
+            min-width: 200px;
             box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
             border: 1px solid #333;
+            z-index: 2000;
         }
 
         .menu-items a {
@@ -97,6 +98,7 @@
             display: block;
             font-size: 0.9rem;
             transition: 0.2s;
+            white-space: nowrap;
         }
 
         .menu-items a:hover {
@@ -693,10 +695,16 @@
                         width: 100% !important;
                         margin-left: 0 !important;
                         box-sizing: border-box !important;
-                        flex-direction: column !important;
+                        display: flex !important;
+                        flex-direction: row !important; /* Teraz budú vedľa seba */
+                        gap: 8px !important;
+                        padding: 10px !important;
                         height: auto !important;
+                        align-items: center !important;
                     }
                     #editor div[style*="background-color: #333"] > div:first-child { width: 100% !important; }
+                    #rel-group-filter { flex: 1 !important; width: auto !important; min-width: 0 !important; }
+                    #rel-search { flex: 1.5 !important; width: auto !important; min-width: 0 !important; }
 
                     /* SCROLLOVATEĽNÝ ZOZNAM PRÍBUZNÝCH (150px) */
                     #rel-add-list {
@@ -781,6 +789,114 @@
                         display: block !important;
                         margin-left: auto !important;
                         margin-right: auto !important;
+                    }
+
+                #skill-btn-container {
+                    display: flex !important;
+                    flex-direction: row !important; /* Zabezpečí smer vedľa seba */
+                    justify-content: space-between;
+                    gap: 10px;
+                }
+
+                #skill-btn-container button {
+                    width: auto !important; /* Zruší vynútenú 100% šírku */
+                    flex: 1; /* Voliteľné: obe tlačidlá budú rovnako široké a vyplnia riadok */
+                }
+
+                #sel-skill-back {
+                    flex: 0 0 50px !important; /* Šípka bude mať pevnú šírku 50px */
+                }
+
+                #filter-container select, #filter-container input {
+                    width: auto !important;
+                }
+
+                #filter-container {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    gap: 8px !important;
+                    width: 100% !important;
+                    
+                    /* ODSTUPY: prvý parameter je odstup od tlačidiel nad ním, druhý od zoznamu pod ním */
+                    margin: 15px 0 10px 0 !important; 
+                    
+                    align-items: stretch !important; /* Natiahne obidva prvky na rovnakú výšku v riadku */
+                    box-sizing: border-box !important;
+                }
+
+                #filter-container select, 
+                #filter-container input {
+                    height: 45px !important;      /* Fixná rovnaká výška pre obidva */
+                    line-height: 45px !important; /* Vycentrovanie textu vertikálne */
+                    box-sizing: border-box !important; /* Dôležité: padding nebude zväčšovať výšku */
+                    margin: 0 !important;         /* Zrušíme náhodné marginy */
+                    padding: 0 10px !important;   /* Vnútorný odstup textu */
+                    border: 1px solid #ccc !important;
+                    font-size: 0.9rem !important;
+                }
+
+                #filter-container select {
+                    flex: 1 !important;
+                    width: 40% !important;
+                    min-width: 0 !important;
+                }
+
+                #filter-container input {
+                    flex: 1.5 !important;
+                    width: 60% !important;
+                    min-width: 0 !important;
+                }
+
+                /* 1. Hlavné rozloženie editora na mobile (stĺpce pod sebou) */
+                #editor-cat-group-row {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    align-items: stretch !important; /* Natiahne oba prvky na rovnakú výšku */
+                    gap: 15px !important;            /* Väčšia medzera medzi stĺpcami */
+                    width: 100% !important;
+                    margin-top: 10px !important;
+                }
+
+                /* Zabezpečenie rovnakej výšky a vzhľadu */
+                #editor-cat-group-row select, 
+                #editor-cat-group-row input {
+                    height: 45px !important;
+                    box-sizing: border-box !important;
+                    margin: 0 !important;
+                    padding: 5px 10px !important;
+                }
+
+                /* Úprava kontajnerov label + input */
+                #editor-cat-group-row > div {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 5px !important; /* Medzera medzi labelom a polom */
+                }
+
+                /* Fixná šírka pre kategóriu, zvyšok pre skupinu */
+                #editor-cat-group-row > div:first-child {
+                    width: 80px !important; 
+                    flex-shrink: 0 !important;
+                }
+
+                #editor-cat-group-row > div:last-child {
+                    flex: 1 !important;
+                }
+
+                .logo-container {
+                        text-align: left !important;
+                        padding-left: 15px !important;
+                        width: 100% !important;
+                        display: flex !important;
+                        justify-content: flex-start !important;
+                    }
+
+                    .logo-img {
+                        margin: 0 !important; /* Zruší centrovanie */
+                        max-width: 200px !important; 
+                        height: auto !important;
                     }
 
                 }
@@ -944,12 +1060,12 @@
                         </span>
                         <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
                     </div>
-                    <div style="display: flex; gap: 5px; margin-top: 15px;">
+                    <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
                         <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 6; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
                         <button class="tab-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.1; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
                     </div>
                 </div>
-                <div style="display: flex; gap: 5px;">
+                <div id="filter-container" style="display: flex; gap: 5px;">
                     <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
                     <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5;" onkeyup="filterBuilder()">
                 </div>
@@ -959,11 +1075,11 @@
 
         <div id="editor" class="tab-content">
             <div class="info-panel" style="flex: 2.5;">
-                <div style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
+                <div id="editor-main-layout" style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
                     <div style="flex: 0.8;">
                         <label style="font-size:1rem; font-weight:bold;">NÁZOV SCHOPNOSTI</label>
                         <input type="text" id="edit-name" style="width:100%; margin-bottom:15px; box-sizing: border-box;" onkeyup="filterEditorList()">
-                        <div style="display: flex; gap: 15px; margin-bottom: 15px;">
+                        <div id="editor-cat-group-row" style="display: flex; gap: 15px; margin-bottom: 15px;">
                             <div style="width: 100px;">
                                 <label style="font-size:1rem; font-weight:bold; white-space: nowrap;">KATEGÓRIA</label>
                                 <input type="number" id="edit-cat" min="1" max="4" style="width:50%; box-sizing: border-box;">
@@ -1021,9 +1137,10 @@
                     
                     <div>
                         <h2 style="color: var(--hybrid-red); margin-top: 0;">1. TVORBA NOVÉHO HRDINU</h2>
-                        <p>Kliknutím na tlačidlo <strong>+ NOVÝ HRDINA</strong> vytvoríte novú postavu. Každý hrdina prechádza dvoma fázami:</p>
+                        <p>Kliknutím na tlačidlo <strong>+</strong> vytvoríte novú postavu. Každý hrdina prechádza dvoma fázami:</p>
                         <ul style="margin-bottom: 0;">
                             <li><strong>POČIATOČNÁ FÁZA:</strong> Máte k dispozícii <strong>40 bodov rastu (BR)</strong>. V zozname schopností vidíte <strong>iba DANOSTI</strong> (Sila, IQ, Obratnosť atď.).</li>
+                            <li> Môžete si pridať <strong>1 až 6 daností</strong> (v tejto fáze nie je možné pridať si všetkých 7).</li>
                             <li><strong>ODOMKNUTIE:</strong> V momente, keď miniete všetkých 40 bodov na Danosti, postava sa odomkne. Získate <strong>bonusových 20 BR</strong> a prístup ku všetkým ostatným skupinám schopností.</li>
                         </ul>
                     </div>
@@ -1402,74 +1519,82 @@
     }
 
     function upgradeSelected() {
-        if (!selectedSkill) return;
-        const char = characters[activeCharIdx];
-        const currentLvl = char.skills[selectedSkill] || 0;
+            if (!selectedSkill) return;
+            const char = characters[activeCharIdx];
+            const currentLvl = char.skills[selectedSkill] || 0;
 
-        // 1. KONTROLA LIMITU 12 SCHOPNOSTÍ
-        if (currentLvl === 0) {
-            const learnedSkillsCount = Object.values(char.skills).filter(lvl => lvl > 0).length;
-            if (learnedSkillsCount >= 12) {
-                showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
-                return;
+            // 1. KONTROLA LIMITOV SCHOPNOSTÍ
+            if (currentLvl === 0) {
+                const learnedSkills = Object.values(char.skills).filter(lvl => lvl > 0);
+                const learnedSkillsCount = learnedSkills.length;
+
+                // Globálny limit 12 schopností
+                if (learnedSkillsCount >= 12) {
+                    showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
+                    return;
+                }
+
+                // ŠPECIFICKÝ LIMIT PRE PRVÚ FÁZU (max 6 daností)
+                if (char.isInitialPhase && learnedSkillsCount >= 6) {
+                    showCustomAlert("V tejto fáze si nemôžeš pridať všetkých 7 daností. Zvýš úroveň tých, ktoré už máš.");
+                    return;
+                }
+            }
+
+            const data = skillsDB_new[selectedSkill];
+            const targetLvl = currentLvl + 1;
+            
+            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+            let discount = relLevels.reduce((a, b) => a + b, 0);
+            
+            const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
+            
+            // 2. KONTROLA DOSTATKU BODOV
+            if (char.sp >= cost) {
+                
+                // ŠPECIÁLNY PRÍPAD: Prechod do druhej fázy (vyžaduje potvrdenie)
+                if (char.isInitialPhase && (char.sp - cost) === 0) {
+                    showCustomAlert(
+                        "Týmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?", 
+                        "POTVRDENIE FÁZY", 
+                        true, 
+                        () => {
+                            char.isInitialPhase = false;
+                            char.sp = (char.sp - cost) + 20;
+                            char.skills[selectedSkill] = targetLvl;
+                            upgradeHistory = []; 
+
+                            finishUpgrade(); 
+                        }
+                    );
+                    return; 
+                } 
+
+                // BEŽNÝ PRÍPAD: Klasické vylepšenie
+                upgradeHistory.push({
+                    skill: selectedSkill,
+                    prevLvl: currentLvl,
+                    prevSP: char.sp,
+                    wasInitialPhase: char.isInitialPhase
+                });
+
+                char.sp -= cost;
+                char.skills[selectedSkill] = targetLvl;
+                
+                finishUpgrade();
+
+            } else { 
+                showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
+            }
+
+            function finishUpgrade() {
+                saveState();
+                renderStats();
+                selectSkill(selectedSkill);
+                filterBuilder();
             }
         }
 
-        const data = skillsDB_new[selectedSkill];
-        const targetLvl = currentLvl + 1;
-        
-        let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
-        let discount = relLevels.reduce((a, b) => a + b, 0);
-        
-        const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
-        
-        // 2. KONTROLA DOSTATKU BODOV
-        if (char.sp >= cost) {
-            
-            // ŠPECIÁLNY PRÍPAD: Prechod do druhej fázy (vyžaduje potvrdenie)
-            if (char.isInitialPhase && (char.sp - cost) === 0) {
-                showCustomAlert(
-                    "Týmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?", 
-                    "POTVRDENIE FÁZY", 
-                    true, 
-                    () => {
-                        // Táto časť sa spustí až po kliknutí na ÁNO v tvojom modálnom okne
-                        char.isInitialPhase = false;
-                        char.sp = (char.sp - cost) + 20;
-                        char.skills[selectedSkill] = targetLvl;
-                        upgradeHistory = []; // Vymazanie histórie po uzavretí fázy
-
-                        finishUpgrade(); // Pomocná funkcia pre uloženie a prekreslenie
-                    }
-                );
-                return; // Zastavíme vykonávanie, čakáme na callback
-            } 
-
-            // BEŽNÝ PRÍPAD: Klasické vylepšenie
-            upgradeHistory.push({
-                skill: selectedSkill,
-                prevLvl: currentLvl,
-                prevSP: char.sp,
-                wasInitialPhase: char.isInitialPhase
-            });
-
-            char.sp -= cost;
-            char.skills[selectedSkill] = targetLvl;
-            
-            finishUpgrade();
-
-        } else { 
-            showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
-        }
-
-        // Vnútorná pomocná funkcia, aby sme neduplikovali kód uloženia
-        function finishUpgrade() {
-            saveState();
-            renderStats();
-            selectSkill(selectedSkill);
-            filterBuilder();
-        }
-    }
     function undoUpgrade() {
         if (upgradeHistory.length === 0) {
             showCustomAlert("ŽIADNE ĎALŠIE KROKY NA VRÁTENIE.");
