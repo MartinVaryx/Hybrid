@@ -1,0 +1,894 @@
+        :root {
+            --bg-paper: #e5e5e5; 
+            --hybrid-black: #000000;
+            --hybrid-red: #c62828;
+            --hybrid-green: #2e7d32;
+            --text-dark: #222222;
+            --border-heavy: 3px solid #000;
+        }
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden; /* Zabráni horizontálnemu scrollu */
+        }
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: var(--bg-paper);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: visible;
+        }
+
+        .stain {
+            position: fixed;
+            background-image: url("assets/machula.png"); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.18;
+            mix-blend-mode: multiply;
+            width: 1050px; 
+            height: 1050px;
+        }
+
+        .stain-tl { top: -250px; left: -350px; transform: rotate(15deg); }
+        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
+        .stain-br { bottom: -300px; right: -250px; transform: rotate(-40deg); }
+
+        .logo-container { text-align: center; margin-bottom: 25px; position: relative; }
+        .logo-img { max-width: 320px; height: auto; display: block; margin: 0 auto; }
+
+        /* Hlavné Menu - Top Right */
+        .main-menu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            font-family: 'Archivo Black', sans-serif;
+        }
+        .responsive-img {
+            max-width: 100%;  /* Obrázok nikdy nebude širší ako text */
+            height: auto;     /* Zachová pomer strán */
+            display: block;   /* Odstráni medzeru pod obrázkom */
+            margin: 10px auto; /* Vycentruje obrázok a pridá odstup od textu */
+        }
+        .menu-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .menu-trigger {
+            background: var(--hybrid-black);
+            color: white;
+            padding: 10px 20px;
+            border: 2px solid white;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .menu-items {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: var(--hybrid-black);
+            min-width: 200px;
+            box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+            border: 1px solid #333;
+            z-index: 2000;
+        }
+
+        .menu-items a {
+            color: #bbb;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 0.9rem;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .menu-items a:hover {
+            background-color: var(--hybrid-red);
+            color: white;
+        }
+
+        .menu-dropdown:hover .menu-items {
+            display: block;
+        }
+
+        /* Skrytie sekcií */
+        .view-section { display: none; }
+        .view-section.active-view { display: block; }
+
+        .char-header {
+            width: 1100px;
+            background: var(--hybrid-black);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border-radius: 8px 8px 0 0;
+            z-index: 1;
+            border: var(--border-heavy);
+            border-bottom: none;    
+        }
+
+        .container {
+            width: 1100px;
+            background-color: #fff;
+            color: #000;
+            border: var(--border-heavy);
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
+            overflow: visible !important;
+            margin-top: -3px;
+            z-index: 1;
+            box-sizing: border-box;
+        }
+
+        .tabs { 
+            display: flex; 
+            background-color: var(--hybrid-black); 
+            padding: 10px 30px; 
+            gap: 5px;
+        }
+        
+        .tab-btn {
+            padding: 12px 35px;
+            border: none;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: 0.3s;
+            clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
+        }
+        
+        .tab-btn:hover {
+            background: #333;
+            color: #bbb;
+        }
+
+        .tab-btn.active { 
+            color: #fff; 
+            background-color: var(--hybrid-red); 
+        }
+
+        .tab-content {
+            display: none !important;
+            padding-top: 0 !important; 
+            visibility: hidden;
+            opacity: 0;
+
+        }
+        .tab-content.active {
+            display: flex !important; /* Väčšina tvojich tabov používa flex */
+            visibility: visible;
+            opacity: 1;
+            height: auto;
+            overflow: visible !important;
+        }
+        /* Upravený stats-panel pre presné zarovnanie s SVG */
+        .stats-panel {
+            flex: 3;
+            position: relative;
+            background-image: url("assets/dennik.png");
+            background-size: 100% 100%;
+            background-repeat: no-repeat;
+            background-position: top-left;
+            width: 100%;
+            aspect-ratio: 210 / 297; /* Pomer strán A4 hárku */
+            border: none !important;
+            background-color: transparent !important;
+            overflow: hidden !important;
+        }
+
+        /* Štýl pre dynamické textové polia */
+        .sheet-field {
+            position: absolute;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-weight: bold;
+            color: #000;
+            pointer-events: none;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+        }
+
+        .share-btn-top {
+            background: #444; 
+            color: white; 
+            margin-left: auto; 
+            height: 38px; 
+            padding: 0 15px; 
+            clip-path: none;
+        }
+
+        .share-btn-top:hover {
+            background: #5865F2; /* Pekná modrá pri hoveri (Discord farba) */
+        }
+
+        .skill-slot {
+            position: absolute;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+            font-size: 1.2rem; /* Mierne väčšie písmo */
+        }
+        .skill-slot:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .skill-slot.selected {
+            background: transparent !important;
+            outline: none !important;
+        }
+
+        .skill-slot.selected .skill-name-text {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .skill-node {
+            width: 160px; 
+            height: 48px;
+            background: white;
+            padding: 8px;
+            border: 2px solid #000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
+            box-sizing: border-box;
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
+        }
+        .skill-node.selected { background-color: var(--hybrid-black); color: white; }
+        .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
+
+        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 560px; z-index: 10;}
+        .control-box { background: #000; color: white; padding: 20px; border-bottom: 5px solid var(--hybrid-red); }
+        
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px;}
+        .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
+        .skill-list-item:hover { background: #f4f4f4; }
+        .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
+
+        .tag {
+            background: #222;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px;
+            text-transform: uppercase;
+        }
+        .tag-remove { color: var(--hybrid-red); cursor: pointer; font-weight: bold; }
+
+        input, select { border: 2px solid #000; padding: 8px; font-family: 'Roboto Condensed', sans-serif; font-weight: bold; text-transform: uppercase; }
+
+        .old-price-wrapper { position: relative; display: inline-block; margin-right: 20px; }
+        .old-price { 
+            font-size: 1.6rem; 
+            color: #444; 
+            font-family: 'Archivo Black', sans-serif;
+        }
+        .old-price::after { 
+            content: ""; position: absolute; left: -5%; top: 50%; width: 110%; height: 3px; 
+            background: var(--hybrid-red); transform: rotate(-15deg); 
+        }
+
+        .owned-rel { color: var(--hybrid-red); font-weight: bold; }
+
+        #sel-skill-rels span {
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        #edit-rels-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            min-height: 105px; /* Pôvodná výška pre PC */
+            width: 100%;       /* Zabezpečí, aby využil priestor v paneli */
+            border: 2px solid #000;
+            padding: 8px;
+            background: #fff;
+            align-content: flex-start;
+            box-sizing: border-box;
+        }
+
+        #status-message {
+            position: fixed;
+            bottom: 80px; /* Aby nezavadzal nad control-boxom */
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--hybrid-black);
+            color: white;
+            padding: 10px 20px;
+            border: 2px solid var(--hybrid-red);
+            z-index: 2000;
+            display: none;
+            font-weight: bold;
+        }
+
+        #rel-add-list {
+            height: 150px !important;      /* Pevná výška pre PC */
+            overflow-y: auto !important;   /* Povolenie scrollbaru */
+            background-color: #fff;
+            border: 1px solid #000;
+            display: block;                /* Zabezpečí správne správanie výšky */
+        }
+
+        #editor .info-panel {
+            position: relative;
+            padding-bottom: 70px; /* Vytvoríme miesto pre sticky tlačidlá */
+        }
+
+        .editor-actions {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            padding: 15px 0;
+            border-top: 1px solid #ddd;
+            z-index: 10;
+            width: 100%;
+        }
+
+        .modal-overlay {
+            display: none; /* JS zmení na flex pri showCustomAlert */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85); 
+            z-index: 10000; /* Musí byť vyššie ako .stain (1) a .main-menu (1000) */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border: 4px solid var(--hybrid-red);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.5);
+            color: black;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        @media (max-width: 768px) {
+                
+                .logo-container {
+                        text-align: left !important;
+                        padding-left: 10px !important; /* Voliteľné: aby logo nebolo úplne nalepené na hrane displeja */
+                    }
+
+                .logo-img {
+                    margin: 0 !important; /* Zruší centrovanie pomocou margin: auto */
+                    max-width: 250px !important; /* Voliteľné: zmenšenie loga, aby na mobile nezaberalo priveľa miesta */
+                }
+                body { 
+                        padding: 5px 0 !important; /* Horný/dolný padding ostáva, bočný zrušíme */
+                    }
+                .char-header, .container {
+                        width: 100% !important;
+                        max-width: 100% !important;
+                        margin: 0 !important;
+                        box-sizing: border-box !important;
+                        border-radius: 0 !important;
+                        border: var(--border-heavy) !important;
+                    }
+
+                    /* 3. Oprava hlavičky, aby sa nerozťahovala až pri aktivácii vstupu */
+                    .char-header {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        flex-wrap: wrap !important;
+                        padding: 10px !important;
+                        gap: 8px !important;
+                        border-bottom: none !important; /* Aby medzi nimi nebola dvojitá hrubá čiara */
+                    }
+
+                    /* 4. Prvky vo vnútri hlavičky */
+                    .char-header > div:first-child {
+                        display: flex !important;
+                        flex: 1 1 auto !important; /* Nechajte ho pružne rásť */
+                        gap: 5px !important;
+                    }
+
+                    /* 5. Kontajner pre zadávanie mena (ten, čo sa objaví po stlačení +) */
+                    #new-char-input-container {
+                        flex: 1 1 100% !important; /* Keď sa objaví, musí zabrať celý riadok */
+                        margin: 5px 0 !important; /* Odstráňte bočný margin 15px, ktorý tam máte v HTML */
+                        box-sizing: border-box !important;
+                    }
+
+                    /* 6. Tlačidlá a selektor */
+                    #char-selector {
+                        flex: 2 !important;
+                        min-width: 0 !important; /* Dôležité pre flexbox na mobile */
+                    }
+
+                    .char-header button {
+                        flex: 1 1 auto !important;
+                        margin: 0 !important;
+                        height: 40px !important;
+                        font-size: 0.75rem !important;
+                        padding: 0 8px !important;
+                        white-space: nowrap !important;
+                    }
+
+                    .share-btn-top {
+                            width: 100% !important;
+                            margin-left: 0 !important;
+                            flex: 1 1 100% !important;
+                        }
+
+                    .tabs { overflow-x: auto; white-space: nowrap; padding: 5px 10px; display: flex; }
+                    .tab-btn { flex: 0 0 auto; padding: 10px 15px; font-size: 0.8rem; }
+                    .tab-content { display: none !important; height: auto !important; padding: 10px !important; box-sizing: border-box; width: 100%; }
+                    .tab-content.active { display: flex !important; flex-direction: column !important; }
+
+                    /* --- KARTA TVORBA POSTAVY --- */
+                    .stats-panel {
+                            order: 1 !important;
+                            background-image: none !important;
+                            background-color: #f9f9f9 !important;
+                            
+                            /* SCROLLOVANIE */
+                            height: 400px !important; /* Nastavte pevnú výšku, aby bolo čo scrollovať */
+                            overflow-y: auto !important; /* Povolenie vertikálneho scrollbaru */
+                            overflow-x: hidden !important;
+                            
+                            /* VYCENTROVANIE A ŠÍRKA */
+                            width: 100% !important;   /* Roztiahne panel na celú šírku kontajnera */
+                            max-width: 100% !important;
+                            margin: 0 auto !important; /* Vycentruje panel */
+                            box-sizing: border-box !important;
+                            
+                            border: 2px solid #000 !important;
+                            padding: 10px !important; /* Trochu viac miesta pre texty vo vnútri */
+                        }
+
+                        /* Zabezpečíme, aby rodičovský kontajner (tab-content) neblokoval vycentrovanie */
+                        .tab-content.active {
+                            display: flex !important;
+                            flex-direction: column !important;
+                            align-items: center !important; /* Vycentruje všetky deti vrátane stats-panel */
+                            width: 100% !important;
+                            padding: 10px !important;
+                        }
+
+                    .br-field::before {
+                        content: "BODY RASTU: "; /* Skrátené, aby sa to zmestilo vedľa mena */
+                        font-size: 1.1rem;
+                        color: var(--hybrid-red);
+                        margin-right: 5px;
+                    }
+
+                    .br-field {
+                        position: static !important;
+                        width: auto !important; /* Zmenené z 100% na auto */
+                        font-size: 1.8rem !important;
+                        display: flex;
+                        align-items: center;
+                    }
+
+                    .name-field {
+                        position: static !important;
+                        width: auto !important;
+                        flex-grow: 1; /* Meno zaberie zvyšný priestor v riadku */
+                        font-size: 1.4rem !important;
+                        color: var(--hybrid-black);
+                        white-space: nowrap;
+                        overflow: hidden;
+                        text-overflow: ellipsis;
+                    }
+
+                    /* Nový obal pre riadok s menom a BR */
+                    .mobile-header-row {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        width: 100%;
+                        border-bottom: 2px solid #000;
+                        padding-bottom: 10px;
+                        margin-bottom: 15px;
+                    }
+
+                    .skill-cat-box { display: none !important; }
+
+                    .skill-slot {
+                        position: static !important;
+                        width: 100% !important;
+                        height: auto !important;
+                        background: white !important;
+                        border: 1px solid #ddd;
+                        padding: 10px !important;
+                        display: flex !important;
+                        justify-content: space-between !important;
+                        box-sizing: border-box;
+                        margin-bottom: 5px;
+                    }
+
+                    .skill-name-text { position: static !important; width: auto !important; font-size: 1.1rem; }
+                    .skill-lvl-box { position: static !important; width: auto !important; background: var(--hybrid-red); color: white; padding: 2px 8px; border-radius: 4px; }
+
+                    .info-panel { order: 2 !important; width: 100% !important; position: static !important; height: auto !important; }
+
+                    /* OVLÁDACÍ PANEL (FIXNÝ) */
+                    .control-box {
+                        position: fixed !important;
+                        bottom: 0; left: 0; width: 100%;
+                        z-index: 1001;
+                        padding: 8px 12px !important;
+                        box-sizing: border-box;
+                        border-top: 4px solid var(--hybrid-red);
+                        background: #000;
+                        display: flex !important;
+                        flex-direction: column;
+                        gap: 5px;
+                        transition: transform 0.3s ease-in-out;
+                    }
+
+                    #sel-skill-name { font-size: 0.95rem !important; }
+                    #sel-skill-cat, #sel-skill-rels { margin: 0 !important; font-size: 0.7rem !important; }
+
+                    .control-box > div:nth-last-of-type(2), 
+                    .control-box > div:nth-last-of-type(1) { 
+                        display: inline-flex !important; 
+                        vertical-align: middle;
+                    }
+
+                    .control-box div[style*="background:#111"] {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        align-items: center;
+                        justify-content: center;
+                        padding: 5px !important;
+                        margin-top: 0 !important;
+                        flex: 1;
+                        min-width: 80px;
+                        height: 45px;
+                        box-sizing: border-box;
+                    }
+                    
+                    #cost-disc { font-size: 1.1rem !important; }
+                    .old-price { font-size: 0.8rem !important; } 
+                    .old-price-wrapper { margin-right: 8px !important; }
+
+                    .control-box div[style*="display: flex; gap: 5px"] {
+                        margin-top: 0 !important;
+                        flex: 2.5;
+                        height: 45px;
+                    }
+                    .control-box div[style*="display: flex; gap: 5px"] .tab-btn:first-child {
+                        flex: 3 !important; /* Pôvodne 6 - zúžime tlačidlo Zvýšiť úroveň */
+                    }
+                    .control-box div[style*="display: flex; gap: 5px"] .tab-btn:last-child {
+                            flex: 1 !important; /* Pôvodne 0.1 - výrazne rozšírime šípku */
+                            font-size: 1.5rem !important; /* Trochu zväčšíme samotnú šípku pre lepšiu ovládateľnosť */
+                        }
+                    .control-box .tab-btn { height: 100% !important; font-size: 0.75rem !important; padding: 0 5px !important; }
+
+                    .control-box { display: flex !important; flex-wrap: wrap !important; flex-direction: row !important; }
+                    .control-box h3, .control-box p, .control-box #sel-skill-rels { flex: 1 0 100%; }
+
+                    #builder-list {
+                        height: 400px !important; /* Odporúčam trochu zväčšiť, keďže padding zaberie miesto */
+                        overflow-y: auto !important;
+                        border: 2px solid var(--hybrid-black);
+                        background: #fff;
+                        margin-bottom: 0 !important;    /* Zruší šedú medzeru pod zoznamom */
+                        padding-bottom: 130px !important; /* Vytvorí bezpečný priestor VNÚTRI zoznamu */
+                    }
+
+                    /* Voliteľné: Zmenšenie položiek v zozname pre lepší prehľad na mobile */
+                    #builder-list .skill-list-item {
+                        padding: 8px 10px !important;
+                        margin-bottom: 0 !important;   
+                        font-size: 0.8rem !important;
+                    }
+                    /* --- KARTA UPRAVIŤ SCHOPNOSTI --- */
+                    #editor.active { display: flex !important; flex-direction: column !important; }
+                
+                    #editor {
+                        gap: 0 !important;
+                        padding-top: 0 !important;
+                    }
+
+                    #editor .info-panel:last-child { 
+                        order: -1 !important; 
+                        width: 100% !important; 
+                        margin: 0 !important; /* Tu sme odstránili 20px medzeru */
+                        height: auto !important; 
+                        flex: none !important;
+                    }
+
+                    /* SCROLLOVATEĽNÝ ZOZNAM V EDITORE (150px) */
+                    #editor-list {
+                        height: 150px !important;
+                        overflow-y: auto !important;
+                        border: 1px solid #444;
+                    }
+
+                    #editor div[style*="justify-content: flex-start"] {
+                        display: flex !important;
+                        flex-direction: row !important;
+                        gap: 5px !important;
+                        margin-left: 0 !important;
+                        width: 100% !important;
+                    }
+
+                    #editor div[style*="justify-content: flex-start"] .tab-btn {
+                        flex: 1;
+                        padding: 0 2px !important;
+                        font-size: 0.65rem !important;
+                        height: 45px !important;
+                        white-space: nowrap;
+                    }
+
+
+                    #editor .info-panel:first-child > div:first-of-type {
+                        background-color: var(--hybrid-green) !important; 
+                        border-top: 3px solid #000 !important;
+                        border-left: none !important;  /* Na mobile vyzerá lepšie bez bočných čiar pri dotyku s krajom */
+                        border-right: none !important;
+                        border-bottom: 3px solid #000 !important;
+                        padding: 15px 15px !important;
+                        
+                        /* Tieto 3 riadky zabezpečia, že box sa dotkne krajov obrazovky (negujú padding rodiča) */
+                        margin-left: -10px !important; 
+                        margin-right: -10px !important;
+                        width: calc(100% + 20px) !important;
+                        
+                        margin-top: 0 !important;
+                        box-sizing: border-box !important;
+                    }
+
+                    /* Úprava labelov, aby boli na červenej lepšie čitateľné (voliteľné) */
+                    #editor .info-panel:first-child > div:first-of-type label {
+                        color: #ffffff !important; 
+                        text-shadow: 1px 1px 0px #000; /* Pre lepšiu čitateľnosť */
+                    }
+                    #editor div[style*="display: flex; gap: 30px"] { flex-direction: column !important; gap: 10px !important; margin: 10px 0 !important; }
+                    
+                    #edit-rels-container {
+                        width: 100% !important;
+                        flex: none !important; /* Toto zruší vplyv flexu z PC verzie */
+                        display: flex !important;
+                    }
+
+                    #editor div[style*="background-color: #333"] {
+                        width: 100% !important;
+                        margin-left: 0 !important;
+                        box-sizing: border-box !important;
+                        display: flex !important;
+                        flex-direction: row !important; /* Teraz budú vedľa seba */
+                        gap: 8px !important;
+                        padding: 10px !important;
+                        height: auto !important;
+                        align-items: center !important;
+                    }
+                    #editor div[style*="background-color: #333"] > div:first-child { width: 100% !important; }
+                    #rel-group-filter { flex: 1 !important; width: auto !important; min-width: 0 !important; }
+                    #rel-search { flex: 1.5 !important; width: auto !important; min-width: 0 !important; }
+
+                    /* SCROLLOVATEĽNÝ ZOZNAM PRÍBUZNÝCH (150px) */
+                    #rel-add-list {
+                        display: block !important;    /* Zabezpečí, aby list nebol inline-block */
+                        width: 100% !important;       /* Roztiahne zoznam na celú šírku rodiča */
+                        height: 200px !important;     /* Pevná výška pre scrollovanie */
+                        overflow-y: auto !important;  /* Aktivuje vertikálny scrollbar */
+                        background-color: #ffffff !important;
+                        border: 1px solid #000;
+                        margin-top: 10px;
+                        box-sizing: border-box;       /* Zabezpečí, aby border nezväčšil šírku nad 100% */
+                    }
+
+                    #rel-add-list .skill-list-item {
+                        color: #000000 !important;
+                        background-color: #ffffff !important;
+                        border-bottom: 1px solid #eee !important;
+                    }
+
+                    #rel-add-list .group-divider {
+                        background-color: #f0f0f0 !important;
+                        color: #444 !important;
+                    }
+
+                    .editor-actions {
+                        position: fixed !important;
+                        bottom: 0;
+                        left: 0;
+                        width: 100%;
+                        background: #111; /* Tmavé pozadie, aby tlačidlá vynikli */
+                        padding: 10px !important;
+                        margin: 0 !important;
+                        border-top: 2px solid var(--hybrid-red);
+                        z-index: 1002; /* Musí byť nad ostatnými prvkami */
+                        box-sizing: border-box;
+                        display: flex !important;
+                        justify-content: space-around !important;
+                    }
+
+                    .editor-actions .tab-btn {
+                        flex: 1; /* Tlačidlá budú rovnako široké */
+                        height: 40px !important;
+                        font-size: 0.7rem !important;
+                    }
+
+                    /* --- KARTA NÁVOD --- */
+                    #navod { width: 100% !important; box-sizing: border-box; overflow-x: hidden; }
+                    #navod > div { padding: 10px !important; width: 100% !important; box-sizing: border-box; margin: 0 !important; }
+                    #navod h1 { font-size: 1.5rem; }
+                    #navod div[style*="display: grid"] { grid-template-columns: 1fr !important; gap: 20px !important; }
+                    #navod table { font-size: 0.85rem; display: block; overflow-x: auto; }
+
+                    .tab-content img {
+                        max-width: 100% !important; /* Vynúti zmenšenie aj pri inline štýloch */
+                        height: auto !important;
+                        display: block !important;
+                        margin: 10px auto !important; /* Vycentruje obrázok a pridá odstup */
+                    }
+
+                    /* Oprava pre obrázky v sekcii kontakt/o projekte, ktoré sú v flex-boxoch */
+                    .tab-content div[style*="display: flex"] {
+                        flex-direction: column !important; /* Na mobile naskladá text a obrázok pod seba */
+                        align-items: center !important;
+                    }
+
+                    .tab-content div[style*="flex: 1"] {
+                        width: 100% !important;
+                        min-width: 0 !important;
+                    }
+                    .char-header, 
+                    .container, 
+                    .stain {
+                        width: 100% !important;
+                        max-width: 100vw !important;
+                        box-sizing: border-box !important;
+                    }
+                img, 
+                    .responsive-img, 
+                    .logo-img {
+                        max-width: 100% !important;
+                        height: auto !important;
+                        display: block !important;
+                        margin-left: auto !important;
+                        margin-right: auto !important;
+                    }
+
+                #skill-btn-container {
+                    display: flex !important;
+                    flex-direction: row !important; /* Zabezpečí smer vedľa seba */
+                    justify-content: space-between;
+                    gap: 10px;
+                }
+
+                #skill-btn-container button {
+                    width: auto !important; /* Zruší vynútenú 100% šírku */
+                    flex: 1; /* Voliteľné: obe tlačidlá budú rovnako široké a vyplnia riadok */
+                }
+
+                #sel-skill-back {
+                    flex: 0 0 50px !important; /* Šípka bude mať pevnú šírku 50px */
+                }
+
+                #filter-container select, #filter-container input {
+                    width: auto !important;
+                }
+
+                #filter-container {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    gap: 8px !important;
+                    width: 100% !important;
+                    
+                    /* ODSTUPY: prvý parameter je odstup od tlačidiel nad ním, druhý od zoznamu pod ním */
+                    margin: 15px 0 10px 0 !important; 
+                    
+                    align-items: stretch !important; /* Natiahne obidva prvky na rovnakú výšku v riadku */
+                    box-sizing: border-box !important;
+                }
+
+                #filter-container select, 
+                #filter-container input {
+                    height: 45px !important;      /* Fixná rovnaká výška pre obidva */
+                    line-height: 45px !important; /* Vycentrovanie textu vertikálne */
+                    box-sizing: border-box !important; /* Dôležité: padding nebude zväčšovať výšku */
+                    margin: 0 !important;         /* Zrušíme náhodné marginy */
+                    padding: 0 10px !important;   /* Vnútorný odstup textu */
+                    border: 1px solid #ccc !important;
+                    font-size: 0.9rem !important;
+                }
+
+                #filter-container select {
+                    flex: 1 !important;
+                    width: 40% !important;
+                    min-width: 0 !important;
+                }
+
+                #filter-container input {
+                    flex: 1.5 !important;
+                    width: 60% !important;
+                    min-width: 0 !important;
+                }
+
+                /* 1. Hlavné rozloženie editora na mobile (stĺpce pod sebou) */
+                #editor-cat-group-row {
+                    display: flex !important;
+                    flex-direction: row !important;
+                    flex-wrap: nowrap !important;
+                    align-items: stretch !important; /* Natiahne oba prvky na rovnakú výšku */
+                    gap: 15px !important;            /* Väčšia medzera medzi stĺpcami */
+                    width: 100% !important;
+                    margin-top: 10px !important;
+                }
+
+                /* Zabezpečenie rovnakej výšky a vzhľadu */
+                #editor-cat-group-row select, 
+                #editor-cat-group-row input {
+                    height: 45px !important;
+                    box-sizing: border-box !important;
+                    margin: 0 !important;
+                    padding: 5px 10px !important;
+                }
+
+                /* Úprava kontajnerov label + input */
+                #editor-cat-group-row > div {
+                    display: flex !important;
+                    flex-direction: column !important;
+                    gap: 5px !important; /* Medzera medzi labelom a polom */
+                }
+
+                /* Fixná šírka pre kategóriu, zvyšok pre skupinu */
+                #editor-cat-group-row > div:first-child {
+                    width: 80px !important; 
+                    flex-shrink: 0 !important;
+                }
+
+                #editor-cat-group-row > div:last-child {
+                    flex: 1 !important;
+                }
+
+                .logo-container {
+                        text-align: left !important;
+                        padding-left: 15px !important;
+                        width: 100% !important;
+                        display: flex !important;
+                        justify-content: flex-start !important;
+                    }
+
+                    .logo-img {
+                        margin: 0 !important; /* Zruší centrovanie */
+                        max-width: 200px !important; 
+                        height: auto !important;
+                    }
+
+                }
+
