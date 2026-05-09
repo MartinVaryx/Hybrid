@@ -29,7 +29,7 @@
             align-items: center;
             min-height: 100vh;
             position: relative;
-            overflow-x: hidden;
+            overflow-x: visible;
         }
 
         .stain {
@@ -134,7 +134,7 @@
             color: #000;
             border: var(--border-heavy);
             box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
-            overflow: visible;
+            overflow: visible !important;
             margin-top: -3px;
             z-index: 1;
             box-sizing: border-box;
@@ -174,15 +174,14 @@
             padding-top: 0 !important; 
             visibility: hidden;
             opacity: 0;
-            height: 0;
-            overflow: hidden;
+
         }
         .tab-content.active {
             display: flex !important; /* Väčšina tvojich tabov používa flex */
             visibility: visible;
             opacity: 1;
             height: auto;
-            overflow: visible;
+            overflow: visible !important;
         }
         /* Upravený stats-panel pre presné zarovnanie s SVG */
         .stats-panel {
@@ -265,10 +264,10 @@
         .skill-node.selected { background-color: var(--hybrid-black); color: white; }
         .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
 
-        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 560px;}
+        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 560px; z-index: 10;}
         .control-box { background: #000; color: white; padding: 20px; border-bottom: 5px solid var(--hybrid-red); }
         
-        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; }
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px;}
         .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
         .skill-list-item:hover { background: #f4f4f4; }
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
@@ -1067,7 +1066,7 @@
                 </div>
                 <div id="filter-container" style="display: flex; gap: 5px;">
                     <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
-                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5;" onkeyup="filterBuilder()">
+                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5; margin-right: 5px;" onkeyup="filterBuilder()">
                 </div>
                 <div class="selection-list" id="builder-list"></div>
             </div>
@@ -1191,96 +1190,39 @@
 </div>
 
 <script>
-    let skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || {
-        "ŠOFÉROVANIE": [2, "VŠEOBECNÉ", ["ZRUČNOSŤ", "ZMYSLY", "IQ"]],
-        "IQ": [4, "DANOSTI", []],
-        "EQ": [4, "DANOSTI", []],
-        "ZRUČNOSŤ": [4, "DANOSTI", []],
-        "SILA": [4, "DANOSTI", []],
-        "OBRATNOSŤ": [4, "DANOSTI", []],
-        "ZMYSLY": [4, "DANOSTI", []],
-        "ODOLNOSŤ": [4, "DANOSTI", []],
-        "VEDA": [3, "VŠEOBECNÉ", ["IQ"]],
-        "PLÁVANIE": [2, "VŠEOBECNÉ", ["OBRATNOSŤ"]],
-        "UMENIE": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
-        "ŠPORT": [3, "VŠEOBECNÉ", ["ZRUČNOSŤ", "SILA", "OBRATNOSŤ", "ZMYSLY"]],
-        "REMESLO": [3, "VŠEOBECNÉ", ["ZRUČNOSŤ", "ZMYSLY"]],
-        "HOBBY": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
-        "POVOLANIE": [3, "VŠEOBECNÉ", ["IQ", "EQ", "ZRUČNOSŤ", "OBRATNOSŤ", "ZMYSLY"]],
-        "PRESVIEDČANIE": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "ZMYSLY"]],
-        "MANIPULÁCIA": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "ZMYSLY", "PREDSTIERANIE"]],
-        "ZASTRAŠOVANIE": [2, "SPOLOČENSKÉ", ["IQ", "EQ", "MANIPULÁCIA"]],
-        "PREDSTIERANIE": [2, "SPOLOČENSKÉ", ["EQ"]],
-        "ZVÁDZANIE": [2, "SPOLOČENSKÉ", ["EQ", "ZMYSLY", "FEROMÓNY"]],
-        "VODCOVSTVO": [2, "SPOLOČENSKÉ", ["IQ", "EQ"]],
-        "RÉTORIKA": [2, "SPOLOČENSKÉ", ["IQ", "EQ"]],
-        "VRHANIE": [1, "BOJ Z DIAĽKY", ["ZRUČNOSŤ", "ZMYSLY"]],
-        "ŤAŽKÉ PREDMETY": [2, "BOJ Z DIAĽKY", ["VRHANIE", "SILA"]],
-        "STREĽBA": [2, "BOJ Z DIAĽKY", ["VRHANIE", "ZRUČNOSŤ", "ZMYSLY"]],
-        "ŤAŽKÉ STRELNÉ ZBRANE": [3, "BOJ Z DIAĽKY", ["VRHANIE", "STREĽBA", "ZRUČNOSŤ", "ZMYSLY"]],
-        "ŠPECIÁLNE STRELNÉ ZBRANE": [4, "BOJ Z DIAĽKY", ["ŤAŽKÉ STRELNÉ ZBRANE", "STREĽBA", "IQ", "ZMYSLY"]],
-        "BOJOVÉ STROJE": [4, "BOJ Z DIAĽKY", ["STREĽBA", "ŤAŽKÉ STRELNÉ ZBRANE", "ZRUČNOSŤ", "IQ"]],
-        "HROMADNÉ NIČENIE": [4, "BOJ Z DIAĽKY", ["ŠPECIÁLNE STRELNÉ ZBRANE", "BOJOVÉ STROJE", "IQ"]],
-        "ĽAHKÉ ZBRANE": [2, "BOJ ZBLÍZKA", ["OBRATNOSŤ", "ZRUČNOSŤ", "SILA", "ŤAŽKÉ ZBRANE", "ZMYSLY"]],
-        "ŤAŽKÉ ZBRANE": [3, "BOJ ZBLÍZKA", ["ĽAHKÉ ZBRANE", "OBRATNOSŤ", "SILA", "ZRUČNOSŤ"]],
-        "OMRÁČENIE": [2, "BOJ ZBLÍZKA", ["ZRUČNOSŤ", "SILA", "ĽAHKÉ ZBRANE", "ŤAŽKÉ ZBRANE"]],
-        "MUČENIE": [2, "BOJ ZBLÍZKA", ["ZASTRAŠOVANIE", "EQ", "ZRUČNOSŤ"]],
-        "TICHÁ ELIMINÁCIA": [4, "BOJ ZBLÍZKA", ["ĽAHKÉ ZBRANE", "PLÝŽENIE", "OBRATNOSŤ", "ZRUČNOSŤ", "SILA"]],
-        "ŠPEHOVANIE": [2, "INFILTRÁCIA", ["ZMYSLY"]],
-        "PLÝŽENIE": [2, "INFILTRÁCIA", ["ŠPEHOVANIE", "OBRATNOSŤ", "ZMYSLY"]],
-        "PASCE": [2, "INFILTRÁCIA", ["ŠPEHOVANIE", "VÝROBA", "OPRAVA", "ZRUČNOSŤ"]],
-        "INVESTIGATÍVA": [3, "INFILTRÁCIA", ["MANIPULÁCIA", "ZMYSLY", "PRESVIEDČANIE", "IQ", "EQ"]],
-        "ŠÍRENIE KLEBIET": [3, "INFILTRÁCIA", ["MANIPULÁCIA", "EQ", "IQ"]],
-        "POUŽÍVANIE VÝBUŠNÍN": [3, "INFILTRÁCIA", ["VÝROBA VÝBUŠNÍN", "ŠPECIÁLNE ZBRANE", "VRHANIE"]],
-        "MAPOVANIE POPULÁCIE": [3, "INFILTRÁCIA", ["ŠPEHOVANIE", "INVESTIGATÍVA", "IQ"]],
-        "PRVÁ POMOC": [1, "LIEČENIE", ["ZRUČNOSŤ", "ZMYSLY", "EQ"]],
-        "MEDICÍNA": [3, "LIEČENIE", ["PRVÁ POMOC", "IQ", "ZMYSLY", "EQ"]],
-        "TERAPIA": [2, "LIEČENIE", ["EMPATIA", "EQ", "PRESVIEDČANIE"]],
-        "CHIRURGIA": [4, "LIEČENIE", ["ZRUČNOSŤ", "IQ", "ZMYSLY"]],
-        "BIOCHÉMIA": [3, "LIEČENIE", ["MEDICÍNA", "IQ"]],
-        "SYNTÉZA FEROMÓNOV": [4, "LIEČENIE", ["BIOCHÉMIA", "MEDICÍNA"]],
-        "BIOLOGICKÉ ZBRANE": [4, "LIEČENIE", ["BIOCHÉMIA", "MEDICÍNA"]],
-        "OPRAVA": [1, "KUTILSTVO", ["ZRUČNOSŤ", "ZMYSLY"]],
-        "STAVBA": [1, "KUTILSTVO", ["SILA", "ZRUČNOSŤ", "ZMYSLY"]],
-        "BUDOVANIE": [2, "KUTILSTVO", ["STAVBA", "IQ", "ZMYSLY"]],
-        "VÝROBA": [2, "KUTILSTVO", ["OPRAVA", "ZRUČNOSŤ", "ZMYSLY"]],
-        "MECHANIKA": [4, "KUTILSTVO", ["OPRAVA", "VÝROBA", "ZRUČNOSŤ", "ZMYSLY", "IQ"]],
-        "ELEKTRONIKA": [3, "KUTILSTVO", ["OPRAVA", "VÝROBA", "ZRUČNOSŤ", "IQ"]],
-        "ŤAŽKÁ TECHNIKA": [4, "KUTILSTVO", ["MECHANIKA", "ŠOFÉROVANIE", "ZRUČNOSŤ"]],
-        "HRA NA GITARU": [1, "VŠEOBECNÉ", ["EQ", "ZRUČNOSŤ", "ZMYSLY"]],
-        "KRÍDLA": [1, "SOMORA", []],
-        "OPATROVANIE": [1, "SOMORA", []],
-        "MIMIKRY": [1, "SOMORA", []],
-        "FEROMÓNY": [1, "SOMORA", []],
-        "ŠPRINT": [1, "SOMORA", []],
-        "STRIDULÁCIA": [2, "SOMORA", ["KRÍDLA"]],
-        "RÝCHLA REGENERÁCIA": [3, "SOMORA", ["ODOLNOSŤ", "LIEČENIE"]],
-        "BIOKAMUFLÁŽ": [2, "SOMORA", ["FEROMÓNY"]],
-        "OSTNE": [2, "SOMORA", []],
-        "PANCIER": [2, "SOMORA", ["ODOLNOSŤ"]],
-        "LEZENIE": [2, "SOMORA", ["OBRATNOSŤ"]],
-        "LIEČENIE": [2, "SOMORA", ["OPATROVANIE"]],
-        "OVLÁDANIE SOMÔR": [3, "SOMORA", ["FEROMÓNY", "OPATROVANIE"]],
-        "KYSELINA": [2, "SOMORA", []],
-        "HRYZADLÁ": [3, "SOMORA", []],
-        "KLEPETÁ": [3, "SOMORA", []],
-        "METAMORFÓZA": [4, "SOMORA", ["RÝCHLA REGENERÁCIA", "LIEČENIE", "MIMIKRY"]],
-        "OVLÁDANIE ĽUDÍ": [4, "SOMORA", ["OVLÁDANIE SOMÔR", "FEROMÓNY"]],
-        "ZALOŽENIE HNIEZDA": [4, "SOMORA", ["OVLÁDANIE SOMÔR", "LIEČENIE", "FEROMÓNY", "OPATROVANIE"]],
-        "ŽIHADLO": [4, "SOMORA", ["OSTNE", "KYSELINA"]],
-        "ŠPLHANIE": [3, "VŠEOBECNÉ", ["OBRATNOSŤ", "SILA", "ZRUČNOSŤ", "ZMYSLY"]],
-        "KRADNUTIE": [3, "VŠEOBECNÉ", ["PLÝŽENIE", "ZRUČNOSŤ", "ZMYSLY", "PREDSTIERANIE", "MANIPULÁCIA"]],
-        "INFORMATIKA": [3, "VŠEOBECNÉ", ["IQ"]]
-    };
-    const originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new)); // Kópia pôvodného stavu pre porovnanie
-
+    // 1. Premennú definujeme globálne na začiatku, aby ju videli všetky funkcie
+    let skillsDB_new = {}; 
+    let originalSkillsDB = {};
     let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true }];
     let activeCharIdx = 0;
     let upgradeHistory = []; // Sem budeme ukladať kroky na vrátenie späť
     let selectedSkill = null;
     let editingRels = [];
 
-    function init() {
+
+    // 2. Funkcia na načítanie dát
+    async function loadSkills() {
+        try {
+            const response = await fetch('skillsDB.json');
+            if (!response.ok) throw new Error("Súbor nenájdený");
+            
+            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
+            skillsDB_new = await response.json();
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
+            
+            console.log("Dáta úspešne načítané");
+        } catch (error) {
+            console.error("Chyba pri načítaní JSON:", error);
+            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+        }
+    }
+
+    // 3. Upravená funkcia init musí byť asynchrónna, aby počkala na loadSkills
+    async function init() {
+        await loadSkills(); // TU ČAKÁME, kým sa súbor načíta
+
+        // Až keď sú dáta v skillsDB_new, spustíme zvyšok aplikácie
         renderCharSelector();
         updateGroupDropdown();
         filterBuilder();
@@ -1288,6 +1230,12 @@
         renderEditorList();
         filterRelSearch();
     }
+
+    // Spustenie aplikácie
+    init();
+
+
+
 
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
