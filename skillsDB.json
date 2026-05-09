@@ -1,0 +1,606 @@
+{
+    "ŠOFÉROVANIE": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "IQ"
+        ]
+    ],
+    "IQ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "EQ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "ZRUČNOSŤ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "SILA": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "OBRATNOSŤ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "ZMYSLY": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "ODOLNOSŤ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "PLÁVANIE": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ"
+        ]
+    ],
+    "PRESVIEDČANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "ZMYSLY"
+        ]
+    ],
+    "MANIPULÁCIA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "ZMYSLY",
+            "PREDSTIERANIE"
+        ]
+    ],
+    "ZASTRAŠOVANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "MANIPULÁCIA"
+        ]
+    ],
+    "PREDSTIERANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ"
+        ]
+    ],
+    "ZVÁDZANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ",
+            "ZMYSLY",
+            "FEROMÓNY",
+            "TANEC"
+        ]
+    ],
+    "VODCOVSTVO": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ"
+        ]
+    ],
+    "RÉTORIKA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ"
+        ]
+    ],
+    "VRHANIE": [
+        1,
+        "BOJ Z DIAĽKY",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "ŤAŽKÉ PREDMETY": [
+        2,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "SILA"
+        ]
+    ],
+    "STREĽBA": [
+        2,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "ŤAŽKÉ STRELNÉ ZBRANE": [
+        3,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "STREĽBA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "ŠPECIÁLNE STRELNÉ ZBRANE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "STREĽBA",
+            "IQ",
+            "ZMYSLY"
+        ]
+    ],
+    "BOJOVÉ STROJE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "STREĽBA",
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "ZRUČNOSŤ",
+            "IQ"
+        ]
+    ],
+    "HROMADNÉ NIČENIE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
+            "BOJOVÉ STROJE",
+            "IQ"
+        ]
+    ],
+    "ĽAHKÉ ZBRANE": [
+        1,
+        "BOJ ZBLÍZKA",
+        [
+            "OBRATNOSŤ",
+            "ZRUČNOSŤ",
+            "SILA",
+            "ŤAŽKÉ ZBRANE",
+            "ZMYSLY"
+        ]
+    ],
+    "ŤAŽKÉ ZBRANE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "OBRATNOSŤ",
+            "SILA",
+            "ZRUČNOSŤ"
+        ]
+    ],
+    "OMRÁČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZRUČNOSŤ",
+            "SILA",
+            "ĽAHKÉ ZBRANE",
+            "ŤAŽKÉ ZBRANE"
+        ]
+    ],
+    "MUČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZASTRAŠOVANIE",
+            "EQ",
+            "ZRUČNOSŤ"
+        ]
+    ],
+    "TICHÁ ELIMINÁCIA": [
+        4,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "PLÝŽENIE",
+            "OBRATNOSŤ",
+            "ZRUČNOSŤ",
+            "SILA"
+        ]
+    ],
+    "ŠPEHOVANIE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ZMYSLY"
+        ]
+    ],
+    "PLÝŽENIE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "OBRATNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "PASCE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "VÝROBA",
+            "OPRAVA",
+            "ZRUČNOSŤ"
+        ]
+    ],
+    "INVESTIGATÍVA": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "MANIPULÁCIA",
+            "ZMYSLY",
+            "PRESVIEDČANIE",
+            "IQ",
+            "EQ"
+        ]
+    ],
+    "ŠÍRENIE KLEBIET": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "MANIPULÁCIA",
+            "EQ",
+            "IQ"
+        ]
+    ],
+    "POUŽÍVANIE VÝBUŠNÍN": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "VÝROBA VÝBUŠNÍN",
+            "ŠPECIÁLNE ZBRANE",
+            "VRHANIE"
+        ]
+    ],
+    "MAPOVANIE POPULÁCIE": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "INVESTIGATÍVA",
+            "IQ"
+        ]
+    ],
+    "PRVÁ POMOC": [
+        1,
+        "LIEČENIE",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "EQ"
+        ]
+    ],
+    "MEDICÍNA": [
+        3,
+        "LIEČENIE",
+        [
+            "PRVÁ POMOC",
+            "IQ",
+            "ZMYSLY",
+            "EQ"
+        ]
+    ],
+    "TERAPIA": [
+        2,
+        "LIEČENIE",
+        [
+            "EMPATIA",
+            "EQ",
+            "PRESVIEDČANIE"
+        ]
+    ],
+    "CHIRURGIA": [
+        4,
+        "LIEČENIE",
+        [
+            "ZRUČNOSŤ",
+            "IQ",
+            "ZMYSLY"
+        ]
+    ],
+    "BIOCHÉMIA": [
+        3,
+        "LIEČENIE",
+        [
+            "MEDICÍNA",
+            "IQ"
+        ]
+    ],
+    "SYNTÉZA FEROMÓNOV": [
+        4,
+        "LIEČENIE",
+        [
+            "BIOCHÉMIA",
+            "MEDICÍNA"
+        ]
+    ],
+    "BIOLOGICKÉ ZBRANE": [
+        4,
+        "LIEČENIE",
+        [
+            "BIOCHÉMIA",
+            "MEDICÍNA"
+        ]
+    ],
+    "OPRAVA": [
+        1,
+        "KUTILSTVO",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "STAVBA": [
+        1,
+        "KUTILSTVO",
+        [
+            "SILA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "BUDOVANIE": [
+        2,
+        "KUTILSTVO",
+        [
+            "STAVBA",
+            "IQ",
+            "ZMYSLY"
+        ]
+    ],
+    "VÝROBA": [
+        2,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "MECHANIKA": [
+        4,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "VÝROBA",
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "IQ"
+        ]
+    ],
+    "ELEKTRONIKA": [
+        3,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "VÝROBA",
+            "ZRUČNOSŤ",
+            "IQ"
+        ]
+    ],
+    "ŤAŽKÁ TECHNIKA": [
+        4,
+        "KUTILSTVO",
+        [
+            "MECHANIKA",
+            "ŠOFÉROVANIE",
+            "ZRUČNOSŤ"
+        ]
+    ],
+    "HRA NA GITARU": [
+        1,
+        "VŠEOBECNÉ",
+        [
+            "EQ",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "KRÍDLA": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "OPATROVANIE": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "MIMIKRY": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "FEROMÓNY": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "ŠPRINT": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "STRIDULÁCIA": [
+        2,
+        "SOMORA",
+        [
+            "KRÍDLA"
+        ]
+    ],
+    "RÝCHLA REGENERÁCIA": [
+        3,
+        "SOMORA",
+        [
+            "ODOLNOSŤ",
+            "LIEČENIE"
+        ]
+    ],
+    "BIOKAMUFLÁŽ": [
+        2,
+        "SOMORA",
+        [
+            "FEROMÓNY"
+        ]
+    ],
+    "OSTNE": [
+        2,
+        "SOMORA",
+        []
+    ],
+    "PANCIER": [
+        2,
+        "SOMORA",
+        [
+            "ODOLNOSŤ"
+        ]
+    ],
+    "LEZENIE": [
+        2,
+        "SOMORA",
+        [
+            "OBRATNOSŤ"
+        ]
+    ],
+    "LIEČENIE": [
+        2,
+        "SOMORA",
+        [
+            "OPATROVANIE"
+        ]
+    ],
+    "OVLÁDANIE SOMÔR": [
+        3,
+        "SOMORA",
+        [
+            "FEROMÓNY",
+            "OPATROVANIE"
+        ]
+    ],
+    "KYSELINA": [
+        2,
+        "SOMORA",
+        []
+    ],
+    "HRYZADLÁ": [
+        3,
+        "SOMORA",
+        []
+    ],
+    "KLEPETÁ": [
+        3,
+        "SOMORA",
+        []
+    ],
+    "METAMORFÓZA": [
+        4,
+        "SOMORA",
+        [
+            "RÝCHLA REGENERÁCIA",
+            "LIEČENIE",
+            "MIMIKRY"
+        ]
+    ],
+    "OVLÁDANIE ĽUDÍ": [
+        4,
+        "SOMORA",
+        [
+            "OVLÁDANIE SOMÔR",
+            "FEROMÓNY"
+        ]
+    ],
+    "ZALOŽENIE HNIEZDA": [
+        4,
+        "SOMORA",
+        [
+            "OVLÁDANIE SOMÔR",
+            "LIEČENIE",
+            "FEROMÓNY",
+            "OPATROVANIE"
+        ]
+    ],
+    "ŽIHADLO": [
+        4,
+        "SOMORA",
+        [
+            "OSTNE",
+            "KYSELINA"
+        ]
+    ],
+    "ŠPLHANIE": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ",
+            "SILA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "KRADNUTIE": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "PLÝŽENIE",
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "PREDSTIERANIE",
+            "MANIPULÁCIA"
+        ]
+    ],
+    "INFORMATIKA": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "IQ"
+        ]
+    ],
+    "TANEC": [
+        2,
+        "BOJ Z DIAĽKY",
+        [
+            "OBRATNOSŤ",
+            "EQ",
+            "ZMYSLY",
+            "PREDSTIERANIE",
+            "ZVÁDZANIE"
+        ]
+    ],
+    "JAZYK": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "IQ",
+            "RÉTORIKA"
+        ]
+    ]
+}
