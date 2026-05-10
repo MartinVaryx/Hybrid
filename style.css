@@ -463,8 +463,36 @@
             border: 1px solid #000;
         }
 
+
+
         /* ŠPECIFICKÉ ÚPRAVY PRE MOBIL (iPhone) */
         @media screen and (max-width: 768px) {
+
+            .header-row {
+                    display: flex;
+                    flex-direction: row; /* Put logo and menu side-by-side */
+                    flex-wrap: wrap;    /* Automatically drop to 2nd row if they touch */
+                    justify-content: space-between; /* Logo left, Button right */
+                    align-items: center;
+                    width: 100%;
+                    padding: 10px 15px;
+                    box-sizing: border-box;
+                }
+
+                .main-menu {
+                        position: static !important; /* Stop it from floating over the logo */
+                        margin: 0 !important;
+                        top: auto !important;
+                        right: auto !important;
+                        flex: 0 0 auto;
+                    }
+
+                /* This ensures that the character header always starts on a fresh line below the logo/menu */
+                .char-header {
+                    clear: both !important;
+                    width: 100% !important;
+                }
+
             #rel-add-container {
                 width: 100vw;
                 height: 100vh;
@@ -520,15 +548,12 @@
                         display: block !important;
                     }
 
-                .logo-container {
-                        text-align: left !important;
-                        padding-left: 10px !important; /* Voliteľné: aby logo nebolo úplne nalepené na hrane displeja */
+                .logo-img {
+                        max-width: 180px !important; /* Smaller logo helps it fit on the same row */
+                        margin: 0 !important;
+                        height: auto !important;
                     }
 
-                .logo-img {
-                    margin: 0 !important; /* Zruší centrovanie pomocou margin: auto */
-                    max-width: 250px !important; /* Voliteľné: zmenšenie loga, aby na mobile nezaberalo priveľa miesta */
-                }
                 body { 
                         padding: 5px 0 !important; /* Horný/dolný padding ostáva, bočný zrušíme */
                     }
@@ -933,7 +958,7 @@
                         max-width: 100vw !important;
                         box-sizing: border-box !important;
                     }
-                img, 
+                    img, 
                     .responsive-img, 
                     .logo-img {
                         max-width: 100% !important;
@@ -1039,17 +1064,12 @@
 
                 .logo-container {
                         text-align: left !important;
-                        padding-left: 15px !important;
-                        width: 100% !important;
-                        display: flex !important;
-                        justify-content: flex-start !important;
+                        padding: 0 !important;
+                        margin: 0 !important;
+                        width: auto !important; /* Allow it to be narrow enough for the button */
+                        flex: 0 1 auto;
                     }
 
-                    .logo-img {
-                        margin: 0 !important; /* Zruší centrovanie */
-                        max-width: 200px !important; 
-                        height: auto !important;
-                    }
+
 
                 }
-
