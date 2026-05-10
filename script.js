@@ -350,46 +350,31 @@
         // Zistíme, či sme v mobilnom zobrazení (napr. šírka pod 768px)
         const isMobile = window.innerWidth <= 768;
         if (isMobile) {
-const headerRow = document.createElement('div');
+            // --- MOBILNÁ VERZIA ---
+            const headerRow = document.createElement('div');
             headerRow.className = "mobile-header-row";
-            // Zaistíme, aby headerRow nebol absolute a správal sa ako flex kontajner
-            headerRow.style.position = "relative";
-            headerRow.style.display = "flex";
-            headerRow.style.justifyContent = "space-between";
-            headerRow.style.alignItems = "center";
-            headerRow.style.padding = "10px";
-            headerRow.style.width = "100%";
-            headerRow.style.boxSizing = "border-box";
+            headerRow.style.cssText = "display: flex; flex-direction: column; gap: 10px; padding: 10px; background: #eee; border-bottom: 2px solid #000; margin-bottom: 10px;";
 
-            // 1. MENO (ľavá strana)
-            const nameField = addSheetText(headerRow, char.name, "auto", "auto", "1.3rem", "auto", "left", "name-field");
-            nameField.style.position = "relative"; // Zrušíme absolute
+            // Meno
+            const nameDiv = document.createElement('div');
+            nameDiv.className = "name-field";
+            nameDiv.style.fontSize = "1.4rem";
+            nameDiv.style.fontWeight = "bold";
+            headerRow.appendChild(nameDiv);
 
-            // 2. Kontajner pre pravú stranu (Ľ + BR)
-            const rightSide = document.createElement('div');
-            rightSide.style.display = "flex";
-            rightSide.style.flexDirection = "row";
-            rightSide.style.gap = "15px"; // Medzera medzi Ľ a BR
-            rightSide.style.alignItems = "center";
+            // Kontajner pre BR a Ľudskosť vedľa seba
+            const statsRow = document.createElement('div');
+            statsRow.style.cssText = "display: flex; justify-content: space-between; align-items: center;";
 
-            const humanityVal = char.humanity !== undefined ? char.humanity : 10;
+            const humanityVal = char.humanity !== undefined ? char.humanity : 50;
 
-            // Pomocná funkcia na vytvorenie statu s popisom
-            const createStat = (label, value, extraClass) => {
-                const wrapper = document.createElement('div');
-                wrapper.style.display = "flex";
-                wrapper.style.gap = "5px";
-                wrapper.style.fontSize = "1.2rem";
-                wrapper.innerHTML = `<span style="font-weight:normal">${label}</span><span class="${extraClass}" style="font-weight:bold">${value}</span>`;
-                return wrapper;
-            };
-
-            // Pridáme Ľ a BR do pravej strany
-            rightSide.appendChild(createStat("ĽUDSKOSŤ:", humanityVal, "humanity-field"));
-            rightSide.appendChild(createStat("BODY RASTU:", char.sp, "br-field"));
-
-            headerRow.appendChild(rightSide);
-            container.appendChild(headerRow);
+            statsRow.innerHTML = `
+                <div class="humanity-field" style="font-weight: bold;"> ${humanityVal}</div>
+                <div class="br-field" style="font-weight: bold;">${char.sp}</div>
+            `;
+            
+            headerRow.appendChild(statsRow);
+            container.appendChild(headerRow); // Pridáme hlavičku ako prvú
 
         } else {
             // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
@@ -735,6 +720,12 @@ const headerRow = document.createElement('div');
             renderStats();
             filterBuilder();
         }
+
+        if (id === 'builder') {
+                renderStats(); // Najprv vykresli štatistiky (ovplyvňujú layout)
+                setTimeout(() => {
+                    filterBuilder(); // S malým oneskorením vykresli zoznam
+                }, 50);}
         
         // 6. Reset scroll
         window.scrollTo(0, 0);
