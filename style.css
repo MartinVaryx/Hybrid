@@ -180,7 +180,7 @@
             flex: 3;
             position: relative;
             background-image: url("assets/dennik.png");
-            background-size: 100% 100%;
+            background-size: cover;
             background-repeat: no-repeat;
             background-position: top-left;
             width: 100%;
