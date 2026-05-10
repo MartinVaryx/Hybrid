@@ -598,7 +598,7 @@
                             background-color: #f9f9f9 !important;
                             
                             /* SCROLLOVANIE */
-                            max-height: 200px !important; /* Nastavte pevnú výšku, aby bolo čo scrollovať */
+                            max-height: 350px !important; /* Nastavte pevnú výšku, aby bolo čo scrollovať */
                             overflow-y: auto !important; /* Povolenie vertikálneho scrollbaru */
                             overflow-x: hidden !important;
                             
