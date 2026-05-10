@@ -399,19 +399,26 @@
 
         /* Mobile Rules (Adjust 768px to your needs) */
         @media screen and (max-width: 768px) {
-            #rel-add-container {
-                    display: none !important; /* Hidden on mobile initially */
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100%;
-                    height: 100% !important;
-                    z-index: 10000;
-                    margin: 0 !important;
-                    flex-direction: column;
-                    justify-content: center;
-                }
-
+        #rel-add-container {
+                display: none; /* Skryté defaultne */
+                position: fixed !important;
+                top: 0;
+                left: 0;
+                width: 100vw;
+                height: 100vh;
+                background-color: rgba(229, 229, 225, 0.98); /* Nepriehľadné pozadie, aby nepresvitalo menu */
+                
+                /* Musí byť vyššie ako .main-menu (ktoré má z-index 1000) */
+                z-index: 9999 !important; 
+                
+                padding: 20px;
+                box-sizing: border-box;
+                overflow-y: auto; /* Povoliť scroll v rámci overlayu */
+                
+                /* Fix pre iOS vrstvenie */
+                -webkit-transform: translateZ(10px);
+                transform: translateZ(10px);
+            }
                 /* Shown only when the JS adds the 'active' class */
                 #rel-add-container.active {
                     display: flex !important;
