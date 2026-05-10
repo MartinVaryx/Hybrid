@@ -792,15 +792,17 @@
         }
     }
 
-    function toggleRelOverlay(show) {
-        const container = document.getElementById('rel-add-container');
-        if (show) {
-            container.classList.add('active');
-            document.body.style.overflow = 'hidden'; // Zastaví scroll na pozadí
-            document.body.classList.add('overlay-open'); // Pomocná trieda pre CSS
-        } else {
-            container.classList.remove('active');
-            document.body.style.overflow = '';
-            document.body.classList.remove('overlay-open');
+        function toggleRelOverlay(show) {
+            const container = document.getElementById('rel-add-container');
+            if (!container) return;
+        
+            if (show) {
+                container.style.display = 'flex'; // Vynútenie zobrazenia
+                container.classList.add('active');
+                document.body.style.overflow = 'hidden'; // Zákaz scrollovania pozadia
+            } else {
+                container.style.display = 'none'; // Vynútenie skrytia
+                container.classList.remove('active');
+                document.body.style.overflow = ''; // Obnova scrollovania
+            }
         }
-    }
