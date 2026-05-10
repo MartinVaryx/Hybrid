@@ -345,7 +345,7 @@
         container.innerHTML = '';
 
         //MENO - pozícia na hárku
-        addSheetText(container, char.name, "12.5%", "17.5%", "1.2rem", "380px", "left", "name-field");
+        addSheetText(container, char.name, "13%", "17.5%", "1.2rem", "380px", "left", "name-field");
 
         // Zistíme, či sme v mobilnom zobrazení (napr. šírka pod 768px)
         const isMobile = window.innerWidth <= 768;
@@ -378,10 +378,10 @@
 
         } else {
             // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
-            addSheetText(container, char.sp.toString(), "25%", "91.5%", "1.8rem", "60px", "center", "br-field");
+            addSheetText(container, char.sp.toString(), "25.5%", "92%", "1.8rem", "60px", "center", "br-field");
             
             const humanityVal = char.humanity !== undefined ? char.humanity : 10;
-            addSheetText(container, humanityVal.toString(), "25%", "78.5%", "1.8rem", "60px", "center", "humanity-field");
+            addSheetText(container, humanityVal.toString(), "25.5%", "78.5%", "1.8rem", "60px", "center", "humanity-field");
         }
 
         //SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
@@ -397,7 +397,7 @@
             for (let row = 0; row < maxRows; row++) {
                 slots.push({
                     x: col === 0 ? 7.5 : 55.5,
-                    y: 40.2 + (row * 4.77) 
+                    y: 41.2 + (row * 4.78) 
                 });
             }
         }
