@@ -382,12 +382,13 @@
         }
 
         #rel-add-container {
-            display: flex;
+                display: flex;
+                z-index: 10000 !important;
+
         }
 
         #mobile-rel-toggle {
                 display: none !important;
-                z-index: 10000 !important;
         }
 
         @media (min-width: 769px) {
