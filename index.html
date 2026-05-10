@@ -17,13 +17,7 @@
 
 
 <div class="main-menu">
-    <div class="menu-dropdown">
-        <button class="menu-trigger">MENU ▼</button>
-        <div class="menu-items">
-            <a href="#" onclick="switchView('intro')">HLAVNÁ STRÁNKA</a>
-            <a href="#" onclick="switchView('builder')">TVORBA HRDINU</a>
-        </div>
-    </div>
+    <button id="view-toggle" class="menu-trigger" onclick="toggleView()">VYTVOR SI HRDINU</button>
 </div>
 
 <div id="view-intro" class="view-section active-view">
@@ -79,7 +73,7 @@
 
     <div class="container">
         <div class="tabs">
-            <button class="tab-btn active" onclick="openTab('builder')">TVORBA POSTAVY</button>
+            <button class="tab-btn active" onclick="openTab('builder')">DENNÍK HRDINU</button>
             <button class="tab-btn" onclick="openTab('editor')">UPRAVIŤ SCHOPNOSTI</button>
             <button class="tab-btn" onclick="openTab('navod')">NÁVOD</button>
         </div>
@@ -132,9 +126,19 @@
                         <div id="edit-rels-container"></div>
                     </div>
                 </div>
-                <div style="display: flex; gap: 15px; height: 180px; margin-top: 10px; align-items: flex-start; background-color: #333; padding: 15px; border: 2px solid #000; box-sizing: border-box; margin-left:15px;">
+                <!-- 1. ADDED THIS BUTTON (Hidden on desktop via CSS) -->
+                <button id="mobile-rel-toggle" class="tab-btn" style="display:none; background: #444; color: white; margin: 10px 15px; width: calc(100% - 30px);" onclick="toggleRelOverlay(true)">
+                    + PRIDAŤ PRÍBUZNÚ SCHOPNOSŤ
+                </button>
+
+                <!-- 2. ADDED id="rel-add-container" TO THIS DIV -->
+                <div id="rel-add-container" style="gap: 15px; height: 180px; margin-top: 10px; align-items: flex-start; background-color: #333; padding: 15px; border: 2px solid #000; box-sizing: border-box; margin-left:15px;">
+                    
+                    <!-- 3. ADDED A CLOSE BUTTON (Only visible in mobile overlay) -->
+                    <button class="mobile-only-close" onclick="toggleRelOverlay(false)" style="display:none; position:absolute; top:10px; right:10px; background:red; color:white; border:none; padding:5px 10px; font-weight:bold;">X</button>
+
                     <div style="flex: 0.9; display: flex; flex-direction: column; gap: 10px;">
-                        <label style="font-size:1rem; font-weight:bold; color: #ffffff;">PRIDAŤ PRÍBUZNÚ</label>
+                        <label style="font-size:1rem; font-weight:bold; color: #ffffff;">PRIDAŤ PRÍBUZNÚ SCHOPNOSŤ</label>
                         <div>
                             <label style="font-size:0.8rem; font-weight:bold; color: #bbb;">HĽADAŤ NÁZOV</label>
                             <input type="text" id="rel-search" placeholder="ZADAJTE NÁZOV..." onkeyup="filterRelSearch()" style="width: 100%; box-sizing: border-box; background: #eee;">
@@ -233,7 +237,7 @@
     // 1. Premennú definujeme globálne na začiatku, aby ju videli všetky funkcie
     let skillsDB_new = {}; 
     let originalSkillsDB = {};
-    let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true }];
+    let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true, humanity: 50 }];
     let activeCharIdx = 0;
     let upgradeHistory = []; // Sem budeme ukladať kroky na vrátenie späť
     let selectedSkill = null;
@@ -274,7 +278,6 @@
         renderEditorList();
         filterRelSearch();
     }
-
 
     init();
 </script>
