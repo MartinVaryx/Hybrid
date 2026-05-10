@@ -796,10 +796,11 @@
         const container = document.getElementById('rel-add-container');
         if (show) {
             container.classList.add('active');
-            // Optional: Prevent body scroll when overlay is open
-            document.body.style.overflow = 'hidden';
+            document.body.style.overflow = 'hidden'; // Zastaví scroll na pozadí
+            document.body.classList.add('overlay-open'); // Pomocná trieda pre CSS
         } else {
             container.classList.remove('active');
-            document.body.style.overflow = 'auto';
+            document.body.style.overflow = '';
+            document.body.classList.remove('overlay-open');
         }
     }
