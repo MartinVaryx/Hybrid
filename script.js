@@ -228,81 +228,95 @@
     }
 
     function upgradeSelected() {
-            if (!selectedSkill) return;
-            const char = characters[activeCharIdx];
-            const currentLvl = char.skills[selectedSkill] || 0;
+        if (!selectedSkill) return;
+        const char = characters[activeCharIdx];
+        const currentLvl = char.skills[selectedSkill] || 0;
+        
+        // Načítame dáta schopnosti hneď na začiatku, aby sme s nimi mohli pracovať
+        const data = skillsDB_new[selectedSkill]; 
+        const skillGroup = data[1]; // Skupina je na indexe 1
+        const targetLvl = currentLvl + 1;
 
-            // 1. KONTROLA LIMITOV SCHOPNOSTÍ
-            if (currentLvl === 0) {
-                const learnedSkills = Object.values(char.skills).filter(lvl => lvl > 0);
-                const learnedSkillsCount = learnedSkills.length;
+        // 1. KONTROLA LIMITOV SCHOPNOSTÍ
+        if (currentLvl === 0) {
+            const learnedSkills = Object.values(char.skills).filter(lvl => lvl > 0);
+            const learnedSkillsCount = learnedSkills.length;
 
-                // Globálny limit 12 schopností
-                if (learnedSkillsCount >= 12) {
-                    showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
-                    return;
-                }
-
-                // ŠPECIFICKÝ LIMIT PRE PRVÚ FÁZU (max 6 daností)
-                if (char.isInitialPhase && learnedSkillsCount >= 6) {
-                    showCustomAlert("V tejto fáze si nemôžeš pridať všetkých 7 daností. Zvýš úroveň tých, ktoré už máš.");
-                    return;
-                }
+            if (learnedSkillsCount >= 16) {
+                showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
+                return;
             }
 
-            const data = skillsDB_new[selectedSkill];
-            const targetLvl = currentLvl + 1;
-            
-            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
-            let discount = relLevels.reduce((a, b) => a + b, 0);
-            
-            const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
-            
-            // 2. KONTROLA DOSTATKU BODOV
-            if (char.sp >= cost) {
-                
-                // ŠPECIÁLNY PRÍPAD: Prechod do druhej fázy (vyžaduje potvrdenie)
-                if (char.isInitialPhase && (char.sp - cost) === 0) {
-                    showCustomAlert(
-                        "Týmto uzavrieš fázu DANOSTÍ. Zmeny už nebudeš môcť vrátiť späť. Želáš si pokračovať?", 
-                        "POTVRDENIE FÁZY", 
-                        true, 
-                        () => {
-                            char.isInitialPhase = false;
-                            char.sp = (char.sp - cost) + 20;
-                            char.skills[selectedSkill] = targetLvl;
-                            upgradeHistory = []; 
-
-                            finishUpgrade(); 
-                        }
-                    );
-                    return; 
-                } 
-
-                // BEŽNÝ PRÍPAD: Klasické vylepšenie
-                upgradeHistory.push({
-                    skill: selectedSkill,
-                    prevLvl: currentLvl,
-                    prevSP: char.sp,
-                    wasInitialPhase: char.isInitialPhase
-                });
-
-                char.sp -= cost;
-                char.skills[selectedSkill] = targetLvl;
-                
-                finishUpgrade();
-
-            } else { 
-                showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
-            }
-
-            function finishUpgrade() {
-                saveState();
-                renderStats();
-                selectSkill(selectedSkill);
-                filterBuilder();
+            if (char.isInitialPhase && learnedSkillsCount >= 6) {
+                showCustomAlert("V tejto fáze si nemôžeš pridať všetkých 7 daností.");
+                return;
             }
         }
+
+        // Výpočet ceny
+        let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+        let discount = relLevels.reduce((a, b) => a + b, 0);
+        const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
+        
+        if (char.humanity <= cost && skillGroup === "SOMORA") {
+            showCustomAlert("Máš príliš nízku ľudskosť.");
+                return;
+        }
+        // 2. KONTROLA DOSTATKU BODOV
+        if (char.sp >= cost) {
+            
+            // Prechod do druhej fázy
+            if (char.isInitialPhase && (char.sp - cost) === 0) {
+                showCustomAlert(
+                    "Týmto uzavrieš fázu DANOSTÍ. Želáš si pokračovať?", 
+                    "POTVRDENIE FÁZY", 
+                    true, 
+                    () => {
+                        char.isInitialPhase = false;
+                        char.sp = (char.sp - cost) + 20;
+                        char.skills[selectedSkill] = targetLvl;
+                        // Ak je to Somora, odčítame humanitu aj pri potvrdení
+                        if (skillGroup === "SOMORA") {
+                            char.humanity = (char.humanity || 10) - cost;
+                        }
+                        upgradeHistory = []; 
+                        finishUpgrade(); 
+                    }
+                );
+                return; 
+            } 
+
+            // BEŽNÝ PRÍPAD
+            upgradeHistory.push({
+                skill: selectedSkill,
+                prevLvl: currentLvl,
+                prevSP: char.sp,
+                prevHumanity: char.humanity || 10, // Uložíme pre undo
+                wasInitialPhase: char.isInitialPhase
+            });
+
+            char.sp -= cost;
+
+            // LOGIKA PRE HUMANITU
+            if (skillGroup === "SOMORA") {
+                // Ak humanity neexistuje, nastavíme základ 10 a odčítame cost
+                char.humanity = (char.humanity || 10) - cost;
+            }
+
+            char.skills[selectedSkill] = targetLvl;
+            finishUpgrade();
+
+        } else { 
+            showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
+        }
+
+        function finishUpgrade() {
+            saveState();
+            renderStats();
+            selectSkill(selectedSkill);
+            filterBuilder();
+        }
+    }
 
     function undoUpgrade() {
         if (upgradeHistory.length === 0) {
@@ -330,26 +344,75 @@
         const char = characters[activeCharIdx];
         container.innerHTML = '';
 
-        // 1. MENO - pozícia na hárku
+        //MENO - pozícia na hárku
         addSheetText(container, char.name, "12.5%", "17.5%", "1.2rem", "380px", "left", "name-field");
 
-        // 2. BODY RASTU - pridávame extraClass 'br-field' pre mobilný popis
-        addSheetText(container, char.sp.toString(), "31.5%", "26.5%", "1.8rem", "60px", "center", "br-field");
+        // Zistíme, či sme v mobilnom zobrazení (napr. šírka pod 768px)
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+const headerRow = document.createElement('div');
+            headerRow.className = "mobile-header-row";
+            // Zaistíme, aby headerRow nebol absolute a správal sa ako flex kontajner
+            headerRow.style.position = "relative";
+            headerRow.style.display = "flex";
+            headerRow.style.justifyContent = "space-between";
+            headerRow.style.alignItems = "center";
+            headerRow.style.padding = "10px";
+            headerRow.style.width = "100%";
+            headerRow.style.boxSizing = "border-box";
 
-        // 3. SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
+            // 1. MENO (ľavá strana)
+            const nameField = addSheetText(headerRow, char.name, "auto", "auto", "1.3rem", "auto", "left", "name-field");
+            nameField.style.position = "relative"; // Zrušíme absolute
+
+            // 2. Kontajner pre pravú stranu (Ľ + BR)
+            const rightSide = document.createElement('div');
+            rightSide.style.display = "flex";
+            rightSide.style.flexDirection = "row";
+            rightSide.style.gap = "15px"; // Medzera medzi Ľ a BR
+            rightSide.style.alignItems = "center";
+
+            const humanityVal = char.humanity !== undefined ? char.humanity : 10;
+
+            // Pomocná funkcia na vytvorenie statu s popisom
+            const createStat = (label, value, extraClass) => {
+                const wrapper = document.createElement('div');
+                wrapper.style.display = "flex";
+                wrapper.style.gap = "5px";
+                wrapper.style.fontSize = "1.2rem";
+                wrapper.innerHTML = `<span style="font-weight:normal">${label}</span><span class="${extraClass}" style="font-weight:bold">${value}</span>`;
+                return wrapper;
+            };
+
+            // Pridáme Ľ a BR do pravej strany
+            rightSide.appendChild(createStat("ĽUDSKOSŤ:", humanityVal, "humanity-field"));
+            rightSide.appendChild(createStat("BODY RASTU:", char.sp, "br-field"));
+
+            headerRow.appendChild(rightSide);
+            container.appendChild(headerRow);
+
+        } else {
+            // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
+            addSheetText(container, char.sp.toString(), "25%", "91.5%", "1.8rem", "60px", "center", "br-field");
+            
+            const humanityVal = char.humanity !== undefined ? char.humanity : 10;
+            addSheetText(container, humanityVal.toString(), "25%", "78.5%", "1.8rem", "60px", "center", "humanity-field");
+        }
+
+        //SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
         const learnedSkills = Object.entries(char.skills)
             .filter(([_, lvl]) => lvl > 0)
             .sort();
 
         const slots = [];
-        const maxRows = 6; 
+        const maxRows = 8; 
         
         // Generovanie pozícií pre PC papier
         for (let col = 0; col < 2; col++) {
             for (let row = 0; row < maxRows; row++) {
                 slots.push({
-                    x: col === 0 ? 7.1 : 55.5,
-                    y: 44.2 + (row * 4.80) 
+                    x: col === 0 ? 7.5 : 55.5,
+                    y: 40.2 + (row * 4.77) 
                 });
             }
         }
@@ -378,7 +441,7 @@
                 // Dôležité: Kategória je v prvom div, ktorý na mobile skrývame cez display:none
                 div.innerHTML = `
                     <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
-                    <div class="skill-name-text" style="position:absolute; left:14%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                    <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
                     <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
                 `;
                 container.appendChild(div);
@@ -496,12 +559,6 @@
         filterBuilder();
     }
 
-    function openTab(id) {
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-        document.getElementById(id).classList.add('active');
-        if (event) event.currentTarget.classList.add('active');
-    }
     
     function createNewCharacter() {
         // Namiesto promptu len zobrazíme skrytý riadok
@@ -516,7 +573,8 @@
                 name: n.toUpperCase(), 
                 sp: 40,
                 skills: {}, 
-                isInitialPhase: true 
+                isInitialPhase: true,
+                humanity: 50 
             }); 
             activeCharIdx = characters.length - 1; 
             saveState();
@@ -547,24 +605,27 @@
             return;
         }
 
-        const char = characters[activeCharIdx];
-        const senderName = char.name.replace(/\s+/g, '_');
+        // Pripravíme si FormData
         const formData = new FormData();
+        const datum = new Date().toISOString().split('T')[0]; // Formát RRRR-MM-DD
         
-        let sprava = `🚀 **Nový príspevok od:** ${char.name}\n`;
+        // 1. PRÍPRAVA VŠETKÝCH POSTÁV
+        // Zabalíme celé pole characters do jedného súboru
+        const allCharsData = JSON.stringify(characters, null, 4);
+        const allCharsBlob = new Blob([allCharsData], { type: 'application/json' });
         
-        // 1. PRÍPRAVA POSTAVY (posiela sa vždy)
-        const charData = JSON.stringify(char, null, 4);
-        const charBlob = new Blob([charData], { type: 'application/json' });
-        formData.append("file1", charBlob, `${senderName}.json`);
-        sprava += `✅ Priložený súbor s postavou.\n`;
+        // Pridáme súbor do formulára
+        formData.append("file1", allCharsBlob, `kompletna_zaloha_postav_${datum}.json`);
 
-        // 2. FILTROVANIE LEN ZMENENÝCH SCHOPNOSTÍ
+        let sprava = `🚀 **Hromadné zdieľanie dát**\n`;
+        sprava += `👥 **Počet postáv:** ${characters.length}\n`;
+        sprava += `✅ Priložený súbor so všetkými postavami.\n`;
+
+        // 2. FILTROVANIE LEN ZMENENÝCH SCHOPNOSTÍ (Globálne)
         let zmeny = {};
         let pocetZmien = 0;
 
         for (let kľúč in skillsDB_new) {
-            // Ak schopnosť v pôvodnej DB neexistuje (nová) alebo sa líši (upravená)
             if (!originalSkillsDB[kľúč] || JSON.stringify(skillsDB_new[kľúč]) !== JSON.stringify(originalSkillsDB[kľúč])) {
                 zmeny[kľúč] = skillsDB_new[kľúč];
                 pocetZmien++;
@@ -575,10 +636,10 @@
         if (pocetZmien > 0) {
             const zmenyData = JSON.stringify(zmeny, null, 4);
             const zmenyBlob = new Blob([zmenyData], { type: 'application/json' });
-            formData.append("file2", zmenyBlob, `${senderName}_ZMENY_SKILLS.json`);
-            sprava += `⚠️ **ZISTENÉ ZMENY (${pocetZmien}):** Priložený súbor s novými/upravenými schopnosťami.`;
+            formData.append("file2", zmenyBlob, `ZMENY_SKILLS_${datum}.json`);
+            sprava += `⚠️ **ZISTENÉ ZMENY V DB (${pocetZmien}):** Priložený súbor s upravenými schopnosťami.`;
         } else {
-            sprava += `ℹ️ Žiadne zmeny v globálnej databáze (neposiela sa).`;
+            sprava += `ℹ️ Žiadne zmeny v globálnej databáze schopností.`;
         }
 
         formData.append("content", sprava);
@@ -592,63 +653,90 @@
             if (response.ok) {
                 showCustomAlert("Odoslané! Vďaka, že nám pomáhaš vylepšiť Hybrid!");
             } else {
-                showCustomAlert("Chyba pri komunikácii s Discordom.");
+                showCustomAlert("Chyba pri komunikácii s Discordom (Status: " + response.status + ")");
             }
         } catch (error) {
             console.error("Chyba:", error);
-            showCustomAlert("Nepodarilo sa odoslať dáta.");
+            showCustomAlert("Nepodarilo sa nadviazať spojenie s Discordom.");
+        }
+    }
+
+    // Premenná na sledovanie aktuálneho stavu (predvolene intro)
+    let currentView = 'intro';
+
+    function toggleView() {
+        if (currentView === 'intro') {
+            switchView('builder');
+        } else {
+            switchView('intro');
         }
     }
 
     function switchView(viewId) {
-        // 1. Hide all main sections
+        // Aktualizujeme informáciu o tom, kde sa nachádzame
+        currentView = viewId;
+        
+        // Získame referenciu na tlačidlo
+        const toggleBtn = document.getElementById('view-toggle');
+
+        // 1. Skryť všetky sekcie
         document.querySelectorAll('.view-section').forEach(view => {
             view.classList.remove('active-view');
         });
         
-        // 2. Show the selected section
+        // 2. Zobraziť vybranú sekciu
         const targetView = document.getElementById('view-' + viewId);
         targetView.classList.add('active-view');
         
-        // 3. Logic for switching to Builder
+        // 3. Logika a zmena textu pre Builder
         if (viewId === 'builder') {
-            openTab('navod'); // Forces the Manual to be the first thing seen
+            toggleBtn.innerText = 'HLAVNÁ STRÁNKA'; // Tlačidlo ponúka cestu späť
+            openTab('navod');
             renderStats();
             filterBuilder();
         }
         
-        // 4. Logic for switching to Intro
+        // 4. Logika a zmena textu pre Intro
         if (viewId === 'intro') {
-            openTab('novinky'); // Forces News to be the default intro tab
+            toggleBtn.innerText = 'VYTVOR SI HRDINU'; // Tlačidlo ponúka cestu vpred
+            openTab('uvod');
         }
     }
 
-    // Update your existing openTab to this version to handle the button highlighting properly
     function openTab(id) {
-        // 1. Skryjeme úplne všetko, čo má triedu tab-content
+        // 1. Hide all tab content
         const contents = document.querySelectorAll('.tab-content');
         contents.forEach(c => {
             c.classList.remove('active');
-            c.style.display = 'none'; // Poistka priamo cez JS
+            c.style.display = 'none'; 
         });
 
-        // 2. Deaktivujeme všetky tlačidlá
+        // 2. Deactivate all tab buttons
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
-        // 3. Aktivujeme len ten jeden vybraný
+        // 3. Activate the selected tab
         const target = document.getElementById(id);
         if (target) {
             target.classList.add('active');
-            target.style.display = 'flex'; // Ak používaš flexbox
+            target.style.display = 'flex'; 
         }
 
-        // 4. Zvýrazníme tlačidlo
+        // 4. Highlight the correct button
         const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
             b.getAttribute('onclick')?.includes(`'${id}'`)
         );
         if (btn) btn.classList.add('active');
         
-        // 5. Reset scrollu - hodí ťa to na vrch stránky pri prepnutí tabu
+        // 5. CRITICAL: Trigger the render for specific tabs
+        if (id === 'editor') {
+            renderEditorList();
+        }
+        if (id === 'builder') {
+            renderStats();
+            filterBuilder();
+        }
+        
+        // 6. Reset scroll
         window.scrollTo(0, 0);
     }
 
@@ -713,3 +801,14 @@
         }
     }
 
+    function toggleRelOverlay(show) {
+        const container = document.getElementById('rel-add-container');
+        if (show) {
+            container.classList.add('active');
+            // Optional: Prevent body scroll when overlay is open
+            document.body.style.overflow = 'hidden';
+        } else {
+            container.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+    }
