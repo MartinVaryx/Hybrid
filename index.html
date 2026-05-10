@@ -137,22 +137,6 @@
                         <div id="edit-rels-container" style="width: 100%; box-sizing: border-box;"></div>
                     </div>
                 </div> 
-                <div id="rel-add-container" style="display: flex; gap: 15px; height: 180px; margin-top: 20px; background-color: #333; padding: 15px; border: 2px solid #000; box-sizing: border-box; margin-left:15px;">
-                    <button class="mobile-only-close" onclick="toggleRelOverlay(false)" style="display:none; position:absolute; top:10px; right:10px; background:red; color:white; border:none; padding:5px 10px; font-weight:bold;">X</button>
-
-                    <div style="flex: 0.9; display: flex; flex-direction: column; gap: 10px;">
-                        <label style="font-size:1rem; font-weight:bold; color: #ffffff;">PRIDAŤ PRÍBUZNÚ SCHOPNOSŤ</label>
-                        <div>
-                            <label style="font-size:0.8rem; font-weight:bold; color: #bbb;">HĽADAŤ NÁZOV</label>
-                            <input type="text" id="rel-search" placeholder="ZADAJTE NÁZOV..." onkeyup="filterRelSearch()" style="width: 100%; box-sizing: border-box; background: #eee;">
-                        </div>
-                        <div>
-                            <label style="font-size:0.8rem; font-weight:bold; color: #bbb;">FILTER SKUPINY</label>
-                            <select id="rel-group-filter" onchange="filterRelSearch()" style="width: 100%; box-sizing: border-box; background: #eee; padding: 5px; cursor: pointer;"></select>
-                        </div>
-                    </div>
-                    <div class="selection-list" id="rel-add-list" style="flex: 1.1; overflow-y: auto; background: #ffffff;"></div>
-                </div>
 
                 <div class="editor-actions" style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-start; margin-left:15px;">
                     <button class="tab-btn" style="background:var(--hybrid-green); color:white; width: 180px; height: 45px; clip-path:none !important; border-radius:0; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
@@ -231,6 +215,23 @@
         <div id="modal-buttons" class="modal-actions">
             </div>
     </div>
+
+
+</div>
+<div id="rel-add-container">
+    <button class="mobile-only-close" onclick="toggleRelOverlay(false)">X</button>
+    <div class="rel-add-controls">
+        <label>PRIDAŤ PRÍBUZNÚ SCHOPNOSŤ</label>
+        <div>
+            <label>HĽADAŤ NÁZOV</label>
+            <input type="text" id="rel-search" placeholder="ZADAJTE NÁZOV..." onkeyup="filterRelSearch()">
+        </div>
+        <div>
+            <label>FILTER SKUPINY</label>
+            <select id="rel-group-filter" onchange="filterRelSearch()"></select>
+        </div>
+    </div>
+    <div class="selection-list" id="rel-add-list"></div>
 </div>
 
 <script src="script.js"></script>
