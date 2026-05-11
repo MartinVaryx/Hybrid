@@ -1,3 +1,14 @@
+    const articles = [
+        {
+            id: 'zaciatok',
+            title: 'Ako to začalo',
+            date: '11. 05. 2026',
+            summary: 'O tom, čo viedlo ku vzniku Hybridu.',
+            thumb: 'assets/articles/zaciatok.jpg',
+            file: 'zaciatok.html'
+        }
+    ];
+    
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
         const editorSelect = document.getElementById('edit-group');
@@ -114,6 +125,7 @@
             list.appendChild(div);
         });
     }
+
     function removeRel(name) { editingRels = editingRels.filter(r => r !== name); renderRelTags(); }
 
     function saveSkill() {
@@ -646,22 +658,21 @@
         }
     }
 
-    // Premenná na sledovanie aktuálneho stavu (predvolene intro)
-    let currentView = 'intro';
-
     function toggleView() {
-        if (currentView === 'intro') {
+        // Zistíme, ktorá sekcia je momentálne aktívna
+        const isIntro = document.getElementById('view-intro').classList.contains('active-view');
+        if (isIntro) {
             switchView('builder');
         } else {
             switchView('intro');
         }
     }
 
+    let currentView = 'intro'; 
+
+    // --- OPRAVENÁ FUNKCIA SWITCHVIEW ---
     function switchView(viewId) {
-        // Aktualizujeme informáciu o tom, kde sa nachádzame
         currentView = viewId;
-        
-        // Získame referenciu na tlačidlo
         const toggleBtn = document.getElementById('view-toggle');
 
         // 1. Skryť všetky sekcie
@@ -671,66 +682,120 @@
         
         // 2. Zobraziť vybranú sekciu
         const targetView = document.getElementById('view-' + viewId);
-        targetView.classList.add('active-view');
-        
-        // 3. Logika a zmena textu pre Builder
-        if (viewId === 'builder') {
-            toggleBtn.innerText = 'HLAVNÁ STRÁNKA'; // Tlačidlo ponúka cestu späť
-            openTab('navod');
-            renderStats();
-            filterBuilder();
+        if (targetView) {
+            targetView.classList.add('active-view');
         }
         
-        // 4. Logika a zmena textu pre Intro
-        if (viewId === 'intro') {
-            toggleBtn.innerText = 'VYTVOR SI HRDINU'; // Tlačidlo ponúka cestu vpred
+        // 3. Logika pre tlačidlá a taby
+        if (viewId === 'builder') {
+            // Ak máme viacero tlačidiel s týmto ID (jedno v Intro, jedno v Builderi)
+            document.querySelectorAll('#view-toggle').forEach(btn => btn.innerText = 'HLAVNÁ STRÁNKA');
+            openTab('builder');
+            renderStats();
+            filterBuilder();
+        } else {
+            document.querySelectorAll('#view-toggle').forEach(btn => btn.innerText = 'VYTVOR SI HRDINU');
             openTab('uvod');
         }
     }
 
+
+
+    function handleRouting() {
+        // Ak je hash prázdny, nastavíme predvolený tab 'uvod'
+        const hash = window.location.hash.replace('#', '') || 'uvod';
+
+        const builderTabs = ['builder', 'editor', 'navod'];
+        const isBuilderViewActive = document.getElementById('view-builder').classList.contains('active-view');
+
+
+        // LOGIKA PREPÍNANIA POHĽADOV (Intro vs Builder)
+        if (builderTabs.includes(hash)) {
+            // Chceme ísť do Buildera, ale sme v Intro? Prepnime to.
+            if (!isBuilderViewActive) {
+                toggleView(); 
+            }
+        } else {
+            // Chceme ísť do Intra (uvod, kontakt...), ale sme v Builderi? Prepnime to späť.
+            if (isBuilderViewActive) {
+                toggleView();
+            }
+        }
+        if (hash.startsWith('novinky-')) {
+                const articleId = hash.replace('novinky-', '');
+                
+                // Ak ešte nie sme v sekcii Intro, prepneme view
+                if (document.getElementById('view-builder').classList.contains('active-view')) {
+                    toggleView();
+                }
+                
+                // Aktivujeme tab novinky bez toho, aby sme spustili renderNewsList()
+                const newsTab = document.getElementById('novinky');
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                newsTab.classList.add('active');
+                
+                // Načítame samotný článok
+                openArticle(articleId);
+                return; // Dôležité: ukončíme funkciu, aby nepokračovala k openTab(hash)
+            } else if (hash === 'novinky') {
+            openTab('novinky');
+        }
+        // Otvoríme konkrétny tab
+        openTab(hash);
+
+
+    }
+
     function openTab(id) {
-        // 1. Hide all tab content
+        // 1. AKTUALIZÁCIA URL HASH
+        if (window.location.hash !== '#' + id) {
+            window.location.hash = id;
+        }
+
+        // 2. Skryť všetok obsah tabov
+        // Odstraňujeme triedu 'active', ktorú tvoj CSS používa na zobrazenie
         const contents = document.querySelectorAll('.tab-content');
         contents.forEach(c => {
             c.classList.remove('active');
-            c.style.display = 'none'; 
+            // V CSS máš .tab-content.active { display: flex !important; }
+            // Ručné nastavovanie .style.display tu nie je nutné, ak CSS funguje správne
         });
 
-        // 2. Deactivate all tab buttons
+        // 3. Deaktivovať všetky tlačidlá tabov
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
-        // 3. Activate the selected tab
+        // 4. Aktivovať vybraný tab
         const target = document.getElementById(id);
         if (target) {
             target.classList.add('active');
-            target.style.display = 'flex'; 
+            
+            // Špeciálna podmienka pre NOVINKY
+            if (id === 'novinky') {
+                renderNewsList(); 
+            }
         }
 
-        // 4. Highlight the correct button
+        // 5. Zvýrazniť správne tlačidlo v navigácii
         const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
             b.getAttribute('onclick')?.includes(`'${id}'`)
         );
         if (btn) btn.classList.add('active');
         
-        // 5. CRITICAL: Trigger the render for specific tabs
+        // 6. Špecifické vykresľovanie pre funkčné taby Buildera
         if (id === 'editor') {
             renderEditorList();
-        }
-        if (id === 'builder') {
-            renderStats();
-            filterBuilder();
+        } else if (id === 'builder') {
+            renderStats(); 
+            setTimeout(() => {
+                filterBuilder(); 
+            }, 50);
         }
 
-        if (id === 'builder') {
-                renderStats(); // Najprv vykresli štatistiky (ovplyvňujú layout)
-                setTimeout(() => {
-                    filterBuilder(); // S malým oneskorením vykresli zoznam
-                }, 50);}
-        
-        // 6. Reset scroll
+        // 7. Reset scrollu na vrch stránky
         window.scrollTo(0, 0);
     }
 
+    
     function showStatus(text) {
         const msg = document.getElementById('status-message');
         msg.innerText = text;
@@ -738,7 +803,6 @@
         setTimeout(() => { msg.style.display = 'none'; }, 3000);
     }
 
-    let modalCallback = null;
 
     function showCustomAlert(message, title = "UPOZORNENIE", isConfirm = false, callback = null) {
         document.getElementById('modal-title').innerText = title;
@@ -792,6 +856,46 @@
         }
     }
 
+    async function init() {
+        console.log("Inicializácia systému...");
+        
+        // Načítanie základných dát
+        await loadSkills(); 
+
+        // Načítanie obsahu pre statické taby (Úvod, O projekte, atď.)
+        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
+        await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
+
+        // Inicializácia rozhrania Buildera
+        renderCharSelector();
+        updateGroupDropdown();
+        filterBuilder();
+        renderStats();
+        renderEditorList();
+        filterRelSearch();
+
+        // Spustenie routingu (Hash navigácia)
+        handleRouting(); 
+        window.addEventListener('hashchange', handleRouting);
+    }
+
+    async function loadSkills() {
+        try {
+            const response = await fetch('skillsDB.json');
+            if (!response.ok) throw new Error("Súbor nenájdený");
+            
+            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
+            skillsDB_new = await response.json();
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
+            
+            console.log("Dáta úspešne načítané");
+        } catch (error) {
+            console.error("Chyba pri načítaní JSON:", error);
+            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+        }
+    }
+
     function toggleRelOverlay(show) {
         const container = document.getElementById('rel-add-container');
         if (show) {
@@ -801,5 +905,73 @@
         } else {
             container.classList.remove('active');
             document.body.style.overflow = 'auto';
+        }
+    }
+
+
+    function renderNewsList() {
+        // Musíme nájsť kontajner vnútri tabu 'novinky'
+        const newsTab = document.getElementById('novinky');
+        if (!newsTab) return;
+
+        // Ak tam ešte nie je wrapper pre novinky, vytvoríme ho
+        if (!document.getElementById('news-wrapper')) {
+            newsTab.innerHTML = `
+                <div id="news-wrapper" class="news-container" style="width:100%">
+                    <div id="news-list-view">
+                        <h2 class="section-title">NAJNOVŠIE SPRÁVY</h2>
+                        <div id="news-feed"></div>
+                    </div>
+                    <div id="news-article-view" style="display: none;">
+                        <button class="back-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                        <div id="article-content"></div>
+                    </div>
+                </div>`;
+        }
+
+        const listContainer = document.getElementById('news-list-view');
+        const articleContainer = document.getElementById('news-article-view');
+        const feed = document.getElementById('news-feed');
+
+        listContainer.style.display = 'block';
+        articleContainer.style.display = 'none';
+
+        feed.innerHTML = articles.map(a => `
+            <div class="news-card" onclick="openArticle('${a.id}')">
+                <img src="${a.thumb}" alt="${a.title}" onerror="this.src='assets/logo.png'">
+                <div class="news-card-info">
+                    <span class="news-date">${a.date}</span>
+                    <h3 style="margin:5px 0;">${a.title}</h3>
+                    <p style="margin:0; font-size:0.9rem; color: #555;">${a.summary}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    async function openArticle(articleId) {
+        const article = articles.find(a => a.id === articleId);
+        if (!article) return;
+
+        const listContainer = document.getElementById('news-list-view');
+        const articleContainer = document.getElementById('news-article-view');
+        const content = document.getElementById('article-content');
+
+        // --- ZMENA: Najprv zobrazíme "načítavanie" ---
+        content.innerHTML = "<p style='color:white; text-align:center;'>Načítavam článok...</p>";
+        listContainer.style.display = 'none';
+        articleContainer.style.display = 'block';
+        
+        window.location.hash = `novinky-${articleId}`;
+        window.scrollTo(0, 0);
+
+        try {
+            const response = await fetch(`tabs/articles/${article.file}?t=${new Date().getTime()}`);
+            if (!response.ok) throw new Error("Súbor nenájdený");
+            
+            const html = await response.text();
+            // --- Vložíme obsah až keď je stiahnutý ---
+            content.innerHTML = html;
+        } catch (e) {
+            content.innerHTML = `<p style='color:var(--hybrid-red);'>Chyba: Článok sa nepodarilo načítať. (${e.message})</p>`;
         }
     }
