@@ -29,11 +29,13 @@
 
     <div class="container">
         <div class="tabs">
-            <button class="tab-btn active" onclick="openTab('uvod')">ÚVOD</button>
-            <button class="tab-btn" onclick="openTab('o-projekte')">O PROJEKTE</button>
+            <button class="tab-btn" onclick="openTab('novinky')">NOVINKY</button>
+            <button class="tab-btn active" onclick="openTab('uvod')">O HYBRIDE</button>
             <button class="tab-btn" onclick="openTab('demo')">DEMO</button>
+            <button class="tab-btn" onclick="openTab('o-projekte')">TVORCOVIA</button>
             <button class="tab-btn" onclick="openTab('kontakt')">KONTAKT</button>
         </div>
+        <div id="novinky" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
         <div id="uvod" class="tab-content active" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
         <div id="o-projekte" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
         <div id="demo" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
@@ -231,53 +233,20 @@
 
 <script src="script.js"></script>
 
-<script>
-    // 1. Premennú definujeme globálne na začiatku, aby ju videli všetky funkcie
-    let skillsDB_new = {}; 
-    let originalSkillsDB = {};
-    let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true, humanity: 50 }];
-    let activeCharIdx = 0;
-    let upgradeHistory = []; // Sem budeme ukladať kroky na vrátenie späť
-    let selectedSkill = null;
-    let editingRels = [];
+    <script>
+        // 1. GLOBÁLNE PREMENNÉ (Tieto tu nechaj, aby ich videli všetky funkcie)
+        let skillsDB_new = {}; 
+        let originalSkillsDB = {};
+        let characters = JSON.parse(localStorage.getItem('characters')) || [{ name: "HRDINA 1", sp: 40, skills: {}, isInitialPhase: true, humanity: 50 }];
+        let activeCharIdx = 0;
+        let upgradeHistory = []; 
+        let selectedSkill = null;
+        let editingRels = [];
 
-
-    // 2. Funkcia na načítanie dát
-    async function loadSkills() {
-        try {
-            const response = await fetch('skillsDB.json');
-            if (!response.ok) throw new Error("Súbor nenájdený");
-            
-            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
-            skillsDB_new = await response.json();
-            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            
-            console.log("Dáta úspešne načítané");
-        } catch (error) {
-            console.error("Chyba pri načítaní JSON:", error);
-            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
-            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
-        }
-    }
-
-    // 3. Upravená funkcia init musí byť asynchrónna, aby počkala na loadSkills
-    async function init() {
-        await loadSkills(); // Načíta JSON databázu
-
-        // Načítaj statické taby (môžeš ich pridať podľa potreby)
-        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
-        await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
-
-        // Pokračuj v pôvodnej inicializácii
-        renderCharSelector();
-        updateGroupDropdown();
-        filterBuilder();
-        renderStats();
-        renderEditorList();
-        filterRelSearch();
-    }
-
-    init();
-</script>
+        // 2. SPUSTENIE (Logika samotného initu sa presúva do script.js)
+        document.addEventListener('DOMContentLoaded', () => {
+            init(); 
+        });
+    </script> 
 </body>
 </html>
