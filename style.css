@@ -180,12 +180,13 @@
             flex: 3;
             position: relative;
             background-image: url("assets/dennik.png");
-            background-size: cover;
+            background-size: contain;
             background-repeat: no-repeat;
             background-position: top-left;
             width: 100%;
             aspect-ratio: 210 / 297; /* Pomer strán A4 hárku */
             border: none !important;
+            margin-bottom: 10px !important;
             background-color: transparent !important;
             overflow: hidden !important;
             align-items: stretch !important; /* Dôležité pre šírku riadkov */
@@ -261,7 +262,7 @@
         .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 560px; z-index: 10;}
         .control-box { background: #000; color: white; padding: 20px; border-bottom: 5px solid var(--hybrid-red); }
         
-        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px;}
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
         .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
         .skill-list-item:hover { background: #f4f4f4; }
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
@@ -791,7 +792,9 @@
                         margin-bottom: 0 !important;    /* Zruší šedú medzeru pod zoznamom */
                         padding-bottom: 130px !important; /* Vytvorí bezpečný priestor VNÚTRI zoznamu */
                     }
-
+                    .builder-list-item {
+                        margin-bottom: 10px;
+                    }
                     /* Voliteľné: Zmenšenie položiek v zozname pre lepší prehľad na mobile */
                     #builder-list .skill-list-item {
                         padding: 8px 10px !important;
