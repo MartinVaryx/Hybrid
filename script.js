@@ -702,97 +702,83 @@
 
 
     function handleRouting() {
-        // Ak je hash prázdny, nastavíme predvolený tab 'uvod'
         const hash = window.location.hash.replace('#', '') || 'uvod';
-
         const builderTabs = ['builder', 'editor', 'navod'];
-        const isBuilderViewActive = document.getElementById('view-builder').classList.contains('active-view');
+        
+        // Zistíme, kde sa nachádzame (bez togglovania)
+        const isArticle = hash.startsWith('novinky-');
+        const targetTab = isArticle ? 'novinky' : hash;
 
-
-        // LOGIKA PREPÍNANIA POHĽADOV (Intro vs Builder)
-        if (builderTabs.includes(hash)) {
-            // Chceme ísť do Buildera, ale sme v Intro? Prepnime to.
-            if (!isBuilderViewActive) {
-                toggleView(); 
-            }
+        // 1. Správne prepnutie hlavného zobrazenia (Intro vs Builder)
+        if (builderTabs.includes(targetTab)) {
+            forceView('builder');
         } else {
-            // Chceme ísť do Intra (uvod, kontakt...), ale sme v Builderi? Prepnime to späť.
-            if (isBuilderViewActive) {
-                toggleView();
-            }
+            forceView('intro');
         }
-        if (hash.startsWith('novinky-')) {
-                const articleId = hash.replace('novinky-', '');
-                
-                // Ak ešte nie sme v sekcii Intro, prepneme view
-                if (document.getElementById('view-builder').classList.contains('active-view')) {
-                    toggleView();
-                }
-                
-                // Aktivujeme tab novinky bez toho, aby sme spustili renderNewsList()
-                const newsTab = document.getElementById('novinky');
-                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-                newsTab.classList.add('active');
-                
-                // Načítame samotný článok
-                openArticle(articleId);
-                return; // Dôležité: ukončíme funkciu, aby nepokračovala k openTab(hash)
-            } else if (hash === 'novinky') {
-            openTab('novinky');
+
+        // 2. Logika pre články vs taby
+        if (isArticle) {
+            const articleId = hash.replace('novinky-', '');
+            openTab('novinky', false); // false = neprepisuj hash, už tam je
+            openArticle(articleId);
+        } else {
+            openTab(targetTab, false); // false = neprepisuj hash
         }
-        // Otvoríme konkrétny tab
-        openTab(hash);
-
-
     }
 
-    function openTab(id) {
-        // 1. AKTUALIZÁCIA URL HASH
-        if (window.location.hash !== '#' + id) {
+    // Pomocná funkcia, ktorá neskáče hore-dole
+    function forceView(viewType) {
+        const introView = document.getElementById('view-intro');
+        const builderView = document.getElementById('view-builder');
+        const toggleBtn = document.getElementById('view-toggle');
+
+        if (viewType === 'builder') {
+            introView.classList.remove('active-view');
+            builderView.classList.add('active-view');
+            if (toggleBtn) toggleBtn.innerText = 'HLAVNÁ STRÁNKA';
+        } else {
+            builderView.classList.remove('active-view');
+            introView.classList.add('active-view');
+            if (toggleBtn) toggleBtn.innerText = 'VYTVOR SI HRDINU';
+        }
+    }
+
+
+    function openTab(id, shouldUpdateHash = true) {
+        // Ak už tab je aktívny, nič nerob (bráni preblikávaniu)
+        const target = document.getElementById(id);
+        if (!target) return;
+
+        // Aktualizácia URL len ak je to žiadané (pri kliku, nie pri routingu)
+        if (shouldUpdateHash && window.location.hash !== '#' + id) {
             window.location.hash = id;
         }
 
-        // 2. Skryť všetok obsah tabov
-        // Odstraňujeme triedu 'active', ktorú tvoj CSS používa na zobrazenie
-        const contents = document.querySelectorAll('.tab-content');
-        contents.forEach(c => {
-            c.classList.remove('active');
-            // V CSS máš .tab-content.active { display: flex !important; }
-            // Ručné nastavovanie .style.display tu nie je nutné, ak CSS funguje správne
-        });
-
-        // 3. Deaktivovať všetky tlačidlá tabov
+        // Klasické prepínanie tried
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
 
-        // 4. Aktivovať vybraný tab
-        const target = document.getElementById(id);
-        if (target) {
-            target.classList.add('active');
-            
-            // Špeciálna podmienka pre NOVINKY
-            if (id === 'novinky') {
-                renderNewsList(); 
-            }
-        }
+        target.classList.add('active');
 
-        // 5. Zvýrazniť správne tlačidlo v navigácii
+        // Zvýraznenie tlačidla
         const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
             b.getAttribute('onclick')?.includes(`'${id}'`)
         );
         if (btn) btn.classList.add('active');
-        
-        // 6. Špecifické vykresľovanie pre funkčné taby Buildera
-        if (id === 'editor') {
-            renderEditorList();
-        } else if (id === 'builder') {
-            renderStats(); 
-            setTimeout(() => {
-                filterBuilder(); 
-            }, 50);
-        }
 
-        // 7. Reset scrollu na vrch stránky
-        window.scrollTo(0, 0);
+        // Špecifická logika pre taby
+        if (id === 'novinky') {
+            ensureNewsStructure(); // Vždy priprav štruktúru
+            if (!window.location.hash.includes('novinky-')) {
+                renderNewsList(); // Zoznam vykresli len ak nie sme v článku
+            }
+        }
+        
+        if (id === 'editor') renderEditorList();
+        if (id === 'builder') {
+            renderStats();
+            setTimeout(() => filterBuilder(), 50);
+        }
     }
 
     
@@ -858,15 +844,15 @@
 
     async function init() {
         console.log("Inicializácia systému...");
-        
-        // Načítanie základných dát
+            
+        // 1. Načítaj dáta (Kritické)
         await loadSkills(); 
 
-        // Načítanie obsahu pre statické taby (Úvod, O projekte, atď.)
+        // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
         const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
         await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
 
-        // Inicializácia rozhrania Buildera
+        // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
         renderCharSelector();
         updateGroupDropdown();
         filterBuilder();
@@ -874,8 +860,11 @@
         renderEditorList();
         filterRelSearch();
 
-        // Spustenie routingu (Hash navigácia)
+        // 4. JEDINÉ spustenie routingu pri štarte
+        // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
         handleRouting(); 
+
+        // 5. Počúvanie na zmeny URL (keď používateľ kliká na "Späť" v prehliadači)
         window.addEventListener('hashchange', handleRouting);
     }
 
@@ -908,13 +897,11 @@
         }
     }
 
-
-    function renderNewsList() {
-        // Musíme nájsť kontajner vnútri tabu 'novinky'
+    function ensureNewsStructure() {
         const newsTab = document.getElementById('novinky');
         if (!newsTab) return;
 
-        // Ak tam ešte nie je wrapper pre novinky, vytvoríme ho
+        // Ak tam ešte nie je wrapper, vytvoríme ho (toto je ten chýbajúci kúsok)
         if (!document.getElementById('news-wrapper')) {
             newsTab.innerHTML = `
                 <div id="news-wrapper" class="news-container" style="width:100%">
@@ -928,6 +915,10 @@
                     </div>
                 </div>`;
         }
+    }
+
+    function renderNewsList() {
+        ensureNewsStructure(); // Najprv sa uistíme, že máme kontajnery
 
         const listContainer = document.getElementById('news-list-view');
         const articleContainer = document.getElementById('news-article-view');
@@ -935,6 +926,7 @@
 
         listContainer.style.display = 'block';
         articleContainer.style.display = 'none';
+        window.location.hash = 'novinky';
 
         feed.innerHTML = articles.map(a => `
             <div class="news-card" onclick="openArticle('${a.id}')">
@@ -949,6 +941,7 @@
     }
 
     async function openArticle(articleId) {
+        ensureNewsStructure();
         const article = articles.find(a => a.id === articleId);
         if (!article) return;
 
