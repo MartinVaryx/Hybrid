@@ -378,10 +378,10 @@
 
         } else {
             // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
-            addSheetText(container, char.sp.toString(), "25.5%", "92%", "1.8rem", "60px", "center", "br-field");
+            addSheetText(container, char.sp.toString(), "25%", "90%", "1.8rem", "60px", "center", "br-field");
             
             const humanityVal = char.humanity !== undefined ? char.humanity : 10;
-            addSheetText(container, humanityVal.toString(), "25.5%", "78.5%", "1.8rem", "60px", "center", "humanity-field");
+            addSheetText(container, humanityVal.toString(), "25%", "76.5%", "1.8rem", "60px", "center", "humanity-field");
         }
 
         //SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
@@ -396,8 +396,8 @@
         for (let col = 0; col < 2; col++) {
             for (let row = 0; row < maxRows; row++) {
                 slots.push({
-                    x: col === 0 ? 7.5 : 55.5,
-                    y: 41.2 + (row * 4.78) 
+                    x: col === 0 ? 6.5 : 54,
+                    y: 40.5 + (row * 4.73) 
                 });
             }
         }
