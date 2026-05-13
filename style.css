@@ -1,5 +1,5 @@
         :root {
-            --bg-paper: #e5e5e5; 
+            --bg-paper: #949494; 
             --hybrid-black: #000000;
             --hybrid-red: #c62828;
             --hybrid-green: #2e7d32;
@@ -31,7 +31,7 @@
             background-repeat: no-repeat;
             z-index: -1;
             pointer-events: none;
-            opacity: 0.18;
+            opacity: 0.2;
             mix-blend-mode: multiply;
             width: 1050px; 
             height: 1050px;
@@ -280,7 +280,7 @@
             margin: 2px;
             text-transform: uppercase;
         }
-        .tag-remove { color: var(--hybrid-red); cursor: pointer; font-weight: bold; }
+        .tag-remove { color: whitesmoke; cursor: pointer; font-weight: bold; }
 
         input, select { border: 2px solid #000; padding: 8px; font-family: 'Roboto Condensed', sans-serif; font-weight: bold; text-transform: uppercase; }
 
