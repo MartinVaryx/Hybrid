@@ -75,7 +75,7 @@
         editingRels.forEach(rel => {
             const span = document.createElement('span');
             span.className = 'tag';
-            span.innerHTML = `${rel} <span class="tag-remove" onclick="removeRel('${rel}')">✕</span>`;
+            span.innerHTML = `<span class="tag-remove" onclick="removeRel('${rel}')">${rel}</span>`;
             container.appendChild(span);
         });
     }
