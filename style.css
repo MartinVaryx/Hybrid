@@ -260,7 +260,7 @@
         .skill-node.selected { background-color: var(--hybrid-black); color: white; }
         .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
 
-        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 20px; align-self: flex-start; height: 560px; z-index: 10;}
+        .info-panel { flex: 1.8; display: flex; flex-direction: column; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 560px; z-index: 10;}
         .control-box { background: #000; color: white; padding: 20px; border-bottom: 5px solid var(--hybrid-red); }
         
         .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
