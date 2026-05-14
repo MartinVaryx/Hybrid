@@ -332,7 +332,6 @@
 
     function undoUpgrade() {
         if (upgradeHistory.length === 0) {
-            showCustomAlert("ŽIADNE ĎALŠIE KROKY NA VRÁTENIE.");
             return;
         }
 
