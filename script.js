@@ -943,11 +943,11 @@
         ensureNewsStructure();
         const article = articles.find(a => a.id === articleId);
         if (!article) return;
-
+    
         const listContainer = document.getElementById('news-list-view');
         const articleContainer = document.getElementById('news-article-view');
         const content = document.getElementById('article-content');
-
+    
         // --- ZMENA: Najprv zobrazíme "načítavanie" ---
         content.innerHTML = "<p style='color:white; text-align:center;'>Načítavam článok...</p>";
         listContainer.style.display = 'none';
@@ -955,9 +955,10 @@
         
         window.location.hash = `novinky-${articleId}`;
         window.scrollTo(0, 0);
-
+    
         try {
-            const response = await fetch(`tabs/articles/${article.file}?t=${new Date().getTime()}`);
+            // --- AKTUALIZÁCIA CESTY: tabs/articles/id_clanku/subor.html ---
+            const response = await fetch(`tabs/articles/${article.id}/${article.file}?t=${new Date().getTime()}`);
             if (!response.ok) throw new Error("Súbor nenájdený");
             
             const html = await response.text();
