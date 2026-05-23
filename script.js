@@ -1,4 +1,10 @@
     const articles = [
+        {   id: 'schopnosti',
+            title: 'Nový systém schopností',
+            date: '23. 05. 2026',
+            summary: 'Prepracovali sme systém schopností, aby bol intuitívnejší.',
+            thumb: 'assets/articles/schopnosti.png',
+            file: 'schopnosti.html'},
         {
             id: 'zaciatok',
             title: 'Ako to začalo',
