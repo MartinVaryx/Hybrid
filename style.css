@@ -385,6 +385,7 @@
 
         .news-card {
             display: flex;
+            align-items: center;
             gap: 20px;
             background: rgba(255,255,255,0.05);
             margin-bottom: 20px;
