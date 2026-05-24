@@ -974,3 +974,62 @@
             content.innerHTML = `<p style='color:var(--hybrid-red);'>Chyba: Článok sa nepodarilo načítať. (${e.message})</p>`;
         }
     }
+
+async function exportpng() {
+    const container = document.getElementById('character-stats');
+    if (!container) {
+        alert("Chyba: Panel štatistík (#character-stats) nebol v HTML nájdený.");
+        return;
+    }
+
+    // Bezpečné zistenie mena postavy pre názov súboru
+    let menoHrdinu = "hrdina";
+    if (typeof characters !== 'undefined' && typeof activeCharIdx !== 'undefined' && characters[activeCharIdx]) {
+        menoHrdinu = characters[activeCharIdx].name.replace(/[^a-zA-Z0-9]/g, "_");
+    }
+
+    try {
+        bezpečnyStatus("Pripravujem čistú kartu na tlač...");
+        
+        // 1. Zaistíme stiahnutie rendering knižnice
+        const h2c = await zaistiHtml2Canvas();
+
+        // 2. DOČASNE SKRYJEME ÚROVNE (lvl)
+        // Použijeme visibility = 'hidden'. Prvok ostane na mieste, nezmení šírku stĺpcov, ale kompletne zmizne z exportu.
+        const lvlBoxy = container.querySelectorAll('.skill-lvl-box');
+        lvlBoxy.forEach(box => {
+            box.style.visibility = 'hidden';
+        });
+
+        // 3. VYTVORENIE SNÍMKY (Canvas)
+        // scale: 3 zabezpečí extrémne vysoké rozlíšenie textu a pozadia pre dokonalú ostrosť pri tlači na papier.
+        // useCORS: true zaistí, že sa správne prenesie aj background-image definovaný v style.css.
+        const canvas = await h2c(container, {
+            scale: 3, 
+            useCORS: true,
+            allowTaint: true,
+            backgroundColor: null,
+            logging: false
+        });
+
+        // 4. OKAMŽITÉ NAVRÁTENIE ÚROVNÍ (Hráč na webe výpadok čísel vôbec nepostrehne)
+        lvlBoxy.forEach(box => {
+            box.style.visibility = 'visible';
+        });
+
+        // 5. VYGENEROVANIE A STIAHNUTIE OBRÁZKA PNG
+        const imgData = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = `hybrid_karta_${menoHrdinu}_na_tlac.png`;
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        bezpečnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
+    } catch (error) {
+        console.error("Export zlyhal:", error);
+        alert("Export zlyhal: " + error.message);
+    }
+}
