@@ -58,6 +58,12 @@
             "EQ",
             "ZMYSLY"
         ]
+    "EMPATIA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ"
+        ]
     ],
     "MANIPULÁCIA": [
         2,
@@ -196,6 +202,17 @@
             "ZRUČNOSŤ"
         ]
     ],
+    "ŠPECIÁLNE ZBRANE": [
+        3,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "ŤAŽKÉ ZBRANE",
+            "IQ",
+            "ZRUČNOSŤ",
+            "MECHANIKA"
+        ]
+    ],
     "OMRÁČENIE": [
         2,
         "BOJ ZBLÍZKA",
@@ -279,6 +296,15 @@
             "VÝROBA VÝBUŠNÍN",
             "ŠPECIÁLNE ZBRANE",
             "VRHANIE"
+        ]
+    ],
+        "VÝROBA VÝBUŠNÍN": [
+        3,
+        "KUTILSTVO",
+        [
+            "VÝROBA",
+            "ELEKTRONIKA",
+            "POUŽÍVANIE VÝBUŠNÍN"
         ]
     ],
     "MAPOVANIE POPULÁCIE": [
@@ -586,7 +612,7 @@
     ],
     "TANEC": [
         2,
-        "BOJ Z DIAĽKY",
+        "VŠEOBECNÉ",
         [
             "OBRATNOSŤ",
             "EQ",
