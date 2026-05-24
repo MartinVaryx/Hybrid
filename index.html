@@ -64,14 +64,13 @@
             <select id="char-selector" onchange="switchCharacter()"></select>
             <button class="tab-btn" style="background: var(--hybrid-red); color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
             <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()"> + </button>
+            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="exportpng()">EXPORTOVAŤ</button>
         </div>
 
         <div id="new-char-input-container" style="display:none; flex-grow: 1; margin: 0 15px; background: #222; padding: 5px 10px; gap: 8px; border: 1px solid var(--hybrid-red); align-items: center;">
             <input type="text" id="new-char-name" placeholder="MENO NOVÉHO HRDINU" style="flex: 1; padding: 8px; font-size: 14px; background: #000; color: white; border: 1px solid #444;">
             <button class="tab-btn" style="background: var(--hybrid-green); color: white; clip-path: none; margin:0; padding: 5px 10px; font-size: 0.8rem;" onclick="confirmNewCharacter()">ULOŽIŤ</button>
             <button class="tab-btn" style="background: var(--hybrid-red); color: white; clip-path: none; margin:0; padding: 5px 10px; font-size: 0.8rem;" onclick="cancelNewCharacter()">ZRUŠIŤ</button>
-            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="exportpng()">EXPORTOVAŤ</button>
-
         </div>
         <button class="tab-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
