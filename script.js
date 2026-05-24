@@ -995,17 +995,17 @@ async function exportpng() {
         const h2c = await zaistiHtml2Canvas();
 
         // 2. DOČASNE SKRYJEME ÚROVNE (lvl)
-        // Použijeme visibility = 'hidden'. Prvok ostane na mieste, nezmení šírku stĺpcov, ale kompletne zmizne z exportu.
-        const lvlBoxy = container.querySelectorAll('.skill-lvl-box');
-        lvlBoxy.forEach(box => {
-            box.style.visibility = 'hidden';
+        const poliaNaSkrytie = container.querySelectorAll('.skill-lvl-box, .humanity-field, .br-field');
+        
+        // Dočasne ich skryjeme (ich vyhradené miesto a šírka v hárku zostanú zachované)
+        poliaNaSkrytie.forEach(pole => {
+            pole.style.visibility = 'hidden';
         });
-
         // 3. VYTVORENIE SNÍMKY (Canvas)
         // scale: 3 zabezpečí extrémne vysoké rozlíšenie textu a pozadia pre dokonalú ostrosť pri tlači na papier.
         // useCORS: true zaistí, že sa správne prenesie aj background-image definovaný v style.css.
         const canvas = await h2c(container, {
-            scale: 3, 
+            scale: 2, 
             useCORS: true,
             allowTaint: true,
             backgroundColor: null,
@@ -1013,15 +1013,15 @@ async function exportpng() {
         });
 
         // 4. OKAMŽITÉ NAVRÁTENIE ÚROVNÍ (Hráč na webe výpadok čísel vôbec nepostrehne)
-        lvlBoxy.forEach(box => {
-            box.style.visibility = 'visible';
+        poliaNaSkrytie.forEach(pole => {
+            pole.style.visibility = 'visible';
         });
 
         // 5. VYGENEROVANIE A STIAHNUTIE OBRÁZKA PNG
         const imgData = canvas.toDataURL('image/png');
         const link = document.createElement('a');
         link.href = imgData;
-        link.download = `hybrid_karta_${menoHrdinu}_na_tlac.png`;
+        link.download = `${menoHrdinu}_dennik.png`;
         
         document.body.appendChild(link);
         link.click();
