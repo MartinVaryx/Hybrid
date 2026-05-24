@@ -299,7 +299,7 @@
             "VRHANIE"
         ]
     ],
-        "VÝROBA VÝBUŠNÍN": [
+    "VÝROBA VÝBUŠNÍN": [
         3,
         "KUTILSTVO",
         [
@@ -351,7 +351,9 @@
         [
             "ZRUČNOSŤ",
             "IQ",
-            "ZMYSLY"
+            "ZMYSLY",
+            "MEDICÍNA",
+            "PRVÁ POMOC"
         ]
     ],
     "BIOCHÉMIA": [
@@ -367,7 +369,8 @@
         "LIEČENIE",
         [
             "BIOCHÉMIA",
-            "MEDICÍNA"
+            "MEDICÍNA",
+            "IQ"
         ]
     ],
     "BIOLOGICKÉ ZBRANE": [
