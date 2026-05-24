@@ -989,7 +989,7 @@ async function exportpng() {
     }
 
     try {
-        bezpečnyStatus("Pripravujem čistú kartu na tlač...");
+        bezpecnyStatus("Pripravujem čistú kartu na tlač...");
         
         // 1. Zaistíme stiahnutie rendering knižnice
         const h2c = await zaistiHtml2Canvas();
@@ -1027,7 +1027,7 @@ async function exportpng() {
         link.click();
         document.body.removeChild(link);
 
-        bezpečnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
+        bezpecnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
     } catch (error) {
         console.error("Export zlyhal:", error);
         alert("Export zlyhal: " + error.message);
