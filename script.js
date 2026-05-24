@@ -1033,3 +1033,29 @@ async function exportpng() {
         alert("Export zlyhal: " + error.message);
     }
 }
+
+function zaistiHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        if (window.html2canvas) {
+            resolve(window.html2canvas);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = () => resolve(window.html2canvas);
+        script.onerror = () => reject(new Error('Nepodarilo sa načítať externú knižnicu pre export.'));
+        document.head.appendChild(script);
+    });
+}
+
+// Bezpečná verzia statusu, ktorá nespadne, ak id="status-message" v HTML neexistuje
+function bezpecnyStatus(text) {
+    const msg = document.getElementById('status-message');
+    if (msg) {
+        msg.innerText = text;
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    } else {
+        console.log("STATUS:", text); // Záloha do konzoly, ak element chýba
+    }
+}
