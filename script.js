@@ -16,6 +16,8 @@
         }
     ];
     
+    
+    
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
         const editorSelect = document.getElementById('edit-group');
@@ -37,17 +39,13 @@
         list.innerHTML = '';
         
         // --- NOVÁ LOGIKA: RESET HODNÔT, AK SA TEXT NEZHODUJE S DB ---
-        // Skontrolujeme, či zadaný text je presným kľúčom v databáze
         if (!skillsDB_new[search]) {
-            // Ak sa nezhoduje, vyčistíme ostatné políčka a prepojenia
             document.getElementById('edit-cat').value = '';
             document.getElementById('edit-group').value = '';
             editingRels = [];
             renderRelTags();
             filterRelSearch();
         } else {
-            // Ak používateľ dopísal text, ktorý presne zodpovedá schopnosti, 
-            // automaticky mu ju načítame do editora (voliteľné, ale zlepší to UX)
             const data = skillsDB_new[search];
             document.getElementById('edit-cat').value = data[0];
             document.getElementById('edit-group').value = data[1];
@@ -58,7 +56,7 @@
         // --- KONIEC NOVEJ LOGIKY ---
 
         const sortedKeys = Object.keys(skillsDB_new)
-            .filter(name => name.includes(search)) // Filtrovanie podľa písania
+            .filter(name => name.includes(search))
             .sort((a, b) => {
                 const gA = skillsDB_new[a][1].toUpperCase();
                 const gB = skillsDB_new[b][1].toUpperCase();
@@ -77,6 +75,10 @@
             const div = document.createElement('div');
             div.className = 'skill-list-item';
             div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
             div.onclick = () => loadToEditor(name);
             list.appendChild(div);
         });
@@ -111,14 +113,14 @@
     function filterRelSearch() {
         const list = document.getElementById('rel-add-list');
         const search = document.getElementById('rel-search').value.toUpperCase();
-        const groupFilter = document.getElementById('rel-group-filter').value; // Hodnota z nového filtra
+        const groupFilter = document.getElementById('rel-group-filter').value;
         list.innerHTML = '';
         
         const sortedKeys = Object.keys(skillsDB_new)
             .filter(name => {
                 const skillGroup = skillsDB_new[name][1];
                 const matchesSearch = name.includes(search);
-                const matchesGroup = !groupFilter || skillGroup === groupFilter; // Logika filtra skupín
+                const matchesGroup = !groupFilter || skillGroup === groupFilter;
                 const isNotAlreadyAdded = !editingRels.includes(name);
                 
                 return matchesSearch && matchesGroup && isNotAlreadyAdded;
@@ -143,17 +145,19 @@
             const div = document.createElement('div');
             div.className = 'skill-list-item';
             div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu (pre zoznam príbuzných schopností)
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
             div.onclick = () => { 
                 editingRels.push(name); 
                 renderRelTags(); 
-                // Po pridaní nevymažeme filter, len vyhľadávanie
                 document.getElementById('rel-search').value = ''; 
                 filterRelSearch(); 
             };
             list.appendChild(div);
         });
     }
-
     function removeRel(name) { editingRels = editingRels.filter(r => r !== name); renderRelTags(); }
 
     function saveSkill() {
@@ -251,7 +255,7 @@
         }
 
         const finalCost = Math.max(targetLvl, baseCost - discount);
-        document.getElementById('sel-skill-name').innerText = `${name} \u2192 ${targetLvl}`;
+        document.getElementById('sel-skill-name').innerText = `${name+":"} ${targetLvl - 1} \u2192 ${targetLvl}`;
         document.getElementById('sel-skill-cat').innerText = `KATEGÓRIA: ${data[0]} | SKUPINA: ${data[1]}`;
         
         const relsBox = document.getElementById('sel-skill-rels');
@@ -727,18 +731,15 @@
         const list = document.getElementById('builder-list');
         const search = document.getElementById('builder-search').value.toUpperCase();
         const groupFilter = document.getElementById('builder-group-filter').value;
-        const char = characters[activeCharIdx]; // Aktuálna postava
+        const char = characters[activeCharIdx];
         list.innerHTML = '';
         
         const sortedKeys = Object.keys(skillsDB_new)
             .filter(name => {
                 const skillGroup = skillsDB_new[name][1];
-                
-                // LOGIKA FÁZY: Ak je v prvej fáze, vidí len DANOSTI
                 if (char.isInitialPhase && skillGroup !== "DANOSTI") {
                     return false;
                 }
-
                 const matchesSearch = name.includes(search);
                 const matchesGroup = !groupFilter || skillGroup === groupFilter;
                 return matchesSearch && matchesGroup;
@@ -762,6 +763,10 @@
             const div = document.createElement('div');
             div.className = 'skill-list-item';
             div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
             div.onclick = () => selectSkill(name);
             list.appendChild(div);
         });
@@ -1109,6 +1114,8 @@
         renderEditorList();
         filterRelSearch();
 
+        initSkillTooltips();
+
         // 4. JEDINÉ spustenie routingu pri štarte
         // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
         handleRouting(); 
@@ -1303,4 +1310,59 @@ async function exportpng() {
         console.error("Export zlyhal:", error);
         alert("Export zlyhal: " + error.message);
     }
+}
+
+function initSkillTooltips() {
+    // Vytvoríme jeden globálny div pre tooltip v dokumente, ak ešte neexistuje
+    let tooltip = document.querySelector('.skill-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'skill-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    // Delegovanie udalosti na celý dokument (bude fungovať aj po premazaní a znovuvykreslení zoznamov)
+    document.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('.skill-list-item');
+        if (!target) return;
+
+        const description = target.getAttribute('data-description');
+        // Ak schopnosť nemá popis (index 3 je prázdny), tooltip nezobrazujeme
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    });
+
+    document.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        // Ošetrenie, aby rámček nevyliezol mimo obrazovku vpravo alebo dole
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('.skill-list-item');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+
+        document.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+        });
+    });
 }
