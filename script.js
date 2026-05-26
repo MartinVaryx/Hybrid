@@ -1361,8 +1361,5 @@ function initSkillTooltips() {
 
         tooltip.classList.remove('visible');
 
-        document.addEventListener('click', () => {
-        tooltip.classList.remove('visible');
-        });
     });
 }
