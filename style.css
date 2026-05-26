@@ -140,7 +140,7 @@
         }
         
         .tab-btn {
-            padding: 12px 35px;
+            padding: 12px 20px;
             border: none;
             background: #222;
             color: #777;
@@ -812,9 +812,9 @@
                         height: 45px;
                     }
                     .control-box div[style*="display: flex; gap: 5px"] .tab-btn:first-child {
-                        flex: 3 !important; /* Pôvodne 6 - zúžime tlačidlo Zvýšiť úroveň */
+                        flex: 5 !important; /* Pôvodne 6 - zúžime tlačidlo Zvýšiť úroveň */
                     }
-                    .control-box div[style*="display: flex; gap: 5px"] .tab-btn:last-child {
+                    .control-box div[style*="display: flex; gap: 5px"] .tab-btn:last-child, .tab-btn:second-child {
                             flex: 1 !important; /* Pôvodne 0.1 - výrazne rozšírime šípku */
                             font-size: 1.5rem !important; /* Trochu zväčšíme samotnú šípku pre lepšiu ovládateľnosť */
                         }
