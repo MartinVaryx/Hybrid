@@ -12,6 +12,7 @@
             summary: 'O tom, čo viedlo ku vzniku Hybridu.',
             thumb: 'assets/articles/zaciatok.jpg',
             file: 'zaciatok.html'
+
         }
     ];
     
@@ -250,12 +251,12 @@
         const char = characters[activeCharIdx];
         const currentLvl = char.skills[selectedSkill] || 0;
         
-        // Načítame dáta schopnosti hneď na začiatku, aby sme s nimi mohli pracovať
         const data = skillsDB_new[selectedSkill]; 
-        const skillGroup = data[1]; // Skupina je na indexe 1
+        if (!data) return;
+        const skillGroup = data[1]; 
         const targetLvl = currentLvl + 1;
 
-        // 1. KONTROLA LIMITOV SCHOPNOSTÍ
+        // 1. KONTROLA LIMITOV SCHOPNOSTÍ (Spoločná pre obe fázy)
         if (currentLvl === 0) {
             const learnedSkills = Object.values(char.skills).filter(lvl => lvl > 0);
             const learnedSkillsCount = learnedSkills.length;
@@ -271,89 +272,311 @@
             }
         }
 
-        // Výpočet ceny
-        let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
-        let discount = relLevels.reduce((a, b) => a + b, 0);
-        const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
-        
-        if (char.humanity <= cost && skillGroup === "SOMORA") {
-            showCustomAlert("Máš príliš nízku ľudskosť.");
-                return;
-        }
-        // 2. KONTROLA DOSTATKU BODOV
-        if (char.sp >= cost) {
+        // --- FÁZA 1: POČIATOČNÁ FÁZA (Základných 40 bodov) ---
+        if (char.isInitialPhase) {
+            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+            let discount = relLevels.reduce((a, b) => a + b, 0);
+            const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
             
-            // Prechod do druhej fázy
-            if (char.isInitialPhase && (char.sp - cost) === 0) {
+            if (char.humanity <= cost && skillGroup === "SOMORA") {
+                showCustomAlert("Máš príliš nízku ľudskosť.");
+                return;
+            }
+
+            if (char.sp < cost) {
+                showCustomAlert("NEDOSTATOK BODOV RASTU!");
+                return;
+            }
+                
+            // Špeciálny prípad: Uzavretie a prechod do druhej fázy
+            if ((char.sp - cost) === 0) {
                 showCustomAlert(
                     "Týmto uzavrieš fázu DANOSTÍ. Želáš si pokračovať?", 
                     "POTVRDENIE FÁZY", 
                     true, 
                     () => {
+                        char.skills[selectedSkill] = targetLvl; // Zapíšeme poslednú schopnosť
+                        char.initialSkillsSnapshot = { ...char.skills }; // Uložíme stav na konci 1. fázy
+                        
                         char.isInitialPhase = false;
-                        char.sp = (char.sp - cost) + 20;
-                        char.skills[selectedSkill] = targetLvl;
-                        // Ak je to Somora, odčítame humanitu aj pri potvrdení
+                        char.sp = 20; // Nastavíme čistých 20 bodov pre 2. fázu
+                        
                         if (skillGroup === "SOMORA") {
                             char.humanity = (char.humanity || 10) - cost;
                         }
-                        upgradeHistory = []; 
+                        upgradeHistory = []; // Vyčistíme históriu prvej fázy
                         finishUpgrade(); 
                     }
                 );
                 return; 
-            } 
+            }
 
-            // BEŽNÝ PRÍPAD
+            // Bežný nákup vo Fáze 1
             upgradeHistory.push({
                 skill: selectedSkill,
+                type: 'upgrade',
                 prevLvl: currentLvl,
                 prevSP: char.sp,
-                prevHumanity: char.humanity || 10, // Uložíme pre undo
-                wasInitialPhase: char.isInitialPhase
+                prevHumanity: char.humanity || 10,
+                wasInitialPhase: true
             });
 
             char.sp -= cost;
-
-            // LOGIKA PRE HUMANITU
             if (skillGroup === "SOMORA") {
-                // Ak humanity neexistuje, nastavíme základ 10 a odčítame cost
                 char.humanity = (char.humanity || 10) - cost;
             }
 
             char.skills[selectedSkill] = targetLvl;
             finishUpgrade();
-
-        } else { 
-            showCustomAlert("NEDOSTATOK BODOV RASTU!"); 
-        }
-
-        function finishUpgrade() {
-            saveState();
-            renderStats();
-            selectSkill(selectedSkill);
-            filterBuilder();
-        }
-    }
-
-    function undoUpgrade() {
-        if (upgradeHistory.length === 0) {
             return;
         }
 
-        const lastAction = upgradeHistory.pop(); // Vyberieme posledný uložený krok
+        // --- FÁZA 2: POKROČILÁ FÁZA (20 bodov + Synergie, Stavový prístup) ---
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        // Nasimulujeme nový stav po nákupe
+        let simulatedSkills = { ...char.skills };
+        simulatedSkills[selectedSkill] = targetLvl;
+
+        const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
+        const simulatedSP = 20 - afterDetails.totalCost;
+
+        if (simulatedSP < 0) {
+            showCustomAlert("NEDOSTATOK BODOV RASTU!");
+            return;
+        }
+
+        // Kontrola humanity pre Somora schopnosti podľa reálneho nárastu ceny po optimalizácii
+        const addedSomoraCost = afterDetails.somoraCost - beforeDetails.somoraCost;
+        if (addedSomoraCost > 0 && (char.humanity || 10) <= addedSomoraCost) {
+            showCustomAlert("Máš príliš nízku ľudskosť pre túto úroveň schopnosti.", "BLOKOVANÉ");
+            return;
+        }
+
+        // Zápis akcie do histórie pre účely UNDO
+        upgradeHistory.push({
+            skill: selectedSkill,
+            type: 'upgrade',
+            prevLvl: currentLvl,
+            wasInitialPhase: false
+        });
+
+        // Uplatnenie vypočítaného optimálneho stavu
+        char.skills[selectedSkill] = targetLvl;
+        char.sp = simulatedSP;
+        char.humanity = (char.humanity || 10) - addedSomoraCost;
+
+        finishUpgrade();
+    }
+
+    // Zjednodušená pomocná funkcia bez volania neexistujúceho kódu
+    function finishUpgrade() {
+        saveState();
+        renderStats();
+        selectSkill(selectedSkill);
+        filterBuilder();
+    }
+
+    function getOptimalCostsForPhase2(char, skillsState) {
+        const snapshot = char.initialSkillsSnapshot || {};
+        let initialSkillsState = { ...snapshot };
+        let targetSkills = [];
+
+        for (const [name, lvl] of Object.entries(skillsState)) {
+            const baseLvl = snapshot[name] || 0;
+            if (lvl > baseLvl) targetSkills.push(name);
+        }
+
+        if (targetSkills.length === 0) {
+            return { totalCost: 0, somoraCost: 0 };
+        }
+
+        function calculateOrderDetails(skillOrder) {
+            let currentSkills = { ...initialSkillsState };
+            let totalCost = 0;
+            let somoraCost = 0;
+
+            for (const skill of skillOrder) {
+                const targetLvl = skillsState[skill];
+                const data = skillsDB_new[skill];
+                const isSomora = data && data[1] === "SOMORA";
+                const baseLvl = snapshot[skill] || 0;
+
+                for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
+                    const relLevels = data[2].map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const discount = relLevels.reduce((sum, l) => sum + l, 0);
+                    const cost = Math.max(lvl, (lvl * data[0]) - discount);
+                    
+                    totalCost += cost;
+                    if (isSomora) somoraCost += cost;
+                    currentSkills[skill] = lvl;
+                }
+            }
+            return { totalCost, somoraCost };
+        }
+
+        let bestCost = Infinity;
+        let bestOrder = [];
+
+        function findBestPath(currentOrder, remainingSkills, currentCost, currentSkillsState) {
+            if (currentCost >= bestCost) return;
+            if (remainingSkills.length === 0) {
+                if (currentCost < bestCost) {
+                    bestCost = currentCost;
+                    bestOrder = [...currentOrder];
+                }
+                return;
+            }
+
+            let candidates = [...remainingSkills].sort((a, b) => {
+                const aHelpsB = skillsDB_new[b][2]?.includes(a);
+                const bHelpsA = skillsDB_new[a][2]?.includes(b);
+                if (aHelpsB && !bHelpsA) return -1;
+                if (bHelpsA && !aHelpsB) return 1;
+                const catA = skillsDB_new[a][0];
+                const catB = skillsDB_new[b][0];
+                if (catA !== catB) return catA - catB;
+                return a.localeCompare(b);
+            });
+
+            for (let i = 0; i < candidates.length; i++) {
+                const skill = candidates[i];
+                let nextSkillsState = { ...currentSkillsState };
+                let costAdded = 0;
+                const targetLvl = skillsState[skill];
+                const data = skillsDB_new[skill];
+                const baseLvl = snapshot[skill] || 0;
+
+                for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
+                    const relLevels = data[2].map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const discount = relLevels.reduce((sum, l) => sum + l, 0);
+                    costAdded += Math.max(lvl, (lvl * data[0]) - discount);
+                    nextSkillsState[skill] = lvl;
+                }
+
+                currentOrder.push(skill);
+                const nextRemaining = remainingSkills.filter(s => s !== skill);
+                findBestPath(currentOrder, nextRemaining, currentCost + costAdded, nextSkillsState);
+                currentOrder.pop();
+            }
+        }
+
+        findBestPath([], targetSkills, 0, { ...initialSkillsState });
+        return calculateOrderDetails(bestOrder);
+    }
+
+
+    function downgradeSkill() {
+        if (!selectedSkill) return;
+        const char = characters[activeCharIdx];
+        if (!char || !char.skills) return;
+
+        const currentLvl = char.skills[selectedSkill] || 0;
+        if (currentLvl === 0) return;
+
+        const data = skillsDB_new[selectedSkill];
+        if (!data) return;
+
+        // FÁZA 1 (Základných 40 bodov)
+        if (char.isInitialPhase) {
+            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+            let discount = relLevels.reduce((a, b) => a + b, 0);
+            const cost = Math.max(currentLvl, (currentLvl * data[0]) - discount);
+
+            upgradeHistory.push({ skill: selectedSkill, type: 'downgrade', prevLvl: currentLvl, wasInitialPhase: true, prevSP: char.sp, prevHumanity: char.humanity });
+
+            char.skills[selectedSkill]--;
+            if (char.skills[selectedSkill] === 0) delete char.skills[selectedSkill];
+            
+            char.sp += cost;
+            if (data[1] === "SOMORA") char.humanity = (char.humanity || 10) + cost;
+
+            saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+            return;
+        }
+
+        // FÁZA 2 (20 bodov + Synergie)
+        const snapshot = char.initialSkillsSnapshot || {};
+        if (data[1] === "DANOSTI" && currentLvl <= (snapshot[selectedSkill] || 0)) {
+            showCustomAlert("Nie je možné znížiť schopnosť pod úroveň z počiatočnej fázy.", "BLOKOVANÉ");
+            return;
+        }
+
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        let simulatedSkills = { ...char.skills };
+        simulatedSkills[selectedSkill]--;
+        if (simulatedSkills[selectedSkill] === 0) delete simulatedSkills[selectedSkill];
+
+        const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
+        const simulatedSP = 20 - afterDetails.totalCost;
+
+        if (simulatedSP < 0) {
+            showCustomAlert("Zrušením schopnosti padnú zľavy. Build by prekročil 20 bodov.", "BLOKOVANÉ");
+            return;
+        }
+
+        // Uložíme úroveň PRED downgradom do histórie pre účely UNDO
+        upgradeHistory.push({
+            skill: selectedSkill,
+            type: 'downgrade',
+            prevLvl: currentLvl,
+            wasInitialPhase: false
+        });
+
+        char.skills[selectedSkill]--;
+        if (char.skills[selectedSkill] === 0) delete char.skills[selectedSkill];
+        
+        char.sp = simulatedSP;
+        char.humanity = (char.humanity || 10) - (afterDetails.somoraCost - beforeDetails.somoraCost);
+
+        saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+    }
+
+    function undoUpgrade() {
+        if (upgradeHistory.length === 0) return;
+
+        const lastAction = upgradeHistory.pop();
         const char = characters[activeCharIdx];
 
-        // Vrátime hodnoty späť
-        char.skills[lastAction.skill] = lastAction.prevLvl;
-        char.sp = lastAction.prevSP;
-        char.isInitialPhase = lastAction.wasInitialPhase;
+        // FÁZA 1: Cúvame klasicky lineárne
+        if (lastAction.wasInitialPhase) {
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+            if (char.skills[lastAction.skill] === 0) delete char.skills[lastAction.skill];
+            char.sp = lastAction.prevSP;
+            char.humanity = lastAction.prevHumanity;
+            char.isInitialPhase = true;
+
+            saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+            return;
+        }
+
+        // FÁZA 2: Stavový prístup riadený algoritmom
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        if (lastAction.type === 'upgrade') {
+            // Ak to bol nákup, vrátime nižšiu (pôvodnú) úroveň
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+        } else if (lastAction.type === 'downgrade') {
+            // Ak to bol downgrade, vrátime vyššiu (pôvodnú) úroveň
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+        }
+
+        // Očistenie nulových hodnôt
+        if (char.skills[lastAction.skill] === 0) {
+            delete char.skills[lastAction.skill];
+        }
+
+        // Kompletný prepočet bodov pre nový stav
+        const afterDetails = getOptimalCostsForPhase2(char, char.skills);
+        
+        char.sp = 20 - afterDetails.totalCost;
+        char.humanity = (char.humanity || 10) - (afterDetails.somoraCost - beforeDetails.somoraCost);
 
         saveState();
         renderStats();
         filterBuilder();
         if (selectedSkill) selectSkill(selectedSkill);
-        
     }
         
     function renderStats() {
@@ -945,36 +1168,64 @@
         `).join('');
     }
 
-    async function openArticle(articleId) {
-        ensureNewsStructure();
-        const article = articles.find(a => a.id === articleId);
-        if (!article) return;
-    
-        const listContainer = document.getElementById('news-list-view');
-        const articleContainer = document.getElementById('news-article-view');
-        const content = document.getElementById('article-content');
-    
-        // --- ZMENA: Najprv zobrazíme "načítavanie" ---
-        content.innerHTML = "<p style='color:white; text-align:center;'>Načítavam článok...</p>";
-        listContainer.style.display = 'none';
-        articleContainer.style.display = 'block';
-        
-        window.location.hash = `novinky-${articleId}`;
-        window.scrollTo(0, 0);
-    
-        try {
-            // --- AKTUALIZÁCIA CESTY: tabs/articles/id_clanku/subor.html ---
-            const response = await fetch(`tabs/articles/${article.id}/${article.file}?t=${new Date().getTime()}`);
-            if (!response.ok) throw new Error("Súbor nenájdený");
-            
-            const html = await response.text();
-            // --- Vložíme obsah až keď je stiahnutý ---
-            content.innerHTML = html;
-        } catch (e) {
-            content.innerHTML = `<p style='color:var(--hybrid-red);'>Chyba: Článok sa nepodarilo načítať. (${e.message})</p>`;
-        }
-    }
+async function openArticle(articleId) {
+    ensureNewsStructure();
+    const article = articles.find(a => a.id === articleId);
+    if (!article) return;
 
+    const listContainer = document.getElementById('news-list-view');
+    const articleContainer = document.getElementById('news-article-view');
+    const content = document.getElementById('article-content');
+
+    // --- ZMENA: Najprv zobrazíme "načítavanie" ---
+    content.innerHTML = "<p style='color:white; text-align:center;'>Načítavam článok...</p>";
+    listContainer.style.display = 'none';
+    articleContainer.style.display = 'block';
+    
+    window.location.hash = `novinky-${articleId}`;
+    window.scrollTo(0, 0);
+
+    try {
+        // --- AKTUALIZÁCIA CESTY: tabs/articles/id_clanku/subor.html ---
+        const response = await fetch(`tabs/articles/${article.id}/${article.file}?t=${new Date().getTime()}`);
+        if (!response.ok) throw new Error("Súbor nenájdený");
+        
+        const html = await response.text();
+        // --- Vložíme obsah až keď je stiahnutý ---
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = `<p style='color:var(--hybrid-red);'>Chyba: Článok sa nepodarilo načítať. (${e.message})</p>`;
+    }
+}
+
+// Pomocná funkcia na dynamické načítanie html2canvas z CDN (ak ešte nie je v projekte)
+function zaistiHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        if (window.html2canvas) {
+            resolve(window.html2canvas);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = () => resolve(window.html2canvas);
+        script.onerror = () => reject(new Error('Nepodarilo sa načítať externú knižnicu pre export.'));
+        document.head.appendChild(script);
+    });
+}
+
+// Bezpečná verzia statusu, ktorá nespadne, ak id="status-message" v HTML neexistuje
+function bezpečnyStatus(text) {
+    const msg = document.getElementById('status-message');
+    if (msg) {
+        msg.innerText = text;
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    } else {
+        console.log("STATUS:", text); // Záloha do konzoly, ak element chýba
+    }
+}
+
+// Hlavná funkcia na export čistého hárku pre ceruzku
 async function exportpng() {
     const container = document.getElementById('character-stats');
     if (!container) {
@@ -989,12 +1240,11 @@ async function exportpng() {
     }
 
     try {
-        bezpecnyStatus("Pripravujem čistú kartu na tlač...");
+        bezpečnyStatus("Pripravujem čistú kartu na tlač...");
         
         // 1. Zaistíme stiahnutie rendering knižnice
         const h2c = await zaistiHtml2Canvas();
 
-        // 2. DOČASNE SKRYJEME ÚROVNE (lvl)
         const poliaNaSkrytie = container.querySelectorAll('.skill-lvl-box, .humanity-field, .br-field');
         
         // Dočasne ich skryjeme (ich vyhradené miesto a šírka v hárku zostanú zachované)
@@ -1027,35 +1277,9 @@ async function exportpng() {
         link.click();
         document.body.removeChild(link);
 
-        bezpecnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
+        bezpečnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
     } catch (error) {
         console.error("Export zlyhal:", error);
         alert("Export zlyhal: " + error.message);
-    }
-}
-
-function zaistiHtml2Canvas() {
-    return new Promise((resolve, reject) => {
-        if (window.html2canvas) {
-            resolve(window.html2canvas);
-            return;
-        }
-        const script = document.createElement('script');
-        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-        script.onload = () => resolve(window.html2canvas);
-        script.onerror = () => reject(new Error('Nepodarilo sa načítať externú knižnicu pre export.'));
-        document.head.appendChild(script);
-    });
-}
-
-// Bezpečná verzia statusu, ktorá nespadne, ak id="status-message" v HTML neexistuje
-function bezpecnyStatus(text) {
-    const msg = document.getElementById('status-message');
-    if (msg) {
-        msg.innerText = text;
-        msg.style.display = 'block';
-        setTimeout(() => { msg.style.display = 'none'; }, 3000);
-    } else {
-        console.log("STATUS:", text); // Záloha do konzoly, ak element chýba
     }
 }
