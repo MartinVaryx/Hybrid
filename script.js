@@ -38,10 +38,13 @@
         const search = nameInput.value.toUpperCase();
         list.innerHTML = '';
         
-        // --- NOVÁ LOGIKA: RESET HODNÔT, AK SA TEXT NEZHODUJE S DB ---
         if (!skillsDB_new[search]) {
             document.getElementById('edit-cat').value = '';
             document.getElementById('edit-group').value = '';
+            
+            const descInput = document.getElementById('edit-desc');
+            if (descInput) descInput.value = '';
+            
             editingRels = [];
             renderRelTags();
             filterRelSearch();
@@ -49,11 +52,15 @@
             const data = skillsDB_new[search];
             document.getElementById('edit-cat').value = data[0];
             document.getElementById('edit-group').value = data[1];
+            
+            // PRIDANÉ: Automatické načítanie popisu pri presnej zhode
+            const descInput = document.getElementById('edit-desc');
+            if (descInput) descInput.value = data[3] || '';
+            
             editingRels = [...data[2]];
             renderRelTags();
             filterRelSearch();
         }
-        // --- KONIEC NOVEJ LOGIKY ---
 
         const sortedKeys = Object.keys(skillsDB_new)
             .filter(name => name.includes(search))
@@ -95,6 +102,13 @@
         document.getElementById('edit-cat').value = data[0];
         document.getElementById('edit-group').value = data[1];
         editingRels = [...data[2]];
+        
+        // PRIDANÉ: Načítanie popisu do textového poľa (ak neexistuje, dáme prázdny text)
+        const descInput = document.getElementById('edit-desc');
+        if (descInput) {
+            descInput.value = data[3] || '';
+        }
+
         renderRelTags();
         filterRelSearch();
     }
@@ -163,9 +177,11 @@
     function saveSkill() {
         const name = document.getElementById('edit-name').value.trim().toUpperCase();
         const cat = parseInt(document.getElementById('edit-cat').value);
+        const descInput = document.getElementById('edit-desc');
+        const description = descInput ? descInput.value.trim() : '';
         let group = document.getElementById('edit-group').value;
         if (!name || !group) return showCustomAlert("VYPLŇTE NÁZOV A SKUPINU.");
-        skillsDB_new[name] = [cat, group, editingRels];
+        skillsDB_new[name] = [cat, group, editingRels, description];
         saveState();
         renderEditorList();
         updateGroupDropdown();
@@ -1116,6 +1132,13 @@
 
         initSkillTooltips();
 
+        const descContainer = document.getElementById('edit-desc-container');
+        if (descContainer) {
+            descContainer.innerHTML = `
+                <textarea id="edit-desc" style="width: 100%; height: 100px; box-sizing: border-box; resize: vertical; margin-top: 5px; padding: 8px; font-family: inherit; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px;"></textarea>
+            `;
+        }
+
         // 4. JEDINÉ spustenie routingu pri štarte
         // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
         handleRouting(); 
@@ -1361,5 +1384,6 @@ function initSkillTooltips() {
 
         tooltip.classList.remove('visible');
 
+        
     });
 }
