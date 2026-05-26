@@ -32,12 +32,33 @@
 
     function renderEditorList() {
         const list = document.getElementById('editor-list');
-        // Filter teraz berie text z políčka pre názov schopnosti
-        const search = document.getElementById('edit-name').value.toUpperCase();
+        const nameInput = document.getElementById('edit-name');
+        const search = nameInput.value.toUpperCase();
         list.innerHTML = '';
         
+        // --- NOVÁ LOGIKA: RESET HODNÔT, AK SA TEXT NEZHODUJE S DB ---
+        // Skontrolujeme, či zadaný text je presným kľúčom v databáze
+        if (!skillsDB_new[search]) {
+            // Ak sa nezhoduje, vyčistíme ostatné políčka a prepojenia
+            document.getElementById('edit-cat').value = '';
+            document.getElementById('edit-group').value = '';
+            editingRels = [];
+            renderRelTags();
+            filterRelSearch();
+        } else {
+            // Ak používateľ dopísal text, ktorý presne zodpovedá schopnosti, 
+            // automaticky mu ju načítame do editora (voliteľné, ale zlepší to UX)
+            const data = skillsDB_new[search];
+            document.getElementById('edit-cat').value = data[0];
+            document.getElementById('edit-group').value = data[1];
+            editingRels = [...data[2]];
+            renderRelTags();
+            filterRelSearch();
+        }
+        // --- KONIEC NOVEJ LOGIKY ---
+
         const sortedKeys = Object.keys(skillsDB_new)
-            .filter(name => name.includes(search)) // Toto zabezpečí filtrovanie podľa písania
+            .filter(name => name.includes(search)) // Filtrovanie podľa písania
             .sort((a, b) => {
                 const gA = skillsDB_new[a][1].toUpperCase();
                 const gB = skillsDB_new[b][1].toUpperCase();
