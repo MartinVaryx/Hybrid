@@ -102,6 +102,30 @@
             display: block;
         }
 
+        /* Globálny štýl pre tooltip rámček */
+        .skill-tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            pointer-events: none; /* Kľúčové: kurzor ignoruje tooltip, takže predíde blikaniu */
+            opacity: 0;
+            transition: opacity 0.15s ease-in-out;
+            display: none;
+            line-height: 1.4;
+        }
+
+        .skill-tooltip.visible {
+            display: block;
+            opacity: 1;
+        }
+
         /* Skrytie sekcií */
         .view-section { display: none; }
         .view-section.active-view { display: block; }
