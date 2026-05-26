@@ -1132,13 +1132,6 @@
 
         initSkillTooltips();
 
-        const descContainer = document.getElementById('edit-desc-container');
-        if (descContainer) {
-            descContainer.innerHTML = `
-                <textarea id="edit-desc" style="width: 100%; height: 100px; box-sizing: border-box; resize: vertical; margin-top: 5px; padding: 8px; font-family: inherit; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px;"></textarea>
-            `;
-        }
-
         // 4. JEDINÉ spustenie routingu pri štarte
         // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
         handleRouting(); 
