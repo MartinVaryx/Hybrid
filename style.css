@@ -326,7 +326,7 @@
             display: inline-block;
         }
 
-        #edit-rels-container {
+        #edit-rels-container, , #edit-desc-container {
             display: flex;
             flex-wrap: wrap;
             gap: 5px;
