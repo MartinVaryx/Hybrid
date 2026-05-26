@@ -632,5 +632,16 @@
             "IQ",
             "RÉTORIKA"
         ]
+    ],
+    "ELIMINÁCIA Z DIAĽKY": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
+            "STREĽBA",
+            "ŤAŽKÉ STRELNÉ ZBRANE"
+        ]
     ]
 }
