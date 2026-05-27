@@ -1130,7 +1130,7 @@
         renderEditorList();
         filterRelSearch();
 
-        initSkillTooltips();
+        initSkillTooltips(); 
 
         // 4. JEDINÉ spustenie routingu pri štarte
         // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
@@ -1269,7 +1269,7 @@ function bezpečnyStatus(text) {
     }
 }
 
-// Hlavná funkcia na export čistého hárku pre ceruzku
+
 async function exportpng() {
     const container = document.getElementById('character-stats');
     if (!container) {
@@ -1277,55 +1277,172 @@ async function exportpng() {
         return;
     }
 
-    // Bezpečné zistenie mena postavy pre názov súboru
     let menoHrdinu = "hrdina";
     if (typeof characters !== 'undefined' && typeof activeCharIdx !== 'undefined' && characters[activeCharIdx]) {
         menoHrdinu = characters[activeCharIdx].name.replace(/[^a-zA-Z0-9]/g, "_");
     }
 
+    const logujStatus = (text) => {
+        if (typeof bezpečnyStatus === "function") bezpečnyStatus(text);
+        else if (typeof showStatus === "function") showStatus(text);
+    };
+
+    const origOverflow = document.body.style.overflow;
+    const origScrollTop = window.scrollY;
+
     try {
-        bezpečnyStatus("Pripravujem čistú kartu na tlač...");
+        logujStatus("Pripravujem čistú kartu na tlač...");
         
-        // 1. Zaistíme stiahnutie rendering knižnice
         const h2c = await zaistiHtml2Canvas();
 
-        const poliaNaSkrytie = container.querySelectorAll('.skill-lvl-box, .humanity-field, .br-field');
+        // FIX: Add '.mobile-header-row' to the fields we hide during export!
+        const poliaNaSkrytie = container.querySelectorAll('.skill-lvl-box, .humanity-field, .br-field, .mobile-header-row');
+        poliaNaSkrytie.forEach(pole => { pole.style.visibility = 'hidden'; });
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let tempStyle = null;
         
-        // Dočasne ich skryjeme (ich vyhradené miesto a šírka v hárku zostanú zachované)
-        poliaNaSkrytie.forEach(pole => {
-            pole.style.visibility = 'hidden';
-        });
-        // 3. VYTVORENIE SNÍMKY (Canvas)
-        // scale: 3 zabezpečí extrémne vysoké rozlíšenie textu a pozadia pre dokonalú ostrosť pri tlači na papier.
-        // useCORS: true zaistí, že sa správne prenesie aj background-image definovaný v style.css.
+        if (isMobile) {
+            window.scrollTo(0, 0);
+            document.body.style.overflow = 'hidden';
+
+            tempStyle = document.createElement('style');
+            tempStyle.id = 'html2canvas-mobile-fix';
+
+            tempStyle.innerHTML = `
+                #character-stats {
+                    width: 1050px !important;
+                    max-width: 1050px !important;
+                    min-width: 1050px !important;
+                    height: 1485px !important;
+                    min-height: 1485px !important;
+                    position: absolute !important; 
+                    top: 0 !important;
+                    left: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: block !important;
+                    overflow: visible !important;
+                    z-index: 99999 !important;
+                    
+                    background-position: top left !important;
+                    background-size: 100% 100% !important;
+                    background-origin: padding-box !important;
+                    background-attachment: scroll !important;
+                }
+
+                #character-stats * {
+                    box-sizing: border-box !important;
+                    overflow: visible !important;
+                }
+
+                #character-stats .name-field,
+                #character-stats .skill-slot,
+                #character-stats .sheet-field {
+                    position: absolute !important;
+                }
+
+                #character-stats .name-field {
+                    font-size: 40px !important;
+                    line-height: 0.9 !important; 
+                    margin-top: -12px !important; 
+                    display: block !important;
+                }
+
+                #character-stats .skill-name-text {
+                    font-size: 30px !important;
+                    line-height: 1.0 !important;
+                    display: block !important;
+                    padding: 0 !important;
+                    white-space: nowrap !important;
+                }
+
+                #character-stats .skill-cat-box {
+                    font-size: 30px !important;
+                    line-height: 1.0 !important;
+                    display: block !important;
+                    padding: 0 !important;
+                    white-space: nowrap !important;
+                }
+
+                #character-stats .skill-slot {
+                    display: block !important;
+                    overflow: visible !important;
+                }
+                
+                /* Completely eliminate any structural height impact from the hidden mobile row */
+                #character-stats .mobile-header-row {
+                    display: none !important;
+                }
+
+                /* FIX: Shift the second column slightly to the right. 
+                  Targets slots whose inline style left attribute begins with 5 (e.g. left: 54.5%)
+                */
+                #character-stats .skill-slot[style*="left: 5"],
+                #character-stats .skill-slot[style*="left:5"] {
+                    transform: translateX(10px) !important;
+                }
+            `;
+
+            document.head.appendChild(tempStyle);
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+        }
+
         const canvas = await h2c(container, {
-            scale: 2, 
+            scale: isMobile ? 2 : 2, 
             useCORS: true,
-            allowTaint: true,
+            allowTaint: false,
             backgroundColor: null,
-            logging: false
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 1050,
+            windowHeight: 1485
         });
 
-        // 4. OKAMŽITÉ NAVRÁTENIE ÚROVNÍ (Hráč na webe výpadok čísel vôbec nepostrehne)
-        poliaNaSkrytie.forEach(pole => {
-            pole.style.visibility = 'visible';
-        });
+        // Restore everything back to normal for live phone viewing
+        poliaNaSkrytie.forEach(pole => { pole.style.visibility = 'visible'; });
+        if (tempStyle) tempStyle.remove();
+        
+        document.body.style.overflow = origOverflow;
+        if (isMobile) {
+            window.scrollTo(0, origScrollTop);
+        }
 
-        // 5. VYGENEROVANIE A STIAHNUTIE OBRÁZKA PNG
         const imgData = canvas.toDataURL('image/png');
+
+        // Trigger Download
         const link = document.createElement('a');
         link.href = imgData;
         link.download = `${menoHrdinu}_dennik.png`;
-        
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
 
-        bezpečnyStatus("ČISTÁ KARTA STIAHNUTÁ!");
+        logujStatus("ČISTÁ KARTA STIAHNUTÁ!");
     } catch (error) {
         console.error("Export zlyhal:", error);
         alert("Export zlyhal: " + error.message);
+        document.body.style.overflow = origOverflow;
     }
+}
+
+// Pomocná funkcia, ktorá vráti živú stránku do pôvodného responzívneho stavu
+function cleanUpExport(originalStyles) {
+    const tempStyle = document.getElementById('html2canvas-desktop-override');
+    if (tempStyle) tempStyle.remove();
+
+    document.body.style.width = originalStyles.width;
+    document.body.style.maxWidth = originalStyles.maxWidth;
+    document.body.style.minWidth = originalStyles.minWidth;
+    document.body.style.padding = originalStyles.padding;
+    document.body.style.margin = originalStyles.margin;
+    document.body.style.overflowX = originalStyles.overflowX;
+    document.body.style.backgroundImage = originalStyles.backgroundImage;
+    document.body.style.backgroundSize = originalStyles.backgroundSize;
+    document.body.style.backgroundRepeat = originalStyles.backgroundRepeat;
+    document.body.style.backgroundColor = originalStyles.backgroundColor;
 }
 
 function initSkillTooltips() {
