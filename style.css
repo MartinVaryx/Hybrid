@@ -163,6 +163,19 @@
             gap: 5px;
         }
         
+        .add-btn,.down-btn, .back-btn {
+            padding: 12px 12px;
+            font-size: 1.6rem;
+            border: none;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: 0.3s;
+            clip-path: polygon(15px 0, 100% 0, calc(100% - 15px) 100%, 0 100%);
+        }
+
         .tab-btn {
             padding: 12px 20px;
             border: none;
@@ -436,15 +449,6 @@
             font-weight: bold;
         }
 
-        .back-btn {
-            background: none;
-            border: 1px solid var(--hybrid-red);
-            color: var(--hybrid-red);
-            padding: 8px 15px;
-            cursor: pointer;
-            margin-bottom: 20px;
-            margin-top: 20px;
-        }
 
         @media (min-width: 769px) {
             .br-field::before, .humanity-field::before {
