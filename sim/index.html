@@ -1369,7 +1369,7 @@
                 } else {
                     handleChallengeTransition(activeChallenge.case_failure);
                 }
-            }, 1800);
+            }, 3000);
         }
 
         function gameloop(success = true) {
@@ -1416,7 +1416,7 @@
                 let stressDmg = Math.max(0, CARDS[player_action[1]][1][0] + weapon - enemy_caution); 
 
                 if (stressDmg + enemy_stress >= ENEMY_TYPES[enemy]["stress_thresh"]) {
-                    log(`\n💥 ${enemy} JE DOLE! Môžeš pokračovať.`, "success-msg", true);
+                    log(`\n💥 ${enemy} JE DOLE! Môžeš pokračovať.`, "success-msg");
                     
                     inputs_frozen = true;
                     updateUI();
