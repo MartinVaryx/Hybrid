@@ -834,10 +834,10 @@
                 "difficulty": 6,
                 "threat": 5,
                 "image": "assets/WRECKS.png",
-                "initial_msg": "Objavil si niekoľko vrakov áut. Možno v niektorom budú zvyšky benzínu. Skús ho vysať.",
+                "initial_msg": "Objavíš niekoľko vrakov áut. Možno v niektorom budú zvyšky benzínu. Skús ho vysať.",
                 "success_msg": "Vyšlo to, máš benzín.",
-                "threat_msg": "Vdýchol si benzín a začneš kašľať.",
-                "threat_avoided_msg": "Zacítil si výpary a prestal si ťahať v poslednej chvíli. Skoro si vdýchol benzín.",
+                "threat_msg": "Vdýchneš benzín a začneš kašľať.",
+                "threat_avoided_msg": "Zacítiš si výpary a prestaneš ťahať v poslednej chvíli. Skoro sa ti benzín dostal do úst.",
                 "failure_msg": "Nepodarilo sa ti to. Buď tam nič nie je, alebo to jednoducho nevieš.",
                 "case_success": "GAME_OVER",
                 "case_threat": "stress+2",
@@ -1031,7 +1031,7 @@
                 // --- NEW: Detect Narrative Decision Nodes ---
                 if (activeChallenge.choice_A && activeChallenge.choice_B) {
                     inputs_frozen = true; // Freeze card tray interactions
-                    document.getElementById("player-turn-indicator").innerText = "Decision Required";
+                    document.getElementById("player-turn-indicator").innerText = "VYBER SI MOŽNOSŤ";
                     
                     // Check if our dynamic choice UI already exists, otherwise build it
                     let choicePrompt = document.getElementById("choice-prompt");
@@ -1293,12 +1293,12 @@
             }
 
             if (inputs_frozen) {
-                document.getElementById("player-turn-indicator").innerText = "Processing";
+                document.getElementById("player-turn-indicator").innerText = "ČAKAJ...";
             } else if (!is_conflict) {
-                document.getElementById("player-turn-indicator").innerText = "Action Required";
+                document.getElementById("player-turn-indicator").innerText = "VYBER SI KARTU";
             } else {
                 if (turn === "p") {
-                    document.getElementById("player-turn-indicator").innerText = "Your Turn";
+                    document.getElementById("player-turn-indicator").innerText = "IDEŠ";
                 } else {
                     document.getElementById("player-turn-indicator").innerText = "Waiting";
                 }
@@ -1462,7 +1462,7 @@
                 stressDmg = Math.max(0, stressDmg); 
 
                 if (stressDmg + stress > stress_thresh) {
-                    log(`💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.`, "failure-msg", true);
+                    log(`💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.`, "failure-msg");
                     inputs_frozen = true;
                     updateUI();
                     return;
