@@ -33,6 +33,10 @@
             overflow-x: hidden;
         }
 
+        .spacing-top-4 {
+            margin-top: 5em; 
+        }
+
         h1 {
             font-family: 'Archivo Black', sans-serif;
             text-transform: uppercase;
@@ -258,7 +262,7 @@
             white-space: pre-wrap;
         }
 
-        .system-msg { color: #ffffff; font-weight: bold; }
+        .system-msg { color: #000000; font-weight: bold;}
         .success-msg { color: #5cd65c; font-weight: bold; }
         .failure-msg { color: #ff4d4d; font-weight: bold; }
         .danger-msg { color: #ffcc00; font-weight: bold; }
@@ -738,23 +742,23 @@
                         </button>
                     </div>
                     <div class="card-container" data-card="O">
-                        <div class="split-zone top" data-action="D">Defend</div>
-                        <div class="split-zone bottom" data-action="A">Attack</div>
+                        <div class="split-zone top" data-action="D">ČIN</div>
+                        <div class="split-zone bottom" data-action="A">ÚTOK</div>
                         <img src="assets/O.png" alt="Card O" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#c62828'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>O CARD</div>'">
                     </div>
                     <div class="card-container" data-card="R">
-                        <div class="split-zone top" data-action="D">Defend</div>
-                        <div class="split-zone bottom" data-action="A">Attack</div>
+                        <div class="split-zone top" data-action="D">ČIN</div>
+                        <div class="split-zone bottom" data-action="A">ÚTOK</div>
                         <img src="assets/R.png" alt="Card R" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#2e7d32'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>R CARD</div>'">
                     </div>
                     <div class="card-container" data-card="S">
-                        <div class="split-zone top" data-action="D">Defend</div>
-                        <div class="split-zone bottom" data-action="A">Attack</div>
+                        <div class="split-zone top" data-action="D">ČIN</div>
+                        <div class="split-zone bottom" data-action="A">ÚTOK</div>
                         <img src="assets/S.png" alt="Card S" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#e65100'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>S CARD</div>'">
                     </div>
                     <div class="card-container" data-card="B">
-                        <div class="split-zone top" data-action="D">Defend</div>
-                        <div class="split-zone bottom" data-action="A">Attack</div>
+                        <div class="split-zone top" data-action="D">ČIN</div>
+                        <div class="split-zone bottom" data-action="A">ÚTOK</div>
                         <img src="assets/B.png" alt="Card B" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#1565c0'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>B CARD</div>'">
                     </div>
 
@@ -775,7 +779,7 @@
                 <div id="challenge-stats-display" class="challenge-display" style="display: none;"></div>
                 <div id="player-card-display" class="player-card-slide"></div>
                     <div id="ready-prompt">
-                        <div style="font-family:'Archivo Black';">Ready for next round?</div>
+                        <div style="font-family:'Archivo Black';">Môžeme pokračovať?</div>
                         <button id="ready-btn" class="adrenaline-select" style="width: 50px; background: var(--hybrid-green);">✓</button>
                     </div>
                 <div class="panel" id="enemy-panel">
@@ -845,9 +849,9 @@
                 "threat": 3,
                 "image": "assets/SNEAK.png",
                 "initial_msg": "Snažíš sa prekĺznuť. Zdá sa, že zatiaľ si ťa nevšimla. (vyber si kartu)",
-                "success_msg": "Úspech! Prekĺzol si.",
-                "threat_msg": "Pozeral si na Skautku a pritom si sa poškriabal na plote.",
-                "threat_avoided_msg": "Takmer si sa poškriabal na plote. Ale keďže si si dával pozor, nič sa ti nestalo.",
+                "success_msg": "Úspech! Skautka si ťa nevšimla a môžeš ísť ďalej.",
+                "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
+                "threat_avoided_msg": "Takmer sa poškriabeš na plote. Ale keďže si dávaš pozor, nič sa ti nestane.",
                 "failure_msg": "Všimla si ťa a rozbehla sa za tebou!",
                 "case_success": "WRECKS",
                 "case_threat": "stress+1",
@@ -858,7 +862,7 @@
                 "image": "assets/CAR.png",
                 "initial_msg": "Po ceste do pevnosti sa ti minul benzín. Možno nejaký nájdeš v neďalekom meste. Medzi tebou a mestom sa ale motá skautka. Čo urobíš?",
                 "choice_A": "Zaútočiť na skautku.",
-                "choice_B": "Pokúsiť sa ju obísť nespozorovaný.",
+                "choice_B": "Pokúsiť sa ju nenápadne obísť.",
                 "case_A": ["SCOUT", "WRECKS"],
                 "case_B": "SNEAK",
             },
@@ -915,11 +919,14 @@
         let inputs_frozen = false;
         let combat_starter = null;
 
-        function log(message, className = "") {
+        function log(message, className = "", extraSpacing = false) {
             const terminal = document.getElementById("terminal-screen");
             const line = document.createElement("div");
-            line.className = `terminal-line ${className}`;
+            
+            // Append the spacing class if extraSpacing is true
+            line.className = `terminal-line ${className} ${extraSpacing ? 'spacing-top-4' : ''}`.trim();
             line.innerText = message;
+            
             terminal.appendChild(line);
             terminal.scrollTop = terminal.scrollHeight;
         }
@@ -932,7 +939,7 @@
         
         function rollDice(cardCode, attack = false, skillLevel = 0, isEnemy = false) {
             if (!(cardCode in CARDS)) {
-                log("Invalid card code error!", "danger-msg");
+                log("Invalid card code error!", "danger-msg", true);
                 return 0;
             }
             
@@ -940,20 +947,18 @@
             let total_roll = 0;
             let dice_list = CARDS[cardCode][side][1];
             let rollsData = []; 
-            
-            log(`${isEnemy ? "Enemy" : "Player"} rolling dice for ${cardCode} (${attack ? "Attack" : "Defense"} side):`);
-            
+                        
             dice_list.forEach(d => {
                 let r = Math.floor(Math.random() * d) + 1;
                 total_roll += r;
-                log(`  D${d}: ${r}`);
+                //log(`  D${d}: ${r}`);
                 rollsData.push({ type: `D${d}`, value: r, isSkillDie: false });
             });
             
             for (let i = 0; i < skillLevel; i++) {
                 let r = Math.floor(Math.random() * 2); 
                 total_roll += r;
-                log(`  DH (Bonus Skill Die): ${r}`);
+                //log(`  DH: ${r}`);
                 rollsData.push({ type: 'DH', value: r, isSkillDie: true });
             }
             
@@ -980,31 +985,39 @@
             }
 
             // 1. If target dictates an explicit Enemy Combat deployment
-            if (actualTarget in ENEMY_TYPES) { // <-- Zmenené z caseTarget na actualTarget
-                log(`\n⚔️ INITIATING COMBAT ENCOUNTER AGAINST: ${actualTarget}`, "danger-msg");
-                enemy = actualTarget; // <-- Zmenené z caseTarget na actualTarget
-                enemy_stress = 0;
-                enemy_escaping = false;
-                is_conflict = true;
-                move = 0;
-                combat_starter = null;
-                inputs_frozen = false;
+            if (actualTarget in ENEMY_TYPES) { 
+                                // Freeze the UI immediately so the player can read
+                inputs_frozen = true;
+                updateUI();
 
-                // --- Display Enemy Image ---
-                const enemyContainer = document.getElementById("enemy-sprite-container");
-                const enemyImg = document.getElementById("enemy-sprite");
-                if (enemyContainer && enemyImg && ENEMY_TYPES[actualTarget].image) { // <-- Zmenené na actualTarget
-                    enemyImg.src = ENEMY_TYPES[actualTarget].image; // <-- Zmenené na actualTarget
-                    enemyContainer.style.display = "block"; 
-                    
-                    // Remove old classes and force animation reflow
-                    enemyContainer.classList.remove("enemy-entrance", "enemy-hit");
-                    void enemyContainer.offsetWidth; 
-                    enemyContainer.classList.add("enemy-entrance");
-                }
-                // ---------------------------------
+                setTimeout(() => {
+                log(`\n⚔️ Priprav sa na boj! Proti tebe stojí: ${actualTarget}`, "danger-msg", true);
+                
 
-                gameloop(false);
+                    enemy = actualTarget; 
+                    enemy_stress = 0;
+                    enemy_escaping = false;
+                    is_conflict = true;
+                    move = 0;
+                    combat_starter = null;
+                    inputs_frozen = false;
+
+                    // --- Display Enemy Image ---
+                    const enemyContainer = document.getElementById("enemy-sprite-container");
+                    const enemyImg = document.getElementById("enemy-sprite");
+                    if (enemyContainer && enemyImg && ENEMY_TYPES[actualTarget].image) { 
+                        enemyImg.src = ENEMY_TYPES[actualTarget].image; 
+                        enemyContainer.style.display = "block"; 
+                        
+                        // Remove old classes and force animation reflow
+                        enemyContainer.classList.remove("enemy-entrance", "enemy-hit");
+                        void enemyContainer.offsetWidth; 
+                        enemyContainer.classList.add("enemy-entrance");
+                    }
+                    // ---------------------------------
+
+                    gameloop(false);
+                }, 4000); // 4-second reading delay
                 return;
             }
 
@@ -1052,13 +1065,11 @@
                     // Map button clicks to clear the prompt and route logic forward
                     document.getElementById("btn-choice-A").onclick = () => {
                         choicePrompt.style.display = "none";
-                        log(`Decision logged: ${activeChallenge.choice_A}`, "system-msg");
                         handleChallengeTransition(activeChallenge.case_A);
                     };
                     
                     document.getElementById("btn-choice-B").onclick = () => {
                         choicePrompt.style.display = "none";
-                        log(`Decision logged: ${activeChallenge.choice_B}`, "system-msg");
                         handleChallengeTransition(activeChallenge.case_B);
                     };
                 }
@@ -1070,17 +1081,17 @@
                 let parts = caseTarget.split("+");
                 let amount = parts[1] ? parseInt(parts[1]) : 1;
                 stress += amount;
-                log(`Applied State Penalty: Stress increased by ${amount}! Total Stress: ${stress}`, "danger-msg");
+                log(`Stúpol ti stres o ${amount}!`, "danger-msg");
                 updateUI();
                 
                 if (stress > stress_thresh) {
-                    log("💀 CRITICAL STRESS CAPACITY REACHED. GAME OVER.", "failure-msg");
+                    log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
                     inputs_frozen = true;
                 }
                 return;
             }
 
-            log(`Warning: Unhandled routing instruction case reference '${caseTarget}'`, "danger-msg");
+            log(`Warning: Unhandled routing instruction case reference '${caseTarget}'`, "danger-msg", true);
         }
 
         function triggerDiceVisualAnimation(diceRolls, isEnemy = false) {
@@ -1196,18 +1207,16 @@
                 }
             }
 
-            log(`\n=========================================`, "system-msg");
             if (activeChallenge.initial_msg) {
-                log(activeChallenge.initial_msg);
+                log(activeChallenge.initial_msg, "system-msg", true);
             } else {
-                log(`CURRENT CHALLENGE LAYER INITIALIZED: ${current_challenge_key}`);
+                log(`${current_challenge_key}`, "system-msg");
             }
             
             // --- UPDATED: Conditionally log difficulty and threat to the terminal ---
             if (activeChallenge.difficulty !== undefined && activeChallenge.threat !== undefined) {
-                log(`DIFFICULTY: ${current_challenge.difficulty}  |  THREAT: ${current_challenge.threat}`);
+                log(`NÁROČNOSŤ: ${current_challenge.difficulty}  |  HROZBA: ${current_challenge.threat}`);
             }
-            log(`=========================================`, "system-msg");
             
             inputs_frozen = false;
             updateUI();
@@ -1305,7 +1314,7 @@
             let roll_result = rollDice(card, false, skill);
             roll_result += adrenaline; 
             
-            log(`Total Challenge Roll Result: ${roll_result} (Includes +${adrenaline} Adrenaline)`);
+            log(`Celkový výsledok: ${roll_result} (Zahŕňa +${adrenaline} za adrenalín)`, "", true);
 
             let success = roll_result >= current_challenge.difficulty;
             let is_tie_or_failure = roll_result <= current_challenge.difficulty;
@@ -1313,9 +1322,9 @@
 
             // 1. Log baseline success or failure text
             if (success) {
-                log(activeChallenge.success_msg || "💪 Success!", "success-msg");
+                log(activeChallenge.success_msg || "💪 Úspech!", "success-msg");
             } else {
-                log(activeChallenge.failure_msg || "❌ Failure!", "failure-msg");
+                log(activeChallenge.failure_msg || "❌ Zlyhanie!", "failure-msg");
             }
 
             // 2. Core Fix: Threat is ONLY rolled/evaluated in case of a tie or a flat-out failure
@@ -1335,13 +1344,11 @@
                 // Realized ONLY if threat roll strictly exceeds the player card's caution threshold
                 let caution_threshold = CARDS[card][0][0];
                 if (threat_roll > caution_threshold) {
-                    log(`${activeChallenge.threat_msg || "⚠️ Threat Tripped!"} (Roll: ${threat_roll} > Caution: ${caution_threshold})`, "danger-msg");
+                    log(`${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"} \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
                     threat_realized = true;
                 } else {
-                    log(`${activeChallenge.threat_avoided_msg || "Threat safely avoided."} (Roll: ${threat_roll} <= Caution: ${caution_threshold})`, "success-msg");
+                    log(`${activeChallenge.threat_avoided_msg || "Vyhol si sa hrozbe."} (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
                 }
-            } else {
-                log("Clean victory! Threat skipped completely because you exceeded the difficulty threshold.", "success-msg");
             }
 
             resetAdrenalineSelection();
@@ -1377,7 +1384,6 @@
                     is_conflict = true;
                     move = 0;
                     combat_starter = null;
-                    log(`\n⚠️ ENEMY ENCOUNTER SPIKED! Combat phase initiated.`, "danger-msg");
                     runConflictTurn();
                 }
             } else {
@@ -1386,21 +1392,21 @@
         }
 
         function resolveConflict() {
-            log(`\n-----------------------------------------`, "system-msg");
-            log(`RESOLVING CONFLICT CYCLES`);
-            log(`Player Selected Action: [${player_action[0]}, ${player_action[1]}]`);
-            log(`Enemy Selected Action: [${enemy_action[0]}, ${enemy_action[1]}]`);
-            log(`-----------------------------------------`, "system-msg");
+            //log(`\n-----------------------------------------`, "system-msg");
+            //log(`RESOLVING CONFLICT CYCLES`);
+            //log(`Player Selected Action: [${player_action[0]}, ${player_action[1]}]`);
+            //log(`Enemy Selected Action: [${enemy_action[0]}, ${enemy_action[1]}]`);
+            //log(`-----------------------------------------`, "system-msg");
 
             let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
             enemy_roll += enemy_advantage;
-            log(`${enemy} calculated total: ${enemy_roll} (includes +${enemy_advantage} advantage).`);
+            log(`${enemy}: ${enemy_roll} (VÝHODA: +${enemy_advantage}).`, "", true);
 
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let player_roll = rollDice(player_action[1], player_action[0] === "A", skill, false);
             player_roll += (advantage + adrenaline); 
             
-            log(`Player calculated total: ${player_roll} (includes +${advantage} advantage, +${adrenaline} adrenaline).`);
+            log(`TY: ${player_roll} (VÝHODA: +${advantage}   ADRENALÍN: +${adrenaline} ).`);
 
             resetAdrenalineSelection();
 
@@ -1409,31 +1415,34 @@
                 let enemy_caution = enemy_action[0] === "D" ? CARDS[enemy_action[1]][0][0] : 0;
                 let stressDmg = Math.max(0, CARDS[player_action[1]][1][0] + weapon - enemy_caution); 
 
-            if (stressDmg + enemy_stress >= ENEMY_TYPES[enemy]["stress_thresh"]) {
-                    log(`\n💥 ${enemy} IS DEFEATED! Area secured. Bypassing obstacle.`, "success-msg");
-                    const enemyContainer = document.getElementById("enemy-sprite-container");
-                    if (enemyContainer) enemyContainer.style.display = "none";
+                if (stressDmg + enemy_stress >= ENEMY_TYPES[enemy]["stress_thresh"]) {
+                    log(`\n💥 ${enemy} JE DOLE! Môžeš pokračovať.`, "success-msg", true);
                     
-                    let activeChallenge = CHALLENGES[current_challenge_key];
-                    enemy = null; enemy_stress = 0; enemy_escaping = false;
-                    enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                    player_action = null; enemy_action = null; is_conflict = false;
+                    inputs_frozen = true;
+                    updateUI();
 
                     setTimeout(() => { 
+                        const enemyContainer = document.getElementById("enemy-sprite-container");
+                        if (enemyContainer) enemyContainer.style.display = "none";
+                        
+                        let activeChallenge = CHALLENGES[current_challenge_key];
+                        enemy = null; enemy_stress = 0; enemy_escaping = false;
+                        enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                        player_action = null; enemy_action = null; is_conflict = false;
+
                         // --- NOVÉ: Ak existuje odložená udalosť po nepriateľovi, spusti ju ---
                         if (pending_challenge_key) {
                             let nextChallenge = pending_challenge_key;
-                            pending_challenge_key = null; // Vynulujeme pre ďalšie zápasy
+                            pending_challenge_key = null; 
                             handleChallengeTransition(nextChallenge);
                         } else {
-                            // Inak použi predvolenú úspešnú vetvu aktuálnej výzvy
                             handleChallengeTransition(activeChallenge.case_success); 
                         }
-                    }, 2000); 
+                    }, 4000); 
                     return;
                 } else {
                     enemy_stress += stressDmg;
-                    log(`${enemy} took ${stressDmg} stress. Current enemy stress: ${enemy_stress}`, "success-msg");
+                    log(`Zvýšil si protivníkovi stres o ${stressDmg}.`, "success-msg");
                     const enemyContainer = document.getElementById("enemy-sprite-container");
                     if (enemyContainer) {
                         enemyContainer.classList.remove("enemy-hit");
@@ -1453,13 +1462,13 @@
                 stressDmg = Math.max(0, stressDmg); 
 
                 if (stressDmg + stress > stress_thresh) {
-                    log(`💀 YOU ARE DEAD. GAME OVER.`, "failure-msg");
+                    log(`💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.`, "failure-msg", true);
                     inputs_frozen = true;
                     updateUI();
                     return;
                 } else {
                     stress += stressDmg;
-                    log(`You took ${stressDmg} stress! Your current stress: ${stress}`, "failure-msg");
+                    log(`Stúpol ti stres o: ${stressDmg}.`, "failure-msg");
                 }
             }
 
@@ -1469,14 +1478,14 @@
             if ((player_roll > enemy_roll && player_action[0] === "D") || 
                 (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A")) {
                 advantage += 1;
-                log("🛡️ Defensive Hold! You absorbed the blow and gained +1 Advantage Status.");
+                log("Útok ťa zasiahol, ale dostaneš sa pri tom do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
             } 
             
             // Enemy gets advantage if they win cleanly on Defense, OR if they tie on Defense against a Player Attack
             if ((player_roll < enemy_roll && enemy_action[0] === "D") || 
                 (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A")) {
                 enemy_advantage += 1;
-                log(`🛡️ ${enemy} parried perfectly! Enemy gains +1 Advantage Status.`);
+                log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
             }
 
             move = 0;
@@ -1494,8 +1503,15 @@
 
         document.getElementById("ready-btn").addEventListener("click", function() {
             document.getElementById("ready-prompt").style.display = "none";
-            log("Player is ready. Proceeding...");
-            setTimeout(enemyChoice, 1200);
+            log("Ok, pokračujeme...", "", true);
+            
+            inputs_frozen = true;
+            updateUI();
+            
+            setTimeout(() => {
+                inputs_frozen = false;
+                enemyChoice();
+            }, 500);
         });
 
         function runConflictTurn() {
@@ -1507,7 +1523,7 @@
                 }
                 
                 turn = combat_starter;
-                log(`Initiating turn cycles. Initiative goes to: ${turn === "p" ? "PLAYER" : "ENEMY"}`);
+                log(`${turn === "p" ? "Začínaš ty." : "Začína " + enemy + "."}`);
             }
 
             updateUI();
@@ -1522,9 +1538,11 @@
                         ready();
                     }
                 } else {
-                    inputs_frozen = false;
                     updateUI();
-                    log("Your turn. Choose Action Mode (Click Top Half for Defend / Bottom Half for Attack) on a card below.");
+                    setTimeout(() => {
+                        log("Si na ťahu. Vyber si kartu a spôsob (ÚTOK/ČIN).", "", true);
+                        inputs_frozen = false;
+                    }, 3000);
                 }
             } else {
                 inputs_frozen = true;
@@ -1556,7 +1574,7 @@
 
 
             player_action = [actionType, cardCode];
-            log(`You chose: [${actionType === "A" ? "Attack" : "Defend"}, Card ${cardCode}]`);
+            //log(`You chose: [${actionType === "A" ? "Attack" : "Defend"}, Card ${cardCode}]`);
             move += 1;
             turn = "e";
             
@@ -1617,10 +1635,22 @@
 
             move += 1;
             turn = "p";
-            let escapeText = enemy_escaping ? " is trying to escape and" : "";
-            log(`Enemy${escapeText} chooses Action: [${enemy_action[0]}, ${enemy_action[1]}]`);
-            displayEnemyCard(enemy_action[0], enemy_action[1]);
-            runGameloopCycle();
+            let escapeText = enemy_escaping ? `${enemy} sa snaží ujsť` : "";
+            
+            if (escapeText) {
+                log(`${escapeText} `, "", true);
+                inputs_frozen = true;
+                updateUI();
+                
+                setTimeout(() => {
+                    inputs_frozen = false;
+                    displayEnemyCard(enemy_action[0], enemy_action[1]);
+                    runGameloopCycle();
+                }, 4000);
+            } else {
+                displayEnemyCard(enemy_action[0], enemy_action[1]);
+                runGameloopCycle();
+            }
         }
 
         function runGameloopCycle() {
@@ -1674,26 +1704,24 @@
                 if (cards_are_flipped) {
                     // Turn the first physical zone into the bottom visual slot (Attack/Red)
                     firstZone.className = "split-zone bottom";
-                    firstZone.innerText = "Attack";
+                    firstZone.innerText = "ÚTOK";
                     firstZone.setAttribute("data-action", "A");
                     
                     // Turn the second physical zone into the top visual slot (Defend/Green)
                     secondZone.className = "split-zone top";
-                    secondZone.innerText = "Defend";
+                    secondZone.innerText = "ČIN";
                     secondZone.setAttribute("data-action", "D");
                 } else {
                     // Revert explicitly to baseline setup
                     firstZone.className = "split-zone top";
-                    firstZone.innerText = "Defend";
+                    firstZone.innerText = "ČIN";
                     firstZone.setAttribute("data-action", "D");
                     
                     secondZone.className = "split-zone bottom";
-                    secondZone.innerText = "Attack";
+                    secondZone.innerText = "ÚTOK";
                     secondZone.setAttribute("data-action", "A");
                 }
             });
-            
-            log(`Cards flipped ${cards_are_flipped ? "Upside Down (Physical Top = Attack)" : "Normal (Physical Top = Defend)"}.`);
         });
 
         document.getElementById("card-tray-container").addEventListener("click", function(e) {
@@ -1747,7 +1775,7 @@
                 // 3. Update hidden input tracker value for the dice rolling engine
                 document.getElementById("adrenaline-select").value = targetAdrenalineVal;
                 
-                log(`ADRENALINE OVERDRIVE ACTIVATED! Stress increased immediately to ${stress}. Gained +${targetAdrenalineVal} to next roll.`);
+                log(`Adrenalín použitý! Stres sa ti zvyšuje na ${stress} a získavaš +${targetAdrenalineVal} k ďalšiemu hodu.`);
                 
                 // 4. Force a UI refresh to immediately shift the red 'S' track indicator to the new position
                 updateUI();
