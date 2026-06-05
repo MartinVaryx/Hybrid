@@ -1,0 +1,488 @@
+{
+    "GAME_OVER": {
+        "skills": [
+            "climb"
+        ],
+        "image": "assets/GAME_OVER.png",
+        "initial_msg": "Koniec hry! Chceš hrať ešte raz?"
+    },
+    "DISTRACT_PREDATOR": {
+        "skills": [
+            "throw"
+        ],
+        "difficulty": 10,
+        "threat": 4,
+        "image": "assets/WRECKS.png",
+        "initial_msg": "Na zemi nájdeš kameň a hodíš ho čo najďalej.",
+        "success_msg": "Podarilo sa. Predátorka išla za zvukom.",
+        "threat_msg": "Hádzal si kameň a nevšimol si si, kam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
+        "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalil si jej zámer.",
+        "failure_msg": "Odhalila ťa, už jej neujdeš.",
+        "case_success": "WRECKS",
+        "case_threat": "enemy_advantage+1",
+        "case_threat_delayed": "WRECKS_PREDATOR_2",
+        "case_failure": "Predátorka_2",
+        "enemy_escape_delayed": "WRECKS_PREDATOR_2"
+    },
+    "WRECKS_PREDATOR_2": {
+        "image": "assets/WRECKS_PREDATOR.png",
+        "initial_msg": "Opäť ťa objavila predátorka.",
+        "choice_A": "Odlákať ju kameňom",
+        "choice_B": "Pustiť sa do nej",
+        "case_A": [
+            "enemy_advantage=0",
+            "DISTRACT_PREDATOR"
+        ],
+        "case_B": "Predátorka_2",
+        "enemy_escape_delayed": "WRECKS_PREDATOR_2"
+    },
+    "Predátorka_2": {
+        "type": "Predátorka"
+    },
+    "WRECKS_PREDATOR": {
+        "image": "assets/WRECKS_PREDATOR.png",
+        "initial_msg": "Skautka, ktorú si nezabil, ušla a zanechala pachovú stopu. Vďaka nej ťa teraz našla predátorka.",
+        "choice_A": "Odlákať ju kameňom",
+        "choice_B": "Pustiť sa do nej",
+        "case_A": [
+            "enemy_advantage=0",
+            "DISTRACT_PREDATOR"
+        ],
+        "case_B": "Predátorka_2",
+        "enemy_escape_delayed": "WRECKS_PREDATOR_2"
+    },
+    "WRECKS": {
+        "skills": [
+            "suck"
+        ],
+        "difficulty": 6,
+        "threat": 5,
+        "image": "assets/WRECKS.png",
+        "initial_msg": "Objavíš niekoľko vrakov áut. Možno v niektorom budú zvyšky benzínu. Skús ho vysať.",
+        "success_msg": "Vyšlo to, máš benzín.",
+        "threat_msg": "Vdýchneš benzín a začneš kašľať. To môže prilákať Somory.",
+        "threat_avoided_msg": "Zacítiš si výpary a prestaneš ťahať v poslednej chvíli. Skoro sa ti benzín dostal do úst.",
+        "failure_msg": "Nepodarilo sa ti to. Buď tam nič nie je, alebo to jednoducho nevieš.",
+        "case_success": "CAR_3",
+        "case_threat": "stress+2",
+        "case_failure": "WRECKS_PREDATOR_2"
+    },
+    "BASEMENT_PREDATOR_2": {
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Opäť ťa objavila predátorka.",
+        "choice_A": "Odlákať ju kameňom",
+        "choice_B": "Pustiť sa do nej",
+        "case_A": [
+            "enemy_advantage=0",
+            "DISTRACT_PREDATOR_BASEMENT"
+        ],
+        "case_B": "Predátorka_1",
+        "enemy_escape_delayed": "BASEMENT_PREDATOR_2"
+    },
+    "DISTRACT_PREDATOR_BASEMENT": {
+        "skills": [
+            "throw"
+        ],
+        "difficulty": 10,
+        "threat": 4,
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Na zemi nájdeš kameň a hodíš ho čo najďalej.",
+        "success_msg": "Podarilo sa. Predátorka išla za zvukom.",
+        "threat_msg": "Hádzal si kameň a nevšimol si si, kam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
+        "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalil si jej zámer.",
+        "failure_msg": "Odhalila ťa, už jej neujdeš.",
+        "case_success": "CITY_2",
+        "case_threat": "enemy_advantage+1",
+        "case_threat_delayed": "BASEMENT_PREDATOR_2",
+        "case_failure": "Predátorka_1",
+        "enemy_escape_delayed": "BASEMENT_PREDATOR_2"
+    },
+    "Predátorka_1": {
+        "type": "Predátorka"
+    },
+    "BASEMENT_PREDATOR": {
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Skautka, ktorú si nezabil, ušla a zanechala pachovú stopu. Vďaka nej ťa teraz našla predátorka.",
+        "choice_A": "Odlákať ju kameňom",
+        "choice_B": "Pustiť sa do nej",
+        "case_A": [
+            "enemy_advantage=0",
+            "DISTRACT_PREDATOR_BASEMENT"
+        ],
+        "case_B": "Predátorka_1",
+        "enemy_escape_delayed": "BASEMENT_PREDATOR"
+    },
+    "CAR_3": {
+        "trigger_delayed": [
+            "BASEMENT_PREDATOR",
+            "WRECKS_PREDATOR",
+            "WRECKS_PREDATOR_2"
+        ],
+        "image": "assets/CAR.png",
+        "initial_msg": "Máš benzín, môžeš pokračovať v ceste!",
+        "choice_A": "Už tu nemám čo robiť. (dokončiť hru)",
+        "choice_B": "Ešte sa tu porozhliadnem.",
+        "case_A": "GAME_OVER",
+        "case_B": "CAR_2"
+    },
+    "CAR_2": {
+        "image": "assets/CAR.png",
+        "initial_msg": "Stále potrebuješ benzín, čo chceš robiť?",
+        "choice_A": "Idem do mesta.",
+        "choice_B": "Budem smutne sedieť a plakať.",
+        "case_A": "CITY_2",
+        "case_B": "CAR_2"
+    },
+    "CITY_2": {
+        "trigger_delayed": [
+            "BASEMENT_PREDATOR"
+        ],
+        "image": "assets/CITY.png",
+        "initial_msg": "Vydáš sa do centra alebo späť k autu?",
+        "choice_A": "Do centra.",
+        "choice_B": "Späť k autu.",
+        "case_A": "WRECKS",
+        "case_B": "CAR"
+    },
+    "IN_BASEMENT": {
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Nachádzaš sa v starej pivnici. Kedysi sa tu niekto ukrýval, ale už tu dlho nebol. Môžeš to tu skúsiť prehľadať.",
+        "skills": [
+            "throw"
+        ],
+        "difficulty": 7,
+        "threat": 2,
+        "success_msg": "Našiel si bandasku benzínu. Môžeš ísť späť k autu.",
+        "threat_msg": "Niečo ťa pichlo. Všimneš si, že to bola použitá injekčná striekačka. Môžeš len dúfať, nebola nakazená HIV alebo podobným svinstvom.",
+        "threat_avoided_msg": "Pri dôkladnom prehrabávaní si všimneš injekčnú striekačku. Nechýbalo veľa a pichla by ťa do ruky.",
+        "failure_msg": "Nenájdeš nič, čo by sa oplatilo zobrať. Bude lepšie ísť späť.",
+        "case_success": "CAR_3",
+        "case_threat": "stress+1",
+        "case_failure": "CITY_2"
+    },
+    "Skautka_2": {
+        "type": "Skautka"
+    },
+    "BASEMENT_DISTRACT": {
+        "skills": [
+            "throw"
+        ],
+        "difficulty": 7,
+        "threat": 2,
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Na zemi nájdeš sklenenú fľašu. Hádžeš ju čo najďalej. Snáď to Skautku odláka.",
+        "success_msg": "Podarilo sa, uteká za fľašou.",
+        "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
+        "threat_avoided_msg": "Všimneš si, že fľaša je rozbitá a hodíš ju opatrne. Neporežeš sa.",
+        "failure_msg": "Skautka kašle na fľašu a ide po tebe.",
+        "case_success": "IN_BASEMENT",
+        "case_success_delayed": "BASEMENT_PREDATOR",
+        "case_threat": "stress+1",
+        "case_failure": [
+            "Skautka_2",
+            "BASEMENT"
+        ],
+        "enemy_escape_delayed": "BASEMENT_PREDATOR"
+    },
+    "BASEMENT_ENCOUNTER": {
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Čo urobíš so Skautkou?",
+        "choice_A": "Odlákať ju preč.",
+        "choice_B": "Poďme sa biť.",
+        "case_A": "BASEMENT_DISTRACT",
+        "case_B": "Skautka_2",
+        "enemy_escape_delayed": "BASEMENT_PREDATOR"
+    },
+    "EXPLORE_BASEMENT": {
+        "skills": [
+            "sneak"
+        ],
+        "difficulty": 8,
+        "threat": 4,
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Blížiš sa ku vchodu. Hluk zrazu nachvíľu prestane.",
+        "success_msg": "Všimol si si, že tam bola ďalšia skautka.",
+        "threat_msg": "Mal si si dávať väčší pozor. Stúpil si na suchú vetvičku a Skautka to počula.",
+        "threat_avoided_msg": "V poslednej chvíli zamrzneš a Skautka to ďalej nerieši.",
+        "failure_msg": "Vchádzaš dnu. Nevšimol si si, že tam je Skautka a prekvapila ťa.",
+        "case_success": "BASEMENT_ENCOUNTER",
+        "case_success_delayed": "BASEMENT_PREDATOR",
+        "case_threat": "enemy_advantage+1",
+        "case_failure": [
+            "Skautka_2",
+            "BASEMENT"
+        ],
+        "enemy_escape_delayed": "BASEMENT_PREDATOR"
+    },
+    "BASEMENT_ENTRANCE": {
+        "image": "assets/BASEMENT.png",
+        "initial_msg": "Objavíš vstup do pivnice. Zdá sa, že tam niečo šramoce. Ideš dole?",
+        "choice_A": "Preskúmať.",
+        "choice_B": "Ísť späť.",
+        "case_A": "EXPLORE_BASEMENT",
+        "case_B": "CITY_2"
+    },
+    "CITY": {
+        "image": "assets/CITY.png",
+        "initial_msg": "Prichádzaš do mesta. Vydáš sa do centra alebo na sídlisko?",
+        "choice_A": "Do centra.",
+        "choice_B": "Na sídlisko.",
+        "case_A": "WRECKS",
+        "case_B": "BASEMENT_ENTRANCE"
+    },
+    "Skautka_1": {
+        "type": "Skautka"
+    },
+    "SNEAK": {
+        "skills": [
+            "sneak"
+        ],
+        "difficulty": 8,
+        "threat": 3,
+        "image": "assets/SNEAK.png",
+        "initial_msg": "Snažíš sa prekĺznuť. Zdá sa, že zatiaľ si ťa nevšimla. (vyber si kartu)",
+        "success_msg": "Úspech! Skautka si ťa nevšimla a môžeš ísť ďalej.",
+        "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
+        "threat_avoided_msg": "Takmer sa poškriabeš na plote. Ale keďže si dávaš pozor, nič sa ti nestane.",
+        "failure_msg": "Všimla si ťa a rozbehla sa za tebou!",
+        "case_success": "CITY",
+        "case_success_delayed": [
+            "WRECKS_PREDATOR",
+            "BASEMENT_PREDATOR"
+        ],
+        "case_threat_delayed": "",
+        "case_failure_delayed": "",
+        "case_threat": "stress+1",
+        "case_failure": [
+            "Skautka_1",
+            "CITY"
+        ],
+        "enemy_escape_delayed": [
+            "WRECKS_PREDATOR",
+            "BASEMENT_PREDATOR"
+        ]
+    },
+    "CAR": {
+        "skills": [
+            "climb"
+        ],
+        "image": "assets/CAR.png",
+        "initial_msg": "Po ceste do pevnosti sa ti minul benzín. Možno nejaký nájdeš v neďalekom meste.",
+        "choice_A": "Do mesta!",
+        "choice_B": "Porozhliadnuť sa.",
+        "case_A": "CITY_0",
+        "case_B": "LOOK_AROUND",
+        "choice_C": "Kašlať na to, idem pešo...",
+        "case_C": "WALK_0"
+    },
+    "START": {
+        "image": "assets/CAR.png",
+        "initial_msg": "Už mesiac cestuješ po krajine. Za celý ten čas si nikoho nestretol. Hľadáš ľudí. Alebo Hybridov. Hocikoho.",
+        "next": "CAR"
+    },
+    "CITY_0": {
+        "initial_msg": "Medzi tebou a mestom sa ale motá skautka. Čo urobíš?",
+        "case_success": "",
+        "case_failure": "",
+        "case_A": [
+            "Skautka_1",
+            "CITY"
+        ],
+        "case_B": "SNEAK",
+        "choice_A": "Zaútočiť na skautku.",
+        "choice_B": "Pokúsiť sa ju nenápadne obísť.",
+        "enemy_escape_delayed": [
+            "WRECKS_PREDATOR",
+            "BASEMENT_PREDATOR"
+        ]
+    },
+    "LOOK_AROUND": {
+        "initial_msg": "Na kopci v diaľke vidíš vysielač.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Ísť k vysielaču",
+        "choice_B": "Ísť späť.",
+        "case_B": "CAR",
+        "case_A": "TOWER_0",
+        "choice_C": "",
+        "case_C": ""
+    },
+    "TOWER_0": {
+        "initial_msg": "Najkratšia cesta vedie cez priamy svah. Vidíš aj nejakú lesnú cestu, ktorá vedie popri svahu - možno k vysielaču, ale to nevieš.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Idem krížom po svahu.",
+        "case_A": "SLOPE",
+        "choice_B": "Skúsim tú cestu.",
+        "case_B": "FOREST_PATH",
+        "choice_C": "Idem radšej späť.",
+        "case_C": "CAR_1",
+        "choice_D": "",
+        "case_D": ""
+    },
+    "WALK_0": {
+        "initial_msg": "Pred tebou je nekonečne dlhá cesta.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Toto nikam nevedie, idem späť...",
+        "case_A": "CAR_1",
+        "choice_B": "Do večera snáď niekam prídem.",
+        "case_B": "WALK_1"
+    },
+    "FOREST_PATH": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": ""
+    },
+    "SLOPE": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": ""
+    },
+    "CAR_1": {
+        "initial_msg": "Si pri aute a stále nemáš benzín.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Idem k veži.",
+        "case_A": "TOWER_0",
+        "choice_B": "Idem do mesta.",
+        "case_B": "CITY",
+        "choice_C": "Idem pešo...",
+        "case_C": "WALK_0"
+    },
+    "WALK_1": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": ""
+    },
+    "LAYOUT": {
+        "GAME_OVER": {
+            "x": 5469,
+            "y": 1025
+        },
+        "DISTRACT_PREDATOR": {
+            "x": 6530,
+            "y": 701
+        },
+        "WRECKS_PREDATOR_2": {
+            "x": 5957,
+            "y": 979
+        },
+        "Predátorka_2": {
+            "x": 5991,
+            "y": 719
+        },
+        "WRECKS_PREDATOR": {
+            "x": 6692,
+            "y": 1226
+        },
+        "WRECKS": {
+            "x": 6871,
+            "y": 936
+        },
+        "BASEMENT_PREDATOR_2": {
+            "x": 5894,
+            "y": 1881
+        },
+        "DISTRACT_PREDATOR_BASEMENT": {
+            "x": 5976,
+            "y": 1633
+        },
+        "Predátorka_1": {
+            "x": 6276,
+            "y": 1809
+        },
+        "BASEMENT_PREDATOR": {
+            "x": 6781,
+            "y": 1827
+        },
+        "CAR_3": {
+            "x": 5926,
+            "y": 1259
+        },
+        "CAR_2": {
+            "x": 6420,
+            "y": 1346
+        },
+        "CITY_2": {
+            "x": 6678,
+            "y": 1547
+        },
+        "IN_BASEMENT": {
+            "x": 5607,
+            "y": 1548
+        },
+        "Skautka_2": {
+            "x": 5309,
+            "y": 2356
+        },
+        "BASEMENT_DISTRACT": {
+            "x": 5743,
+            "y": 2089
+        },
+        "BASEMENT_ENCOUNTER": {
+            "x": 6357,
+            "y": 2252
+        },
+        "EXPLORE_BASEMENT": {
+            "x": 6950,
+            "y": 2087
+        },
+        "BASEMENT_ENTRANCE": {
+            "x": 7353,
+            "y": 1796
+        },
+        "CITY": {
+            "x": 7329,
+            "y": 1356
+        },
+        "Skautka_1": {
+            "x": 7912,
+            "y": 866
+        },
+        "SNEAK": {
+            "x": 7342,
+            "y": 789
+        },
+        "CAR": {
+            "x": 8201,
+            "y": 1468
+        },
+        "START": {
+            "x": 8768,
+            "y": 1213
+        },
+        "CITY_0": {
+            "x": 7876,
+            "y": 1307
+        },
+        "LOOK_AROUND": {
+            "x": 8232,
+            "y": 1740
+        },
+        "TOWER_0": {
+            "x": 8383,
+            "y": 2195
+        },
+        "WALK_0": {
+            "x": 9336,
+            "y": 1723
+        },
+        "FOREST_PATH": {
+            "x": 8059,
+            "y": 2517
+        },
+        "SLOPE": {
+            "x": 8580,
+            "y": 2513
+        },
+        "CAR_1": {
+            "x": 7807,
+            "y": 1923
+        },
+        "WALK_1": {
+            "x": 9874,
+            "y": 1711
+        }
+    }
+}
