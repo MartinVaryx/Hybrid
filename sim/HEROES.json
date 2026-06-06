@@ -1,60 +1,28 @@
 [
     {
-        "name": "HRDINA 1",
-        "sp": 40,
-        "skills": {},
-        "isInitialPhase": true,
-        "humanity": 50
-    },
-    {
-        "name": "SEIYA",
+        "name": "NATAŠA",
         "sp": 0,
         "skills": {
-            "IQ": 2,
-            "EQ": 2,
+            "OBRATNOSŤ": 2,
+            "ZRUČNOSŤ": 2,
+            "IQ": 1,
             "ZMYSLY": 2,
-            "ZRUČNOSŤ": 1,
-            "MEDICÍNA": 2,
-            "STREĽBA": 2,
-            "BOJOVÉ STROJE": 1,
-            "PRVÁ POMOC": 3,
-            "JAZYK": 1,
-            "INFORMATIKA": 2,
-            "ĽAHKÉ ZBRANE": 1
+            "STREĽBA": 3,
+            "PLÝŽENIE": 2,
+            "OSTNE": 1,
+            "PRESVIEDČANIE": 2,
+            "ZASTRAŠOVANIE": 1,
+            "KRADNUTIE": 1,
+            "LEZENIE": 2,
+            "ŠPRINT": 1
         },
         "isInitialPhase": false,
-        "humanity": 50
-    },
-    {
-        "name": "OG",
-        "sp": 2,
-        "skills": {
-            "EQ": 2,
-            "IQ": 2,
-            "OBRATNOSŤ": 1,
-            "ODOLNOSŤ": 2,
-            "SILA": 1,
-            "ZRUČNOSŤ": 1,
-            "BOJOVÉ STROJE": 1,
-            "ELIMINÁCIA Z DIAĽKY": 1,
-            "HROMADNÉ NIČENIE": 1,
-            "ŠPECIÁLNE STRELNÉ ZBRANE": 1,
-            "STREĽBA": 1,
-            "ŤAŽKÉ STRELNÉ ZBRANE": 1,
-            "ĽAHKÉ ZBRANE": 1,
-            "ŠPECIÁLNE ZBRANE": 1,
-            "ŤAŽKÉ ZBRANE": 1,
-            "MECHANIKA": 1
-        },
-        "isInitialPhase": false,
-        "humanity": 50,
+        "humanity": 44,
         "initialSkillsSnapshot": {
-            "EQ": 2,
-            "IQ": 2,
-            "OBRATNOSŤ": 1,
-            "ODOLNOSŤ": 1,
-            "SILA": 1,
-            "ZRUČNOSŤ": 1
+            "OBRATNOSŤ": 2,
+            "ZRUČNOSŤ": 2,
+            "IQ": 1,
+            "ZMYSLY": 2
         }
     }
 ]
