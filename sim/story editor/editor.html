@@ -1,0 +1,1057 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HYBRID // Smart Connection Editor (with Layout Save)</title>
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --text-light: #ffffff;
+            --accent-red: #c62828;
+            --accent-blue: #1565c0;
+            --accent-green: #2e7d32;
+            --accent-orange: #ef6c00;
+            --enemy-node-bg: #4a0000;
+            --enemy-node-border: #ff1744;
+            --border-color: #333;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: var(--bg-dark);
+            color: var(--text-light);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            background: var(--panel-bg);
+            border-bottom: 3px solid var(--accent-red);
+            z-index: 10;
+        }
+        h1 { font-family: 'Archivo Black', sans-serif; text-transform: uppercase; font-size: 1.5rem; }
+        .btn {
+            background: var(--accent-red);
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            font-family: 'Archivo Black', sans-serif;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+        .btn:hover { background: #b71c1c; }
+        .btn-secondary { background: var(--accent-blue); }
+        .btn-secondary:hover { background: #0d47a1; }
+        .btn-success { background: var(--accent-green); }
+        .btn-success:hover { background: #1b5e20; }
+        #file-input, #enemy-file-input { display: none; }
+        
+        .main-container {
+            display: flex;
+            flex: 1;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .workspace {
+            flex: 1;
+            position: relative;
+            background-color: #151515;
+            background-image: linear-gradient(rgba(255,255,255,0.03) 1px, transparent 1px),
+                              linear-gradient(90deg, rgba(255,255,255,0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            overflow: hidden;
+            cursor: grab;
+            user-select: none;
+        }
+        .workspace:active { cursor: grabbing; }
+        
+        #connections-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 1;
+        }
+        
+        .zoom-pan-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 15000px; 
+            height: 15000px;
+            transform-origin: 0 0;
+            pointer-events: none;
+            will-change: transform;
+        }
+        
+        .nodes-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+        
+        .node-box {
+            position: absolute;
+            width: 200px;
+            background: #2a2a2a;
+            border: 2px solid #555;
+            padding: 12px;
+            border-radius: 6px;
+            cursor: move;
+            pointer-events: auto;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            transition: border-color 0.1s, box-shadow 0.1s;
+        }
+        .node-box:hover { border-color: var(--accent-blue); }
+        .node-box.selected { border-color: #00e676; box-shadow: 0 0 12px rgba(0,230,118,0.4); }
+        .node-box-title { font-family: 'Archivo Black', sans-serif; font-size: 0.95rem; color: #ffff55; margin-bottom: 4px; word-break: break-all; }
+        .node-box-meta { font-size: 0.75rem; color: #aaa; }
+
+        .node-box.enemy-node {
+            width: 130px;
+            height: 130px;
+            border-radius: 50%;
+            background: var(--enemy-node-bg);
+            border: 3px dashed var(--enemy-node-border);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 10px;
+        }
+        .node-box.enemy-node .node-box-title { color: #ffffbb; font-size: 0.9rem; margin-bottom: 2px; }
+        .node-box.enemy-node .node-box-meta { color: #ff8a80; font-weight: bold; text-transform: uppercase; font-size: 0.7rem; }
+        
+        .sidebar {
+            width: 380px;
+            background: var(--panel-bg);
+            border-left: 2px solid var(--border-color);
+            padding: 20px;
+            overflow-y: auto;
+            z-index: 10;
+            box-shadow: -5px 0 15px rgba(0,0,0,0.5);
+        }
+        .sidebar h2 { font-family: 'Archivo Black', sans-serif; margin-bottom: 15px; color: var(--accent-red); font-size: 1.3rem; border-bottom: 1px solid #333; padding-bottom: 5px; }
+        
+        .form-group { position: relative; margin-bottom: 12px; }
+        .form-group label { display: block; font-weight: bold; margin-bottom: 4px; font-size: 0.8rem; text-transform: uppercase; color: #888; }
+        .form-control {
+            width: 100%;
+            background: #0a0a0a;
+            border: 1px solid #444;
+            color: white;
+            padding: 6px 10px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            border-radius: 4px;
+        }
+        .form-control:focus { border-color: var(--accent-blue); outline: none; }
+        textarea.form-control { resize: vertical; height: 70px; }
+        .info-msg { text-align: center; color: #666; margin-top: 40px; }
+        
+        /* Dropdown */
+        .custom-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: #252525;
+            border: 1px solid #555;
+            max-height: 220px;
+            overflow-y: auto;
+            z-index: 999;
+            border-radius: 0 0 4px 4px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.5);
+            display: none;
+        }
+        .custom-dropdown div { padding: 6px 10px; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #333; }
+        .custom-dropdown div:hover { background: var(--accent-blue); color: white; }
+        .custom-dropdown .enemy-opt { border-left: 3px solid var(--accent-red); color: #ff8a80; }
+        .custom-dropdown .cmd-opt { border-left: 3px solid var(--accent-orange); color: #ffb74d; font-weight: bold; }
+
+        #zoom-badge {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0,0,0,0.7);
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-family: 'Archivo Black', sans-serif;
+            font-size: 0.85rem;
+            z-index: 5;
+            pointer-events: none;
+            border: 1px solid #444;
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>HYBRID story editor</h1>
+        <div>
+            <button class="btn btn-secondary" onclick="toggleDelayedLines()" id="toggle-delayed-btn" style="margin-right: 15px;">Skryť Delayed</button>
+
+            <button class="btn btn-success" onclick="createNewNode()" id="add-node-btn" style="display:none; margin-right: 15px;">+ Nový uzol</button>
+            <label for="enemy-file-input" id="enemy-label" class="btn btn-secondary" style="display:none; margin-right: 5px;">1. Načítať ENEMY_TYPES.json</label>
+            <input type="file" id="enemy-file-input" accept=".json">
+            <label for="file-input" id="challenges-label" class="btn btn-secondary" style="display:none; margin-right: 5px;">2. Načítať CHALLENGES.json</label>
+            <input type="file" id="file-input" accept=".json">
+            <button class="btn" onclick="exportJSON()" id="export-btn" style="display:none;">Exportovať JSON</button>
+        </div>
+    </header>
+
+    <div class="main-container">
+        <div class="workspace" id="workspace-area">
+            <div id="zoom-badge">Zoom: 100%</div>
+            <canvas id="connections-canvas"></canvas>
+            
+            <div class="zoom-pan-container" id="graph-container">
+                <div class="nodes-layer" id="nodes-layer"></div>
+            </div>
+        </div>
+
+        <div class="sidebar" id="sidebar-panel">
+            <h2>Detail Prvku</h2>
+            <div class="info-msg" id="sidebar-status-text">Prebieha automatické načítanie herných súborov...</div>
+        </div>
+    </div>
+
+    <script>
+        let rawChallenges = {};
+        let enemyTypes = {};
+        let allKeys = new Set();
+        let activeNodeKey = null;
+        let nodePositions = {};
+        let loadedLayout = null; 
+
+        let zoom = 1.0;
+        const MIN_ZOOM = 0.15;
+        const MAX_ZOOM = 2.0;
+        let panX = 150;
+        let panY = 150;
+        let isPanning = false;
+        let startPanX = 0;
+        let startPanY = 0;
+        let showDelayedLines = true;
+
+        // UPRAVENÉ: Pridané case_C, case_D, case_E pre sledovanie prepojení v layoutoch
+        const layoutLinkKeys = ["case_success", "case_failure", "case_A", "case_B", "case_C", "case_D", "case_E", "case_threat", "case_B_success", "case_B_failure"];
+
+        const systemCommands = [
+            "stress+1", "stress-1", 
+            "advantage+1", "advantage-1", 
+            "enemy_advantage+1", "enemy_advantage-1",
+            "difficulty+1", "difficulty-1"
+        ];
+
+        const graphContainer = document.getElementById('graph-container');
+        const workspace = document.getElementById('workspace-area');
+        const canvas = document.getElementById('connections-canvas');
+
+        window.addEventListener('DOMContentLoaded', () => {
+            attemptAutoFetch();
+            setupWorkspaceInput();
+            window.addEventListener('resize', resizeCanvas);
+            document.addEventListener('click', () => {
+                document.querySelectorAll('.custom-dropdown').forEach(d => d.style.display = 'none');
+            });
+        });
+
+        function resizeCanvas() {
+            canvas.width = workspace.clientWidth;
+            canvas.height = workspace.clientHeight;
+            drawArrows();
+        }
+
+        async function attemptAutoFetch() {
+            try {
+                const enemyResponse = await fetch('./ENEMY_TYPES.json');
+                if(!enemyResponse.ok) throw new Error();
+                const enemyData = await enemyResponse.json();
+                enemyTypes = enemyData.ENEMY_TYPES ? enemyData.ENEMY_TYPES : enemyData;
+                
+                const challengesResponse = await fetch('./CHALLENGES.json');
+                if(!challengesResponse.ok) throw new Error();
+                const challengesData = await challengesResponse.json();
+                
+                processChallengesData(challengesData);
+                onDataReady();
+            } catch (err) {
+                console.log("[INFO] Auto-fetch zlyhal. Zapínam manuálny režim.");
+                document.getElementById('enemy-label').style.display = 'inline-block';
+                document.getElementById('sidebar-status-text').innerText = "Súbory sa nepodarilo automaticky stiahnuť. Použi import hore.";
+                setupManualInputs();
+            }
+        }
+
+        function processChallengesData(data) {
+            rawChallenges = data.CHALLENGES ? data.CHALLENGES : data;
+            if (rawChallenges.LAYOUT) {
+                loadedLayout = rawChallenges.LAYOUT;
+                delete rawChallenges.LAYOUT; 
+                console.log("[INFO] Načítal sa uložený fixný layout pozícií.");
+            } else {
+                loadedLayout = null;
+            }
+        }
+
+        function toggleDelayedLines() {
+            showDelayedLines = !showDelayedLines;
+            const btn = document.getElementById('toggle-delayed-btn');
+            btn.innerText = showDelayedLines ? "Skryť Delayed" : "Zobraziť Delayed";
+            drawArrows(); // Prekreslíme plátno s novým nastavením
+        }
+
+        function onDataReady() {
+            document.getElementById('sidebar-status-text').innerText = "Vyber uzol zoexecute siete pre editáciu hodnôt.";
+            document.getElementById('export-btn').style.display = 'inline-block';
+            document.getElementById('add-node-btn').style.display = 'inline-block';
+            
+            analyzeKeys();
+            generateSmartPositions(); 
+            resizeCanvas();
+            centerCameraOnNode('START');
+            renderNetwork();
+        }
+
+        function setupManualInputs() {
+            document.getElementById('enemy-file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        enemyTypes = JSON.parse(evt.target.result);
+                        if(enemyTypes.ENEMY_TYPES) enemyTypes = enemyTypes.ENEMY_TYPES;
+                        document.getElementById('enemy-label').style.background = '#2e7d32';
+                        document.getElementById('enemy-label').innerText = '1. Nepriatelia OK ✓';
+                        document.getElementById('challenges-label').style.display = 'inline-block';
+                    } catch(err) { alert("Chyba v ENEMY_TYPES."); }
+                };
+                reader.readAsText(file);
+            });
+
+            document.getElementById('file-input').addEventListener('change', function(e) {
+                const file = e.target.files[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    try {
+                        const parsed = JSON.parse(evt.target.result);
+                        processChallengesData(parsed);
+                        document.getElementById('challenges-label').style.background = '#2e7d32';
+                        document.getElementById('challenges-label').innerText = '2. Príbeh OK ✓';
+                        onDataReady();
+                    } catch(err) { alert("Chyba v CHALLENGES."); }
+                };
+                reader.readAsText(file);
+            });
+        }
+
+        function createNewNode() {
+            const nodeName = prompt("Zadaj unikátny názov (ID) pre nový uzol:");
+            if (!nodeName) return;
+            const cleanKey = nodeName.trim().toUpperCase();
+            if (rawChallenges[cleanKey] || enemyTypes[cleanKey]) {
+                alert("Uzol s týmto názvom už existuje!");
+                return;
+            }
+
+            rawChallenges[cleanKey] = {
+                initial_msg: "Nový vytvorený príbehový uzol.",
+                case_success: "",
+                case_failure: ""
+            };
+
+            const rect = workspace.getBoundingClientRect();
+            nodePositions[cleanKey] = {
+                x: (-panX + rect.width / 2) / zoom,
+                y: (-panY + rect.height / 2) / zoom,
+                isEnemy: false
+            };
+
+            analyzeKeys();
+            renderNetwork();
+            openNodeEditor(cleanKey);
+        }
+
+        function setupWorkspaceInput() {
+            workspace.addEventListener('mousedown', (e) => {
+                if (e.target.closest('.node-box') || e.target.closest('.custom-dropdown')) return;
+                isPanning = true;
+                startPanX = e.clientX - panX;
+                startPanY = e.clientY - panY;
+            });
+            window.addEventListener('mousemove', (e) => {
+                if (!isPanning) return;
+                panX = e.clientX - startPanX;
+                panY = e.clientY - startPanY;
+                applyTransformations();
+                drawArrows();
+            });
+            window.addEventListener('mouseup', () => { isPanning = false; });
+            workspace.addEventListener('wheel', (e) => {
+                e.preventDefault();
+                const zoomFactor = 1.1;
+                let newZoom = e.deltaY < 0 ? zoom * zoomFactor : zoom / zoomFactor;
+                newZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, newZoom));
+                
+                const rect = workspace.getBoundingClientRect();
+                const mouseX = e.clientX - rect.left;
+                const mouseY = e.clientY - rect.top;
+                
+                panX = mouseX - (mouseX - panX) * (newZoom / zoom);
+                panY = mouseY - (mouseY - panY) * (newZoom / zoom);
+                
+                zoom = newZoom;
+                applyTransformations();
+                drawArrows();
+                document.getElementById('zoom-badge').innerText = `Zoom: ${Math.round(zoom * 100)}%`;
+            }, { passive: false });
+        }
+
+        function applyTransformations() {
+            graphContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${zoom})`;
+        }
+
+        function analyzeKeys() {
+            allKeys.clear();
+            
+            // UPRAVENÉ: Pridané choice_C/case_C, choice_D/case_D, choice_E/case_E do štruktúry formulárov
+            const standardOrder = [
+                "initial_msg", "skills", "difficulty", "threat", "image", 
+                "success_msg", "threat_msg", "threat_avoided_msg", "failure_msg", 
+                "choice_A", "case_A", "choice_B", "case_B", 
+                "choice_C", "case_C", "choice_D", "case_D", "choice_E", "case_E", 
+                "case_success", "case_threat", "case_failure", "type"
+            ];
+            
+            standardOrder.forEach(k => allKeys.add(k));
+
+            for (const key in rawChallenges) {
+                if (key === 'LAYOUT') continue;
+                Object.keys(rawChallenges[key]).forEach(k => allKeys.add(k));
+            }
+
+            if (rawChallenges.LAYOUT) {
+                for (const key in rawChallenges.LAYOUT) {
+                    if (key === 'LAYOUT') continue;
+                    if (!(key in rawChallenges)) {
+                        let isEnemyNode = false;
+                        const parts = key.split('_');
+                        if (parts[0] in enemyTypes) {
+                            isEnemyNode = true;
+                        }
+
+                        rawChallenges[key] = isEnemyNode ? {
+                            type: parts[0] in enemyTypes ? parts[0] : key
+                        } : {
+                            initial_msg: "Tento uzol bol načítaný z LAYOUTu, ale nemá príbehové dáta. Napíš text..."
+                        };
+                    }
+                }
+            }
+
+            for (const key in nodePositions) {
+                if (!(key in rawChallenges)) {
+                    delete nodePositions[key];
+                }
+            }
+
+            for (const key in rawChallenges) {
+                if (key === 'LAYOUT') continue;
+
+                const nodeData = rawChallenges[key];
+                let isEnemy = false;
+
+                if (nodeData && typeof nodeData === 'object' && nodeData.type && (nodeData.type in enemyTypes)) {
+                    isEnemy = true;
+                }
+
+                if (!nodePositions[key]) {
+                    const savedX = (rawChallenges.LAYOUT && rawChallenges.LAYOUT[key]) ? rawChallenges.LAYOUT[key].x : 150;
+                    const savedY = (rawChallenges.LAYOUT && rawChallenges.LAYOUT[key]) ? rawChallenges.LAYOUT[key].y : 150;
+                    nodePositions[key] = { x: savedX, y: savedY, isEnemy: isEnemy };
+                } else {
+                    nodePositions[key].isEnemy = isEnemy;
+                }
+            }
+        }
+
+        function generateSmartPositions() {
+            nodePositions = {};
+            const keys = Object.keys(rawChallenges);
+            
+            if (loadedLayout) {
+                keys.forEach(key => {
+                    const isEnemy = !!(rawChallenges[key] && rawChallenges[key].type && rawChallenges[key].type in enemyTypes);
+                    if (loadedLayout[key]) {
+                        nodePositions[key] = {
+                            x: loadedLayout[key].x,
+                            y: loadedLayout[key].y,
+                            isEnemy: isEnemy
+                        };
+                    } else {
+                        nodePositions[key] = { x: 150, y: 150, isEnemy: isEnemy };
+                    }
+                });
+            } else {
+                let levels = {};
+                keys.forEach(k => levels[k] = 0);
+
+                for (let i = 0; i < 4; i++) { 
+                    keys.forEach(sourceKey => {
+                        const node = rawChallenges[sourceKey];
+                        layoutLinkKeys.forEach(param => {
+                            const val = node[param];
+                            const processTarget = (target) => {
+                                if (typeof target === 'string' && levels[target] !== undefined) {
+                                    levels[target] = Math.max(levels[target], levels[sourceKey] + 1);
+                                }
+                            };
+                            if (typeof val === 'string') processTarget(val);
+                            else if (Array.isArray(val)) val.forEach(processTarget);
+                        });
+                    });
+                }
+
+                let levelCounters = {};
+                keys.forEach(key => {
+                    let lvl = levels[key];
+                    if (levelCounters[lvl] === undefined) levelCounters[lvl] = 0;
+                    
+                    const isEnemy = !!(rawChallenges[key] && rawChallenges[key].type && rawChallenges[key].type in enemyTypes);
+                    nodePositions[key] = {
+                        x: 100 + lvl * 320,
+                        y: 100 + levelCounters[lvl] * 240,
+                        isEnemy: isEnemy
+                    };
+                    levelCounters[lvl]++;
+                });
+            }
+            applyTransformations();
+        }
+
+        function renderNetwork() {
+            const layer = document.getElementById('nodes-layer');
+            layer.innerHTML = '';
+
+            for (const key in nodePositions) {
+                const pos = nodePositions[key];
+                const box = document.createElement('div');
+                box.id = `node-${key}`;
+                
+                if (pos.isEnemy) {
+                    box.className = `node-box enemy-node ${activeNodeKey === key ? 'selected' : ''}`;
+                    const baseType = rawChallenges[key]?.type || "Nepriateľ";
+                    const enemyStats = enemyTypes[baseType] || { skill: '?' };
+                    
+                    box.innerHTML = `
+                        <div class="node-box-title">${key}</div>
+                        <div class="node-box-meta">Boj (${baseType})</div>
+                        <div style="font-size:11px; color:#aaa;">Sila šablóny: ${enemyStats.skill}</div>
+                    `;
+                    box.addEventListener('click', (e) => { e.stopPropagation(); openNodeEditor(key); });
+                } else {
+                    const node = rawChallenges[key];
+                    box.className = `node-box ${activeNodeKey === key ? 'selected' : ''}`;
+                    let meta = node.difficulty ? `Test (Nár: ${node.difficulty})` : "Rozhodnutie";
+                    
+                    box.innerHTML = `
+                        <div class="node-box-title">${key}</div>
+                        <div class="node-box-meta">${meta}</div>
+                        <div style="font-size: 11px; color: #888; margin-top:4px; overflow:hidden; max-height:32px;">
+                            ${node.initial_msg ? node.initial_msg : ''}
+                        </div>
+                    `;
+                    box.addEventListener('click', (e) => { e.stopPropagation(); openNodeEditor(key); });
+                }
+
+                box.style.left = `${pos.x}px`;
+                box.style.top = `${pos.y}px`;
+                setupDragAndDrop(box, key);
+                layer.appendChild(box);
+            }
+            drawArrows();
+        }
+
+        function setupDragAndDrop(el, key) {
+            let isDragging = false;
+            let startX, startY;
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+                isDragging = true;
+                startX = (e.clientX / zoom) - nodePositions[key].x;
+                startY = (e.clientY / zoom) - nodePositions[key].y;
+                el.style.zIndex = 100;
+                e.stopPropagation();
+            });
+
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                let newX = (e.clientX / zoom) - startX;
+                let newY = (e.clientY / zoom) - startY;
+
+                if (key === 'START') {
+                    let deltaX = newX - nodePositions[key].x;
+                    let deltaY = newY - nodePositions[key].y;
+
+                    for (const k in nodePositions) {
+                        nodePositions[k].x += deltaX;
+                        nodePositions[k].y += deltaY;
+
+                        const nodeEl = document.getElementById(`node-${k}`);
+                        if (nodeEl) {
+                            nodeEl.style.left = `${nodePositions[k].x}px`;
+                            nodeEl.style.top = `${nodePositions[k].y}px`;
+                        }
+                    }
+                } else {
+                    nodePositions[key].x = Math.max(0, newX);
+                    nodePositions[key].y = Math.max(0, newY);
+                    el.style.left = `${nodePositions[key].x}px`;
+                    el.style.top = `${nodePositions[key].y}px`;
+                }
+                
+                drawArrows();
+            });
+
+            document.addEventListener('mouseup', () => { if (isDragging) isDragging = false; });
+        }
+        
+        function drawArrows() {
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            for (const sourceKey in rawChallenges) {
+                const node = rawChallenges[sourceKey];
+                const startPos = nodePositions[sourceKey];
+                if (!startPos) continue;
+
+                for (const param in node) {
+                    const val = node[param];
+                    if (typeof val === 'string' && nodePositions[val]) {
+                        drawSingleArrow(ctx, startPos, nodePositions[val], param);
+                    } else if (Array.isArray(val)) {
+                        val.forEach(target => {
+                            if (typeof target === 'string' && nodePositions[target]) {
+                                drawSingleArrow(ctx, startPos, nodePositions[target], param);
+                            }
+                        });
+                    }
+                }
+            }
+        }
+
+        function drawSingleArrow(ctx, start, end, label) {
+            const startX = (start.x + 100) * zoom + panX;
+            const startY = (start.y + 35) * zoom + panY;
+            const endX = (end.isEnemy ? end.x + 65 : end.x + 100) * zoom + panX;
+            const endY = (end.isEnemy ? end.y + 65 : end.y + 35) * zoom + panY;
+
+            if (Math.max(startX, endX) < 0 || Math.min(startX, endX) > canvas.width ||
+                Math.max(startY, endY) < 0 || Math.min(startY, endY) > canvas.height) {
+                return;
+            }
+
+            if (!showDelayedLines && label.includes('delayed')) {
+                return;
+            }
+
+            let color = '#555';
+            if (label.includes('success')) color = '#2e7d32';
+            if (label.includes('failure')) color = '#d32f2f';
+            if (label.includes('A')) color = '#1565c0'; // Modrá
+            if (label.includes('B')) color = '#ad1457'; // Malinová/ružová
+            
+            // UPRAVENÉ: Unikátne vizuálne farby pre nové vetvy C, D, E
+            if (label.includes('C')) color = '#7b1fa2'; // Fialová
+            if (label.includes('D')) color = '#00796b'; // Tyrkysová / Teal
+            if (label.includes('E')) color = '#e65100'; // Tmavooranžová
+
+            if (label.includes('threat')) color = '#ef6c00';
+            if (label.includes('delayed')) color = '#afb42b'; 
+            if (end.isEnemy) color = '#ff1744';
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 2.0 * zoom;
+            ctx.beginPath();
+            ctx.moveTo(startX, startY);
+            
+            const cp1x = startX + (endX - startX) / 2;
+            const cp1y = startY;
+            const cp2x = startX + (endX - startX) / 2;
+            const cp2y = endY;
+            
+            ctx.bezierCurveTo(cp1x, cp1y, cp2x, cp2y, endX, endY);
+            ctx.stroke();
+
+            const angle = Math.atan2(endY - startY, endX - startX);
+            const arrowLength = 10 * zoom;
+            const arrowX = endX - (end.isEnemy ? 65 : 100) * Math.cos(angle) * 0.18 * zoom;
+            const arrowY = endY - (end.isEnemy ? 65 : 35) * Math.sin(angle) * 0.18 * zoom;
+
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.moveTo(arrowX, arrowY);
+            ctx.lineTo(arrowX - arrowLength * Math.cos(angle - Math.PI / 6), arrowY - arrowLength * Math.sin(angle - Math.PI / 6));
+            ctx.lineTo(arrowX - arrowLength * Math.cos(angle + Math.PI / 6), arrowY - arrowLength * Math.sin(angle + Math.PI / 6));
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function centerCameraOnNode(key) {
+            const pos = nodePositions[key];
+            if (!pos) return;
+
+            // Zistíme rozmery viditeľnej pracovnej plochy
+            const viewWidth = workspace.clientWidth;
+            const viewHeight = workspace.clientHeight;
+
+            // Príbehový uzol má fixnú šírku 200px, výšku odhadneme na cca 70px
+            const nodeWidth = 200;
+            const nodeHeight = 70;
+
+            // Výpočet pre presné vycentrovanie bodu na stred obrazovky pri zohľadnení aktuálneho zoomu
+            panX = (viewWidth / 2) - (pos.x + nodeWidth / 2) * zoom;
+            panY = (viewHeight / 2) - (pos.y + nodeHeight / 2) * zoom;
+
+            // Aplikujeme nový posun na grafické vrstvy
+            applyTransformations();
+            drawArrows();
+        }
+
+        function openNodeEditor(key) {
+            activeNodeKey = key;
+            renderNetwork();
+            const sidebar = document.getElementById('sidebar-panel');
+            const nodeData = rawChallenges[key];
+            const isEnemy = nodePositions[key]?.isEnemy || false;
+            let html = `<h2>Editor: <span style="color: ${isEnemy ? 'var(--accent-red)' : 'inherit'}">${key}</span></h2>`;
+
+            html += `
+                <button class="btn btn-secondary" style="width: 100%; margin-bottom: 15px;" onclick="duplicateNode('${key}')">
+                    🗐 Duplikovať tento uzol
+                </button>
+            `;
+
+            if (isEnemy) {
+                const baseType = nodeData.type || key;
+                const enemyStats = enemyTypes[baseType] || { skill: '?', stress_thresh: '?', weapon: '?', image: '?' };
+                
+                html += `
+                    <div style="background: #2a1010; padding: 12px; border: 1px solid var(--accent-red); margin-bottom: 15px; border-radius: 4px; font-size: 0.9rem;">
+                        <div style="font-weight: bold; color: var(--enemy-node-border); margin-bottom: 6px;">⚔️ BOJOVÝ UZOL (Inštancia)</div>
+                        <div style="border-top: 1px dashed #555; padding-top: 6px; color: #ddd;">
+                            <div><strong>Šablóna [${baseType}]:</strong></div>
+                            <div>• Schopnosť (Skill): ${enemyStats.skill}</div>
+                            <div>• Hranica stresu: ${enemyStats.stress_thresh}</div>
+                            <div>• Zbraň (Damage): ${enemyStats.weapon}</div>
+                            <div style="color: #aaa; font-size: 0.8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">• Obrázok: ${enemyStats.image}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // 1. Vykreslenie štandardných polí (vynecháme špecifické vetvy choice_A-E a case_A-E)
+            allKeys.forEach(fieldKey => {
+                if (/^(choice|case)_[A-E]$/.test(fieldKey)) return; // Tieto preskočíme, spracujeme ich dynamicky nižšie
+
+                const value = nodeData[fieldKey];
+                const displayVal = value !== undefined ? value : '';
+                
+                html += `<div class="form-group">
+                    <label>${fieldKey.replace(/_/g, ' ')}</label>`;
+
+                if (fieldKey.includes('msg') || fieldKey === 'initial_msg') {
+                    html += `<textarea class="form-control" onchange="updateValue('${key}', '${fieldKey}', this.value)">${displayVal}</textarea>`;
+                } else {
+                    const formattedVal = Array.isArray(displayVal) ? JSON.stringify(displayVal) : displayVal;
+                    html += `
+                        <input type="text" class="form-control" 
+                            id="input-${fieldKey}"
+                            value='${formattedVal}' 
+                            onclick="event.stopPropagation()"
+                            onfocus="showDropdown('${fieldKey}', this)"
+                            oninput="filterDropdown('${fieldKey}', this)"
+                            onchange="updateValue('${key}', '${fieldKey}', this.value)">
+                        <div class="custom-dropdown" id="drop-${fieldKey}"></div>
+                    `;
+                }
+                html += `</div>`;
+            });
+
+            // 2. Dynamické vykreslenie iba existujúcich volieb a vetiev (A až E)
+            const letters = ['A', 'B', 'C', 'D', 'E'];
+            // Zistíme, ktoré písmená už v uzle majú definovanú voľbu alebo vetvu
+            let activeLetters = letters.filter(l => nodeData[`choice_${l}`] !== undefined || nodeData[`case_${l}`] !== undefined);
+            
+            // Ak v uzle nie je žiadna vetva, predvolíme zobrazenie vetvy A
+            if (activeLetters.length === 0) {
+                activeLetters = ['A'];
+            }
+
+            html += `<div style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                        <h3 style="font-size: 1rem; text-transform: uppercase; color: #ffff55; margin-bottom: 12px;">Voľby a Vetvy (Choices & Cases)</h3>`;
+
+            activeLetters.forEach(l => {
+                const choiceKey = `choice_${l}`;
+                const caseKey = `case_${l}`;
+                const choiceVal = nodeData[choiceKey] !== undefined ? nodeData[choiceKey] : '';
+                const caseVal = nodeData[caseKey] !== undefined ? nodeData[caseKey] : '';
+
+                html += `
+                    <div style="background: #252525; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid var(--accent-blue);">
+                        <div style="font-weight: bold; font-size: 0.85rem; color: #aaa; margin-bottom: 8px; text-transform: uppercase;">Vetva ${l}</div>
+                        
+                        <div class="form-group">
+                            <label>${choiceKey.replace(/_/g, ' ')}</label>
+                            <input type="text" class="form-control" 
+                                id="input-${choiceKey}"
+                                value='${choiceVal}' 
+                                onclick="event.stopPropagation()"
+                                onfocus="showDropdown('${choiceKey}', this)"
+                                oninput="filterDropdown('${choiceKey}', this)"
+                                onchange="updateValue('${key}', '${choiceKey}', this.value)">
+                            <div class="custom-dropdown" id="drop-${choiceKey}"></div>
+                        </div>
+
+                        <div class="form-group" style="margin-bottom: 0;">
+                            <label>${caseKey.replace(/_/g, ' ')}</label>
+                            <input type="text" class="form-control" 
+                                id="input-${caseKey}"
+                                value='${caseVal}' 
+                                onclick="event.stopPropagation()"
+                                onfocus="showDropdown('${caseKey}', this)"
+                                oninput="filterDropdown('${caseKey}', this)"
+                                onchange="updateValue('${key}', '${caseKey}', this.value)">
+                            <div class="custom-dropdown" id="drop-${caseKey}"></div>
+                        </div>
+                    </div>
+                `;
+            });
+
+
+            // Nájdeme prvé voľné písmeno v poradí, ktoré ešte nie je zobrazené
+            const nextLetter = letters.find(l => !activeLetters.includes(l));
+            if (nextLetter) {
+                html += `
+                    <button class="btn btn-secondary" style="width: 100%; padding: 8px; font-size: 0.9rem; margin-top: 5px;" 
+                            onclick="addChoiceCaseLetter('${key}', '${nextLetter}')">
+                        + Pridať Vetvu ${nextLetter}
+                    </button>
+                `;
+            }
+
+            html += `</div>`;
+            sidebar.innerHTML = html;
+        }
+
+        // Pomocná funkcia pre dynamické pridanie novej vetvy do dát uzla
+        function addChoiceCaseLetter(nodeKey, letter) {
+            if (!rawChallenges[nodeKey]) return;
+            
+            // Inicializujeme prázdne hodnoty pre novú vetvu
+            rawChallenges[nodeKey][`choice_${letter}`] = "";
+            rawChallenges[nodeKey][`case_${letter}`] = "";
+            
+            // Aktualizujeme zoznam kľúčov a prekreslíme panel editora pre daný uzol
+            analyzeKeys();
+            openNodeEditor(nodeKey);
+        }
+        function showDropdown(fieldKey, inputEl) {
+            document.querySelectorAll('.custom-dropdown').forEach(d => d.style.display = 'none');
+            const dropContainer = document.getElementById(`drop-${fieldKey}`);
+            if (!dropContainer) return;
+
+            let optionsHTML = '';
+            
+            systemCommands.forEach(cmd => {
+                optionsHTML += `<div class="cmd-opt" onclick="selectDropdownVal('${fieldKey}', '${cmd}')">${cmd}</div>`;
+            });
+
+            Object.keys(rawChallenges).forEach(nodeName => {
+                optionsHTML += `<div onclick="selectDropdownVal('${fieldKey}', '${nodeName}')">${nodeName}</div>`;
+            });
+
+            Object.keys(enemyTypes).forEach(enemyName => {
+                optionsHTML += `<div class="enemy-opt" onclick="selectDropdownVal('${fieldKey}', '${enemyName}')">${enemyName} (Boj)</div>`;
+            });
+
+            dropContainer.innerHTML = optionsHTML;
+            dropContainer.style.display = 'block';
+            filterDropdown(fieldKey, inputEl);
+        }
+
+        function filterDropdown(fieldKey, inputEl) {
+            const query = inputEl.value.trim().toUpperCase();
+            const dropContainer = document.getElementById(`drop-${fieldKey}`);
+            if (!dropContainer) return;
+
+            const divs = dropContainer.querySelectorAll('div');
+            let visibleCount = 0;
+
+            divs.forEach(div => {
+                const text = div.innerText.toUpperCase();
+                if (text.includes(query) || query === '') {
+                    div.style.display = 'block';
+                    visibleCount++;
+                } else {
+                    div.style.display = 'none';
+                }
+            });
+            dropContainer.style.display = visibleCount > 0 ? 'block' : 'none';
+        }
+
+        function selectDropdownVal(fieldKey, selectedValue) {
+            const input = document.getElementById(`input-${fieldKey}`);
+            if (input) {
+                input.value = selectedValue;
+                updateValue(activeNodeKey, fieldKey, selectedValue);
+            }
+            const dropContainer = document.getElementById(`drop-${fieldKey}`);
+            if (dropContainer) dropContainer.style.display = 'none';
+        }
+
+        function duplicateNode(sourceKey) {
+            // 1. Kontrola, či zdrojový uzol vôbec existuje
+            if (!rawChallenges[sourceKey]) {
+                alert("Zdrojový uzol neexistuje!");
+                return;
+            }
+
+            let baseName = sourceKey;
+            let nextIndex = 0;
+
+            // Regulárny výraz hľadá na konci názvu podčiarkovník nasledovaný číslom (napr. _1, _12)
+            const match = sourceKey.match(/(.*)_(\d+)$/);
+
+            if (match) {
+                // Ak uzol už má príponu _x, rozdelíme ho na základné meno a index
+                baseName = match[1];
+                
+                // Prejdeme všetky existujúce uzly a zistíme najvyššie priradené číslo pre toto baseName
+                let maxIndex = parseInt(match[2], 10);
+                
+                for (const existingKey in rawChallenges) {
+                    const existingMatch = existingKey.match(new RegExp(`^${baseName}_(\\d+)$`));
+                    if (existingMatch) {
+                        const currentIndex = parseInt(existingMatch[1], 10);
+                        if (currentIndex > maxIndex) {
+                            maxIndex = currentIndex;
+                        }
+                    }
+                }
+                // Nový index bude najvyšší nájdený + 1
+                nextIndex = maxIndex + 1;
+            } else {
+                // Ak uzol nemá príponu _x, predvolený index je _0
+                nextIndex = 0;
+                
+                // Pre istotu skontrolujeme, či už náhodou neexistuje uzol "Názov_0", ak áno, posunieme index vyššie
+                while (rawChallenges[`${baseName}_${nextIndex}`]) {
+                    nextIndex++;
+                }
+            }
+
+            // Vygenerovanie finálneho unikátneho kľúča
+            const newKey = `${baseName}_${nextIndex}`;
+
+            // 2. Hlboká kópia dát z pôvodného uzla (Deep Copy)
+            rawChallenges[newKey] = JSON.parse(JSON.stringify(rawChallenges[sourceKey]));
+
+            // 3. Nastavenie pozície pre nový uzol v layout-e
+            const currentPos = nodePositions[sourceKey];
+            if (currentPos) {
+                // Posunieme novú node o 40px nižšie a doprava, aby nebola priamo na tej starej
+                nodePositions[newKey] = {
+                    x: currentPos.x + 40,
+                    y: currentPos.y + 40,
+                    isEnemy: currentPos.isEnemy
+                };
+            } else {
+                nodePositions[newKey] = { x: 150, y: 150, isEnemy: false };
+            }
+
+            // 4. Prekreslenie celej aplikácie a otvorenie nového uzla v editore
+            analyzeKeys();
+            renderNetwork();
+            openNodeEditor(newKey);
+            
+            console.log(`[INFO] Uzol ${sourceKey} bol úspešne duplikovaný ako ${newKey}`);
+        }
+
+        function updateValue(nodeKey, fieldKey, rawValue) {
+            let value = rawValue.trim();
+            if (value === "") {
+                delete rawChallenges[nodeKey][fieldKey];
+                return;
+            }
+
+            // Špeciálne ošetrenie pre pole zručností (skills)
+            if (fieldKey === 'skills') {
+                // Ak už používateľ zadal zátvorky, pokúsime sa ich spracovať ako JSON
+                if (value.startsWith('[') && value.endsWith(']')) {
+                    try { 
+                        value = JSON.parse(value); 
+                    } catch(e) {
+                        // Ak JSON zlyhá, očistíme to ručne
+                        value = value.replace(/[\[\]"']/g, '').split(',').map(s => s.trim()).filter(s => s !== "");
+                    }
+                } else {
+                    // Ak zadal text bez zátvoriek (napr. "sneak" alebo "sneak, combat"), rozdelíme ho podľa čiarky
+                    value = value.split(',').map(s => s.trim()).filter(s => s !== "");
+                }
+            } 
+            // Štandardné spracovanie pre ostatné polia
+            else if (!isNaN(value) && value !== "") {
+                value = Number(value);
+            } else if (value.startsWith('[') && value.endsWith(']')) {
+                try { value = JSON.parse(value); } catch(e) {}
+            }
+
+            rawChallenges[nodeKey][fieldKey] = value;
+            analyzeKeys();
+            drawArrows();
+        }
+
+        function exportJSON() {
+            const exportData = JSON.parse(JSON.stringify(rawChallenges));
+            const savedLayout = {};
+            for (const key in nodePositions) {
+                savedLayout[key] = {
+                    x: Math.round(nodePositions[key].x),
+                    y: Math.round(nodePositions[key].y)
+                };
+            }
+
+            exportData.LAYOUT = savedLayout;
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(exportData, null, 4));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", "CHALLENGES.json");
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+    </script>
+</body>
+</html>

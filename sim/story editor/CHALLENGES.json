@@ -238,7 +238,7 @@
     },
     "SNEAK": {
         "skills": [
-            "PLÝŽENIE"
+            "sneak"
         ],
         "difficulty": 8,
         "threat": 3,
@@ -248,7 +248,7 @@
         "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
         "threat_avoided_msg": "Takmer sa poškriabeš na plote. Ale keďže si dávaš pozor, nič sa ti nestane.",
         "failure_msg": "Všimla si ťa a rozbehla sa za tebou!",
-        "case_success": ["weapon+sekera","CITY"],
+        "case_success": "CITY",
         "case_success_delayed": [
             "WRECKS_PREDATOR",
             "BASEMENT_PREDATOR"

@@ -169,14 +169,6 @@
             padding-bottom: 5px;
         }
 
-        #enemy-sprite-container {
-            position: absolute;
-            right: 230px;          /* Aligns it to the right side of the gaming table */
-            top: 50%;
-            transform: translateY(-50%); /* Centers it vertically */
-            z-index: 40;
-            pointer-events: none; /* Prevents it from blocking card clicks */
-        }
 
         #enemy-sprite {
             max-width: 250px;     /* Adjust size to fit your table proportions */
@@ -413,9 +405,12 @@
             margin-bottom: 0; /* Clears out the bottom margin since they are now side-by-side */
         }
 
+
+
+
         #enemy-sprite-container {
             position: absolute;
-            right: 230px;          
+            right: 260px;          
             top: 50%;
             transform: translateY(-50%); 
             z-index: 40;

@@ -1,0 +1,20 @@
+ {
+            "Skautka": {
+                "skill": 2,
+                "stress_thresh": 5,
+                "weapon": 1,
+                "image": "assets/SCOUT.png"
+            },
+            "Predátorka": {
+                "skill": 3,
+                "stress_thresh": 5,
+                "weapon": 2,
+                "image": "assets/PREDATOR.png"
+            },
+            "Puritán": {
+                "skill": 3,
+                "stress_thresh": 7,
+                "weapon": 1,
+                "image": "assets/PURITAN.png"
+            }
+        }
