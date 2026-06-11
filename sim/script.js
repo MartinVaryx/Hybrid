@@ -873,6 +873,15 @@
             const suffixes = ['A', 'B', 'C', 'D', 'E', 'F'];
             let validChoices = [];
 
+            const preloadUrls = suffixes
+            .map(suff => activeChallenge[`case_${suff}`])
+            .filter(target => target && CHALLENGES[target]?.image)
+            .map(target => CHALLENGES[target].image);
+
+            if (preloadUrls.length > 0) {
+                preloadImages(preloadUrls); // Use the helper function defined previously
+            }
+
             // Parse normal options out of the challenge node
             suffixes.forEach(suff => {
                 if (activeChallenge[`choice_${suff}`] && activeChallenge[`case_${suff}`]) {
@@ -914,7 +923,7 @@
                         position: absolute; bottom: 2%; right: 8%; padding: 20px;
                         display: grid;
                         grid-template-columns: repeat(3, 1fr);
-                        gap: 10px; z-index: 200; width: 100%; max-width: 650px;
+                        gap: 20px; z-index: 200; width: 100%; max-width: 650px;
                     `;
                     document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
                 }
@@ -922,8 +931,8 @@
                 choicePrompt.innerHTML = "";
 
 
-                const CHAR_THRESHOLD_WIDE = 5;   // spans 2 columns
-                const CHAR_THRESHOLD_FULL = 2;   // spans full row
+                const CHAR_THRESHOLD_WIDE = 15;   // spans 2 columns
+                const CHAR_THRESHOLD_FULL = 50;   // spans full row
 
                 validChoices.forEach((choice) => {
                     const btn = document.createElement("button");
@@ -934,17 +943,17 @@
                     const colSpan = isFull ? 3 : isWide ? 2 : 1;
 
                     btn.style.cssText = `
-                        width: 100%;
+
                         height: 56px;
                         white-space: nowrap;
                         padding: 0 16px;
-                        border-radius: 999px;
-                        background: ${choice.isBack ? "rgba(60,60,60,0.5)" : "rgba(240, 240, 240, 0.93)"};
+                        border-radius: 9px;
+                        background: ${choice.isBack ? "rgb(186, 186, 186)" : "rgba(240, 240, 240, 0.93)"};
                         backdrop-filter: blur(6px);
                         -webkit-backdrop-filter: blur(6px);
-                        border: 3px solid ${choice.isBack ? "rgba(255,255,255,0.15)" : "rgba(0, 0, 0, 0.96)"};
+                        border: 3px solid  rgba(0, 0, 0, 0.96);
                         color: #000000;
-                        font-size: ${choice.isBack ? "0.8em" : "1em"};
+                        font-size: ${choice.isBack ? "1.2em" : "1.1em"};
                         cursor: pointer;
                         grid-column: span ${colSpan};
                     `;
@@ -1055,7 +1064,11 @@
             // --- Image asset straight to the CSS variable ---
             if (tableFloor) {
                 if (activeChallenge.image) {
-                    tableFloor.style.setProperty('--bg-image', `url('${activeChallenge.image}')`);
+                    const newUrl = `url('${activeChallenge.image}')`;
+                    // Only update if it's different from the current value
+                    if (tableFloor.style.getPropertyValue('--bg-image') !== newUrl) {
+                        tableFloor.style.setProperty('--bg-image', newUrl);
+                    }
                 } else {
                     tableFloor.style.removeProperty('--bg-image');
                 }
@@ -2090,6 +2103,7 @@
             if (!gameOn) {
                 return
             }
+            preloadImages(target);
             proceed_target = target; 
             inputs_frozen = true;
             
@@ -2329,6 +2343,33 @@
 
         function runGameloopCycle() {
             gameloop(false, true);
+        }
+
+        function preloadImages(targets) {
+            // Ensure targets is an array to handle both single strings and arrays of targets
+            const targetList = Array.isArray(targets) ? targets : [targets];
+
+            targetList.forEach(target => {
+                // 1. Guard: Check if target is a valid string key in CHALLENGES
+                if (typeof target !== 'string') return;
+
+                const node = CHALLENGES[target];
+                
+                // 2. If it's a valid node and has an image, preload it
+                if (node?.image) {
+                    const img = new Image();
+                    img.src = node.image;
+                }
+                
+                // 3. If it's an array (sequence), recurse to find the first valid image
+                else if (Array.isArray(node)) {
+                    const firstWithImage = node.find(t => CHALLENGES[t]?.image);
+                    if (firstWithImage) {
+                        const img = new Image();
+                        img.src = CHALLENGES[firstWithImage].image;
+                    }
+                }
+            });
         }
 
         function displayEnemyCard(actionType, cardCode) {
