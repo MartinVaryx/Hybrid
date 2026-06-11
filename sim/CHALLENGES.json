@@ -1651,7 +1651,7 @@
         "Predátorka_1": true,
         "Predátorka_2": true,
         "SHACK_0": true,
-        "SHACK_1": true,
+        "SHACK_1": false,
         "SHACK_CELLAR": false,
         "SHACK_DOOR": true,
         "SHACK_LOOK_AROUND": true,
