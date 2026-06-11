@@ -796,6 +796,13 @@
         localStorage.setItem('characters', JSON.stringify(saved));
     }
 
+    function useItemBuilder(name){
+        window.parent.useItem(name);
+        setTimeout(() => {
+            renderInventar()
+        }, 500);
+    }
+
     function renderInventar() {
         const table = document.querySelector("#inventar table");
         if (!table) return;
@@ -820,7 +827,7 @@
             const hasEffect = itemData && itemData.effect;
 
             const useBtn = hasEffect
-                ? `<button class="basic-btn" onclick="window.parent.useItem('${name}')" 
+                ? `<button class="basic-btn" onclick="useItemBuilder('${name}')" 
                     style="background:var(--hybrid-green); color:white; border:1px solid #fff; 
                     height:40px; font-size:0.8rem; clip-path:none; margin:0; border-radius:12px; padding:10px;">
                     <strong>POUŽIŤ</strong></button>`
@@ -1020,7 +1027,6 @@
         );
         if (btn) btn.classList.add('active');
         if (id === 'inventar') renderInventar();
-        if (id === 'editor') renderEditorList();
         if (id === 'builder') {
             renderStats();
             setTimeout(() => filterBuilder(), 50);

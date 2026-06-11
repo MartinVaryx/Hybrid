@@ -39,6 +39,7 @@
         "enemy_escape_delayed": "WRECKS_PREDATOR_2"
     },
     "Predátorka_2": {
+        "image": "assets/PLACEHOLDER.png",
         "type": "Predátorka"
     },
     "WRECKS_PREDATOR": {
@@ -107,6 +108,7 @@
         "enemy_escape_delayed": "BASEMENT_PREDATOR_2"
     },
     "Predátorka_1": {
+        "image": "assets/PLACEHOLDER.png",
         "type": "Predátorka"
     },
     "BASEMENT_PREDATOR": {
@@ -202,6 +204,7 @@
         ]
     },
     "Skautka_2": {
+        "image": "assets/PLACEHOLDER.png",
         "type": "Skautka"
     },
     "BASEMENT_DISTRACT": {
@@ -277,6 +280,7 @@
         "case_C": "CAR_1"
     },
     "Skautka_1": {
+        "image": "assets/PLACEHOLDER.png",
         "type": "Skautka"
     },
     "SNEAK": {
@@ -345,9 +349,11 @@
             "WRECKS_PREDATOR",
             "BASEMENT_PREDATOR"
         ],
-        "back": true
+        "back": true,
+        "image": "assets/PLACEHOLDER.png"
     },
     "LOOK_AROUND": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Na kopci v diaľke vidíš vysielač.",
         "case_success": "",
         "case_failure": "",
@@ -358,6 +364,7 @@
         "back": true
     },
     "TOWER_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Najkratšia cesta vedie cez priamy svah. Vidíš aj nejakú lesnú cestu, ktorá vedie popri svahu - možno k vysielaču, ale to nevieš.",
         "case_success": "",
         "case_failure": "",
@@ -371,6 +378,7 @@
         "case_D": ""
     },
     "WALK_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Pred tebou je nekonečne dlhá cesta.",
         "case_success": "",
         "case_failure": "",
@@ -380,6 +388,7 @@
         "case_B": "WALK_1"
     },
     "FOREST_PATH": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Zatiaľ to nevyzerá, že cesta vedie hore. Objavíš ale akúsi starú chatrč.",
         "case_success": "",
         "case_failure": "",
@@ -398,7 +407,7 @@
         ],
         "difficulty": 9,
         "threat": 3,
-        "image": "TOWER",
+"       image": "assets/PLACEHOLDER.png",
         "success_msg": "Je to náročné, ale podarí sa ti vyškriabať sa hore.",
         "threat_msg": "Šmykneš sa, zvezieš sa niekoľko metrov, pri čom sa zoderieš a doudieraš.",
         "threat_avoided_msg": "Šmykne sa ti noha, ale stihneš sa chytiť konára.",
@@ -406,6 +415,7 @@
         "case_threat": "stress+1"
     },
     "CAR_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri aute a stále nemáš benzín.",
         "case_success": "",
         "case_failure": "",
@@ -417,6 +427,7 @@
         "case_C": "WALK_0"
     },
     "WALK_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Kráčaš a akoby si bol stále na tom istom mieste. Len keď sa obzieš dozadu, vidíš, že auto sa ti vzďaľuje.",
         "case_success": "",
         "case_failure": "",
@@ -430,6 +441,7 @@
         "case_B": "WALK_0"
     },
     "TOWER_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri vysielači. Je jasne označený červeným krížom - to znamená, že patrí Puritánom.",
         "case_success": "",
         "case_failure": "",
@@ -439,6 +451,7 @@
         ]
     },
     "FOREST_PATH_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Narazíš na nejakého muža, on ťa ešte nezbadal. Týchto poznáš, je to Puritán. Ak zistí, že si Hybrid, nebude sa s tebou maznať.",
         "case_success": "",
         "case_failure": "",
@@ -459,6 +472,7 @@
         "case_E": ""
     },
     "SHACK_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Stojíš pri starej chatrči. Je obrastená tŕnistým krovím. Ak tu niekto za posledný mesiac bol, dal si naozaj záležať na tom, aby to nebolo vidno. Chceš sa skúsiť dostať dnu?",
         "case_success": "",
         "case_failure": "",
@@ -473,12 +487,14 @@
         "case_E": "SHACK_1"
     },
     "FOREST_PATH_ESCAPE": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Najskôr ideš opatrne, potom pridáš do kroku.",
         "case_success": "",
         "case_failure": "",
         "skills": "[run, agility]"
     },
     "FOREST_PATH_SNEAK": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "case_failure": ""
@@ -487,13 +503,14 @@
         "initial_msg": "PURITÁN: Čo si zač? Kde si sa tu vzal? Ty nie si od nás. Nie si náhodou Hybrid?",
         "case_success": "",
         "case_failure": "",
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "choice_A": "Nie, som človek. Stratil som sa. Potrebujem pomoc.",
         "case_A": "PURITAN_LIE",
         "choice_B": "Som pánom tohto lesa, vzdaj sa.",
         "case_B": "PURITAN_THREATEN"
     },
     "PURITÁN_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "case_failure": "",
@@ -509,7 +526,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "success_msg": "PURITÁN: Áno? Pokračuj.",
         "threat_msg": "Je presvedčený, že klameš.",
         "threat_avoided_msg": "Zdá sa, že mal podozrenie, ale zažehnal si ho.",
@@ -530,7 +547,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "success_msg": "Zľakol sa a zdrhá. Môžeš ísť ďalej.",
         "threat_msg": "Zazvonil na nejaký zvon, určite privolal ďalších.",
         "threat_avoided_msg": "Vytiahol nejaký zvon, ale vyrazil si mu ho z ruky.",
@@ -538,6 +555,7 @@
         "case_threat_delayed": "PURITÁN_2"
     },
     "PURITAN_CONVINCE": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "PURITÁN: Tak poď so mnou. U nás nájde útočisko každá zblúdilá duša.\n(vieš, že je to pasca)",
         "case_success": "",
         "case_failure": "",
@@ -554,6 +572,7 @@
         "case_C": "FOREST_PATH_1"
     },
     "PURITAN_DONT_CONVINCE": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "S týmto sa nedohodneš. Ak chceš ísť tadiaľto ďalej, budeš ho musieť poraziť.",
         "case_success": "",
         "case_failure": "",
@@ -570,6 +589,7 @@
         "case_C": ""
     },
     "FOREST_PATH_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si späť pri chatrči.",
         "case_success": "",
         "case_failure": "",
@@ -586,6 +606,7 @@
         "case_E": "SHACK_CELLAR"
     },
     "PURITÁN_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ten prekliaty zvonec. Bol to alarm a privolal ďalších.",
         "case_success": "",
         "case_failure": "",
@@ -595,6 +616,7 @@
         ]
     },
     "CAR_4": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri aute a stále nemáš benzín.",
         "case_success": "",
         "case_failure": "",
@@ -625,7 +647,7 @@
         ],
         "difficulty": 9,
         "threat": 3,
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "success_msg": "Môžeš ísť ďalej.",
         "threat_msg": "Zazvonil na nejaký zvon, určite privolal ďalších.",
         "threat_avoided_msg": "Vytiahol nejaký zvon, ale vyrazil si mu ho z ruky.\n\nPURITÁN: Ešte sme neskončili...",
@@ -633,6 +655,7 @@
         "case_threat_delayed": "PURITÁN_2"
     },
     "CLIFF": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ešte ani zďaleka nemáš vyhrané. Aby si sa dostal k vysielaču, potrebuješ zdolať vysoké bralo.",
         "case_success": "",
         "case_failure": "",
@@ -652,7 +675,7 @@
         ],
         "difficulty": 10,
         "threat": 4,
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "success_msg": "Si hore!",
         "threat_msg": "Už po prvých pár metroch sa chytíš koreňa, ktorý sa uvoľní a spadneš.",
         "threat_avoided_msg": "Vyskúšaš trčiaci koreň, ale zistíš, že je suchý, kým sa naň zavesíš. To mohlo dopadnúť zle.",
@@ -660,6 +683,7 @@
         "case_threat": "stress+1"
     },
     "GENERATOR": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Vysielač je napojený na generátor. Tam určite bude benzín.",
         "case_success": "",
         "case_failure": "",
@@ -680,7 +704,7 @@
         "case_failure": "GENERATOR",
         "difficulty": 6,
         "threat": 4,
-        "image": "TOWER.png",
+        "image": "assets/TOWER.png",
         "success_msg": "Podarilo sa, máš benzín!",
         "threat_avoided_msg": "Zacítiš si výpary a prestaneš ťahať v poslednej chvíli. Skoro sa ti benzín dostal do úst.",
         "threat_msg": "Vdýchneš benzín a zakašleš sa.",
@@ -689,6 +713,7 @@
         "back": true
     },
     "CAR_5": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri aute.",
         "case_success": "",
         "case_failure": "",
@@ -721,7 +746,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": "Objavíš tajný vchod, vedie do pivnice a vôbec nie je zamknutý.",
         "threat_msg": "Poriadne sa na kríkoch doškriabeš.",
         "threat_avoided_msg": "Máš čo robiť, aby ti tŕne nerozdriapali kožu. Ale nejakým zázrakom sa ti to podarí.",
@@ -745,7 +770,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": "Dvere neodolali tvojmu šarmu.",
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
@@ -768,7 +793,7 @@
         ],
         "difficulty": 8,
         "threat": 3,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": "Zaprieš sa do mreží, zapraská drevo a prekotíš sa dozadu aj s mrežami. Okno už taký problém nerobilo. Môžeš ísť dnu.",
         "threat_msg": "Všade to prekliate tŕnie. Už máš doškriabané ruky.",
         "threat_avoided_msg": "Stále si musíš dávať pozor na tŕnie. Ale aspoň si nedoškriabeš ruky. Tentoraz.",
@@ -777,6 +802,7 @@
         "back": true
     },
     "SHACK_CELLAR": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ocitneš sa v pivnici.",
         "case_success": "",
         "case_failure": "",
@@ -788,6 +814,7 @@
         "case_C": "SHACK_CELLAR_0"
     },
     "SHACK_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Vojdeš dnu a zacítiš mŕtvolný zápach. Je prítmie, ale vidíš, že chatrč má len jednu veľkú miestnosť - v jednom rohu primitívna kuchynka, v druhom krb a v strede stôl. Okrem toho vidíš dvere do pivnice a rebrík do podkrovia.",
         "case_success": "",
         "case_failure": "",
@@ -834,7 +861,7 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": [
             "Zdalo sa, že žiadna z tých harabúrd nebude užitočná, ale aha - objavíš sekeru v celkom fajn stave! A okrem nej záhradnú hadicu."
         ],
@@ -862,7 +889,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": "Dvere neodolali tvojmu šarmu.",
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
@@ -871,6 +898,7 @@
         "case_failure": "SHACK_CELLAR"
     },
     "UNLOCK_CELLAR": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Dvere sú odomknuté.",
         "case_success": "",
         "case_failure": "",
@@ -900,7 +928,7 @@
         ],
         "difficulty": 9,
         "threat": 3,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "threat_msg": "Nevydržíš to a vyvrátiš obed. Nie, že by bolo jedla nazvyš.",
         "success_msg": "Objavíš mŕtvolu, ako sa hovorí - v pokročilom štádiu rozkladu - a pri nej nejaké papiere. Papiere rýchlo zoberieš. Nájdeš aj staré lano, ale potom musíš ísť dole.",
         "threat_avoided_msg": "Napne ťa, ale z posledných síl zvratky zatlačíš späť.",
@@ -909,6 +937,7 @@
         "trigger_delayed": "item"
     },
     "SHACK_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si späť v hlavnej miestnosti chatrče. Na stole sú papiere, ktoré boli pri mŕtvole.",
         "case_success": "",
         "case_failure": "",
@@ -949,13 +978,14 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "SHACK.png",
+        "image": "assets/SHACK.png",
         "success_msg": "To vôbec nie je zlé. 3 nože, brokovnica aj s pár nábojmi a na skrini si všimneš fľašu - zdá sa, že slivovica.",
         "threat_msg": "Načiahneš sa po fľašu, do drgneš do skrine, fľaša spadne na zem a rozbije sa. Hej, bola to slivovica. Škoda.",
         "threat_avoided_msg": "Načiahneš sa po fľašu, do drgneš do skrine, fľaša spadne, ale v poslednej sekunde ju chytíš. Otvoríš ju - hej, je to slivovica.",
         "failure_msg": "Nedarí sa ti nájsť nič užitočné. Všimneš si len fľašu na skrini."
     },
     "SHACK_EXPLORE_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Dostaneš sa k slivovici. Tej by bolo škoda.",
         "case_success": "",
         "case_failure": "",
@@ -965,6 +995,7 @@
         ]
     },
     "DEAD_LETTERS": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Volám sa Svetlana. Ak si náhodou puritán, tak dúfam, že zhoríš v pekle. To vy ste skutoční diabli, nie my. Ak nie si... Nech si, kto chceš, mne už asi nepomôžeš.",
         "case_success": "",
         "case_failure": "",
@@ -976,6 +1007,7 @@
         "back": true
     },
     "DEAD_LETTERS_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Som tu v podstate odkedy dostali Reného, môjho priateľa. Nikdy sme nikomu neublížili. Puritáni to odmietajú pochopiť, ale aj my máme zmysel pre morálku. Aspoň niektorí z nás. My s Reném sme nikdy sme nikomu neublížili.",
         "case_success": "",
         "case_failure": "",
@@ -986,6 +1018,7 @@
         "back": true
     },
     "DEAD_LETTERS_1": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Mali sme striktnú zásadu - jedli sme len mäso tých, ktorých sme nemali šancu zachrániť. Nikdy by sme nikoho nenechali zomrieť, aby sme.... Nie to ešte niekoho zabiť! To sú klamstvá!",
         "case_success": "",
         "case_failure": "",
@@ -996,6 +1029,7 @@
         "back": true
     },
     "DEAD_LETTERS_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ak nie si jeden z nás, možno sa pýtaš, prečo by vôbec niekto jedol ľudksé mäso. Ale nech sa ľudia pozrú okolo seba! Toto je jediná šanca, ako prežiť. Streliva je stále menej a palicami Somory neutlčieme.",
         "case_success": "",
         "case_failure": "",
@@ -1006,6 +1040,7 @@
         "back": true
     },
     "DEAD_LETTERS_3": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ak ľudí požerú Somory, to je akože lepšie? Ale už je to aj tak jedno. Dúfala som, že to vzdajú, no sliedia za mnou ako psy. Míňa sa mi jedlo, ale... Videla som, čo spravili Renému, bastardi! Radšej zomriem od hladu, ako by som sa nimi mala nechať chytiť.",
         "case_success": "",
         "case_failure": "",
@@ -1016,6 +1051,7 @@
         "back": true
     },
     "DEAD_LETTERS_4": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Už sem raz vtrhli. Bolo to o chlp, našťastie som ich zbadala, kým boli ešte ďaleko. Vyliezla som cez pivnicu a odplazila som sa preč. Odvtedy už tejto skrýši nevenujú veľkú pozornosť. No vždy, keď sa odtiaľto pohnem, narazím na jedného z nich. Už mi je to vlastne aj jedno.",
         "case_success": "",
         "case_failure": "",
@@ -1026,6 +1062,7 @@
         "back": true
     },
     "DEAD_LETTERS_5": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Po tej mäsiarčine, ktorej sa dopustili na poslednom človeku - pardón - Hybridovi, čo mi zostával, už s týmto svetom nechcem nič mať. Ak ich boh existuje a nezabráni v tom svojim vlastným stúpencom, tak v skutočnosti uctievajú démona a nie boha.",
         "case_success": "",
         "case_failure": "",
@@ -1034,6 +1071,7 @@
         "back": true
     },
     "DEAD_LETTERS_6": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ja už som sa dokonca naučila pohybovať medzi nimi a vôbec na mňa neútočili - ak som nebola v ich teritóriu. To som si kedysi nedokázala ani predstaviť - žiť bez strachu, že ma čoskoro dostane jedna z tých beštií. Ak máme možnosť získať tieto schopnosti, prečo by sme ich nevyužili?",
         "case_success": "",
         "case_failure": "",
@@ -1057,24 +1095,28 @@
         "case_D": "NO_HOSE"
     },
     "NO_CONTAINER": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nemáš bandasku.",
         "case_success": "",
         "case_failure": "",
         "back": true
     },
     "NO_HOSE": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nemáš hadicu.",
         "case_success": "",
         "case_failure": "",
         "back": true
     },
     "NO_HOSE_NO_CONTAINER": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nemáš bandasku ani hadicu.",
         "case_success": "",
         "case_failure": "",
         "back": true
     },
     "WALK_3": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Chceš pokračovať?",
         "case_success": "",
         "case_failure": "",
@@ -1088,6 +1130,7 @@
         "case_B": "WALK_0"
     },
     "WALK_4": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ešte nemáš dosť?",
         "case_success": "",
         "case_failure": "",
@@ -1102,24 +1145,28 @@
         ]
     },
     "SKAUTKA_3": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ešte vládzeš?",
         "case_success": "",
         "case_failure": "",
         "type": "Skautka"
     },
     "PREDÁTORKA_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Asi si vošiel do ich teritória!",
         "case_success": "",
         "case_failure": "",
         "type": "Predátorka"
     },
     "SKAUTKA_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Napadne ťa Skautka.",
         "case_success": "",
         "case_failure": "",
         "type": "Skautka"
     },
     "WALK_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Chceš ísť ďalej?",
         "case_success": "",
         "case_failure": "",
@@ -1132,12 +1179,14 @@
         "case_B": "WALK_0"
     },
     "PREDÁTORKA_0": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ďalšie Somora!",
         "case_success": "",
         "case_failure": "",
         "type": "Predátorka"
     },
     "WALK_5": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Ešte nemáš dosť?",
         "case_success": "",
         "case_failure": "",
@@ -1147,24 +1196,28 @@
         "case_B": "GAME_FINISHED"
     },
     "PREDÁTORKA_3": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "case_failure": "",
         "type": "Predátorka"
     },
     "PREDÁTORKA_4": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "case_failure": "",
         "type": "Predátorka"
     },
     "PREDÁTORKA_5": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "case_failure": "",
         "type": "Predátorka"
     },
     "GAME_FINISHED": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "To ty si pravé monštrum! Monštrum, ktoré sa prebilo cez teritórium Somôr a objavilo pevnosť. Koniec hry.",
         "case_success": "",
         "case_failure": ""
@@ -1181,7 +1234,7 @@
         ],
         "difficulty": 8,
         "threat": 3,
-        "image": "FOREST.png",
+        "image": "assets/FOREST.png",
         "success_msg": "Si hore!",
         "threat_msg": "Šmykne sa ti noha, skĺzneš kúsok dole a spáliš si na lane ruky.",
         "threat_avoided_msg": "Šmykne sa ti noha, ale pevne sa držíš lana. Inak to mohlo byť nepríjemné.",
@@ -1190,6 +1243,7 @@
         "back": true
     },
     "TOWER_2": {
+        "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri vysielači. Je jasne označený červeným krížom - to znamená, že patrí Puritánom.",
         "case_success": "",
         "case_failure": "",
@@ -1597,7 +1651,7 @@
         "Predátorka_1": true,
         "Predátorka_2": true,
         "SHACK_0": true,
-        "SHACK_1": false,
+        "SHACK_1": true,
         "SHACK_CELLAR": false,
         "SHACK_DOOR": true,
         "SHACK_LOOK_AROUND": true,

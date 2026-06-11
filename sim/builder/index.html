@@ -26,10 +26,7 @@
 
 
 
-<div id="view-intro" class="view-section active-view">
-
-
-    </div> <div id="view-builder" class="view-section" style="display: block;">
+<div id="view-builder" class="view-section" style="display: block;">
     <div class="header-row">
         <div class="logo-container">
             <img src="assets/logo.png" alt="HYBRID" class="logo-img">
@@ -40,8 +37,8 @@
         <div class="tabs">
             <button class="tab-btn active" onclick="openTab('builder')">DENNÍK HRDINU</button>
             <button class="tab-btn" onclick="openTab('inventar')">INVENTÁR</button>
-            <button class="tab-btn" onclick="openTab('editor')">UPRAVIŤ SCHOPNOSTI</button>
             <button class="tab-btn" onclick="openTab('navod')">NÁVOD</button>
+            <button class="tab-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
 
         <div id="builder" class="tab-content active">
@@ -72,56 +69,6 @@
             </div>
         </div>
 
-        <div id="editor" class="tab-content">
-            <div class="info-panel" style="flex: 2.5;">
-                <div id="editor-main-layout" style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
-                    <div style="flex: 0.8;">
-                        <label style="font-size:1rem; font-weight:bold;">NÁZOV SCHOPNOSTI</label>
-                        <input type="text" id="edit-name" style="width:100%; margin-bottom:15px; box-sizing: border-box;" onkeyup="filterEditorList()">
-                        
-                        <div id="editor-cat-group-row" style="display: flex; gap: 15px; margin-bottom: 15px;">
-                            <div style="width: 100px;">
-                                <label style="font-size:1rem; font-weight:bold; white-space: nowrap;">KATEGÓRIA</label>
-                                <input type="number" id="edit-cat" min="1" max="4" style="width:100%; box-sizing: border-box;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size:1rem; font-weight:bold;">SKUPINA</label>
-                                <select id="edit-group" style="width:100%; box-sizing: border-box; padding: 5px;"></select>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div style="flex: 1.1; width: 100%;">
-                        <div style="display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; margin-bottom: 5px; width: 100%;">
-                            <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">PRÍBUZNÉ SCHOPNOSTI</label>
-                            
-                        <button id="mobile-rel-toggle" 
-                                style="background: #444; color: white; border: none; width: 24px; height: 24px; cursor: pointer; border-radius: 4px; clip-path: none !important; font-weight: bold;" 
-                                onclick="toggleRelOverlay(true)">
-                            +
-                        </button>
-                        </div>
-
-                        <div id="edit-rels-container" style="width: 100%; box-sizing: border-box;"></div>
-                        
-                        <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">POPIS</label>
-
-                        <div id="edit-desc-container" style="width: 100%; box-sizing: border-box;">
-                            <textarea id="edit-desc" style="width: 100%; height: 100px; box-sizing: border-box; resize: vertical; margin-top: 5px; padding: 8px; font-family: inherit; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px;"></textarea>
-                        </div>
-                    </div>
-                </div> 
-
-                <div class="editor-actions" style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-start; margin-left:15px;">
-                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; width: 180px; height: 45px; clip-path:none !important; border-radius:0; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
-                    <button class="tab-btn" style="background:var(--hybrid-red); color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 25px;" onclick="deleteSkill()">ZMAZAŤ</button>
-                    <button class="tab-btn" style="background:#555; color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 20px; margin-left: auto;" onclick="exportSkills()">EXPORTOVAŤ</button>
-                </div>
-            </div> <div class="info-panel" style="flex: 1.1; margin-left:25px; margin-right:15px;">
-                <h3 style="font-family:'Archivo Black'; margin-top: 10px; margin-bottom:10px;">ZOZNAM SCHOPNOSTÍ</h3>
-                <div class="selection-list" id="editor-list" style="height: calc(100% - 60px); overflow-y: auto;"></div>
-            </div>
-        </div>
         <div id="navod" class="tab-content">
             <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
                 <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
@@ -163,22 +110,6 @@
                     </div>
                 </div>
 
-                <div style="margin-top: 40px; background: #000; color: #fff; padding: 25px; border-radius: 4px;">
-                    <h2 style="color: var(--hybrid-red); margin-top: 0;">3. EDITOR SCHOPNOSTÍ</h2>
-                    <p>V záložke <strong>UPRAVIŤ SCHOPNOSTI</strong> môžete spravovať globálnu databázu. Zmeny sa prejavia len na vašom zariadení.</p>
-                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                        <tr>
-                            <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Kategória 1-4</strong></td>
-                            <td style="padding: 10px; border-bottom: 1px solid #444;">Určuje základnú cenu schopnosti.</td>
-                        </tr>
-                        <tr>
-                            <td style="padding: 10px; border-bottom: 1px solid #444;"><strong>Príbuzné schopnosti</strong></td>
-                            <td style="padding: 10px; border-bottom: 1px solid #444;">Tu definujete, ktoré schopnosti znižujú cenu tejto schopnosti (napr. VRHANIE pomáha STREĽBE).<br></br>
-                            Kliknutím na tlačidlo <strong>+</strong> pridáte novú príbuznú schopnosť, kliknutím na schopnosť v zozname ju odstránite.</td>
-                            
-                        </tr>
-                    </table>
-                </div>
             </div>
         </div>
         <div id="inventar" class="tab-content">
