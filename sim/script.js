@@ -9,7 +9,7 @@
         let gameOn = false;
         let stockHeroesData = [];
 
-        const DEBUG = true;
+        const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
         let current_challenge_key = "START"; 
@@ -911,32 +911,46 @@
                     choicePrompt = document.createElement("div");
                     choicePrompt.id = "choice-prompt";
                     choicePrompt.style.cssText = `
-                        position: absolute; bottom: 2%; right: 5%; padding: 20px; 
-                        display: flex; flex-direction: row; flex-wrap: wrap; 
-                        justify-content: center; gap: 12px; z-index: 200; width: 100%; max-width: 650px;
+                        position: absolute; bottom: 2%; right: 8%; padding: 20px;
+                        display: grid;
+                        grid-template-columns: repeat(3, 1fr);
+                        gap: 10px; z-index: 200; width: 100%; max-width: 650px;
                     `;
                     document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
                 }
 
                 choicePrompt.innerHTML = "";
-                if (validChoices.length > 2) {
-                    choicePrompt.style.flexDirection = "column"; 
-                } else {
-                    choicePrompt.style.flexDirection = "row";
-                }
+
+
+                const CHAR_THRESHOLD_WIDE = 5;   // spans 2 columns
+                const CHAR_THRESHOLD_FULL = 2;   // spans full row
 
                 validChoices.forEach((choice) => {
                     const btn = document.createElement("button");
                     btn.className = "adrenaline-select";
-                    
-                    if (choice.isBack) {
-                        btn.style.cssText = "width: 20%; white-space: normal; padding: 12px; height: auto; background-color: #4a4a4a; border-color: #777;";
-                    } else {
-                        btn.style.cssText = "width: 100%; white-space: normal; padding: 12px; height: auto;";
-                    }
-                    
+
+                    const isWide = choice.text.length > CHAR_THRESHOLD_WIDE && choice.text.length <= CHAR_THRESHOLD_FULL;
+                    const isFull = choice.text.length > CHAR_THRESHOLD_FULL;
+                    const colSpan = isFull ? 3 : isWide ? 2 : 1;
+
+                    btn.style.cssText = `
+                        width: 100%;
+                        height: 56px;
+                        white-space: nowrap;
+                        padding: 0 16px;
+                        border-radius: 999px;
+                        background: ${choice.isBack ? "rgba(60,60,60,0.5)" : "rgba(240, 240, 240, 0.93)"};
+                        backdrop-filter: blur(6px);
+                        -webkit-backdrop-filter: blur(6px);
+                        border: 3px solid ${choice.isBack ? "rgba(255,255,255,0.15)" : "rgba(0, 0, 0, 0.96)"};
+                        color: #000000;
+                        font-size: ${choice.isBack ? "0.8em" : "1em"};
+                        cursor: pointer;
+                        grid-column: span ${colSpan};
+                    `;
+
                     btn.innerText = choice.text;
-                    
+
                     btn.onclick = () => {
                         choicePrompt.style.display = "none";
                         if (typeof choice.target === 'string' && choice.target.startsWith("BACK_ACTION_")) {
@@ -944,8 +958,15 @@
                         }
                         handleChallengeTransition(choice.target);
                     };
-                    
+
                     choicePrompt.appendChild(btn);
+                    
+                    if (isWide) {
+                        const spacer = document.createElement("div");
+                        spacer.style.cssText = "grid-column: span 1;";
+                        choicePrompt.appendChild(spacer);
+                    }
+                    // isFull needs no spacer — span 3 already consumes the entire row
                 });
 
                 choicePrompt.style.display = "flex";
