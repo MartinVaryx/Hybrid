@@ -13,6 +13,23 @@
             padding: 0;
         }
 
+        .stain {
+            position: fixed;
+            background-image: url("assets/machula.png"); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.2;
+            mix-blend-mode: multiply;
+            width: 800px; 
+            height: 800px;
+        }
+
+        .stain-tl { top: -500px; left: -350px; transform: rotate(15deg); }
+        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
+        .stain-br { bottom: -500px; right: 250px; transform: rotate(-40deg); }
+
         body {
             font-family: 'Roboto Condensed', sans-serif;
             background-color: var(--bg-paper);
@@ -149,6 +166,11 @@
             font-weight: bold;
         }
 
+        #sp-label, #sp {
+            font-size: 1.3rem;
+            font-weight: bold;
+            margin-right: 5px;
+        }
         .status-badge {
             display: flex;
             padding: 15px 15px;
@@ -217,7 +239,7 @@
         }
 
         /* Ready Box - Now anchored to the top-left */
-        #ready-prompt, #restart-prompt {
+        #ready-prompt, #name-prompt {
             position: absolute;
             top: 60px;
             right: 260px;
@@ -229,7 +251,50 @@
             align-items: center;
             gap: 5px;
             box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
-            z-index: 200;
+            z-index: 3000;
+        }
+
+        #restart-prompt {
+            position: absolute;
+            top: 20px;
+            right: 110px;
+            min-width: 250px;
+            background: #fff;
+            border: 6px solid var(--hybrid-red);
+            padding: 10px;
+            display: none; 
+            flex-direction: column;
+            align-items: center;
+            gap: 5px;
+            box-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+            z-index: 3000;
+        }
+
+
+        /* Štýl pre celoobrazovkový overlay */
+        .builder-overlay-modal {
+            display: none; /* Defaultne skryté */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.95); /* Tmavé pozadie */
+            z-index: 99999; /* Zabezpečí, že bude nad celou hrou */
+            overflow-y: auto; /* Posúvanie ak je obsah väčší */
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        /* Vnútorný kontajner pre zachovanie dizajnu hry */
+        .builder-overlay-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            position: relative;
+            background: #111;
+            border: 2px solid var(--hybrid-red, #c62828);
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         /* Ready Box - Now anchored to the top-left */
@@ -703,4 +768,8 @@
                 transform: translateY(250px) rotate(-360deg); /* Settles hovering overlay style */
                 opacity: 1;
             }
+
+
         }
+
+        

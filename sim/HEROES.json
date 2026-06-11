@@ -2,6 +2,7 @@
     {
         "name": "NATAŠA",
         "sp": 0,
+        "stress": 0,
         "skills": {
             "OBRATNOSŤ": 2,
             "ZRUČNOSŤ": 2,
@@ -23,6 +24,8 @@
             "ZRUČNOSŤ": 2,
             "IQ": 1,
             "ZMYSLY": 2
-        }
+        },
+        "defaultWeapons":["pištoľ"],
+        "defaultAmmo":{"pištoľ":10}
     }
 ]
