@@ -9,10 +9,10 @@
         let gameOn = false;
         let stockHeroesData = [];
 
-        const DEBUG = true;
+        const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
-        let current_challenge_key = "IN_BASEMENT"; 
+        let current_challenge_key = "START"; 
 
 
         const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
