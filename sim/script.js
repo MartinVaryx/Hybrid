@@ -1062,17 +1062,25 @@
             current_challenge.threat = activeChallenge.threat;
 
             // --- Image asset straight to the CSS variable ---
-            if (tableFloor) {
-                if (activeChallenge.image) {
-                    const newUrl = `url('${activeChallenge.image}')`;
-                    // Only update if it's different from the current value
-                    if (tableFloor.style.getPropertyValue('--bg-image') !== newUrl) {
-                        tableFloor.style.setProperty('--bg-image', newUrl);
-                    }
-                } else {
-                    tableFloor.style.removeProperty('--bg-image');
-                }
+            if (tableFloor && activeChallenge.image) {
+                const newUrl = activeChallenge.image;
+                
+                // 1. Check if it's already the current one to prevent unnecessary work
+                if (tableFloor.style.getPropertyValue('--bg-image') === `url('${newUrl}')`) return;
+
+                // 2. Create a temporary image to force a clean decode
+                const tempImg = new Image();
+                
+                // 3. Attach the handler BEFORE setting the source to ensure it's caught
+                tempImg.onload = () => {
+                    tableFloor.style.setProperty('--bg-image', `url('${newUrl}')`);
+                    tableFloor.classList.add('fade-in'); 
+                };
+                
+                // 4. Set the source LAST
+                tempImg.src = newUrl; 
             }
+            
 
             // --- Check for and execute matched delayed triggers ---
             if (activeChallenge.trigger_delayed && Array.isArray(activeChallenge.trigger_delayed)) {
