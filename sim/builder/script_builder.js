@@ -807,11 +807,13 @@
         const table = document.querySelector("#inventar table");
         if (!table) return;
 
-        const HERO = characters[activeCharIdx]
-        const ITEM_LIST = window.parent && window.parent.ITEM_LIST;
-        if (!HERO || !ITEM_LIST) return;
+        const saved = JSON.parse(localStorage.getItem('characters')) || [];
+        const savedChar = saved.find(c => c.name.toUpperCase() === characters[activeCharIdx].name.toUpperCase());
+        const items = savedChar ? (savedChar.items || {}) : {};
 
-        const items = HERO.items || {};
+        const ITEM_LIST = window.parent && window.parent.ITEM_LIST;
+        if (!ITEM_LIST) return;
+
         const entries = Object.entries(items).filter(([name, qty]) => qty > 0);
 
         table.innerHTML = "";

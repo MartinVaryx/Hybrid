@@ -5,8 +5,8 @@
         ],
         "image": "assets/GAME_OVER.png",
         "initial_msg": "Koniec hry! Chceš hrať ešte raz?",
-        "choice_A":"Áno.",
-        "case_A":"restart"
+        "choice_A": "Áno.",
+        "case_A": "restart"
     },
     "DISTRACT_PREDATOR": {
         "skills": [
@@ -456,7 +456,7 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Zobrať nohy na ramená.",
-        "case_A": "FOREST_PATH_ESCAPE",
+        "case_A": "PURITAN_ESCAPE",
         "choice_B": "Skúsim ho osloviť.",
         "case_B": "PURITAN_D_0",
         "choice_C": "Napadnem ho.",
@@ -485,13 +485,6 @@
         "back": true,
         "choice_E": "Idem dnu.",
         "case_E": "SHACK_1"
-    },
-    "FOREST_PATH_ESCAPE": {
-        "image": "assets/PLACEHOLDER.png",
-        "initial_msg": "Najskôr ideš opatrne, potom pridáš do kroku.",
-        "case_success": "",
-        "case_failure": "",
-        "skills": "[run, agility]"
     },
     "FOREST_PATH_SNEAK": {
         "image": "assets/PLACEHOLDER.png",
@@ -603,7 +596,9 @@
             "SHACK_2"
         ],
         "choice_E": "Idem do pivnice.",
-        "case_E": "SHACK_CELLAR"
+        "case_E": "SHACK_CELLAR",
+        "choice_A": "Pokračujem po lesnej ceste.",
+        "case_A": "FOREST_PATH_0"
     },
     "PURITÁN_2": {
         "image": "assets/PLACEHOLDER.png",
@@ -689,7 +684,7 @@
         "case_failure": "",
         "choice_A": "Vysať benzín. Puritáni si ho nezaslúžia.",
         "case_A": "SUCK",
-        "choice_B": "Nebudem od nich kradnúť.",
+        "choice_B": "K hybridom sa správajú ako monštrá, ale sú to ľudia. Nebudem od nich kradnúť.",
         "case_B": "CAR_5",
         "choice_C": "Vysať benzín.",
         "case_C": "NO_HOSE",
@@ -757,6 +752,7 @@
         "initial_msg": "Dvere sú zaistené kovovou tyčou a zámkom. Môžeš ich skúsiť vykopnúť.",
         "case_success": [
             "set_SHACK_0_false",
+            "flag_shackOpen:true",
             "set_SHACK_WINDOW_false",
             "set_SHACK_DOOR_false",
             "set_SHACK_LOOK_AROUND_false",
@@ -775,12 +771,14 @@
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
         "failure_msg": "S týmito dverami len tak nepohneš.",
-        "case_threat": "stress+1"
+        "case_threat": "stress+1",
+        "trigger_delayed": "fla"
     },
     "SHACK_WINDOW": {
         "initial_msg": "Na oknách sú mreže. Ale sú staré a hrdzavé. Skús ich vytrhnúť.",
         "case_success": [
             "set_SHACK_0_false",
+            "flag_shackOpen:true",
             "set_SHACK_WINDOW_false",
             "set_SHACK_DOOR_false",
             "set_SHACK_LOOK_AROUND_false",
@@ -807,9 +805,13 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Ísť hore.",
-        "case_A": "if_doorOpen==true_SHACK_1_else_SHACK_DOOR_0",
+        "case_A": [
+            "SHACK_2",
+            "SHACK_1",
+            "SHACK_DOOR_0"
+        ],
         "choice_B": "Ísť von.",
-        "case_B": "SHACK_0",
+        "case_B": "if_shackOpen:true_FOREST_PATH_else_SHACK_0",
         "choice_C": "Prehľadať to tu.",
         "case_C": "SHACK_CELLAR_0"
     },
@@ -875,6 +877,7 @@
         "initial_msg": "Dvere sú zaistené kovovou tyčou a zámkom. Môžeš ich skúsiť vykopnúť.",
         "case_success": [
             "set_SHACK_0_false",
+            "flag_shackOpen:true",
             "set_SHACK_WINDOW_false",
             "set_SHACK_DOOR_false",
             "set_SHACK_DOOR_0_false",
@@ -1249,6 +1252,23 @@
         "case_failure": "",
         "next": "GENERATOR"
     },
+    "PURITAN_ESCAPE": {
+        "initial_msg": "Najskôr ideš opatrne, potom pridáš do kroku.",
+        "case_success": "BACK_ACTION_2",
+        "case_failure": "PURITÁN_1",
+        "image": "assets/PLACEHOLDER.png",
+        "skills": [
+            "PLÝŽENIE",
+            "OBRATNOSŤ"
+        ],
+        "difficulty": 7,
+        "threat": 3,
+        "success_msg": "Podarilo sa ti ujsť.",
+        "threat_msg": "Všimol si ťa a spustil poplach.",
+        "case_threat_delayed": "PURITÁN_2",
+        "threat_avoided_msg": "Ešteže si dávaš pozor, takmer si ťa všimol.",
+        "failure_msg": "Dobehne ťa a už je neskoro vysvetľovať, pokladá ťa za nepriateľa."
+    },
     "LAYOUT": {
         "GAME_OVER": {
             "x": 5469,
@@ -1295,8 +1315,8 @@
             "y": 1259
         },
         "CAR_2": {
-            "x": 7595,
-            "y": 1939
+            "x": 7543,
+            "y": 1946
         },
         "CITY_2": {
             "x": 6733,
@@ -1363,8 +1383,8 @@
             "y": 1791
         },
         "FOREST_PATH": {
-            "x": 7953,
-            "y": 2456
+            "x": 8084,
+            "y": 2359
         },
         "SLOPE": {
             "x": 8812,
@@ -1390,13 +1410,9 @@
             "x": 6937,
             "y": 3116
         },
-        "FOREST_PATH_ESCAPE": {
-            "x": 7886,
-            "y": 3100
-        },
         "FOREST_PATH_SNEAK": {
-            "x": 8132,
-            "y": 2562
+            "x": 8177,
+            "y": 2538
         },
         "PURITAN_D_0": {
             "x": 8348,
@@ -1419,8 +1435,8 @@
             "y": 3686
         },
         "PURITAN_DONT_CONVINCE": {
-            "x": 8092,
-            "y": 3418
+            "x": 8022,
+            "y": 3440
         },
         "FOREST_PATH_1": {
             "x": 7522,
@@ -1455,8 +1471,8 @@
             "y": 3677
         },
         "CAR_5": {
-            "x": 7670,
-            "y": 2195
+            "x": 7887,
+            "y": 2160
         },
         "SHACK_LOOK_AROUND": {
             "x": 6408,
@@ -1609,6 +1625,10 @@
         "TOWER_2": {
             "x": 9350,
             "y": 2923
+        },
+        "PURITAN_ESCAPE": {
+            "x": 7888,
+            "y": 3049
         }
     },
     "ACTIVE": {
@@ -1635,7 +1655,6 @@
         "FOREST_PATH_0": true,
         "FOREST_PATH_1": true,
         "FOREST_PATH_2": true,
-        "FOREST_PATH_ESCAPE": true,
         "FOREST_PATH_SNEAK": true,
         "GAME_OVER": true,
         "GENERATOR": true,
@@ -1651,7 +1670,7 @@
         "Predátorka_1": true,
         "Predátorka_2": true,
         "SHACK_0": true,
-        "SHACK_1": true,
+        "SHACK_1": false,
         "SHACK_CELLAR": false,
         "SHACK_DOOR": true,
         "SHACK_LOOK_AROUND": true,
@@ -1701,6 +1720,7 @@
         "PREDÁTORKA_0": true,
         "GAME_FINISHED": true,
         "CLIFF_CLIMB_0": false,
-        "TOWER_2": true
+        "TOWER_2": true,
+        "PURITAN_ESCAPE": true
     }
 }
