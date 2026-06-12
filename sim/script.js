@@ -8,7 +8,7 @@
         let hero_created = true;
         let gameOn = false;
         let stockHeroesData = [];
-
+ 
         const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
@@ -408,10 +408,10 @@
             if (typeof actualTarget === 'string' && CHALLENGES[actualTarget] && CHALLENGES[actualTarget].type) {
                 const enemyType = CHALLENGES[actualTarget].type;
                 if (enemyType in ENEMY_TYPES) {
-                    instanceKey = actualTarget; // "Skautka_2"
-                    pre_encounter_challenge_key = current_challenge_key; // Remember where we came from
+                    instanceKey = actualTarget; 
+                    pre_encounter_challenge_key = current_challenge_key; 
 
-                    actualTarget = enemyType;   // "Skautka"
+                    actualTarget = enemyType;   
                 }
             }
 
@@ -1799,6 +1799,7 @@
                         log(`\n Úspešne ujdeš z boja!`, "success-msg");
                         inputs_frozen = true;
                         updateUI();
+                        
                         setTimeout(() => {
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
@@ -1824,26 +1825,31 @@
                                 } else if (activeChallenge && activeChallenge.case_success) {
                                     proceed(activeChallenge.case_success);
                                 }
-                            } else if (pre_encounter_challenge_key) {
-                                // Go back to where the player was before the encounter.
-                                // But if that node is a wrapper (has a .type → it IS the encounter we just fled),
-                                // pop further back in challenge_history to find a real navigation node.
-                                let escapeTarget = pre_encounter_challenge_key;
-                                if (CHALLENGES[escapeTarget] && CHALLENGES[escapeTarget].type && CHALLENGES[escapeTarget].type in ENEMY_TYPES) {
-                                    // The node we came from was itself an encounter wrapper — step further back
-                                    escapeTarget = challenge_history.length > 0 ? challenge_history[challenge_history.length - 1] : null;
+                            } 
+                            // Bežný útek hráča cez BACK_ACTION históriu
+                            else if (pre_encounter_challenge_key) {
+                                let stepsToRetreat = 1; 
+                                
+                                // Ak bod odkiaľ sme prišli bol boj, ustúpime o 2 kroky namiesto 1
+                                if (CHALLENGES[pre_encounter_challenge_key] && CHALLENGES[pre_encounter_challenge_key].type && CHALLENGES[pre_encounter_challenge_key].type in ENEMY_TYPES) {
+                                    stepsToRetreat = 2;
                                 }
+                                
                                 pre_encounter_challenge_key = null;
                                 pending_challenge_key = null;
-                                if (escapeTarget) {
-                                    document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
-                                    const enemyCardContainer = document.getElementById("enemy-card-container");
-                                    if (enemyCardContainer) enemyCardContainer.innerHTML = "";
-                                    const playerCardContainer = document.getElementById("player-card-container");
-                                    if (playerCardContainer) playerCardContainer.innerHTML = "";
-                                    handleChallengeTransition('BACK_ACTION_' + escapeTarget);
-                                }
-                            } else if (pending_challenge_key) {
+
+                                // Vyčistenie hracieho poľa
+                                document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
+                                const enemyCardContainer = document.getElementById("enemy-card-container");
+                                if (enemyCardContainer) enemyCardContainer.innerHTML = "";
+                                const playerCardContainer = document.getElementById("player-card-container");
+                                if (playerCardContainer) playerCardContainer.innerHTML = "";
+                                
+                                // Opravená premenná z escape_target -> stepsToRetreat
+                                handleChallengeTransition('BACK_ACTION_' + stepsToRetreat);
+                            } 
+                            // Fallback navigácia dopredu, ak neexistuje pred-bojová história
+                            else if (pending_challenge_key) {
                                 let nextChallenge = pending_challenge_key; pending_challenge_key = null; proceed(nextChallenge);
                             } else if (activeChallenge && activeChallenge.case_success) {
                                 proceed(activeChallenge.case_success);
@@ -1990,6 +1996,10 @@
                     if (enemyContainer) enemyContainer.style.display = "none";
 
                     let activeChallenge = CHALLENGES[current_challenge_key];
+                    if (current_challenge_key) {
+                            CHALLENGES["ACTIVE"][current_challenge_key] = false; 
+                        }
+                    
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false;
