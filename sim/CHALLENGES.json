@@ -20,10 +20,13 @@
         "threat_msg": "Hádzal si kameň a nevšimol si si, kam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
         "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalil si jej zámer.",
         "failure_msg": "Odhalila ťa, už jej neujdeš.",
-        "case_success": "WRECKS",
+        "case_success": "if_distractBasment:true_CITY_2_else_WRECKS",
         "case_threat": "enemy_advantage+1",
-        "case_threat_delayed": "WRECKS_PREDATOR_2",
-        "case_failure": "Predátorka_2",
+        "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
+        "case_failure": [
+            "if_distractBasment:true_CITY_2_else_WRECKS",
+            "Predátorka_2"
+        ],
         "enemy_escape_delayed": "WRECKS_PREDATOR_2"
     },
     "WRECKS_PREDATOR_2": {
@@ -78,30 +81,10 @@
         "choice_B": "Pustiť sa do nej",
         "case_A": [
             "enemy_advantage=0",
-            "DISTRACT_PREDATOR_BASEMENT"
+            "flag_distractBasment:true",
+            "DISTRACT_PREDATOR"
         ],
         "case_B": [
-            "Predátorka_1",
-            "CITY_2"
-        ],
-        "enemy_escape_delayed": "BASEMENT_PREDATOR_2"
-    },
-    "DISTRACT_PREDATOR_BASEMENT": {
-        "skills": [
-            "throw"
-        ],
-        "difficulty": 10,
-        "threat": 4,
-        "image": "assets/BASEMENT.png",
-        "initial_msg": "Na zemi nájdeš kameň a hodíš ho čo najďalej.",
-        "success_msg": "Podarilo sa. Predátorka išla za zvukom.",
-        "threat_msg": "Hádzal si kameň a nevšimol si si, kam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
-        "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalil si jej zámer.",
-        "failure_msg": "Odhalila ťa, už jej neujdeš.",
-        "case_success": "CITY_2",
-        "case_threat": "enemy_advantage+1",
-        "case_threat_delayed": "BASEMENT_PREDATOR_2",
-        "case_failure": [
             "Predátorka_1",
             "CITY_2"
         ],
@@ -118,7 +101,8 @@
         "choice_B": "Pustiť sa do nej",
         "case_A": [
             "enemy_advantage=0",
-            "DISTRACT_PREDATOR_BASEMENT"
+            "flag_distractBasment:true",
+            "DISTRACT_PREDATOR"
         ],
         "case_B": [
             "Predátorka_1",
@@ -143,7 +127,7 @@
         "initial_msg": "Stále potrebuješ benzín, čo chceš robiť?",
         "choice_A": "Idem do mesta.",
         "choice_B": "Budem smutne sedieť a plakať.",
-        "case_A": "CITY_2",
+        "case_A": "CITY",
         "case_B": "CAR_2",
         "choice_C": "Idem K vysielaču",
         "case_C": [
@@ -296,7 +280,11 @@
         "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
         "threat_avoided_msg": "Takmer sa poškriabeš na plote. Ale keďže si dávaš pozor, nič sa ti nestane.",
         "failure_msg": "Všimla si ťa a rozbehla sa za tebou!",
-        "case_success": "CITY",
+        "case_success": [
+            "set_CITY_true",
+            "CITY",
+            "set_CITY_0_false"
+        ],
         "case_success_delayed": [
             "WRECKS_PREDATOR",
             "BASEMENT_PREDATOR"
@@ -306,7 +294,9 @@
         "case_threat": "stress+1",
         "case_failure": [
             "Skautka_1",
-            "CITY"
+            "set_CITY_true",
+            "CITY",
+            "set_CITY_0_false"
         ],
         "enemy_escape_delayed": [
             "WRECKS_PREDATOR",
@@ -340,6 +330,8 @@
         "case_failure": "",
         "case_A": [
             "Skautka_1",
+            "if_Skautka_1:false_set_CITY_true",
+            "if_Skautka_1:false_set_CITY_0_false_else",
             "CITY"
         ],
         "case_B": "SNEAK",
@@ -373,7 +365,7 @@
         "choice_B": "Skúsim tú cestu.",
         "case_B": "FOREST_PATH",
         "choice_C": "Idem radšej späť.",
-        "case_C": "CAR_4",
+        "case_C": "CAR_1",
         "choice_D": "",
         "case_D": ""
     },
@@ -417,8 +409,6 @@
     "CAR_1": {
         "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Si pri aute a stále nemáš benzín.",
-        "case_success": "",
-        "case_failure": "",
         "choice_A": "Idem k vysielaču.",
         "case_A": "TOWER_0",
         "choice_B": "Idem do mesta.",
@@ -446,7 +436,7 @@
         "case_success": "",
         "case_failure": "",
         "next": [
-            "set_FORREST_PATH_0_false",
+            "set_FOREST_PATH_0_false",
             "GENERATOR"
         ]
     },
@@ -477,7 +467,7 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Skúsim dvere.",
-        "case_A": "SHACK_DOOR",
+        "case_A": "SHACK_DOOR_BREAK",
         "choice_B": "Skúsim to oknom.",
         "case_B": "SHACK_WINDOW",
         "choice_C": "Prehľadám okolie.",
@@ -488,9 +478,27 @@
     },
     "FOREST_PATH_SNEAK": {
         "image": "assets/PLACEHOLDER.png",
-        "initial_msg": "Nový vytvorený príbehový uzol.",
-        "case_success": "",
-        "case_failure": ""
+        "initial_msg": "Obchádzaš cestu cez les ponad Puritána.",
+        "case_success": [
+            "set_FOREST_PATH_0_false",
+            "set_TOWER_1_true",
+            "TOWER_1"
+        ],
+        "case_failure": [
+            "BACK_ACTION_1"
+        ],
+        "trigger_delayed": "difficulty+1",
+        "skills": [
+            "PLÝŽENIE"
+        ],
+        "difficulty": 7,
+        "threat": 4,
+        "success_msg": "Už by ťa nedobehol, môžeš ísť ďalej.",
+        "threat_msg": "Všimol si ťa a zazvonil na nejaký zvon, určite privolal ďalších.",
+        "threat_avoided_msg": "Takmer si ťa všimne, ale v poslednej chvíli zamrzneš za stromom.",
+        "failure_msg": "Dáva si priveľký pozor, nedarí sa ti obísť ho.",
+        "case_threat_delayed": "PURITÁN_2"
+
     },
     "PURITAN_D_0": {
         "initial_msg": "PURITÁN: Čo si zač? Kde si sa tu vzal? Ty nie si od nás. Nie si náhodou Hybrid?",
@@ -609,18 +617,6 @@
             "Puritán",
             "Puritán"
         ]
-    },
-    "CAR_4": {
-        "image": "assets/PLACEHOLDER.png",
-        "initial_msg": "Si pri aute a stále nemáš benzín.",
-        "case_success": "",
-        "case_failure": "",
-        "choice_A": "Idem k veži.",
-        "case_A": "TOWER_0",
-        "choice_B": "Idem do mesta.",
-        "case_B": "CITY_0",
-        "choice_C": "Idem pešo...",
-        "case_C": "WALK_0"
     },
     "FOREST_PATH_2": {
         "initial_msg": "Vidíš, že Puritán váha.",
@@ -748,19 +744,8 @@
         "failure_msg": "Nepodarí sa ti k chatrči veľmi priblížiť. Asi tam aj tak nič nie je.",
         "case_threat": "stress+1"
     },
-    "SHACK_DOOR": {
+    "SHACK_DOOR_BREAK": {
         "initial_msg": "Dvere sú zaistené kovovou tyčou a zámkom. Môžeš ich skúsiť vykopnúť.",
-        "case_success": [
-            "set_SHACK_0_false",
-            "flag_shackOpen:true",
-            "set_SHACK_WINDOW_false",
-            "set_SHACK_DOOR_false",
-            "set_SHACK_LOOK_AROUND_false",
-            "set_SHACK_1_true",
-            "SHACK_1"
-        ],
-        "case_failure": "SHACK_0",
-        "back": true,
         "skills": [
             "SILA"
         ],
@@ -771,8 +756,19 @@
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
         "failure_msg": "S týmito dverami len tak nepohneš.",
+        "case_success": [
+            "set_SHACK_0_false",
+            "flag_shackOpen:true",
+            "set_SHACK_WINDOW_false",
+            "set_SHACK_DOOR_BREAK_false",
+            "flag_doorOpen:true",
+            "set_SHACK_1_true",
+            "set_UNLOCK_CELLAR_false",
+            "SHACK_1"
+        ],
         "case_threat": "stress+1",
-        "trigger_delayed": "fla"
+        "case_failure": "if_fromCellar:true_SHACK_CELLAR_else_SHACK_0",
+        "back": true
     },
     "SHACK_WINDOW": {
         "initial_msg": "Na oknách sú mreže. Ale sú staré a hrdzavé. Skús ich vytrhnúť.",
@@ -808,7 +804,7 @@
         "case_A": [
             "SHACK_2",
             "SHACK_1",
-            "SHACK_DOOR_0"
+            "SHACK_DOOR_BREAK"
         ],
         "choice_B": "Ísť von.",
         "case_B": "if_shackOpen:true_FOREST_PATH_else_SHACK_0",
@@ -873,33 +869,6 @@
         "case_threat": "stress+1",
         "back": true
     },
-    "SHACK_DOOR_0": {
-        "initial_msg": "Dvere sú zaistené kovovou tyčou a zámkom. Môžeš ich skúsiť vykopnúť.",
-        "case_success": [
-            "set_SHACK_0_false",
-            "flag_shackOpen:true",
-            "set_SHACK_WINDOW_false",
-            "set_SHACK_DOOR_false",
-            "set_SHACK_DOOR_0_false",
-            "flag_doorOpen:true",
-            "set_SHACK_1_true",
-            "set_UNLOCK_CELLAR_false",
-            "SHACK_1"
-        ],
-        "back": true,
-        "skills": [
-            "SILA"
-        ],
-        "difficulty": 9,
-        "threat": 2,
-        "image": "assets/SHACK.png",
-        "success_msg": "Dvere neodolali tvojmu šarmu.",
-        "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
-        "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
-        "failure_msg": "S týmito dverami len tak nepohneš.",
-        "case_threat": "stress+1",
-        "case_failure": "SHACK_CELLAR"
-    },
     "UNLOCK_CELLAR": {
         "image": "assets/PLACEHOLDER.png",
         "initial_msg": "Dvere sú odomknuté.",
@@ -953,9 +922,7 @@
             "čo je na tých papieroch."
         ],
         "case_B": "DEAD_LETTERS",
-        "choice_C": "Odomknem pivnicu.",
         "choice_D": "Idem do pivnice.",
-        "case_C": "UNLOCK_CELLAR",
         "choice_E": "Prehľadať to tu.",
         "case_E": "SHACK_EXPLORE"
     },
@@ -1255,7 +1222,11 @@
     "PURITAN_ESCAPE": {
         "initial_msg": "Najskôr ideš opatrne, potom pridáš do kroku.",
         "case_success": "BACK_ACTION_2",
-        "case_failure": "PURITÁN_1",
+        "case_failure": [
+            "PURITÁN_1",
+            "set_PURITAN_CONVINCE_false",
+            "set_PURITAN_LIE_false"
+        ],
         "image": "assets/PLACEHOLDER.png",
         "skills": [
             "PLÝŽENIE",
@@ -1271,92 +1242,88 @@
     },
     "LAYOUT": {
         "GAME_OVER": {
-            "x": 5469,
-            "y": 1025
+            "x": 10362,
+            "y": 0
         },
         "DISTRACT_PREDATOR": {
             "x": 6416,
             "y": 763
         },
         "WRECKS_PREDATOR_2": {
-            "x": 5957,
-            "y": 979
+            "x": 6412,
+            "y": 465
         },
         "Predátorka_2": {
-            "x": 5991,
-            "y": 719
+            "x": 6024,
+            "y": 511
         },
         "WRECKS_PREDATOR": {
-            "x": 6189,
-            "y": 495
+            "x": 6007,
+            "y": 755
         },
         "WRECKS": {
-            "x": 6534,
-            "y": 1011
+            "x": 6734,
+            "y": 607
         },
         "BASEMENT_PREDATOR_2": {
-            "x": 5894,
-            "y": 1881
-        },
-        "DISTRACT_PREDATOR_BASEMENT": {
-            "x": 5976,
-            "y": 1633
+            "x": 5741,
+            "y": 1375
         },
         "Predátorka_1": {
-            "x": 6258,
-            "y": 1812
+            "x": 6172,
+            "y": 1241
         },
         "BASEMENT_PREDATOR": {
-            "x": 6649,
-            "y": 1861
+            "x": 6451,
+            "y": 1158
         },
         "CAR_3": {
-            "x": 5926,
-            "y": 1259
+            "x": 9976,
+            "y": 31
         },
         "CAR_2": {
-            "x": 7543,
-            "y": 1946
+            "x": 7733,
+            "y": 2066
         },
         "CITY_2": {
-            "x": 6733,
-            "y": 1324
+            "x": 6816,
+            "y": 1522
         },
         "IN_BASEMENT": {
-            "x": 5675,
-            "y": 1511
+            "x": 6294,
+            "y": 1808
         },
         "Skautka_2": {
-            "x": 6354,
-            "y": 2486
+            "x": 6263,
+            "y": 2405
         },
         "BASEMENT_DISTRACT": {
             "x": 5743,
             "y": 2089
         },
         "BASEMENT_ENCOUNTER": {
-            "x": 6357,
-            "y": 2252
+            "x": 6283,
+            "y": 2120
         },
         "EXPLORE_BASEMENT": {
-            "x": 6717,
-            "y": 2239
+            "x": 6662,
+            "y": 2122
         },
         "BASEMENT_ENTRANCE": {
-            "x": 7031,
-            "y": 1595
+            "x": 7078,
+            "y": 1795
         },
         "CITY": {
-            "x": 7282,
-            "y": 1321
+            "x": 7332,
+            "y": 1421
         },
         "Skautka_1": {
-            "x": 7879,
-            "y": 1059
+            "x": 7984,
+            "y": 1154
         },
         "SNEAK": {
-            "x": 7342,
-            "y": 789
+            "x": 7580,
+            "y": 1183
         },
         "CAR": {
             "x": 8253,
@@ -1367,8 +1334,8 @@
             "y": 1213
         },
         "CITY_0": {
-            "x": 7884,
-            "y": 1365
+            "x": 7842,
+            "y": 1464
         },
         "LOOK_AROUND": {
             "x": 8242,
@@ -1387,140 +1354,132 @@
             "y": 2359
         },
         "SLOPE": {
-            "x": 8812,
-            "y": 2212
+            "x": 8636,
+            "y": 2514
         },
         "CAR_1": {
             "x": 8033,
             "y": 1917
         },
         "WALK_1": {
-            "x": 9766,
-            "y": 2017
+            "x": 9826,
+            "y": 2039
         },
         "TOWER_1": {
-            "x": 9309,
-            "y": 3230
+            "x": 9358,
+            "y": 3280
         },
         "FOREST_PATH_0": {
-            "x": 8051,
-            "y": 2818
+            "x": 7970,
+            "y": 2784
         },
         "SHACK_0": {
-            "x": 6937,
-            "y": 3116
+            "x": 6613,
+            "y": 3052
         },
         "FOREST_PATH_SNEAK": {
             "x": 8177,
             "y": 2538
         },
         "PURITAN_D_0": {
-            "x": 8348,
-            "y": 2990
+            "x": 8383,
+            "y": 3046
         },
         "PURITÁN_1": {
-            "x": 8402,
-            "y": 3490
+            "x": 8471,
+            "y": 3316
         },
         "PURITAN_LIE": {
-            "x": 8417,
-            "y": 3146
+            "x": 8142,
+            "y": 3535
         },
         "PURITAN_THREATEN": {
-            "x": 8655,
-            "y": 3203
+            "x": 8727,
+            "y": 3216
         },
         "PURITAN_CONVINCE": {
-            "x": 8556,
-            "y": 3686
+            "x": 8644,
+            "y": 3652
         },
         "PURITAN_DONT_CONVINCE": {
-            "x": 8022,
-            "y": 3440
+            "x": 8486,
+            "y": 3943
         },
         "FOREST_PATH_1": {
-            "x": 7522,
-            "y": 3578
+            "x": 7673,
+            "y": 3736
         },
         "PURITÁN_2": {
-            "x": 5461,
-            "y": 1334
-        },
-        "CAR_4": {
-            "x": 8564,
-            "y": 1679
+            "x": 5852,
+            "y": 1663
         },
         "FOREST_PATH_2": {
-            "x": 8722,
-            "y": 3427
+            "x": 8721,
+            "y": 3423
         },
         "CLIFF": {
-            "x": 8927,
-            "y": 2512
+            "x": 8766,
+            "y": 2307
         },
         "CLIFF_CLIMB": {
-            "x": 9081,
-            "y": 2745
+            "x": 8906,
+            "y": 2705
         },
         "GENERATOR": {
-            "x": 9573,
-            "y": 3170
+            "x": 9770,
+            "y": 3233
         },
         "SUCK": {
-            "x": 9258,
-            "y": 3677
+            "x": 9989,
+            "y": 2961
         },
         "CAR_5": {
-            "x": 7887,
-            "y": 2160
+            "x": 8724,
+            "y": 2036
         },
         "SHACK_LOOK_AROUND": {
-            "x": 6408,
-            "y": 3306
+            "x": 5831,
+            "y": 3532
         },
-        "SHACK_DOOR": {
-            "x": 6685,
-            "y": 3502
+        "SHACK_DOOR_BREAK": {
+            "x": 6511,
+            "y": 3478
         },
         "SHACK_WINDOW": {
-            "x": 7020,
-            "y": 3468
+            "x": 6912,
+            "y": 3321
         },
         "SHACK_CELLAR": {
-            "x": 6271,
-            "y": 3683
+            "x": 5974,
+            "y": 3888
         },
         "SHACK_1": {
-            "x": 6698,
-            "y": 4014
+            "x": 6792,
+            "y": 3653
         },
         "SHACK_CELLAR_0": {
-            "x": 5970,
-            "y": 3814
-        },
-        "SHACK_DOOR_0": {
-            "x": 6377,
-            "y": 3881
+            "x": 5659,
+            "y": 4081
         },
         "UNLOCK_CELLAR": {
-            "x": 7244,
-            "y": 3858
+            "x": 7248,
+            "y": 3831
         },
         "SHACK_ATTIC": {
-            "x": 7105,
-            "y": 4020
+            "x": 7096,
+            "y": 3974
         },
         "SHACK_2": {
             "x": 7244,
             "y": 4235
         },
         "SHACK_EXPLORE": {
-            "x": 6839,
-            "y": 4265
+            "x": 6743,
+            "y": 3953
         },
         "SHACK_EXPLORE_2": {
-            "x": 6245,
-            "y": 4328
+            "x": 7077,
+            "y": 3519
         },
         "DEAD_LETTERS": {
             "x": 7076,
@@ -1587,16 +1546,16 @@
             "y": 2106
         },
         "SKAUTKA_0": {
-            "x": 9867,
-            "y": 2199
+            "x": 9869,
+            "y": 2268
         },
         "WALK_2": {
-            "x": 10077,
-            "y": 1942
+            "x": 10126,
+            "y": 1975
         },
         "PREDÁTORKA_0": {
-            "x": 10120,
-            "y": 2128
+            "x": 10165,
+            "y": 2148
         },
         "WALK_5": {
             "x": 10780,
@@ -1619,16 +1578,16 @@
             "y": 1397
         },
         "CLIFF_CLIMB_0": {
-            "x": 9323,
-            "y": 2646
+            "x": 9367,
+            "y": 2335
         },
         "TOWER_2": {
-            "x": 9350,
-            "y": 2923
+            "x": 9459,
+            "y": 2755
         },
         "PURITAN_ESCAPE": {
-            "x": 7888,
-            "y": 3049
+            "x": 7911,
+            "y": 3106
         }
     },
     "ACTIVE": {
@@ -1641,15 +1600,13 @@
         "CAR_1": true,
         "CAR_2": true,
         "CAR_3": true,
-        "CAR_4": true,
         "CAR_5": true,
-        "CITY": true,
+        "CITY": false,
         "CITY_0": true,
         "CITY_2": true,
         "CLIFF": true,
         "CLIFF_CLIMB": true,
         "DISTRACT_PREDATOR": true,
-        "DISTRACT_PREDATOR_BASEMENT": true,
         "EXPLORE_BASEMENT": true,
         "FOREST_PATH": true,
         "FOREST_PATH_0": true,
@@ -1672,7 +1629,7 @@
         "SHACK_0": true,
         "SHACK_1": false,
         "SHACK_CELLAR": false,
-        "SHACK_DOOR": true,
+        "SHACK_DOOR_BREAK": true,
         "SHACK_LOOK_AROUND": true,
         "SHACK_WINDOW": true,
         "SNEAK": true,
@@ -1689,7 +1646,6 @@
         "WRECKS_PREDATOR": true,
         "WRECKS_PREDATOR_2": true,
         "SHACK_CELLAR_0": true,
-        "SHACK_DOOR_0": true,
         "UNLOCK_CELLAR": true,
         "SHACK_ATTIC": true,
         "SHACK_EXPLORE": true,
