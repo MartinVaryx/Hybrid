@@ -44,8 +44,12 @@
             overflow-x: hidden;
         }
 
-        .spacing-top-4 {
+        .spacing-top {
             margin-top: 5.5em; 
+        }
+
+        .spacing-bottom {
+            margin-bottom: 2.5em; 
         }
 
         h1 {
@@ -340,32 +344,97 @@
             gap: 5px;
             z-index: 200;
         }
-
-        /* Console Output Layout Rules */
-        .terminal {
+        /* LAYER 1: The Outer Frame */
+        .terminal-border-box {
             flex: 1;
-            background: #ffffff;
-            color: #000000;
-            font-family: 'Archivo Black', Courier, monospace;
-            padding: 15px;
-            margin-top:8px;
-            border: var(--border-heavy);
+            margin-top: 5px;
             height: 127px;
-            overflow-y: auto;
+            background: #ffffff;
+            border: var(--border-heavy);
+            border-radius: 13px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
-            font-size: 0.95rem;
-            line-height: 1.4;
+            overflow: hidden; 
+            
+            /* NEW: This centers the inner scroll box vertically so the top and bottom gaps match */
+            display: flex;
+            align-items: center; 
+        }
+
+        /* LAYER 2: The Scrollbar Container */
+        .terminal-scroll-container {
+            /* NEW: Instead of 100% height, we subtract 12px (6px gap for the top, 6px for the bottom)
+            This keeps the scrollbar thumb from ever reaching the curved corners. */
+            height: calc(100% - 6px); 
+            width: 100%;
+            overflow-y: auto;
+            
+            /* Standard margins push the scrollbar away from the right frame wall */
+            margin-right: 5px; 
+        }
+
+        /* LAYER 3: The Text Engine */
+        .terminal-content {
+            color: #000000;
+            font-family: 'Protest Riot', sans-serif;
+            font-size: 1.29rem;
+            padding: 5px 10px 10px 10px; 
+        }
+
+        /* CLEAN, SYMMETRICAL SCROLLBAR STYLING */
+        .terminal-scroll-container::-webkit-scrollbar {
+            width: 8px; 
+        }
+
+        .terminal-scroll-container::-webkit-scrollbar-track {
+            background: transparent; 
+        }
+
+        .terminal-scroll-container::-webkit-scrollbar-thumb {
+            background: #888888;
+            border-radius: 4px; 
+        }
+
+        .terminal-scroll-container::-webkit-scrollbar-thumb:hover {
+            background: #555555;
         }
 
         .terminal-line {
-            margin-bottom: 4px;
+            margin-bottom: 0px !important;
             white-space: pre-wrap;
+            line-height: 1.4; /* Controls the tight spacing between lines */
         }
 
-        .system-msg { color: #000000; font-weight: bold;}
-        .success-msg { color: #5cd65c; font-weight: bold; }
-        .failure-msg { color: #ff4d4d; font-weight: bold; }
-        .danger-msg { color: #ffcc00; font-weight: bold; }
+        /* TARGETS ONLY THE VERY FIRST LINE */
+        .terminal-line:first-child {
+            margin-top: 20px !important; /* Adjust this to change space at the top */
+        }
+
+        /* TARGETS ONLY THE CURRENT LAST LINE — BUT ONLY IF IT ISN'T A SHORT MESSAGE */
+        /* 1. Normal final lines get the tight hammer */
+        .terminal-line:last-child:not(.spacing-bottom):not(.spacing-bottom-medium) {
+            margin-bottom: -10px !important; 
+        }
+
+        /* 2. Ultra-short lines get the big margin — UNLESS they are system/danger/failure alerts */
+        .spacing-bottom:not(.danger-msg):not(.failure-msg):not(.success-msg):not(.error-msg) {
+            margin-bottom: 2.2rem !important; 
+        }
+
+        /* 3. Medium lines get pushed slightly up — UNLESS they are system/danger/failure alerts */
+        .spacing-bottom-medium:not(.danger-msg):not(.failure-msg):not(.success-msg):not(.error-msg) {
+            margin-bottom: 0.5rem !important; 
+        }
+
+        /* 4. FORCE danger, failure, and success messages to always remain perfectly tight */
+        .danger-msg, .failure-msg, .success-msg, .error-msg {
+            margin-bottom: 0px !important;
+        }
+
+        .system-msg { color: #171717;}
+        .success-msg { color: #5cd65c; }
+        .failure-msg { color: #ff4d4d; }
+        .danger-msg { color: #ffa200; }
+        .error-msg { color: #e2dc2e; }
 
         /* Controls Section */
         .controls-panel {
@@ -395,6 +464,12 @@
         }
         .adrenaline-select:hover {
             transform: scale(1.05);
+        }
+
+        /* Visual highlight to make keyboard selection obvious to the player */
+        .adrenaline-select.choice-hover-highlight {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
         }
 
         /* Localized Card Tray Containment (Left-Bounded) */
@@ -492,6 +567,28 @@
             opacity: 1;
             background-color: rgba(198, 40, 40, 0.5);
         }
+
+        #card-tray-container:not(.mouse-active) .card-container.keyboard-hover {
+            transform: scale(1.5) translateY(-10px);
+            z-index: 9999 !important;
+        }
+
+        #card-tray-container:not(.mouse-active) .card-container.flipped.keyboard-hover {
+            transform: scale(1.5) rotate(180deg) translateY(10px);
+            z-index: 9999 !important;
+        }
+
+        #card-tray-container:not(.mouse-active) .split-zone.top.keyboard-hover-zone {
+            opacity: 1;
+            background-color: rgba(46, 125, 50, 0.5);
+        }
+
+        #card-tray-container:not(.mouse-active) .split-zone.bottom.keyboard-hover-zone {
+            opacity: 1;
+            background-color: rgba(198, 40, 40, 0.5);
+        }
+
+
         .enemy-stats-row {
             display: flex;
             gap: 20px; /* Puts comfortable breathing room between the two stat blocks */

@@ -226,7 +226,7 @@
     },
     "EXPLORE_BASEMENT": {
         "skills": [
-            "sneak"
+            "PLÝŽENIE"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -270,7 +270,7 @@
     "SNEAK": {
         "back": true,
         "skills": [
-            "sneak"
+            "PLÝŽENIE"
         ],
         "difficulty": 8,
         "threat": 3,
@@ -331,7 +331,6 @@
         "case_A": [
             "Skautka_1",
             "if_Skautka_1:false_set_CITY_true",
-            "if_Skautka_1:false_set_CITY_0_false_else",
             "CITY"
         ],
         "case_B": "SNEAK",
@@ -412,7 +411,7 @@
         "choice_A": "Idem k vysielaču.",
         "case_A": "TOWER_0",
         "choice_B": "Idem do mesta.",
-        "case_B": "CITY",
+        "case_B": ["CITY","CITY_0"],
         "choice_C": "Idem pešo...",
         "case_C": "WALK_0"
     },
@@ -1230,7 +1229,8 @@
         "image": "assets/PLACEHOLDER.png",
         "skills": [
             "PLÝŽENIE",
-            "OBRATNOSŤ"
+            "OBRATNOSŤ",
+            "ŠPRINT"
         ],
         "difficulty": 7,
         "threat": 3,

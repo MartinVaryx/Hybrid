@@ -3,8 +3,6 @@
     
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
-        const editorSelect = document.getElementById('edit-group');
-        const relFilterSelect = document.getElementById('rel-group-filter');
         
         const char = characters[activeCharIdx];
         const allGroups = [...new Set(Object.values(skillsDB_new).map(s => s[1]))].sort();
@@ -14,89 +12,7 @@
             : allGroups;
 
         builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + builderGroups.map(g => `<option value="${g}">${g}</option>`).join('');
-        editorSelect.innerHTML = allGroups.map(g => `<option value="${g}">${g}</option>`).join('');
-        relFilterSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + allGroups.map(g => `<option value="${g}">${g}</option>`).join('');
-    }
-
-    function renderEditorList() {
-        const list = document.getElementById('editor-list');
-        const nameInput = document.getElementById('edit-name');
-        const search = nameInput.value.toUpperCase();
-        list.innerHTML = '';
-        
-        if (!skillsDB_new[search]) {
-            document.getElementById('edit-cat').value = '';
-            document.getElementById('edit-group').value = '';
-            
-            const descInput = document.getElementById('edit-desc');
-            if (descInput) descInput.value = '';
-            
-            editingRels = [];
-            renderRelTags();
-            filterRelSearch();
-        } else {
-            const data = skillsDB_new[search];
-            document.getElementById('edit-cat').value = data[0];
-            document.getElementById('edit-group').value = data[1];
-            
-            // PRIDANÉ: Automatické načítanie popisu pri presnej zhode
-            const descInput = document.getElementById('edit-desc');
-            if (descInput) descInput.value = data[3] || '';
-            
-            editingRels = [...data[2]];
-            renderRelTags();
-            filterRelSearch();
-        }
-
-        const sortedKeys = Object.keys(skillsDB_new)
-            .filter(name => name.includes(search))
-            .sort((a, b) => {
-                const gA = skillsDB_new[a][1].toUpperCase();
-                const gB = skillsDB_new[b][1].toUpperCase();
-                return gA.localeCompare(gB) || a.localeCompare(b);
-            });
-
-        let curG = "";
-        sortedKeys.forEach(name => {
-            if (skillsDB_new[name][1].toUpperCase() !== curG) {
-                curG = skillsDB_new[name][1].toUpperCase();
-                const d = document.createElement('div'); 
-                d.className = 'group-divider'; 
-                d.innerText = curG;
-                list.appendChild(d);
-            }
-            const div = document.createElement('div');
-            div.className = 'skill-list-item';
-            div.innerText = name;
-            
-            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu
-            div.setAttribute('data-description', skillsDB_new[name][3] || '');
-            
-            div.onclick = () => loadToEditor(name);
-            list.appendChild(div);
-        });
-    }
-
-    // Aby ti fungovalo prepojenie, pridaj aj tento alias (ak ho tvoj kód vyžaduje)
-    function filterEditorList() {
-        renderEditorList();
-    }
-
-    function loadToEditor(name) {
-        const data = skillsDB_new[name];
-        document.getElementById('edit-name').value = name;
-        document.getElementById('edit-cat').value = data[0];
-        document.getElementById('edit-group').value = data[1];
-        editingRels = [...data[2]];
-        
-        // PRIDANÉ: Načítanie popisu do textového poľa (ak neexistuje, dáme prázdny text)
-        const descInput = document.getElementById('edit-desc');
-        if (descInput) {
-            descInput.value = data[3] || '';
-        }
-
-        renderRelTags();
-        filterRelSearch();
+        if (char && char.isInitialPhase) builderSelect.value = "DANOSTI";
     }
 
     function renderRelTags() {
@@ -110,70 +26,7 @@
         });
     }
 
-    function filterRelSearch() {
-        const list = document.getElementById('rel-add-list');
-        const search = document.getElementById('rel-search').value.toUpperCase();
-        const groupFilter = document.getElementById('rel-group-filter').value;
-        list.innerHTML = '';
-        
-        const sortedKeys = Object.keys(skillsDB_new)
-            .filter(name => {
-                const skillGroup = skillsDB_new[name][1];
-                const matchesSearch = name.includes(search);
-                const matchesGroup = !groupFilter || skillGroup === groupFilter;
-                const isNotAlreadyAdded = !editingRels.includes(name);
-                
-                return matchesSearch && matchesGroup && isNotAlreadyAdded;
-            })
-            .sort((a, b) => {
-                const gA = skillsDB_new[a][1].toUpperCase();
-                const gB = skillsDB_new[b][1].toUpperCase();
-                return gA.localeCompare(gB) || a.localeCompare(b);
-            });
 
-        let curG = "";
-        sortedKeys.forEach(name => {
-            const group = skillsDB_new[name][1].toUpperCase();
-            if (group !== curG) {
-                curG = group;
-                const d = document.createElement('div');
-                d.className = 'group-divider';
-                d.innerText = curG;
-                list.appendChild(d);
-            }
-
-            const div = document.createElement('div');
-            div.className = 'skill-list-item';
-            div.innerText = name;
-            
-            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu (pre zoznam príbuzných schopností)
-            div.setAttribute('data-description', skillsDB_new[name][3] || '');
-            
-            div.onclick = () => { 
-                editingRels.push(name); 
-                renderRelTags(); 
-                document.getElementById('rel-search').value = ''; 
-                filterRelSearch(); 
-            };
-            list.appendChild(div);
-        });
-    }
-    function removeRel(name) { editingRels = editingRels.filter(r => r !== name); renderRelTags(); }
-
-    function saveSkill() {
-        const name = document.getElementById('edit-name').value.trim().toUpperCase();
-        const cat = parseInt(document.getElementById('edit-cat').value);
-        const descInput = document.getElementById('edit-desc');
-        const description = descInput ? descInput.value.trim() : '';
-        let group = document.getElementById('edit-group').value;
-        if (!name || !group) return showCustomAlert("VYPLŇTE NÁZOV A SKUPINU.");
-        skillsDB_new[name] = [cat, group, editingRels, description];
-        saveState();
-        renderEditorList();
-        updateGroupDropdown();
-        filterBuilder();
-        showStatus("SCHOPNOSŤ ULOŽENÁ.");
-    }
 
     function exportSkills() {
         // Príprava dát do formátu JSON (s odsadením 4 medzery pre lepšiu čitateľnosť)
@@ -198,40 +51,6 @@
         URL.revokeObjectURL(url);
     }
 
-    function deleteSkill() {
-        const name = document.getElementById('edit-name').value.toUpperCase();
-        
-        // Najprv overíme, či schopnosť vôbec v databáze je
-        if (!skillsDB_new[name]) {
-            showCustomAlert("Schopnosť nebola nájdená.", "CHYBA");
-            return;
-        }
-
-        // Vyvoláme modálne okno s potvrdením
-        showCustomAlert(
-            `Naozaj chcete natrvalo ZMAZAŤ schopnosť ${name}?`, 
-            "POTVRDENIE ZMAZANIA", 
-            true, 
-            () => {
-                // Táto časť sa vykoná len po kliknutí na ÁNO
-                delete skillsDB_new[name];
-                
-                // Aktualizácia stavu a rozhrania
-                saveState();
-                renderEditorList();
-                updateGroupDropdown();
-                filterBuilder();
-                
-                // Vyčistíme políčka v editore po zmazaní
-                document.getElementById('edit-name').value = '';
-                document.getElementById('edit-cat').value = '';
-                editingRels = [];
-                renderRelTags();
-                
-                showCustomAlert(`Schopnosť ${name} bola odstránená.`, "ZMAZANÉ");
-            }
-        );
-    }
 
     function selectSkill(name) {
         selectedSkill = name;
@@ -513,6 +332,7 @@
         saveState();
         renderStats();
         selectSkill(selectedSkill);
+        updateGroupDropdown();
         filterBuilder();
     }
 

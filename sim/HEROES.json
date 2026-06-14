@@ -1,4 +1,26 @@
-[
+[{
+        "name": "ANJELIK",
+        "stress": 0,
+        "items": {},
+        "weapons": [],
+        "ammo": {},
+        "sp": 0,
+        "skills": {
+            "OBRATNOSŤ": 3,
+            "SILA": 1,
+            "ZMYSLY": 2,
+            "ŤAŽKÉ ZBRANE": 4,
+            "PLÝŽENIE": 4
+        },
+        "isInitialPhase": false,
+        "initialSkillsSnapshot": {},
+        "humanity": 50,
+        "defaultWeapons": ["mačeta"],
+        "defaultAmmo": {},
+        "defaultItems": {},
+        "stress_thresh": 8,
+        "weapon": 0
+    },
     {
         "name": "NATAŠA",
         "sp": 0,
