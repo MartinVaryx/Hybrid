@@ -8,8 +8,9 @@
         let hero_created = true;
         let gameOn = false;
         let stockHeroesData = [];
- 
-        const DEBUG = false;
+
+        const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
+        const DEBUG = true;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
         let current_challenge_key = "START"; 
@@ -106,6 +107,7 @@
         }
 
 
+
         // --- Core Engine Architecture Variables ---
         let pending_challenge_key = null;  
         let pre_encounter_challenge_key = null; // Tracks where the player was before entering combat (for escape)
@@ -125,6 +127,7 @@
         let weapon = 0;
         let stress = 0;
         const stress_thresh = 8;
+        const ADVANTAGE_CAP = 3;
         let skill = 0;
         let advantage = 0;
         let enemy_advantage = 0;
@@ -853,12 +856,44 @@
                 updateUI();
 
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
+                const oldEnemy = document.getElementById("enemy-card-container");
+                const oldPlayer = document.getElementById("player-card-display");
+                if (oldEnemy) oldEnemy.classList.remove("show"); // Odsunie starú kartu nepriateľa
+                if (oldPlayer) oldPlayer.classList.remove("show"); // Odsunie starú kartu hráča
 
-                enemy = actualTarget;
+                // 1. STABILIZE KEY REFERENCES
+                // Ensure enemy_id strongly favors the state tracking wrapper over the base engine archetype
+                enemy = actualTarget; // "Skautka"
+                if (!instanceKey || instanceKey === enemy) {
+                    // Fallback: If instanceKey was lost, scan CHALLENGES to see if current_challenge_key was the wrapper
+                    if (current_challenge_key && CHALLENGES[current_challenge_key] && CHALLENGES[current_challenge_key].type === enemy) {
+                        instanceKey = current_challenge_key;
+                    }
+                }
                 enemy_id = instanceKey ? instanceKey : actualTarget;
-                enemy_stress = (instanceKey && CHALLENGES[instanceKey] && CHALLENGES[instanceKey].saved_stress)
-                    ? CHALLENGES[instanceKey].saved_stress
-                    : 0;
+
+                // 2. CALCULATE REST MODIFIERS
+                let enemy_rest = 0;
+                if (typeof MODE !== 'undefined') {
+                    if (MODE === "EASY") enemy_rest = 1;
+                    else if (MODE === "NORMAL") enemy_rest = 2;
+                    else enemy_rest = 3;
+                } else {
+                    enemy_rest = 2; // Default fallback if global game difficulty state is loading out of order
+                }
+
+                // 3. EXTRACT AND APPLY SAVED STRESS FROM WRAPPER
+                let foundWrapper = CHALLENGES[enemy_id];
+                
+                if (foundWrapper && typeof foundWrapper.saved_stress !== 'undefined') {
+                    enemy_stress = Math.max(0, foundWrapper.saved_stress - enemy_rest);
+                    if (foundWrapper.saved_stress > 0) {
+                        log(`Od posledného súboja si nepriateľ odpočinul. Stres mu klesol o ${enemy_rest}. (Aktuálny stres: ${enemy_stress})`, "info-msg");
+                    }
+                } else {
+                    enemy_stress = 0;
+                }
+
                 enemy_escaping = false;
                 is_conflict = true;
                 move = 0;
@@ -1158,7 +1193,7 @@
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("enemy_advantage")) {
-                    enemy_advantage += modifier;
+                    enemy_advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
                     if (enemy_advantage < 0) enemy_advantage = 0; 
                     
                     if (modifier > 0) {
@@ -1169,7 +1204,7 @@
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("advantage")) {
-                    advantage += modifier;
+                    advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
                     if (advantage < 0) advantage = 0; 
                     
                     if (modifier > 0) {
@@ -1307,7 +1342,7 @@
                     modifier < 0 ? "success-msg" : "danger-msg");
             } 
             else if (effectTarget === "advantage") {
-                advantage = Math.max(0, advantage + modifier);
+                advantage = Math.max(0, Math.min(advantage + modifier, ADVANTAGE_CAP));;
                 log(modifier > 0 
                     ? `Získavaš +${amount} k výhode. (${advantage})` 
                     : `Strácaš ${amount} z výhody. (${advantage})`, 
@@ -1669,18 +1704,162 @@
             const options = Array.from(el.options);
             if (options.length <= 1) return; // Ak je v zozname len jedna možnosť, niet kam cyklovať
 
+            // Ak nie je konflikt, všetky dostupné možnosti sú automaticky povolené
+            if (typeof is_conflict === 'undefined' || !is_conflict) {
+                let nextIndex = (el.selectedIndex + direction + options.length) % options.length;
+                while (options[nextIndex].disabled && nextIndex !== el.selectedIndex) {
+                    nextIndex = (nextIndex + direction + options.length) % options.length;
+                }
+                if (nextIndex !== el.selectedIndex) {
+                    el.selectedIndex = nextIndex;
+                    el.dispatchEvent(new Event('change', { bubbles: true }));
+                }
+                return;
+            }
+
+            /**
+             * Presná kópia overenia z Card Tray Listeneru pre jednu konkrétnu dvojicu
+             */
+            function simulateActionCheck(actionType, skillVal, weaponVal) {
+                const upperSkill = (skillVal || "").toUpperCase();
+                const isPlaceholderSkill = skillVal === "placeholder" || skillVal === "none" || skillVal === "";
+                const isPlaceholderWeapon = weaponVal === "placeholder" || weaponVal === "";
+
+                const skillData = typeof SKILLS_DB !== 'undefined' ? SKILLS_DB[skillVal] : null;
+                const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
+                const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) || 
+                                    (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));
+
+                // --- 0. B. VALIDÁCIA PRE BOJ ---
+                if (!isCombatSkill && !isDefenseSkill && !isPlaceholderSkill) return false;
+
+                // --- 1. KROK: VRHANIE A ŤAŽKÉ PREDMETY ---
+                if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
+                    if (!WEAPON_LIST["VRHACIE"] || WEAPON_LIST["VRHACIE"][weaponVal] === undefined) return false;
+                }
+
+                // --- 2. KROK: KONTROLA EXKLUZIVITY ÚTOK/OBRANA ---
+                if (!isPlaceholderSkill) {
+                    if (actionType === "A" && !isCombatSkill && isDefenseSkill) return false;
+                    if (actionType === "D" && isCombatSkill && !isDefenseSkill) return false;
+                }
+
+                // --- 3. KROK: KONTROLA KOMBINÁCIE ZBRANE A SCHOPNOSTI ---
+                if (!isPlaceholderSkill) {
+                    if (skillData) {
+                        const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
+                        if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
+                            if (isPlaceholderWeapon) return false;
+                        }
+                    }
+
+                    if (!isPlaceholderWeapon) {
+                        let foundDamage = 0;
+                        for (const category in WEAPON_LIST) {
+                            if (WEAPON_LIST[category] && WEAPON_LIST[category][weaponVal] !== undefined) {
+                                foundDamage = WEAPON_LIST[category][weaponVal];
+                                break;
+                            }
+                        }
+                        
+                        const weaponAllowed = WEAPON_SKILLS[String(foundDamage)] || [];
+                        const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
+                        if (!allowedSkills.includes(upperSkill)) return false;
+
+                        if (skillData && skillData[1]) {
+                            const skillCategory = skillData[1].toUpperCase();
+                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                                if (skillCategory === "BOJ ZBLÍZKA" || skillCategory === "BOJ Z DIAĽKY") {
+                                    if (!WEAPON_LIST[skillCategory] || WEAPON_LIST[skillCategory][weaponVal] === undefined) return false;
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // --- 4. KROK: KONTROLA MUNÍCIE ---
+                if (actionType === "A" && !isPlaceholderWeapon) {
+                    if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[weaponVal] !== undefined) {
+                        const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
+                        const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
+                        const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+
+                        if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                            const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][weaponVal] : undefined;
+                            if (currentAmmo === undefined || currentAmmo <= 0) return false;
+                        }
+                    }
+                }
+
+                // --- 5. KROK: REŽIMY PRENASLEDOVANIA A ÚNIKU ---
+                const isChaseMode = typeof chase_mode !== 'undefined' && chase_mode;
+                const isPlayerEscaping = typeof player_escaping !== 'undefined' && player_escaping;
+                const isEnemyEscaping = typeof enemy_escaping !== 'undefined' && enemy_escaping;
+                const escapeCounter = typeof enemy_escape_counter !== 'undefined' ? enemy_escape_counter : 0;
+
+                if (isChaseMode || isPlayerEscaping || isEnemyEscaping) {
+                    if (isPlayerEscaping && actionType === "D" && !isPlaceholderSkill && !CHASE_SKILLS.includes(upperSkill)) return false;
+                    if (isEnemyEscaping) {
+                        if (actionType === "D" && !isPlaceholderSkill && !CHASE_SKILLS.includes(upperSkill)) return false;
+                        if (actionType === "A") {
+                            if (isPlaceholderWeapon) {
+                                if (escapeCounter >= 1) return false;
+                            } else {
+                                const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
+                                const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
+                                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                                const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
+                                if (!canAttackAtDistance && escapeCounter >= 1) return false;
+                            }
+                        }
+                    }
+                }
+
+                return true;
+            }
+
+            // Zhromaždenie všetkých teoreticky dostupných možností hrdinu pre elimináciu deadlockov
+            const playerWeapons = ["placeholder"].concat((HERO && HERO.weapons) || []);
+
+            /**
+             * Kontrola, či kandidát vytvorí validnú kombináciu aspoň s JEDNÝM dostupným prvkom hrdinu
+             */
+            function isCandidateValid(candidateValue) {
+                // Unikátna záchrana: Prázdne/placeholder voľby sú povolené vždy ako únikový bod
+                if (candidateValue === "placeholder" || candidateValue === "none" || candidateValue === "") return true;
+
+                // Ak cyklujeme zbrane, automaticky ju schválime (nikdy ich neskipujeme z hernej logiky)
+                if (dropdownId === "player-weapon-dropdown") return true;
+
+                try {
+                    if (dropdownId === "player-skill-dropdown") {
+                        // Testujeme skill voči všetkým zbraniam, ktoré hrdina reálne vlastní
+                        return playerWeapons.some(w => simulateActionCheck("A", candidateValue, w) || simulateActionCheck("D", candidateValue, w));
+                    }
+                } catch (err) {
+                    // Defenzívny fallback: Ak zlyhá DB alebo chýba premenná, voľbu radšej prepustíme
+                    return true;
+                }
+                return true;
+            }
+
             let currentIndex = el.selectedIndex;
             let nextIndex = currentIndex;
 
-            // Cyklujeme indexy, ignorujeme iba explicitne zakázané (disabled) možnosti, ak nejaké sú
             do {
                 nextIndex = (nextIndex + direction + options.length) % options.length;
                 if (nextIndex === currentIndex) break;
-            } while (options[nextIndex].disabled);
+
+                const candidate = options[nextIndex];
+                if (candidate.disabled) continue;
+
+                if (isCandidateValid(candidate.value)) {
+                    break; 
+                }
+            } while (nextIndex !== currentIndex);
 
             if (nextIndex !== currentIndex) {
                 el.selectedIndex = nextIndex;
-                // Spustíme zmenu (change event), aby náš tray listener vedel okamžite reagovať
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }
@@ -2133,6 +2312,7 @@
             if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
                 log(`\n🏃‍♂️ Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
                 
+                
                 enemy_escape_counter += 2; // Nepriateľ získava okamžitý útek
                 log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
                 
@@ -2153,6 +2333,10 @@
                         } else if (activeChallenge.enemy_escape_delayed !== "") {
                             DELAYED.push(activeChallenge.enemy_escape_delayed);
                         }
+                    }
+                    
+                    if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
+                        CHALLENGES[enemy_id].saved_stress = enemy_stress;
                     }
 
                     // Kompletný bezpečný reset bojových premenných
@@ -2340,19 +2524,20 @@
                         log(`Získavaš 1 BR.`, "success-msg");
                         inputs_frozen = true;
                         updateUI();
-                        // Bind the transition safely to your terminal output finish line
                         onTerminalFinishedCallback = () => {
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
-                            let activeChallenge = CHALLENGES[current_challenge_key];
-                            
-                            // Zapíšeme prípadné delayed efekty z úteku nepriateľa
+                            let activeChallenge = CHALLENGES[current_challenge_key];                            
                             if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                                 if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
                                     DELAYED.push(...activeChallenge.enemy_escape_delayed);
                                 } else if (activeChallenge.enemy_escape_delayed !== "") {
                                     DELAYED.push(activeChallenge.enemy_escape_delayed);
                                 }
+                            }
+
+                            if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
+                                CHALLENGES[enemy_id].saved_stress = enemy_stress;
                             }
 
                             // Kompletný bezpečný reset bojových premenných
@@ -2383,11 +2568,8 @@
                     }
                 }
 
-                // Ak chase_mode pokračuje (nikto nedosiahol limit 2 a nikto nezaútočil, aby ho zrušil),
-                // tak po aplikovaní prípadných zranení zo streľby nižšie sa posunieme do ďalšieho chase kola.
             }
 
-            // --- 1. CALCULATE INCOMING/OUTGOING STRESS SIMULTANEOUSLY ---
             let potential_player_damage = 0;
             let potential_enemy_damage = 0;
 
@@ -2520,19 +2702,18 @@
             if (!player_escaping){ 
                 if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
                     (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
-                    advantage += 1;
+                    advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
                     log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
                 } 
             }
             if (!enemy_escaping){
                 if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
                 (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
-                    enemy_advantage += 1;
+                    enemy_advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
                     log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
                 }
             }
         
-
             if (player_action[0] === "D" && enemy_action[0] === "D") {
                 const capturedPlayerAction = player_action;   
                 const capturedEnemyAction = enemy_action;     
@@ -2560,7 +2741,6 @@
             setTimeout(() => {
                 gameloop(false);
             },2000);
-
         }
 
         function checkConflictThreat(roll, isEnemy, action) {
@@ -2589,7 +2769,7 @@
                             log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg");
                         }
                     } else {
-                        advantage += 1;
+                        advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
                         log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Nepriateľ sa dostal do horšej pozície, získavaš výhodu.`, "danger-msg");
                     }
                 } else {
@@ -2604,7 +2784,7 @@
                             log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg");
                         }
                     } else {
-                        enemy_advantage += 1;
+                        enemy_advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
                         log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Dostaneš sa do horšej pozície, nepriateľ získava výhodu.`, "danger-msg");
                     }
                     if (HERO.stress > stress_thresh) {
@@ -2659,24 +2839,29 @@
 
         // Dedicated transition executor
         function executeProceedTransition() {
+            let delay = 0;
+            if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
 
                 const enemyCardContainer = document.getElementById("enemy-card-container");
-                if (enemyCardContainer) {
-                    enemyCardContainer.innerHTML = "";
-                }
+                const playerCardDisplay = document.getElementById("player-card-display");
 
-                const playerCardContainer = document.getElementById("player-card-container");
-                if (playerCardContainer) {
-                    playerCardContainer.innerHTML = "";
-                }
+                // Trigger visual slide outs
+                if (enemyCardContainer) enemyCardContainer.classList.remove("show");
+                if (playerCardDisplay) playerCardDisplay.classList.remove("show");
 
-                if (typeof proceed_target === 'function') {
-                    proceed_target();
-                } else {
-                    handleChallengeTransition(proceed_target);
-                }
+                // Delay the DOM destruction and actual target execution by 500ms
+                setTimeout(() => {
+                    if (enemyCardContainer) enemyCardContainer.innerHTML = "";
+                    if (playerCardDisplay) playerCardDisplay.innerHTML = "";
+
+                    if (typeof proceed_target === 'function') {
+                        proceed_target();
+                    } else {
+                        handleChallengeTransition(proceed_target);
+                    }
+                }, delay); // Matches your CSS 0.5s transition
             }
         }
 
@@ -2777,35 +2962,56 @@
 
 
         function handleConflictInput(actionType, cardCode) {
-            if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                log("DEBUG: spúšťam handleconflictinput.", "info-msg");
-            }
-            if (move === 0) {
-                hidecards(true);
-                const tableFloor = document.querySelector('.gaming-table-floor');
-                const existingPools = tableFloor.querySelectorAll('.dice-animation-pool');
-                existingPools.forEach(pool => pool.remove());
-            }
-            // IF a new round is starting and player goes first, slide the old card away
+
             const playerDisplay = document.getElementById("player-card-display");
-            const rotClass = actionType === "D" ? "rotate-player-D" : "rotate-player-A";
+            const enemyDisplay = document.getElementById("enemy-card-container"); // or your enemy wrapper ID
+
+            // Check if either card is currently visible on the table
+            const isPlayerShowing = playerDisplay && playerDisplay.classList.contains("show");
+            const isEnemyShowing = enemyDisplay && enemyDisplay.classList.contains("show");
+
+            inputs_frozen = true;
+            updateUI();
+
+            function proceedWithSelection() {
+                if (move === 0) {
+                    hidecards(true);
+                    const tableFloor = document.querySelector('.gaming-table-floor');
+                    if (tableFloor) {
+                        const existingPools = tableFloor.querySelectorAll('.dice-animation-pool');
+                        existingPools.forEach(pool => pool.remove());
+                    }
+                }
+
+                const rotClass = actionType === "D" ? "rotate-player-D" : "rotate-player-A";
+                    
+                if (playerDisplay) {
+                    playerDisplay.innerHTML = `
+                        <div class="card-container table-card ${rotClass}">
+                            <img src="assets/${cardCode}.png" class="card-img">
+                        </div>`;
+                    
+                    void playerDisplay.offsetWidth;
+                    playerDisplay.classList.add("show");
+                }
+
+                player_action = [actionType, cardCode];
+                move += 1;
+                turn = "e";
                 
-                // Build card with 'table-card' class to separate from tray behavior
-                playerDisplay.innerHTML = `
-                    <div class="card-container table-card ${rotClass}">
-                        <img src="assets/${cardCode}.png" class="card-img">
-                    </div>`;
+                runGameloopCycle();
+            }
+
+            // If EITHER card is showing, strip the 'show' class from BOTH at the exact same instant
+            if (isPlayerShowing || isEnemyShowing) {
+                if (playerDisplay) playerDisplay.classList.remove("show");
+                if (enemyDisplay && move === 0) enemyDisplay.classList.remove("show"); // 👈 Safe! Even if it was already hidden.
                 
-            playerDisplay.classList.add("show");
-
-
-
-            player_action = [actionType, cardCode];
-            //log(`You chose: [${actionType === "A" ? "Attack" : "Defend"}, Card ${cardCode}]`);
-            move += 1;
-            turn = "e";
-            
-            runGameloopCycle();
+                // Wait 500ms for both cards to slide off-screen simultaneously
+                setTimeout(proceedWithSelection, 500);
+            } else {
+                proceedWithSelection();
+            }
         }
 
         function enemyChoice() {
@@ -2837,96 +3043,250 @@
         }
 
         function proceedWithEnemyChoice() {
-            // =========================================================================
-            // ŠPECIÁLNA LOGIKA PRE PRENASLEDOVANIE (CHASE MODE)
-            // =========================================================================
-            if (chase_mode) {
-                let choices = ["O", "R", "S", "B"];
-                let randomCard = choices[Math.floor(Math.random() * choices.length)];
+            // 1. Safe context and UI value extraction
+            const weaponDropdown = document.getElementById("player-weapon-dropdown");
+            const playerWeapon = weaponDropdown ? (parseInt(weaponDropdown.value) || 0) : 0;
 
-                if (enemy_escaping) {
-                    if (Math.random() < 0.7) {
-                        enemy_action = ["D", "B"]; 
-                    } else {
-                        enemy_action = ["A", randomCard]; 
-                    }
-                } 
-                else if (player_escaping) {
-                    let enemyData = ENEMY_TYPES[enemy];
-                    let hasRanged = enemyData && enemyData["ranged"] === true;
+            const skillDropdown = document.getElementById("player-skill-dropdown");
+            const playerSkill = skillDropdown ? (parseInt(skillDropdown.value) || 0) : 0;
 
-                    if (hasRanged || player_escape_counter < 1) {
-                        let choice = Math.random() < 0.5 ? "A" : "D";
-                        enemy_action = [choice, randomCard];
-                    } else {
-                        enemy_action = ["D", randomCard];
-                    }
+            const adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
+            
+            // Per instructions: total player advantage combines adrenaline and global advantage
+            const totalPlayerAdvantage = adrenaline + (typeof advantage !== 'undefined' ? advantage : 0);
+            const currentEnemyAdvantage = typeof enemy_advantage !== 'undefined' ? enemy_advantage : 0;
+
+            // Helper baseline functions
+            function easyAction(forcedType = null) {
+                const cards   = ["O", "R", "S", "B"];
+                const card    = cards[Math.floor(Math.random() * cards.length)];
+                const type    = forcedType ?? (Math.random() < 0.5 ? "A" : "D");
+                return [type, card];
+            }
+
+            function normalAction(options) {
+                const pick = options[Math.floor(Math.random() * options.length)];
+                const [type, card] = pick.split("-");
+                return [type, card];
+            }
+
+            function hardAction(scenario, playerCard = null) {
+                const counterMap = { "O": "B", "R": "R", "S": "S", "B": "R" };
+                switch (scenario) {
+                    case "attack_counter":
+                        return ["A", playerCard ? (counterMap[playerCard] ?? "R") : "R"];
+                    case "defend":
+                        return Math.random() < 0.5 ? ["D", "S"] : ["D", "B"];
+                    case "escape":
+                        return ["D", "O"];
+                    case "blind":
+                        return ["A", "R"];
+                    default:
+                        return ["A", "R"];
                 }
             }
-            // =========================================================================
-            // ŠTANDARDNÝ SÚBOJ
-            // =========================================================================
-            else {
-                let pa = player_action;
-                if (pa) {
-                    if (pa[0] === "A") {
-                        if (CARDS[pa[1]][1][0] + enemy_stress - 3 > ENEMY_TYPES[enemy]["stress_thresh"]) {
-                            enemy_action = ["D", "B"];
-                        } else if (HERO.stress > stress_thresh - 3) {
-                            enemy_action = ["D", "B"];
-                        } else if (enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"] - 2) {
-                            let choice = Math.random() < 0.5 ? "A" : "D";
-                            enemy_action = [choice, "O"];
+
+            // 2. Main AI Decision Matrix
+            if (chase_mode) {
+                const cards      = ["O", "R", "S", "B"];
+                const randomCard = cards[Math.floor(Math.random() * cards.length)];
+
+                if (enemy_escaping) {
+                    if (MODE === "EASY") {
+                        enemy_action = Math.random() < 0.5 ? ["D", "B"] : ["A", randomCard];
+                    } else if (MODE === "NORMAL") {
+                        // If player's weapon is highly lethal, narrow choices to fast escapes or interrupts
+                        enemy_action = (playerWeapon >= 1 || totalPlayerAdvantage > 2)
+                            ? normalAction(["D-O", "A-R", "A-S"])
+                            : normalAction(["D-S", "D-B", "D-O", "A-O"]);
+                    } else { // HARD
+                        // Under severe player weapon pressure, abandon basic blocks and force speed escape
+                        if (playerWeapon >= 1) {
+                            enemy_action = ["D", "O"]; 
                         } else {
-                            let choices = ["O", "R", "S", "B"];
-                            let choice = choices[Math.floor(Math.random() * choices.length)];
-                            enemy_action = ["A", choice];
+                            enemy_action = Math.random() < 0.7 ? hardAction("defend") : ["A", randomCard];
                         }
+                    }
+
+                } else if (player_escaping) {
+                    const enemyData  = ENEMY_TYPES[enemy];
+                    const hasRanged  = enemyData && enemyData["ranged"] === true;
+
+                    if (MODE === "EASY") {
+                        enemy_action = ["D", randomCard];
+                    } else if (MODE === "NORMAL") {
+                        if (hasRanged || player_escape_counter < 1) {
+                            enemy_action = totalPlayerAdvantage > 3 
+                                ? normalAction(["A-R", "A-S"]) // High priority control options
+                                : normalAction(["A-R", "A-B", "A-O", "A-S"]);
+                        } else {
+                            enemy_action = normalAction(["A-R", "D-S", "D-R"]);
+                        }
+                    } else { // HARD
+                        if (hasRanged || player_escape_counter < 1) {
+                            enemy_action = hardAction("attack_counter"); 
+                        } else {
+                            enemy_action = hardAction("defend");
+                        }
+                    }
+                }
+            } else {
+                // Standard Combat Loop
+                const pa              = player_action;
+                const enemyStressThresh = ENEMY_TYPES[enemy]["stress_thresh"];
+
+                if (pa) {
+                    const playerCardStressDmg = CARDS[pa[1]][1][0]; 
+                    const enemyNearDeath      = playerCardStressDmg + enemy_stress - 3 > enemyStressThresh;
+                    const playerPressuring    = HERO.stress > stress_thresh - 3;
+                    const enemyHighStress     = enemy_stress > enemyStressThresh - 2;
+
+                    if (pa[0] === "A") {
+                        const playerCard = pa[1]; // 'O', 'R', 'S', or 'B'
+
+                        if (MODE === "EASY") {
+                            enemy_action = enemyNearDeath ? ["D", "B"] : easyAction();
+
+                        } else if (MODE === "NORMAL") {
+                            // Logic adjustments for dealing with Heavy Blows (A-B)
+                            if (playerCard === "B") {
+                                // Blend safer defenses (D-O) and speed counters (A-S)
+                                enemy_action = totalPlayerAdvantage >= 2 
+                                    ? normalAction(["D-O", "D-S"]) 
+                                    : normalAction(["A-S", "A-R"]);
+                            } else if (enemyNearDeath || playerPressuring || playerWeapon >= 1) {
+                                enemy_action = normalAction(["D-B", "D-S", "A-R"]); 
+                            } else if (enemyHighStress) {
+                                enemy_action = normalAction(["A-O", "A-R", "D-S"]);
+                            } else {
+                                enemy_action = normalAction(["A-R", "A-S", "A-O", "D-S", "D-R"]);
+                            }
+
+                        } else { // HARD Mode - Directly matching the RL Policy
+                            if (playerCard === "B") {
+                                // SPECIFIC INSIGHT: Player played a slow, high damage Heavy Blow (A-B)
+                                if (totalPlayerAdvantage >= 2) {
+                                    // Player has momentum: Use D-O to guarantee a -3 damage absorption safety net. 
+                                    // Avoid D-B completely because a failed evasion amplifies damage to a catastrophic level.
+                                    enemy_action = ["D", "O"]; 
+                                } else {
+                                    // Player has no leverage: Exploit the slow wind-up! 
+                                    // Counterattack with a speed priority option (A-S is highest Q-value, else A-R).
+                                    enemy_action = Math.random() < 0.6 ? ["A", "S"] : ["A", "R"];
+                                }
+                            } else if (enemyNearDeath || playerPressuring) {
+                                // Weapon mitigation clause
+                                enemy_action = playerWeapon >= 1 ? ["A", "R"] : ["D", "B"];
+                            } else if (enemyHighStress) {
+                                enemy_action = totalPlayerAdvantage >= 3 ? ["A", "R"] : ["A", "O"];
+                            } else {
+                                // Healthy Combat State: Respond to high player weapon values
+                                if (playerWeapon >= 1) {
+                                    enemy_action = ["A", "R"]; // Shut down player gears with reactive counters
+                                } else if (totalPlayerAdvantage > currentEnemyAdvantage + 2) {
+                                    enemy_action = ["A", "S"]; // Respond to advantage gaps with swift speed tags
+                                } else {
+                                    enemy_action = hardAction("attack_counter", playerCard);
+                                }
+                            }
+                        }
+
                     } else {
-                        enemy_action = ["A", "O"]; 
-                        let choices = ["O", "R", "S", "B"];
-                        for (let c of choices) {
-                            if (CARDS[c][1][0] + ENEMY_TYPES[enemy]["weapon"] > CARDS[pa[1]][0][0]) {
-                                enemy_action = ["A", c];
-                                break;
+                        // Player is Defending
+                        if (MODE === "EASY") {
+                            enemy_action = easyAction("A");
+                        } else if (MODE === "NORMAL") {
+                            const cards = ["O", "R", "S", "B"];
+                            let picked  = null;
+                            const structuralThreshold = playerSkill > 2 ? 1 : 0; 
+
+                            if (Math.random() < 0.5) {
+                                for (const c of cards) {
+                                    if (CARDS[c][1][0] + ENEMY_TYPES[enemy]["weapon"] > CARDS[pa[1]][0][0] + structuralThreshold) {
+                                        picked = c;
+                                        break;
+                                    }
+                                }
+                            }
+                            enemy_action = ["A", picked ?? "O"];
+
+                        } else { // HARD
+                            enemy_action = ["A", "O"];
+                            const cards = ["O", "R", "S", "B"];
+                            for (const c of cards) {
+                                if (CARDS[c][1][0] + ENEMY_TYPES[enemy]["weapon"] > CARDS[pa[1]][0][0]) {
+                                    enemy_action = ["A", c];
+                                    break;
+                                }
                             }
                         }
                     }
-                } else if (enemy_stress >= ENEMY_TYPES[enemy]["stress_thresh"] - 1) {
-                    enemy_action = ["D", "B"];
-                    enemy_escaping = true;
-                    chase_mode = true; 
+
                 } else {
-                    let choices = ["O", "R", "S", "B"];
-                    let choice = choices[Math.floor(Math.random() * choices.length)];
-                    enemy_action = ["A", choice];
+                    // Player hasn't selected an action yet (empty queue)
+                    const nearEscapeThresh = enemy_stress >= enemyStressThresh - 1;
+
+                    if (MODE === "EASY") {
+                        if (nearEscapeThresh && Math.random() < 0.3) {
+                            enemy_action      = ["D", "B"];
+                            enemy_escaping    = true;
+                            chase_mode        = true;
+                        } else {
+                            enemy_action = easyAction("A");
+                        }
+
+                    } else if (MODE === "NORMAL") {
+                        if (nearEscapeThresh) {
+                            if (Math.random() < 0.5 || playerWeapon >= 1) {
+                                enemy_action      = ["D", "O"];
+                                enemy_escaping    = true;
+                                chase_mode        = true;
+                            } else {
+                                enemy_action = normalAction(["A-R", "D-R", "D-B", "A-S"]);
+                            }
+                        } else {
+                            enemy_action = totalPlayerAdvantage > 3 
+                                ? normalAction(["A-R", "A-S"]) 
+                                : normalAction(["A-R", "D-R", "D-B", "A-S", "D-S"]);
+                        }
+
+                    } else { // HARD
+                        if (nearEscapeThresh) {
+                            enemy_action      = hardAction("escape");
+                            enemy_escaping    = true;
+                            chase_mode        = true;
+                        } else {
+                            // Blind-opening prioritization based on positional momentum
+                            enemy_action = totalPlayerAdvantage > 2 ? ["A", "S"] : hardAction("blind");
+                        }
+                    }
                 }
             }
 
-            // =========================================================================
-            // UKONČENIE ŤAHU A VYKRESLENIE
-            // =========================================================================
-            move += 1;
-            turn = "p";
-            
+            // 3. Game-loop and State Engine Execution
+            move  += 1;
+            turn   = "p";
+
             let escapeText = "";
             if (chase_mode) {
-                escapeText = enemy_escaping ? `${enemy} zdrhá!` : `${enemy} ťa prenasleduje!`;
+                escapeText = enemy_escaping
+                    ? `${enemy} zdrhá!`
+                    : `${enemy} ťa prenasleduje!`;
             } else if (enemy_escaping) {
                 escapeText = `${enemy} sa snaží ujsť`;
             }
-            
+
             if (escapeText) {
                 log(`${escapeText} `, "", true);
                 inputs_frozen = true;
                 updateUI();
-                
+
                 onTerminalFinishedCallback = () => {
                     inputs_frozen = false;
                     displayEnemyCard(enemy_action[0], enemy_action[1]);
                     runGameloopCycle();
                 };
-                
+
                 if (!isProcessingQueue) {
                     const callback = onTerminalFinishedCallback;
                     onTerminalFinishedCallback = null;
@@ -2990,7 +3350,7 @@
             container.classList.add("show");
         }
 
-        function hidecards(player = false) {
+        function hidecards(player = false, callback = null) {
             const container = document.getElementById("enemy-card-container");
             if (container) {
                 container.classList.remove("show");
@@ -2998,6 +3358,11 @@
             const playerDisplay = document.getElementById("player-card-display");
             if (playerDisplay && player) {
                 playerDisplay.classList.remove("show");
+            }
+
+            // Wait 500ms for the CSS slide-out animation to finish before clearing/moving on
+            if (callback) {
+                setTimeout(callback, 500); 
             }
         }
 
@@ -3071,7 +3436,6 @@
         }
 
         function selectHero() {
-            // 1. Ak je pole HEROES prázdne, pokúsime sa ho urgentne načítať z localStorage
             if (!HEROES || HEROES.length === 0) {
                 const localData = localStorage.getItem('characters');
                 if (localData) {
@@ -4107,6 +4471,37 @@
                                         return; // Zablokuje ťah
                                     }
                                 }
+                            }
+                        }
+                    }
+
+                    // Dynamické zistenie kategórie zbrane (BOJ Z DIAĽKY / BOJ ZBLÍZKA / VRHACIE)
+                    let weaponCategory = "";
+                    for (const category in WEAPON_LIST) {
+                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                            weaponCategory = category.toUpperCase();
+                            break;
+                        }
+                    }
+
+                    if (skillData && skillData[1]) {
+                        const skillCategory = skillData[1].toUpperCase();
+                        
+                        // STRIKTNÉ PRAVIDLO: Zbraň na diaľku vyžaduje skill obsahujúci "BOJ Z DIAĽKY" (okrem Vrhania/Ťažkých predmetov)
+                        if (weaponCategory === "BOJ Z DIAĽKY") {
+                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                                if (!skillCategory.includes("BOJ Z DIAĽKY")) {
+                                    log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
+                                    return;
+                                }
+                            }
+                        }
+                        
+                        // STRIKTNÉ PRAVIDLO: Zbraň na blízko vyžaduje skill obsahujúci "BOJ ZBLÍZKA"
+                        if (weaponCategory === "BOJ ZBLÍZKA") {
+                            if (!skillCategory.includes("BOJ ZBLÍZKA")) {
+                                log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
+                                return;
                             }
                         }
                     }

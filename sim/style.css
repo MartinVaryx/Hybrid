@@ -430,11 +430,11 @@
             margin-bottom: 0px !important;
         }
 
-        .system-msg { color: #171717;}
-        .success-msg { color: #5cd65c; }
-        .failure-msg { color: #ff4d4d; }
-        .danger-msg { color: #ffa200; }
-        .error-msg { color: #e2dc2e; }
+        .system-msg  { color: #171717; } 
+        .success-msg { color: #30a900; text-shadow: 1px 1px 3px rgb(196, 196, 196); }
+        .failure-msg { color: #ca0000; text-shadow: 1px 1px 3px rgb(169, 169, 169); }
+        .danger-msg  { color: #d68700; text-shadow: 1px 1px 3px rgb(164, 164, 164); }
+        .error-msg   { color: #eee600; text-shadow: 1px 1px 3px rgb(0, 0, 0); }
 
         /* Controls Section */
         .controls-panel {
