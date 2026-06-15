@@ -320,18 +320,24 @@
         "image": "assets/CAR.png",
         "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
         "choice_A": "test",
-        "case_A": ["TEST2","stress+1"]
+        "case_A": [
+            "TEST2",
+            "stress+1"
+        ]
     },
-        "TEST2": {
+    "TEST2": {
         "image": "assets/CAR.png",
         "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
         "choice_A": "test",
-        "case_A": ["TEST","stress+1"]
+        "case_A": [
+            "TEST",
+            "stress+1"
+        ]
     },
     "START": {
         "image": "assets/CAR.png",
         "initial_msg": "Už mesiac cestuješ po krajine. Bez akéhokoľvek kontaktu. Hľadáš ľudí. Alebo Hybridov. Hocikoho.",
-        "next": "CITY_0",
+        "next": "CAR",
         "initial_msg_1": "Čo ak už nikto nezostal?",
         "initial_msg_2": "Nie. Tak to nesmie byť. Potom by už nemalo zmysel pokračovať.",
         "initial_msg_3": "A teraz sa ti navyše minul benzín. Možno nejaký nájdeš v neďalekom meste."
@@ -423,7 +429,10 @@
         "choice_A": "Idem k vysielaču.",
         "case_A": "TOWER_0",
         "choice_B": "Idem do mesta.",
-        "case_B": ["CITY","CITY_0"],
+        "case_B": [
+            "CITY",
+            "CITY_0"
+        ],
         "choice_C": "Idem pešo...",
         "case_C": "WALK_0"
     },
@@ -509,7 +518,6 @@
         "threat_avoided_msg": "Takmer si ťa všimne, ale v poslednej chvíli zamrzneš za stromom.",
         "failure_msg": "Dáva si priveľký pozor, nedarí sa ti obísť ho.",
         "case_threat_delayed": "PURITÁN_2"
-
     },
     "PURITAN_D_0": {
         "initial_msg": "PURITÁN: Čo si zač? Kde si sa tu vzal? Ty nie si od nás. Nie si náhodou Hybrid?",
@@ -658,7 +666,7 @@
     },
     "CLIFF": {
         "image": "assets/PLACEHOLDER.png",
-        "initial_msg": "Ešte ani zďaleka nemáš vyhrané. Aby si sa dostal k vysielaču, potrebuješ zdolať vysoké bralo.",
+        "initial_msg": "Ešte ani zďaleka nemáš vyhrané. Aby si sa dostal k vysielaču, potrebuješ zdolať vysoké bralo. Všimneš si aj úzky chodník, ktorý ide po obvode kopca.",
         "case_success": "",
         "case_failure": "",
         "choice_A": "To zvládnem.",
@@ -666,7 +674,10 @@
         "choice_B": "Idem späť.",
         "case_B": "TOWER_0",
         "choice_C": "Použijem lano.",
-        "case_C": "CLIFF_CLIMB_0"
+        "case_C": "CLIFF_CLIMB_0",
+        "choice_D": "Idem po chodníku.",
+        "case_D": "TRACK",
+        "back": true
     },
     "CLIFF_CLIMB": {
         "initial_msg": "Utrieš si špinavé dlane a vrhneš sa na skaly.",
@@ -1252,6 +1263,80 @@
         "threat_avoided_msg": "Ešteže si dávaš pozor, takmer si ťa všimol.",
         "failure_msg": "Dobehne ťa a už je neskoro vysvetľovať, pokladá ťa za nepriateľa."
     },
+    "TRACK": {
+        "initial_msg": "Možno je to len chodník vyšľapaný zverou a ty len zablúdiš. Navyše sa začína zvažovať, určite nevedie hore k vysielaču.",
+        "case_success": "",
+        "case_failure": "",
+        "back": true,
+        "next": "LAKE"
+    },
+    "LAKE": {
+        "initial_msg": "Prichádzaš k jazeru a hneď si všimneš, že na brehu oproti z neho vyčnieva betónový bunker. Časť bunkra - nevieš, aká veľká - sa nachádza pod vodou.",
+        "case_success": "",
+        "case_failure": "",
+        "back": true,
+        "choice_A": "Idem k bunkru.",
+        "case_A": "BUNKER"
+    },
+    "BUNKER": {
+        "initial_msg": "Okno na bunkri je zamrežované, ale dvere sú otvorené. Má to však jeden háčik - bunker je zatopený a budeš mať vodu tak po prsia.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": [
+            "To nevadí",
+            "prebrodím sa dnu."
+        ],
+        "case_A": "BUNKER_0",
+        "back": true
+    },
+    "BUNKER_0": {
+        "initial_msg": "Dnu preniká trochu svetla, ale aj tak toho veľa nevidíš. Len vrchnú časť stien a strop. Ak je tu niečo zaujímavé, je to pod vodou.",
+        "case_success": "",
+        "case_failure": "",
+        "image": "assets/BUNKER:png",
+        "choice_A": "Ideme sa potápať!",
+        "case_A": "DIVE",
+        "choice_B": "Späť pod vodu!",
+        "case_B": "DIVE_0",
+        "choice_C": "Ešte tam určite niečo bude.",
+        "case_C": "DIVE_4"
+    },
+    "DIVE": {
+        "initial_msg": "Nadýchneš sa a zmizneš pod hladinou.",
+        "case_success": [
+            "item_DEZINFEKCIA+1",
+            "set_DIVE_false",
+            "set_DIVE_0_true",
+            "BUNKER_0"
+        ],
+        "case_failure": "BUNKER_0",
+        "image": "assets/BUNKER.png",
+        "difficulty": 9,
+        "threat": 4,
+        "success_msg": "Vylovíš fľaštičku dezinfekcie. Zdá sa, že voda do nej vôbec neprenikla.",
+        "threat_msg": "Do niečoho sa zamotáš. Bojuješ o život. Zdá sa, že tvoje chvíle sú zrátané. Keď už ti dochádzajú poslendé molekuly kyslíka, vyslobodíš sa. Ten pocit už nechceš nikdy zažiť.",
+        "case_threat": "stress+2",
+        "threat_avoided_msg": "Ako pred sebou habkáš, zacítiš kus dlhej látky, ktorý sa okolo teba začne omotávať. Pre istotu sa vynoríš.",
+        "failure_msg": "Vylovíš... kus dreva. To naozaj nestálo za tú námahu."
+    },
+    "DIVE_0": {
+        "initial_msg": "Nádych...",
+        "case_success": "BUNKER_1",
+        "case_failure": "",
+        "image": "assets/BUNKER.png",
+        "success_msg": "Objavíš vchod do vedľajšej časti a vynoríš sa tam. Našťasie je tam trochu vzduchu."
+    },
+    "DIVE_4": {
+        "initial_msg": "Bunker nebol až taký opustený, ako sa zdalo. Podarí sa ti vyloviť jeho predchádzajúceho majiteľa.",
+        "case_success": "",
+        "case_failure": "",
+        "next": "BUNKER_0"
+    },
+    "BUNKER_1": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": ""
+    },
     "LAYOUT": {
         "GAME_OVER": {
             "x": 10362,
@@ -1302,24 +1387,24 @@
             "y": 1522
         },
         "IN_BASEMENT": {
-            "x": 6294,
-            "y": 1808
+            "x": 6332,
+            "y": 1569
         },
         "Skautka_2": {
-            "x": 6263,
-            "y": 2405
+            "x": 6393,
+            "y": 1799
         },
         "BASEMENT_DISTRACT": {
-            "x": 5743,
-            "y": 2089
+            "x": 5774,
+            "y": 2021
         },
         "BASEMENT_ENCOUNTER": {
             "x": 6283,
             "y": 2120
         },
         "EXPLORE_BASEMENT": {
-            "x": 6662,
-            "y": 2122
+            "x": 6765,
+            "y": 2057
         },
         "BASEMENT_ENTRANCE": {
             "x": 7078,
@@ -1340,6 +1425,14 @@
         "CAR": {
             "x": 8253,
             "y": 1447
+        },
+        "TEST": {
+            "x": 150,
+            "y": 150
+        },
+        "TEST2": {
+            "x": 150,
+            "y": 150
         },
         "START": {
             "x": 8768,
@@ -1362,8 +1455,8 @@
             "y": 1791
         },
         "FOREST_PATH": {
-            "x": 8084,
-            "y": 2359
+            "x": 7428,
+            "y": 2475
         },
         "SLOPE": {
             "x": 8636,
@@ -1378,8 +1471,8 @@
             "y": 2039
         },
         "TOWER_1": {
-            "x": 9358,
-            "y": 3280
+            "x": 9413,
+            "y": 3184
         },
         "FOREST_PATH_0": {
             "x": 7970,
@@ -1402,24 +1495,24 @@
             "y": 3316
         },
         "PURITAN_LIE": {
-            "x": 8142,
-            "y": 3535
+            "x": 9236,
+            "y": 3714
         },
         "PURITAN_THREATEN": {
-            "x": 8727,
-            "y": 3216
+            "x": 8672,
+            "y": 3147
         },
         "PURITAN_CONVINCE": {
-            "x": 8644,
-            "y": 3652
+            "x": 8152,
+            "y": 3606
         },
         "PURITAN_DONT_CONVINCE": {
-            "x": 8486,
-            "y": 3943
+            "x": 8639,
+            "y": 3923
         },
         "FOREST_PATH_1": {
-            "x": 7673,
-            "y": 3736
+            "x": 7558,
+            "y": 3578
         },
         "PURITÁN_2": {
             "x": 5852,
@@ -1430,12 +1523,12 @@
             "y": 3423
         },
         "CLIFF": {
-            "x": 8766,
-            "y": 2307
+            "x": 8745,
+            "y": 2271
         },
         "CLIFF_CLIMB": {
-            "x": 8906,
-            "y": 2705
+            "x": 8883,
+            "y": 2641
         },
         "GENERATOR": {
             "x": 9770,
@@ -1446,8 +1539,8 @@
             "y": 2961
         },
         "CAR_5": {
-            "x": 8724,
-            "y": 2036
+            "x": 8892,
+            "y": 1961
         },
         "SHACK_LOOK_AROUND": {
             "x": 5831,
@@ -1462,36 +1555,36 @@
             "y": 3321
         },
         "SHACK_CELLAR": {
-            "x": 5974,
-            "y": 3888
+            "x": 5715,
+            "y": 4522
         },
         "SHACK_1": {
             "x": 6792,
             "y": 3653
         },
         "SHACK_CELLAR_0": {
-            "x": 5659,
-            "y": 4081
+            "x": 5361,
+            "y": 4356
         },
         "UNLOCK_CELLAR": {
-            "x": 7248,
-            "y": 3831
+            "x": 7222,
+            "y": 3860
         },
         "SHACK_ATTIC": {
-            "x": 7096,
-            "y": 3974
+            "x": 6847,
+            "y": 4053
         },
         "SHACK_2": {
             "x": 7244,
             "y": 4235
         },
         "SHACK_EXPLORE": {
-            "x": 6743,
-            "y": 3953
+            "x": 6287,
+            "y": 4117
         },
         "SHACK_EXPLORE_2": {
-            "x": 7077,
-            "y": 3519
+            "x": 6331,
+            "y": 3760
         },
         "DEAD_LETTERS": {
             "x": 7076,
@@ -1590,16 +1683,48 @@
             "y": 1397
         },
         "CLIFF_CLIMB_0": {
-            "x": 9367,
-            "y": 2335
+            "x": 9038,
+            "y": 2460
         },
         "TOWER_2": {
-            "x": 9459,
-            "y": 2755
+            "x": 9175,
+            "y": 2976
         },
         "PURITAN_ESCAPE": {
-            "x": 7911,
-            "y": 3106
+            "x": 7968,
+            "y": 3102
+        },
+        "TRACK": {
+            "x": 10889,
+            "y": 2886
+        },
+        "LAKE": {
+            "x": 11221,
+            "y": 3050
+        },
+        "BUNKER": {
+            "x": 11535,
+            "y": 3209
+        },
+        "BUNKER_0": {
+            "x": 11942,
+            "y": 3226
+        },
+        "DIVE": {
+            "x": 11867,
+            "y": 3509
+        },
+        "DIVE_0": {
+            "x": 12260,
+            "y": 3367
+        },
+        "DIVE_4": {
+            "x": 12159,
+            "y": 2920
+        },
+        "BUNKER_1": {
+            "x": 12611,
+            "y": 3568
         }
     },
     "ACTIVE": {
@@ -1689,6 +1814,16 @@
         "GAME_FINISHED": true,
         "CLIFF_CLIMB_0": false,
         "TOWER_2": true,
-        "PURITAN_ESCAPE": true
+        "PURITAN_ESCAPE": true,
+        "TRACK": true,
+        "TEST": true,
+        "LAKE": true,
+        "TEST2": true,
+        "BUNKER": true,
+        "BUNKER_0": true,
+        "BUNKER_1": true,
+        "DIVE": true,
+        "DIVE_0": false,
+        "DIVE_4": false
     }
 }
