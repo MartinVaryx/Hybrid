@@ -89,6 +89,12 @@
             },
             "LANO": {
                 "description":"Mohlo by sa zísť.",
+            },
+            "DEZINFEKCIA": {
+                "description": "Už 10 rokov po exspirácii. Snáď aspoň neuškodí, ak aj nepomôže.",
+                "effect":"stress-2",
+                 "message":"STRESS (-2) \n Poriadne to páli, tak je ešte asi dobrá."
+
             }
         }
         window.ITEM_LIST = ITEM_LIST;
