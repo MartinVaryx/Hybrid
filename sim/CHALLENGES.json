@@ -274,7 +274,7 @@
         ],
         "difficulty": 8,
         "threat": 3,
-        "image": "assets/SNEAK.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Snažíš sa prekĺznuť. Zdá sa, že zatiaľ si ťa nevšimla. (vyber si kartu)",
         "success_msg": "Úspech! Skautka si ťa nevšimla a môžeš ísť ďalej.",
         "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
@@ -316,10 +316,22 @@
         "choice_C": "Kašlať na to, idem pešo...",
         "case_C": "WALK_0"
     },
+    "TEST": {
+        "image": "assets/CAR.png",
+        "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
+        "choice_A": "test",
+        "case_A": ["TEST2","stress+1"]
+    },
+        "TEST2": {
+        "image": "assets/CAR.png",
+        "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
+        "choice_A": "test",
+        "case_A": ["TEST","stress+1"]
+    },
     "START": {
         "image": "assets/CAR.png",
         "initial_msg": "Už mesiac cestuješ po krajine. Bez akéhokoľvek kontaktu. Hľadáš ľudí. Alebo Hybridov. Hocikoho.",
-        "next": "CAR",
+        "next": "CITY_0",
         "initial_msg_1": "Čo ak už nikto nezostal?",
         "initial_msg_2": "Nie. Tak to nesmie byť. Potom by už nemalo zmysel pokračovať.",
         "initial_msg_3": "A teraz sa ti navyše minul benzín. Možno nejaký nájdeš v neďalekom meste."
@@ -341,7 +353,7 @@
             "BASEMENT_PREDATOR"
         ],
         "back": true,
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/CITY.png"
     },
     "LOOK_AROUND": {
         "image": "assets/PLACEHOLDER.png",
@@ -406,7 +418,7 @@
         "case_threat": "stress+1"
     },
     "CAR_1": {
-        "image": "assets/PLACEHOLDER.png",
+        "image": "assets/CAR.png",
         "initial_msg": "Si pri aute a stále nemáš benzín.",
         "choice_A": "Idem k vysielaču.",
         "case_A": "TOWER_0",
@@ -703,7 +715,7 @@
         "back": true
     },
     "CAR_5": {
-        "image": "assets/PLACEHOLDER.png",
+        "image": "assets/CAR.png",
         "initial_msg": "Si pri aute.",
         "case_success": "",
         "case_failure": "",

@@ -9,6 +9,7 @@
         let gameOn = false;
         let stockHeroesData = [];
 
+
         const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = true;
         const conflict_difficulty = 6;
@@ -126,6 +127,7 @@
         let move = 0;
         let weapon = 0;
         let stress = 0;
+        let perm_stress = 0;
         const stress_thresh = 8;
         const ADVANTAGE_CAP = 3;
         let skill = 0;
@@ -153,6 +155,8 @@
         let isProcessingQueue = false;
         let onTerminalFinishedCallback = null; 
         let activeLogTimeout = null; // NEW: Keeps track of the active waiting timer
+        let is_collapse_check = false;
+        let collapse_resume_callback = null;
 
         function log(message, className = "", extraSpacing = true, extraSpacingB = false) {
             // Removed ^ so it matches "danger-msg", "combat-danger", etc.
@@ -584,20 +588,23 @@
             return total_roll;
         }
 
-        function restartGame() {
-            showGeneralPrompt(
-                'Zvýšené úrovne schopností ti zostanú, ale tvoj pokrok ani predmety nebudú uložené. \n Chceš začať odznova?',
-                () => {            
-                        log("🔄 Reštartujem hru...", "danger-msg", true);
+        function restartGame(menu = false) {
+            gameOn = false;
+            let delay = 0;
+            if (menu) {delay = 0} else {delay = 6000}
+            setTimeout(() => {
+                
+                showGeneralPrompt(
+                    'Chceš začať odznova? \n \n Zvýšené úrovne schopností ti zostanú, ale tvoj pokrok ani predmety nebudú uložené.',
+                    () => {            
 
-                        inputs_frozen = true;
-                        updateUI();
-                        
-                        // Okamžité vyčistenie a znovunačítanie pôvodného stavu hry
-                        window.location.reload();
-                    }
-            );
+                            updateUI();
+                            // Okamžité vyčistenie a znovunačítanie pôvodného stavu hry
+                            window.location.reload();
+                        }
 
+                );
+            },delay);
         }
 
         function showMenu() {
@@ -707,8 +714,10 @@
             
 
         function handleChallengeTransition(caseTarget) {
-            if (!caseTarget) return;
-            gameOn = true;
+            if (!caseTarget || !gameOn) return;
+            if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
+                return; // Early return to completely freeze challenge transitions
+            }
 
             document.querySelectorAll("#card-tray-container .card-container").forEach(card => {
                 card.classList.remove("keyboard-hover");
@@ -1134,8 +1143,20 @@
 
                 if (lowerTarget.includes("stress")) {
                     HERO.stress += modifier;
-                    if(modifier <0) flashRed();
-                    if (HERO.stress < 0) HERO.stress = 0; 
+                    if(modifier > 0) flashRed();
+                    
+                    // --- UPRAVENÉ PRAVIDLO PRE PERM_STRESS ---
+                    // Ak hrdina nemá perm_stress, dno je 0
+                    const currentPermStress = perm_stress || 0;
+
+                    if (modifier < 0 && HERO.stress < currentPermStress) {
+                        // Ak stres klesal a padol pod permanentný stres, zarovnáme ho presne naň
+                        HERO.stress = currentPermStress;
+                    } else if (HERO.stress < 0) {
+                        // Poistka pre prípad, že perm_stress je 0, aby stres nešiel do záporných čísiel
+                        HERO.stress = 0;
+                    }
+                    // -------------------------------------
                     
                     if (modifier > 0) {
                         log(`Stúpol ti stres o ${amount}!`, "danger-msg");
@@ -1143,12 +1164,46 @@
                         log(`Stres ti klesol o ${amount}.`, "success-msg");
                     }
                     
+                    // --- KONTROLA KOLAPSU ---
                     if (HERO.stress > stress_thresh) {
-                        inputs_frozen = true;
-                        log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
-                        restartGame();
-                        return;
-                    }
+                        is_collapse_check = true;
+
+                        // Do runCollapseCheck pošleme dva callbacky: 
+                        // 1. pre ÚSPECH (ak sa zachráni), 2. pre ZLYHANIE (ak nezvládne hod)
+                        runCollapseCheck(
+                            // --- CALLBACK PRE ÚSPECH ---
+                            () => {
+                                is_collapse_check = false;
+                                inputs_frozen = false;
+                                updateUI();
+
+                                if (typeof onTerminalFinishedCallback === "function") {
+                                    const callback = onTerminalFinishedCallback;
+                                    onTerminalFinishedCallback = null;
+                                    callback();
+                                }
+                            },
+                            // --- CALLBACK PRE ZLYHANIE (Game Over) ---
+                            () => {
+                                is_collapse_check = false;
+                                inputs_frozen = true;
+                                log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
+                                
+                                // Keďže cez mody hrozí prepísanie fronty, zavoláme reštart hneď,
+                                // ako dobehne posledná osudná správa
+                                onTerminalFinishedCallback = () => { 
+                                    restartGame(); 
+                                };
+
+                                // Poistka: ak terminál práve nespracováva žiadny text, reštartujeme okamžite
+                                if (typeof isProcessingQueue !== 'undefined' && !isProcessingQueue) {
+                                    restartGame();
+                                }
+                            }
+                        );
+
+                        return true; 
+                    }                    
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("sp")) {
@@ -1452,6 +1507,9 @@
                     };
 
                     btn.onclick = () => {
+                        if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
+                            return; // Early return to completely freeze challenge transitions
+                        }
                         choicePrompt.style.display = "none";
                         narrative_phase = false;
                         handleChallengeTransition(choice.target);
@@ -2029,7 +2087,23 @@
 
             document.querySelectorAll(".stress-node").forEach(cell => {
                 const val = parseInt(cell.getAttribute("data-val"));
-                if (val <= HERO.stress) {
+                
+                // Resetujeme všetky stavové triedy pred novým vyhodnotením
+                cell.classList.remove("active-perm", "filled-perm", "active-stress", "filled-stress");
+                
+                // Zabezpečíme načítanie globálnej premennej perm_stress (ak neexistuje, použijeme 0)
+                const currentPerm = typeof perm_stress !== 'undefined' ? perm_stress : 0;
+
+                // 1. VRSTVA: Permanentný stres (čierne pozadie)
+                if (val <= currentPerm) {
+                    if (val === currentPerm) {
+                        cell.classList.add("active-perm");
+                    } else {
+                        cell.classList.add("filled-perm");
+                    }
+                } 
+                // 2. VRSTVA: Bežný stres (červené pozadie - aplikuje sa iba na políčka nad perm_stress)
+                else if (val <= HERO.stress) {
                     if (val === HERO.stress) {
                         cell.classList.add("active-stress");
                     } else {
@@ -2072,6 +2146,9 @@
                     if (activeChallenge && activeChallenge.difficulty !== undefined && activeChallenge.threat !== undefined) {
                         challengeDisplay.style.display = "flex";
                         is_action_phase = true
+                    } else if (is_collapse_check) {
+                        challengeDisplay.style.display = "flex";
+
                     } else {
                         is_action_phase = false;
                         challengeDisplay.style.display = "none";
@@ -2089,7 +2166,7 @@
                 tray.className = "card-tray conflict-mode";
                 
                 if (tableFloor) tableFloor.classList.add("combat-mode");
-                if (challengeDisplay) challengeDisplay.style.display = "none";
+                if (challengeDisplay && !is_collapse_check) challengeDisplay.style.display = "none";
                 is_action_phase = false;
                 if (enemyHeading) enemyHeading.innerText = enemy;
             }
@@ -2282,7 +2359,7 @@
             // Oprava: Ak adrenalín nie je vybraný, vráti 0 (nie "")
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let player_roll = rollDice(player_action[1], player_action[0] === "A", skill, false);
-
+            let stress_increased = false;
             // PRIDANÉ: Definovanie modifikátorov, ktoré v kóde chýbali
             let p_adv_mod = advantage;
             let p_ad_mod = adrenaline;
@@ -2600,49 +2677,112 @@
             if (potential_player_damage > 0) {
                 HERO.stress += potential_player_damage;
                 flashRed();
+                stress_increased = true;
                 log(`Stúpol ti stres o: ${potential_player_damage}.`, "failure-msg");
             }
 
             // --- 3. EVALUATE HEALTH THRESHOLDS (DEATH CHECKS) ---
-            let player_dead = HERO.stress > stress_thresh;
+            let player_collapse = HERO.stress > stress_thresh;
             let enemy_dead = enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"];
 
             // CASE A: Mutual Kill (Tie scenario where both exceed stress thresholds)
-            if (player_dead && enemy_dead) {
-                log(`\n💀 Ou! Zabili ste sa navzájom!`, "failure-msg", true);
-                inputs_frozen = true;
-                updateUI();
-                // Bind the game restart directly to the completion of the terminal text sequence
-                onTerminalFinishedCallback = () => {
-                    restartGame();
-                };
+            if (player_collapse && enemy_dead) {
+                is_collapse_check = true; 
+                runCollapseCheck(() => {
+                    player_collapse = false; 
 
-                // Fallback protection: If the text queue is already completely empty, restart immediately
-                if (!isProcessingQueue) {
-                    const callback = onTerminalFinishedCallback;
-                    onTerminalFinishedCallback = null;
-                    callback();
-                }
+                    HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                    log(`\n💥 Ustál si to! Hoci to bolo na hrane, ${enemy.toUpperCase()} padá a ty prežívaš! Získavaš 1 BR.`, "success-msg");
+                    inputs_frozen = true; 
+                    updateUI();
+
+                    onTerminalFinishedCallback = () => {
+                        const enemyContainer = document.getElementById("enemy-sprite-container");
+                        if (enemyContainer) enemyContainer.style.display = "none";
+
+                        let activeChallenge = CHALLENGES[current_challenge_key];
+                        if (current_challenge_key) { 
+                            CHALLENGES["ACTIVE"][current_challenge_key] = false; 
+                        }
+                                                enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                        enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                        player_action = null; enemy_action = null; is_conflict = false;
+
+                        if (pending_challenge_key) {
+                            let nextChallenge = pending_challenge_key; 
+                            pending_challenge_key = null; 
+                            proceed(nextChallenge); 
+                        } else {
+                            proceed(activeChallenge.case_success); 
+                        }
+                    };
+
+                    if (!isProcessingQueue) { 
+                        const callback = onTerminalFinishedCallback; 
+                        onTerminalFinishedCallback = null; 
+                        callback(); 
+                    }
+                });
                 return;
             }
 
             // CASE B: Only Player Collapses
-            if (player_dead) {
-                log(`💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.`, "failure-msg", true);
-                inputs_frozen = true;
-                updateUI();
-                // Bind the game restart directly to the completion of the terminal text sequence
-                onTerminalFinishedCallback = () => {
-                    restartGame();
-                };
+            if (player_collapse) {
+                runCollapseCheck(() => {
+                    player_collapse = false; 
+                    if (player_escape_counter < 1){
+                        player_zero_counter += 1;
+                    } else {
+                        player_zero_counter = 0;
+                    }
 
-                // Fallback protection: If the text queue is already completely empty, restart immediately
-                if (!isProcessingQueue) {
-                    const callback = onTerminalFinishedCallback;
-                    onTerminalFinishedCallback = null;
-                    callback();
-                }
-                return;
+                    if (enemy_escape_counter < 1){
+                        enemy_zero_counter += 1;
+                    } else {
+                        enemy_zero_counter = 0;
+                    }
+
+                    if (!player_escaping){ 
+                        if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
+                            (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
+                            advantage += 1;
+                            log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
+                        } 
+                    }
+                    if (!enemy_escaping){
+                        if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
+                        (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
+                            enemy_advantage += 1;
+                            log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
+                        }
+                    }
+
+                    if (player_action[0] === "D" && enemy_action[0] === "D") {
+                        const capturedPlayerAction = player_action;   
+                        const capturedEnemyAction = enemy_action;     
+                        const capturedPlayerRoll = player_roll;
+                        const capturedEnemyRoll = enemy_roll;
+
+                        if (capturedPlayerRoll <= conflict_difficulty) {
+                            checkConflictThreat(capturedPlayerRoll, false, capturedPlayerAction);
+                        }
+                        if (capturedEnemyRoll <= conflict_difficulty) {
+                            checkConflictThreat(capturedEnemyRoll, true, capturedEnemyAction);
+                        }
+                    }
+
+                    // Reset variables for next round context and spin up standard turn loop
+                    move = 0;
+                    round += 1;
+                    player_action = null;
+                    enemy_action = null;
+
+                    setTimeout(() => {
+                        gameloop(false);
+                    }, 2000);
+                });
+
+                return; // Stop execution of the current resolveConflict loop immediately!
             }
 
             // CASE C: Only Enemy Collapses
@@ -2787,10 +2927,22 @@
                         enemy_advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
                         log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Dostaneš sa do horšej pozície, nepriateľ získava výhodu.`, "danger-msg");
                     }
+                    
+                    // --- NOVÁ ÚPRAVA: INTERCEPCIA KOLAPSU V SÚBOJI ---
                     if (HERO.stress > stress_thresh) {
-                        inputs_frozen = true;
-                        log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
-                        restartGame();
+                        is_collapse_check = true;
+
+                        runCollapseCheck(() => {
+                            // TENTO CALLBACK SA SPUSTÍ, IBA AK HRÁČ V HODE USPEJE:
+                            is_collapse_check = false;
+                            inputs_frozen = false;
+                            updateUI();
+                            if (typeof onTerminalFinishedCallback === "function") {
+                                const callback = onTerminalFinishedCallback;
+                                onTerminalFinishedCallback = null;
+                                callback();
+                            }
+                        });
                         return;
                     }
                 }
@@ -2800,6 +2952,144 @@
             }
 
             updateUI();
+        }
+
+
+        function runCollapseCheck(onSuccessCallback, onFailureCallback) {
+            // Flag the engine that card clicks belong to this sub-system now
+            is_collapse_check = true;
+            inputs_frozen = true;
+            hidecards(true); 
+
+            collapse_resume_callback = onSuccessCallback;
+            // Ak onFailureCallback nebol poslaný (napr. v konflikte), zostane null a použije sa predvolené správanie
+            collapse_failure_callback = onFailureCallback || null; 
+
+            // Challenge difficulty equals the player's current stress. Threat is hardcoded to 2.
+            current_challenge.difficulty = HERO.stress; 
+            current_challenge.threat = 2;
+
+            const challengeDisplay = document.getElementById("challenge-stats-display");
+            if (challengeDisplay) {
+                challengeDisplay.style.display = "flex";
+                challengeDisplay.innerHTML = `
+                    <div class="stat-item">
+                        <img src="assets/DIFFICULTY.png" class="stat-icon"> 
+                        <span>${current_challenge.difficulty}</span>
+                    </div>
+                    <div class="stat-item">
+                        <img src="assets/THREAT.png" class="stat-icon"> 
+                        <span>${current_challenge.threat}</span>
+                    </div>
+                `;
+            }
+
+            log("⚠️ KONTROLA KOLAPSU! Musíš odolať tlaku nahromadeného stresu.", "danger-msg", true);
+            log(`NÁROČNOSŤ: ${current_challenge.difficulty} (Tvoj Stres)  |  HROZBA: ${current_challenge.threat}`,"danger-msg");
+
+            inputs_frozen = false;
+            updateUI();
+        }
+
+        function resolveCollapseCheck(card) {
+            inputs_frozen = true;
+            updateUI();
+
+            let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
+            let roll_result = rollDice(card, false, 0, false);
+            
+            log(`Výsledok kontroly kolapsu: ${roll_result} (+${adrenaline})`, "error-msg");
+            roll_result += adrenaline; 
+
+            let success = roll_result > current_challenge.difficulty;
+            let is_tie_or_failure = roll_result <= current_challenge.difficulty;
+            let threat_realized = false;
+
+            if (success) {
+                log("💪 Úspech! Zvládneš extrémny tlak a pokračuješ v boji.", "success-msg");
+            } else {
+                log("❌ Zlyhanie! Skolabuješ pod extrémnym tlakom.", "failure-msg");
+            }
+            if (is_tie_or_failure) {
+                let threat_roll = 0;
+                let threatRollsData = [];
+                
+                for (let n = 0; n < current_challenge.threat; n++) {
+                    let r = Math.floor(Math.random() * 2); // 0 or 1
+                    threat_roll += r;
+                    threatRollsData.push({ type: "DH", value: r, isSkillDie: true });
+                }
+
+                // Display threat visual dice pool explicitly tracked away from player pool
+                triggerDiceVisualAnimation(threatRollsData, true); 
+
+                let caution_threshold = CARDS[card][0][0]; 
+                if (threat_roll > caution_threshold) {
+                    log(`⚠️ Permanentný stres narastá! \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
+                    threat_realized = true;
+                } else {
+                    log(`Vyhneš sa trvalým následkom. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                }
+            }
+
+            resetAdrenalineSelection();
+
+            // --- OPRAVA CHYBY: Zvýšenie globálneho perm_stress o 1 (predtým bolo "= + 1", čo natvrdo priradilo 1) ---
+            if (threat_realized) {
+                if (typeof perm_stress === 'undefined') perm_stress = 0;
+                perm_stress += 1;
+                log(`Tvoj permanentný stres sa zvýšil o 1! (na ${perm_stress})`, "danger-msg");
+                updateUI();
+            }
+
+            // Handle Resolution routing paths
+            if (success) {
+                const challengeDisplay = document.getElementById("challenge-stats-display");
+                if (challengeDisplay) challengeDisplay.style.display = "none";
+                
+                is_collapse_check = false;
+
+                log("Zotavuješ sa z krízy and pokračuješ presne tam, kde si prestal.");
+                
+                if (typeof collapse_resume_callback === "function") {
+                    const resume = collapse_resume_callback;
+                    collapse_resume_callback = null;
+                    collapse_failure_callback = null; // Vyčistíme aj druhý callback
+                    resume(); 
+                }
+            } else {
+                // --- AK HOD ZLYHAL ---
+                
+                // 1. Ak existuje špecifický failure callback (napr. z executeMods), odovzdáme riadenie jemu
+                if (typeof collapse_failure_callback === "function") {
+                    const failure = collapse_failure_callback;
+                    collapse_resume_callback = null;
+                    collapse_failure_callback = null;
+                    failure();
+                } 
+                // 2. Predvolený mechanizmus konca hry (funguje výborne pre checkConflictThreat)
+                else {
+                    if (typeof enemy !== 'undefined' && typeof ENEMY_TYPES !== 'undefined' && ENEMY_TYPES[enemy] && enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"]) {
+                        log(`\n💀 Ou! Zabili ste sa navzájom! Skolabuješ v rovnakom momente, ako padol nepriateľ.`, "failure-msg", true);
+                    } else {
+                        // Bežný kolaps (padol iba hráč)
+                        log("💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.", "failure-msg", true);
+                    }
+
+                    inputs_frozen = true;
+                    updateUI();
+
+                    onTerminalFinishedCallback = () => {
+                        restartGame();
+                    };
+
+                    if (typeof isProcessingQueue !== 'undefined' && !isProcessingQueue) {
+                        const callback = onTerminalFinishedCallback;
+                        onTerminalFinishedCallback = null;
+                        callback();
+                    }
+                }
+            }
         }
 
         function ready() {
@@ -3886,8 +4176,8 @@
         // Funkcia na zobrazenie / skrytie Manažéra Hrdinu
         function toggleBuilder(show) {
             if (show) {
-                if (is_conflict || is_action_phase) {
-                    showGeneralPrompt("Teraz nie je čas...");
+                if (is_conflict || is_action_phase || is_collapse_check) {
+                    log("Teraz nie je čas...");
                     return;
                 }
                 if (hero_selected != true) {
@@ -4323,6 +4613,21 @@
 
         document.getElementById("card-tray-container").addEventListener("click", function(e) {
             if (inputs_frozen) return;
+
+            if (is_collapse_check) {
+                // Nájdeme najbližšiu kliknutú kartu bez ohľadu na zónu split-zone
+                const cardContainer = e.target.closest(".card-container");
+                if (!cardContainer) return;
+                
+                const cardCode = cardContainer.getAttribute("data-card");
+                
+                // Resetujeme skill na 0, pretože collapse check je čistý hod bez bonusov schopností
+                skill = 0; 
+                
+                // Odovzdáme riadenie vyhodnocovaciemu motoru kolapsu
+                resolveCollapseCheck(cardCode);
+                return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
+            }
 
             // --- SYNCHRONIZÁCIA KLÁVESNICE PODĽA MYŠI ---
             const clickedCard = e.target.closest(".card-container");

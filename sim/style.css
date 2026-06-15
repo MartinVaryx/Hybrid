@@ -659,6 +659,23 @@
             transition: all 0.15s ease;
             user-select: none;
         }
+        
+        /* Aktuálna špička permanentného stresu: čierne pozadie, biely text */
+        .track-cell.active-perm {
+            background: #000000 !important;
+            color: #ffffff !important;
+            transform: scale(1.15);
+            z-index: 10;
+        }
+
+        /* Stopa permanentného stresu: čierne pozadie a čierny neviditeľný text */
+        .track-cell.filled-perm {
+            background: #000000 !important;
+            color: #000000 !important;
+            transform: scale(1.15);
+        }
+
+        /* --- BEŽNÝ STRES (ČERVENÝ) --- */
 
         /* Highlighted current stress value */
         .track-cell.active-stress {
@@ -668,23 +685,24 @@
             z-index: 10;
         }
 
-        .stress-node {
-            color: black;
-            /* MINIMÁLNA ZMENA: Odstránenie okrajov */
-            border: none !important;
-                    }
-
-        .stress-node:not(.active-stress) {
-            background: none !important; /* Príklad: šedé pozadie pre neaktívny stres */
-            color: #888888 !important;      /* Nevýrazná farba textu */
-            transform: scale(1.15);          /* Uistíme sa, že nie sú zväčšené */
-        }
-
         /* Keeps the trail of previous stress values red */
         .track-cell.filled-stress {
             background: var(--hybrid-red) !important;
-            color: var(--hybrid-red)  !important;
-            transform: scale(1.15)
+            color: var(--hybrid-red) !important;
+            transform: scale(1.15);
+        }
+
+        /* --- ZÁKLADNÝ UZOL --- */
+        .stress-node {
+            color: black;
+            border: none !important; /* Odstránenie okrajov */
+        }
+
+        /* Neaktívne políčka stresu (nad aktuálnym stresom aj permanentným stresom) */
+        .stress-node:not(.active-stress):not(.filled-stress):not(.active-perm):not(.filled-perm) {
+            background: none !important;
+            color: #888888 !important; /* Nevýrazná farba textu pre prázdne uzly */
+            transform: scale(1.15);
         }
 
         /* Adrenaline Track Active Interaction Nodes */
