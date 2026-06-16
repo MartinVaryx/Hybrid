@@ -6,6 +6,12 @@
                 "ranged":false,
                 "image": "assets/SCOUT.png"
             },
+            "Skautka_dummy": {
+                "stress_thresh": 2,
+                "weapon": -5,
+                "ranged":false,
+                "image": "assets/SCOUT.png"
+            },
             "Predátorka": {
                 "skill": 3,
                 "stress_thresh": 5,

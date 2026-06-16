@@ -1291,9 +1291,7 @@
     },
     "BUNKER_0": {
         "initial_msg": "Dnu preniká trochu svetla, ale aj tak toho veľa nevidíš. Len vrchnú časť stien a strop. Ak je tu niečo zaujímavé, je to pod vodou.",
-        "case_success": "",
-        "case_failure": "",
-        "image": "assets/BUNKER:png",
+        "image": "assets/BUNKER.png",
         "choice_A": "Ideme sa potápať!",
         "case_A": "DIVE",
         "choice_B": "Späť pod vodu!",
@@ -1337,394 +1335,608 @@
         "case_success": "",
         "case_failure": ""
     },
+    "TUTORIAL": {
+        "initial_msg": "Vitaj v hre Hybrid!",
+        "case_success": "",
+        "case_failure": "",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_0"
+    },
+    "TUTORIAL_0": {
+        "initial_msg": "Táto digitálna verzia slúži ako doplnok k stolnej hre Hybrid - preto všetky tie kocky a karty.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_1",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START"
+    },
+    "TUTORIAL_1": {
+        "initial_msg": "V tomto tutoriále sa dozvieš všetko podstatné. Ak si ho budeš chcieť zopakovať, nájdeš ho v MENU.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_2",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Toto okno je scrollovateľné, takže ak ti ujde nejaká správa alebo si ju budeš chcieť pripomenúť, všetko nájdeš vyššie."
+    },
+    "TUTORIAL_2": {
+        "initial_msg": "Začneme tým, čo všetko tvorí tvoju postavu. Podstatné je sledovať ukazovateľ stresu. Ten vyjadruje stav tvojej postavy.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_3",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Pod ním sa nachádza ukazovateľ adrenalínu. Ten poskytne jednorazový bonus, ale okamžite ti zvýši stres na hodnotu nad ním. Môžeš ho použiť, ak veľmi potrebuješ uspieť pri niektorej skúške. Pokojne si to teraz vyskúšaj.",
+        "initial_msg_2": ""
+    },
+    "TUTORIAL_3": {
+        "initial_msg": "Hlavnú mechaniku hry ale tvorí systém kariet: OPATRNE, RÁZNE, SMELO a BEZHLAVO.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_4",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Voľbou karty si vyberáš spôsob, ako budeš konať a každá má svoje výhody aj nevýhody."
+    },
+    "TUTORIAL_4": {
+        "initial_msg": "V pravom hornom rohu je MOTIVÁCIA. Tá určuje kocky, ktorými hodíš pri výbere danej karty. Čím vyššia celková hodnota kociek, tým máš väčšiu šancu na úspech.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_5",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Motivácia sa porovnáva s NÁROČNOSŤOU. To je jednoducho číslo, ktoré potrebuješ hodiť. Náročnosť býva v rozmedzí 6 až 12. Ak na kockách padne menej, zlyháš."
+    },
+    "TUTORIAL_5": {
+        "initial_msg": "Môžeš si to vyskúšať pri tejto \"výzve\". Náročnosť je veľmi nízka.",
+        "case_success": "TUTORIAL_6",
+        "case_failure": "TUTORIAL_5",
+        "difficulty": 5,
+        "threat": 0,
+        "success_msg": "Super, podarilo sa.",
+        "failure_msg": "Skús to ešte raz."
+    },
+    "TUTORIAL_6": {
+        "initial_msg": "Okrem zlyhania však môžu nastať aj komplikácie. To, či nastanú, určuje HROZBA. Tá máva hodnotu 2 až 6.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_7",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Ak je tvoj hod nižší ako NÁROČNOSŤ, čelíš HROZBE. To znamená, že sa hodí kockami hrozby (toľko kociek, koľko je hodnota hrozby) a ak sa hrozba naplní, čelíš následkom.",
+        "initial_msg_2": "Kockami hrozby sa hádže, aj keď je tvoj hod rovný  náročnosti (vtedy aj uspeješ, aj čelíš hrozbe).",
+        "initial_msg_3": "Pred hrozbou ťa ale chráni OPATRNOSŤ ľavom rohu karty. Hrozba sa naplní len v prípade, že na kockách hrozby padne VIAC, ako je tvoja OPATRNOSŤ. Vyskúšaj si to."
+    },
+    "TUTORIAL_7": {
+        "initial_msg": "Vyber si kartu a všimni si, akú má OPATRNOSŤ. Náročnosť je zámerne vysoká, takže zlyháš a potom sa hodí kockami hrozby. Nemusíš sa báť, v hre na takúto náročnosť nenarazíš.",
+        "case_success": "",
+        "case_failure": "TUTORIAL_8",
+        "difficulty": 30,
+        "threat": 3,
+        "threat_avoided_msg": "Opatrnosť ti pomohla vyhnúť sa HROZBE. V tomto prípade sa hrozbe vyhneš a nič zlé sa ti nestane.",
+        "failure_msg": "Teraz sa vyhodnotí HROZBA.",
+        "threat_msg": "Hrozba sa naplnila a teraz by sa ti v hre stalo niečo nepríjemné."
+    },
+    "TUTORIAL_8": {
+        "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": [
+            "SCOUT_DUMMY",
+            "TUTORIAL_9"
+        ],
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
+        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
+        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky."
+    },
+    "SCOUT_DUMMY": {
+        "initial_msg": "Klikni na polovicu karty, na ktorej je \"ÚTOK\".",
+        "case_success": "",
+        "case_failure": "",
+        "type": "Skautka_dummy"
+    },
+    "TUTORIAL_9": {
+        "initial_msg": "V SPORE však môžeš aj robiť manévre výberom polovice karty s OPATRNOSŤOU, na ktorej svieti \"ČIN\".  Ak po výbere tejto karty vyhráš výmenu (hodíš viac, ako súper), zvýši sa tvoja VÝHODA. Tá ti až do konca SPORU poskytuje bonus k hodu.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": [
+            "SCOUT_DUMMY_0",
+            "TUTORIAL_10"
+        ],
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Ak zlyháš a nepriateľ ťa zasiahne počas manévru, zvýšenie stresu, ktoré ti spôsobí, bude stlmené tvojou OPATRNOSŤOU. (Pozor na kartu BEZHLAVO! Tá má \"neopatrnosť\" a súperov útok ešte zosilní, ak ťa trafí.)"
+    },
+    "SCOUT_DUMMY_0": {
+        "initial_msg": "Vyskúšaj v súboji použiť ČIN.",
+        "case_success": "",
+        "case_failure": "",
+        "type": "Skautka_dummy"
+    },
+    "TUTORIAL_10": {
+        "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_11",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
+        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
+        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky."
+    },
+    "TUTORIAL_11": {
+        "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pokračovať.",
+        "case_A": "TUTORIAL_11",
+        "choice_B": "Preskočiť tutoriál.",
+        "case_B": "START",
+        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
+        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
+        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky."
+    },
     "LAYOUT": {
         "GAME_OVER": {
-            "x": 10362,
-            "y": 0
+            "x": 12695,
+            "y": 1233
         },
         "DISTRACT_PREDATOR": {
-            "x": 6416,
-            "y": 763
+            "x": 8749,
+            "y": 1996
         },
         "WRECKS_PREDATOR_2": {
-            "x": 6412,
-            "y": 465
+            "x": 8745,
+            "y": 1698
         },
         "Predátorka_2": {
-            "x": 6024,
-            "y": 511
+            "x": 8357,
+            "y": 1744
         },
         "WRECKS_PREDATOR": {
-            "x": 6007,
-            "y": 755
+            "x": 8340,
+            "y": 1988
         },
         "WRECKS": {
-            "x": 6734,
-            "y": 607
+            "x": 9067,
+            "y": 1840
         },
         "BASEMENT_PREDATOR_2": {
-            "x": 5741,
-            "y": 1375
+            "x": 8074,
+            "y": 2608
         },
         "Predátorka_1": {
-            "x": 6172,
-            "y": 1241
+            "x": 8505,
+            "y": 2474
         },
         "BASEMENT_PREDATOR": {
-            "x": 6451,
-            "y": 1158
+            "x": 8784,
+            "y": 2391
         },
         "CAR_3": {
-            "x": 9976,
-            "y": 31
+            "x": 12309,
+            "y": 1264
         },
         "CAR_2": {
-            "x": 7733,
-            "y": 2066
+            "x": 10066,
+            "y": 3299
         },
         "CITY_2": {
-            "x": 6816,
-            "y": 1522
+            "x": 9149,
+            "y": 2755
         },
         "IN_BASEMENT": {
-            "x": 6332,
-            "y": 1569
+            "x": 8665,
+            "y": 2802
         },
         "Skautka_2": {
-            "x": 6393,
-            "y": 1799
+            "x": 8726,
+            "y": 3032
         },
         "BASEMENT_DISTRACT": {
-            "x": 5774,
-            "y": 2021
+            "x": 8107,
+            "y": 3254
         },
         "BASEMENT_ENCOUNTER": {
-            "x": 6283,
-            "y": 2120
+            "x": 8616,
+            "y": 3353
         },
         "EXPLORE_BASEMENT": {
-            "x": 6765,
-            "y": 2057
+            "x": 9098,
+            "y": 3290
         },
         "BASEMENT_ENTRANCE": {
-            "x": 7078,
-            "y": 1795
+            "x": 9411,
+            "y": 3028
         },
         "CITY": {
-            "x": 7332,
-            "y": 1421
+            "x": 9665,
+            "y": 2654
         },
         "Skautka_1": {
-            "x": 7984,
-            "y": 1154
+            "x": 10317,
+            "y": 2387
         },
         "SNEAK": {
-            "x": 7580,
-            "y": 1183
+            "x": 9913,
+            "y": 2416
         },
         "CAR": {
-            "x": 8253,
-            "y": 1447
+            "x": 10586,
+            "y": 2680
         },
         "TEST": {
-            "x": 150,
-            "y": 150
+            "x": 2483,
+            "y": 1383
         },
         "TEST2": {
-            "x": 150,
-            "y": 150
+            "x": 2483,
+            "y": 1383
         },
         "START": {
-            "x": 8768,
-            "y": 1213
+            "x": 11101,
+            "y": 2446
         },
         "CITY_0": {
-            "x": 7842,
-            "y": 1464
+            "x": 10175,
+            "y": 2697
         },
         "LOOK_AROUND": {
-            "x": 8242,
-            "y": 1670
+            "x": 10575,
+            "y": 2903
         },
         "TOWER_0": {
-            "x": 8360,
-            "y": 2201
+            "x": 10693,
+            "y": 3434
         },
         "WALK_0": {
-            "x": 9093,
-            "y": 1791
+            "x": 11426,
+            "y": 3024
         },
         "FOREST_PATH": {
-            "x": 7428,
-            "y": 2475
+            "x": 9761,
+            "y": 3708
         },
         "SLOPE": {
-            "x": 8636,
-            "y": 2514
+            "x": 10969,
+            "y": 3747
         },
         "CAR_1": {
-            "x": 8033,
-            "y": 1917
+            "x": 10366,
+            "y": 3150
         },
         "WALK_1": {
-            "x": 9826,
-            "y": 2039
+            "x": 12159,
+            "y": 3272
         },
         "TOWER_1": {
-            "x": 9413,
-            "y": 3184
+            "x": 11746,
+            "y": 4417
         },
         "FOREST_PATH_0": {
-            "x": 7970,
-            "y": 2784
+            "x": 10303,
+            "y": 4017
         },
         "SHACK_0": {
-            "x": 6613,
-            "y": 3052
+            "x": 8946,
+            "y": 4285
         },
         "FOREST_PATH_SNEAK": {
-            "x": 8177,
-            "y": 2538
+            "x": 10510,
+            "y": 3771
         },
         "PURITAN_D_0": {
-            "x": 8383,
-            "y": 3046
+            "x": 10716,
+            "y": 4279
         },
         "PURITÁN_1": {
-            "x": 8471,
-            "y": 3316
+            "x": 10804,
+            "y": 4549
         },
         "PURITAN_LIE": {
-            "x": 9236,
-            "y": 3714
+            "x": 11569,
+            "y": 4947
         },
         "PURITAN_THREATEN": {
-            "x": 8672,
-            "y": 3147
+            "x": 11005,
+            "y": 4380
         },
         "PURITAN_CONVINCE": {
-            "x": 8152,
-            "y": 3606
+            "x": 10485,
+            "y": 4839
         },
         "PURITAN_DONT_CONVINCE": {
-            "x": 8639,
-            "y": 3923
+            "x": 10972,
+            "y": 5156
         },
         "FOREST_PATH_1": {
-            "x": 7558,
-            "y": 3578
+            "x": 9891,
+            "y": 4811
         },
         "PURITÁN_2": {
-            "x": 5852,
-            "y": 1663
+            "x": 8185,
+            "y": 2896
         },
         "FOREST_PATH_2": {
-            "x": 8721,
-            "y": 3423
+            "x": 11054,
+            "y": 4656
         },
         "CLIFF": {
-            "x": 8745,
-            "y": 2271
+            "x": 11078,
+            "y": 3504
         },
         "CLIFF_CLIMB": {
-            "x": 8883,
-            "y": 2641
+            "x": 11216,
+            "y": 3874
         },
         "GENERATOR": {
-            "x": 9770,
-            "y": 3233
+            "x": 12103,
+            "y": 4466
         },
         "SUCK": {
-            "x": 9989,
-            "y": 2961
+            "x": 12322,
+            "y": 4194
         },
         "CAR_5": {
-            "x": 8892,
-            "y": 1961
+            "x": 11225,
+            "y": 3194
         },
         "SHACK_LOOK_AROUND": {
-            "x": 5831,
-            "y": 3532
+            "x": 8164,
+            "y": 4765
         },
         "SHACK_DOOR_BREAK": {
-            "x": 6511,
-            "y": 3478
+            "x": 8844,
+            "y": 4711
         },
         "SHACK_WINDOW": {
-            "x": 6912,
-            "y": 3321
+            "x": 9245,
+            "y": 4554
         },
         "SHACK_CELLAR": {
-            "x": 5715,
-            "y": 4522
+            "x": 8048,
+            "y": 5755
         },
         "SHACK_1": {
-            "x": 6792,
-            "y": 3653
+            "x": 9125,
+            "y": 4886
         },
         "SHACK_CELLAR_0": {
-            "x": 5361,
-            "y": 4356
+            "x": 7694,
+            "y": 5589
         },
         "UNLOCK_CELLAR": {
-            "x": 7222,
-            "y": 3860
+            "x": 9555,
+            "y": 5093
         },
         "SHACK_ATTIC": {
-            "x": 6847,
-            "y": 4053
+            "x": 9180,
+            "y": 5286
         },
         "SHACK_2": {
-            "x": 7244,
-            "y": 4235
+            "x": 9577,
+            "y": 5468
         },
         "SHACK_EXPLORE": {
-            "x": 6287,
-            "y": 4117
+            "x": 8620,
+            "y": 5350
         },
         "SHACK_EXPLORE_2": {
-            "x": 6331,
-            "y": 3760
+            "x": 8664,
+            "y": 4993
         },
         "DEAD_LETTERS": {
-            "x": 7076,
-            "y": 4455
+            "x": 9409,
+            "y": 5688
         },
         "DEAD_LETTERS_0": {
-            "x": 7181,
-            "y": 4659
+            "x": 9514,
+            "y": 5892
         },
         "DEAD_LETTERS_1": {
-            "x": 7387,
-            "y": 4797
+            "x": 9720,
+            "y": 6030
         },
         "DEAD_LETTERS_2": {
-            "x": 7653,
-            "y": 4895
+            "x": 9986,
+            "y": 6128
         },
         "DEAD_LETTERS_3": {
-            "x": 8198,
-            "y": 4824
+            "x": 10531,
+            "y": 6057
         },
         "DEAD_LETTERS_4": {
-            "x": 8469,
-            "y": 4701
+            "x": 10802,
+            "y": 5934
         },
         "DEAD_LETTERS_5": {
-            "x": 8697,
-            "y": 4574
+            "x": 11030,
+            "y": 5807
         },
         "DEAD_LETTERS_6": {
-            "x": 7926,
-            "y": 4895
+            "x": 10259,
+            "y": 6128
         },
         "WRECKS_0": {
-            "x": 6841,
-            "y": 1080
+            "x": 9174,
+            "y": 2313
         },
         "NO_CONTAINER": {
-            "x": 9607,
-            "y": 209
+            "x": 11940,
+            "y": 1442
         },
         "NO_HOSE": {
-            "x": 9391,
-            "y": 336
+            "x": 11724,
+            "y": 1569
         },
         "NO_HOSE_NO_CONTAINER": {
-            "x": 9216,
-            "y": 457
+            "x": 11549,
+            "y": 1690
         },
         "WALK_3": {
-            "x": 10315,
-            "y": 1829
+            "x": 12648,
+            "y": 3062
         },
         "WALK_4": {
-            "x": 10542,
-            "y": 1711
+            "x": 12875,
+            "y": 2944
         },
         "SKAUTKA_3": {
-            "x": 10594,
-            "y": 2069
+            "x": 12927,
+            "y": 3302
         },
         "PREDÁTORKA_2": {
-            "x": 10349,
-            "y": 2106
+            "x": 12682,
+            "y": 3339
         },
         "SKAUTKA_0": {
-            "x": 9869,
-            "y": 2268
+            "x": 12202,
+            "y": 3501
         },
         "WALK_2": {
-            "x": 10126,
-            "y": 1975
+            "x": 12459,
+            "y": 3208
         },
         "PREDÁTORKA_0": {
-            "x": 10165,
-            "y": 2148
+            "x": 12498,
+            "y": 3381
         },
         "WALK_5": {
-            "x": 10780,
-            "y": 1530
+            "x": 13113,
+            "y": 2763
         },
         "PREDÁTORKA_3": {
-            "x": 10687,
-            "y": 1911
+            "x": 13020,
+            "y": 3144
         },
         "PREDÁTORKA_4": {
-            "x": 10907,
-            "y": 1910
+            "x": 13240,
+            "y": 3143
         },
         "PREDÁTORKA_5": {
-            "x": 10936,
-            "y": 1755
+            "x": 13269,
+            "y": 2988
         },
         "GAME_FINISHED": {
-            "x": 11020,
-            "y": 1397
+            "x": 13353,
+            "y": 2630
         },
         "CLIFF_CLIMB_0": {
-            "x": 9038,
-            "y": 2460
+            "x": 11371,
+            "y": 3693
         },
         "TOWER_2": {
-            "x": 9175,
-            "y": 2976
+            "x": 11508,
+            "y": 4209
         },
         "PURITAN_ESCAPE": {
-            "x": 7968,
-            "y": 3102
+            "x": 10301,
+            "y": 4335
         },
         "TRACK": {
-            "x": 10889,
-            "y": 2886
+            "x": 13222,
+            "y": 4119
         },
         "LAKE": {
-            "x": 11221,
-            "y": 3050
+            "x": 13554,
+            "y": 4283
         },
         "BUNKER": {
-            "x": 11535,
-            "y": 3209
+            "x": 13868,
+            "y": 4442
         },
         "BUNKER_0": {
-            "x": 11942,
-            "y": 3226
+            "x": 14275,
+            "y": 4459
         },
         "DIVE": {
-            "x": 11867,
-            "y": 3509
+            "x": 14200,
+            "y": 4742
         },
         "DIVE_0": {
-            "x": 12260,
-            "y": 3367
+            "x": 14593,
+            "y": 4600
         },
         "DIVE_4": {
-            "x": 12159,
-            "y": 2920
+            "x": 14492,
+            "y": 4153
         },
         "BUNKER_1": {
-            "x": 12611,
-            "y": 3568
+            "x": 14944,
+            "y": 4801
+        },
+        "TUTORIAL": {
+            "x": 16138,
+            "y": 41
+        },
+        "TUTORIAL_0": {
+            "x": 16466,
+            "y": 120
+        },
+        "TUTORIAL_1": {
+            "x": 16727,
+            "y": 239
+        },
+        "TUTORIAL_2": {
+            "x": 16957,
+            "y": 323
+        },
+        "TUTORIAL_3": {
+            "x": 17236,
+            "y": 419
+        },
+        "TUTORIAL_4": {
+            "x": 17474,
+            "y": 524
+        },
+        "TUTORIAL_5": {
+            "x": 17689,
+            "y": 346
+        },
+        "TUTORIAL_6": {
+            "x": 17721,
+            "y": 618
+        },
+        "TUTORIAL_7": {
+            "x": 18096,
+            "y": 504
+        },
+        "TUTORIAL_8": {
+            "x": 17961,
+            "y": 716
+        },
+        "SCOUT_DUMMY": {
+            "x": 18479,
+            "y": 603
+        },
+        "TUTORIAL_9": {
+            "x": 18188,
+            "y": 815
+        },
+        "SCOUT_DUMMY_0": {
+            "x": 18709,
+            "y": 756
+        },
+        "TUTORIAL_10": {
+            "x": 18414,
+            "y": 911
+        },
+        "TUTORIAL_11": {
+            "x": 18688,
+            "y": 1027
         }
     },
     "ACTIVE": {
@@ -1764,7 +1976,7 @@
         "Predátorka_1": true,
         "Predátorka_2": true,
         "SHACK_0": true,
-        "SHACK_1": false,
+        "SHACK_1": true,
         "SHACK_CELLAR": false,
         "SHACK_DOOR_BREAK": true,
         "SHACK_LOOK_AROUND": true,
@@ -1824,6 +2036,21 @@
         "BUNKER_1": true,
         "DIVE": true,
         "DIVE_0": false,
-        "DIVE_4": false
+        "DIVE_4": false,
+        "TUTORIAL": true,
+        "TUTORIAL_0": true,
+        "TUTORIAL_1": true,
+        "TUTORIAL_2": true,
+        "TUTORIAL_3": true,
+        "TUTORIAL_4": true,
+        "TUTORIAL_5": true,
+        "TUTORIAL_6": true,
+        "TUTORIAL_7": true,
+        "TUTORIAL_8": true,
+        "SCOUT_DUMMY": true,
+        "TUTORIAL_9": true,
+        "SCOUT_DUMMY_0": true,
+        "TUTORIAL_10": true,
+        "TUTORIAL_11": true
     }
 }
