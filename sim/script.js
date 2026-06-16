@@ -10,7 +10,7 @@
         let stockHeroesData = [];
 
 
-        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
+        const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
@@ -283,6 +283,8 @@
                 } else {
                     if (prompt) prompt.style.display = "none";
                     inputs_frozen = true;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
                     executeProceedTransition();
                 }
             } else {
@@ -294,6 +296,8 @@
                 isProcessingQueue = false; 
                 if (prompt) prompt.style.display = "none";
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 executeProceedTransition();
             }
         });
@@ -561,6 +565,8 @@
                         isProcessingQueue = false; 
                         proceedPrompt.style.display = "none";
                         inputs_frozen = true;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.remove('enable-interaction');
                         executeProceedTransition();
                     }
                     return;
@@ -894,6 +900,8 @@
             // 1. If target dictates an explicit Enemy Combat deployment
             if (actualTarget in ENEMY_TYPES) { 
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 updateUI();
 
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
@@ -988,6 +996,8 @@
                                 // Následné kliknutie reálne spustí boj
                                 proceed(() => {
                                     inputs_frozen = false;
+                                    const scrollRow = document.querySelector('.card-scroll-row');
+                                    if (scrollRow) scrollRow.classList.add('enable-interaction');
                                     updateUI();
                                     gameloop(false);
                                 });
@@ -1010,6 +1020,8 @@
                     // Počkáme na jedno stlačenie Proceed, kým reálne spustíme bojové kolo
                     proceed(() => {
                         inputs_frozen = false;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.add('enable-interaction');
                         updateUI();
                         gameloop(false);
                     });
@@ -1052,6 +1064,8 @@
                 modificationExecuted = executeMods(caseTarget)
                 if (modificationExecuted) {
                     inputs_frozen = false;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.add('enable-interaction');
                     updateUI();
                     return;
                 }
@@ -1207,6 +1221,8 @@
                             () => {
                                 is_collapse_check = false;
                                 inputs_frozen = false;
+                                const scrollRow = document.querySelector('.card-scroll-row');
+                                if (scrollRow) scrollRow.classList.add('enable-interaction');
                                 updateUI();
 
                                 if (typeof onTerminalFinishedCallback === "function") {
@@ -1219,6 +1235,8 @@
                             () => {
                                 is_collapse_check = false;
                                 inputs_frozen = true;
+                                const scrollRow = document.querySelector('.card-scroll-row');
+                                if (scrollRow) scrollRow.classList.remove('enable-interaction');
                                 log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
                                 
                                 // Keďže cez mody hrozí prepísanie fronty, zavoláme reštart hneď,
@@ -1497,10 +1515,13 @@
 
             if (validChoices.length > 0 && (hasRealChoices || activeChallenge.difficulty === undefined)) {
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 narrative_phase = true; 
                 document.getElementById("player-turn-indicator").innerText = "VYBER SI MOŽNOSŤ";
                 
                 let choicePrompt = document.getElementById("choice-prompt");
+                
                 if (!choicePrompt) {
                     choicePrompt = document.createElement("div");
                     choicePrompt.id = "choice-prompt";
@@ -1524,12 +1545,27 @@
                     
                     // Set base styling matching your custom specs
                     if (choice.isBack) {
-                        btn.style.cssText = `
-                            position: absolute; bottom: 10px; left: -20px; height: 46px;
-                            white-space: nowrap; padding: 0 16px; border-radius: 9px;
-                            background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
-                            color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
-                        `;
+                        const isMobile = window.matchMedia("(max-width: 768px)").matches;
+
+                        if (isMobile) {
+                            // Mobile style: Pulls it into a full block width or centers it neatly above/below
+                            btn.style.cssText = `
+                                width: 60px;
+                                margin-bottom: 4px;
+                                height: 46px; 
+                                border-radius: 9px;
+                                background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
+                                color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
+                            `;
+                        } else {
+                            // Desktop style: Glued safely to the absolute left side
+                            btn.style.cssText = `
+                                position: absolute; bottom: 10px; left: -20px; height: 46px;
+                                white-space: nowrap; padding: 0 16px; border-radius: 9px;
+                                background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
+                                color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
+                            `;
+                        }
                     } else {
                         btn.style.cssText = `
                             height: 46px; white-space: nowrap; padding: 0 16px; border-radius: 9px;
@@ -1741,6 +1777,8 @@
                 
                 
                 inputs_frozen = false;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.add('enable-interaction');
                 updateUI();
 
                 // Message Queue Logic
@@ -1753,6 +1791,8 @@
 
                 if (sequentialMsgs.length > 0) {
                     inputs_frozen = true;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
                     updateUI();
                     let currentMsgIdx = 0;
 
@@ -1762,12 +1802,16 @@
                             if (activeChallenge && activeChallenge.next) {
                                 proceed(() => {
                                     inputs_frozen = false;
+                                    const scrollRow = document.querySelector('.card-scroll-row');
+                                    if (scrollRow) scrollRow.classList.add('enable-interaction');
                                     updateUI();
                                     handleChallengeTransition(activeChallenge.next);
                                 });
                             } else {
                                 proceed(() => {
                                     inputs_frozen = false;
+                                    const scrollRow = document.querySelector('.card-scroll-row');
+                                    if (scrollRow) scrollRow.classList.add('enable-interaction');
                                     updateUI();
                                     renderChallengeChoices(activeChallenge); // Securely renders choices after message strings
                                 });
@@ -2284,6 +2328,8 @@
 
         function resolveActionPhase(card) {
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
             updateUI();
 
             const activeChallenge = CHALLENGES[current_challenge_key];
@@ -2345,7 +2391,8 @@
             const runThreatPostProcessing = () => {
                 resetAdrenalineSelection();
                 inputs_frozen = false;
-
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.add('enable-interaction');
                 if (threat_realized) {
                     if (activeChallenge.case_threat_delayed) {
                         if (Array.isArray(activeChallenge.case_threat_delayed)) {
@@ -2451,6 +2498,8 @@
                 // If there is no threat evaluation required, proceed immediately
                 resetAdrenalineSelection();
                 inputs_frozen = false;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.add('enable-interaction');
 
                 if (logs_pending.length > 0 || isProcessingQueue) {
                     onTerminalFinishedCallback = doTransition;
@@ -2526,6 +2575,9 @@
                 log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
                 
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                 updateUI();
                 
                 // Remove inputs_frozen or update UI elements if necessary, then hook into the terminal finish
@@ -2629,6 +2681,9 @@
                     if (player_escape_counter >= 2) {
                         log(`\n Úspešne ujdeš z boja!`, "success-msg");
                         inputs_frozen = true;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                         updateUI();
                         
                         // Bind everything safely to your terminal output sequence completion
@@ -2732,6 +2787,9 @@
                         HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                         log(`Získavaš 1 BR.`, "success-msg");
                         inputs_frozen = true;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                         updateUI();
                         onTerminalFinishedCallback = () => {
                             const enemyContainer = document.getElementById("enemy-sprite-container");
@@ -2826,6 +2884,9 @@
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                     log(`\n💥 Ustál si to! Hoci to bolo na hrane, ${enemy.toUpperCase()} padá a ty prežívaš! Získavaš 1 BR.`, "success-msg");
                     inputs_frozen = true; 
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
@@ -2922,6 +2983,9 @@
                 HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                 log(`\n💥 ${enemy} JE DOLE! Získavaš 1 BR a môžeš pokračovať.`, "success-msg");
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                 updateUI();
 
                 // Bind the container reset and challenge updates cleanly to the terminal text completion
@@ -3068,6 +3132,9 @@
                             // TENTO CALLBACK SA SPUSTÍ, IBA AK HRÁČ V HODE USPEJE:
                             is_collapse_check = false;
                             inputs_frozen = false;
+                            const scrollRow = document.querySelector('.card-scroll-row');
+                            if (scrollRow) scrollRow.classList.add('enable-interaction');
+
                             updateUI();
                             if (typeof onTerminalFinishedCallback === "function") {
                                 const callback = onTerminalFinishedCallback;
@@ -3091,6 +3158,9 @@
             // Flag the engine that card clicks belong to this sub-system now
             is_collapse_check = true;
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
             hidecards(true); 
 
             collapse_resume_callback = onSuccessCallback;
@@ -3110,11 +3180,17 @@
             log("⚠️ KONTROLA KOLAPSU! Musíš odolať tlaku nahromadeného stresu.", "danger-msg", true);
 
             inputs_frozen = false;
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+
             updateUI();
         }
 
         function resolveCollapseCheck(card) {
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
             updateUI();
 
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
@@ -3201,6 +3277,9 @@
                     }
 
                     inputs_frozen = true;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
@@ -3220,11 +3299,17 @@
             log("Ok, pokračujeme...", "", true);
             
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
             updateUI();
             
             // Bind unfreezing and enemy execution directly to terminal output completion
             onTerminalFinishedCallback = () => {
                 inputs_frozen = false;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.add('enable-interaction');
+
                 enemyChoice();
             };
 
@@ -3246,6 +3331,9 @@
             }
             proceed_target = target; 
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
             
             const prompt = document.getElementById("proceed-prompt");
             if (prompt) {
@@ -3299,6 +3387,9 @@
             if (move < 2) {
                 if (turn === "e") {
                     inputs_frozen = true;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                     updateUI();
 
                     function advanceRoundFlow() {
@@ -3330,10 +3421,16 @@
                     }
 
                     inputs_frozen = true;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
                         inputs_frozen = false;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.add('enable-interaction');
+
                         updateUI(); 
                     };
 
@@ -3345,6 +3442,9 @@
                 }
             } else {
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                 updateUI();
 
                 onTerminalFinishedCallback = () => {
@@ -3370,6 +3470,9 @@
             const isEnemyShowing = enemyDisplay && enemyDisplay.classList.contains("show");
 
             inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
             updateUI();
 
             function proceedWithSelection() {
@@ -3678,10 +3781,16 @@
             if (escapeText) {
                 log(`${escapeText} `, "", true);
                 inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
                 updateUI();
 
                 onTerminalFinishedCallback = () => {
                     inputs_frozen = false;
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.add('enable-interaction');
+
                     displayEnemyCard(enemy_action[0], enemy_action[1]);
                     runGameloopCycle();
                 };
@@ -3969,6 +4078,7 @@
             function confirmHeroSelection() {
                 switchCharacterGlobally(activeCharIdx);
                 hero_selected = true;
+                gameOn = true;
                 overlay.remove();
                 document.removeEventListener("keydown", heroKeyHandler);
                 updateUI();
@@ -4033,7 +4143,7 @@
             if (activeHero.skills && Object.keys(activeHero.skills).length > 0) {
                 for (const [skillName, val] of Object.entries(activeHero.skills)) {
                     skillsGrid.innerHTML += `
-                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 2px; padding-right:50px;">
                             <span>${skillName}:</span>
                             <span style="color: var(--hybrid-green); font-weight: bold;">${val}</span>
                         </div>`;
