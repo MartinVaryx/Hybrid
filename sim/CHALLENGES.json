@@ -321,17 +321,23 @@
         "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
         "choice_A": "test",
         "case_A": [
-            "TEST2",
-            "stress+1"
+            "stress+1",
+            "TEST2"
+        ],
+        "choice_B":"tests",
+        "case_B":[
+            "stress+1",
+            "TEST2"            
         ]
+
     },
     "TEST2": {
         "image": "assets/CAR.png",
         "initial_msg": "Si pri svojom aute. Ktoré má prázdnu nádrž.",
         "choice_A": "test",
         "case_A": [
-            "TEST",
-            "stress+1"
+            "stress+1",
+            "TEST"
         ]
     },
     "START": {

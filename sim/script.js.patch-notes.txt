@@ -1,0 +1,5 @@
+Patches applied:
+- change enemy_zero_counter/ player_zero_counter thresholds from >1 to >0 so D advantage can trigger on first relevant move.
+- Added onTerminalFinishedCallback invocation at the end of flushLogQueue when logs_pending fully flushed to avoid stuck state when skipping logs.
+
+Rationale: flushLogQueue previously didn't call the completion callback, leaving game frozen when logs were skipped during conflict. Advantage threshold >1 skipped first-move advantage; changing to >0 allows first-move advantage as requested.

@@ -10,8 +10,8 @@
         let stockHeroesData = [];
 
 
-        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
+        const DEBUG = true;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
         let current_challenge_key = "START";
