@@ -11,10 +11,11 @@
 
 
         const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
-        let current_challenge_key = "START"; 
+        let current_challenge_key = "START";
+        if (DEBUG) { gameOn = true, hero_selected = true};
 
 
         const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
@@ -155,6 +156,10 @@
         let currentSelectedCardIdx = 0; // Index karty v tray (0, 1, 2...)
         let currentSelectedActionType = "D"; // Predvolene vrchná zóna ("D" alebo "A" podľa flipu)
 
+        let touchHoverActive = false;
+        let touchPendingCardIdx = null;
+        let touchClickSuppressed = false;
+        const isTouchDevice = typeof window !== 'undefined' && ('ontouchstart' in window || navigator.maxTouchPoints > 0);
 
         // Global state initialized outside the functions
         let logs_pending = [];
@@ -163,6 +168,39 @@
         let activeLogTimeout = null; // NEW: Keeps track of the active waiting timer
         let is_collapse_check = false;
         let collapse_resume_callback = null;
+        let collapse_failure_callback = null;
+        let collapse_pending_proceed_target = null;
+        let collapse_pending_target = null;
+        let collapse_conflict_mode = false;
+        let collapse_savedActionType = "D";
+
+        function enterCollapseConflictMode() {
+            collapse_conflict_mode = true;
+            collapse_savedActionType = currentSelectedActionType || "D";
+            currentSelectedActionType = "D";
+            document.querySelectorAll("#card-tray-container .card-container").forEach(card => {
+                const zone1 = card.children[0];
+                const zone2 = card.children[1];
+                // During collapse, zonation is irrelevant: hide both zones
+                if (zone1) zone1.style.display = "none";
+                if (zone2) zone2.style.display = "none";
+            });
+            updateCardKeyboardHighlight();
+        }
+
+        function exitCollapseConflictMode() {
+            if (!collapse_conflict_mode) return;
+            collapse_conflict_mode = false;
+            document.querySelectorAll("#card-tray-container .card-container").forEach(card => {
+                const zone1 = card.children[0];
+                const zone2 = card.children[1];
+                if (!zone1 || !zone2) return;
+                zone1.style.display = "";
+                zone2.style.display = "";
+            });
+            currentSelectedActionType = collapse_savedActionType || "D";
+            updateCardKeyboardHighlight();
+        }
 
 
         function log(message, className = "", extraSpacing = true, extraSpacingB = false) {
@@ -212,9 +250,14 @@
             }
 
             if (logs_pending.length > 0) {
-                const characterDelay = currentLog.message.length * 35;
-                const finalDelay = Math.max(800, 400 + characterDelay);
-                activeLogTimeout = setTimeout(processQueue, finalDelay);
+                if (logs_pending.length > 4) {
+                    // If too many logs are waiting, flush the backlog quickly.
+                    activeLogTimeout = setTimeout(processQueue, 0);
+                } else {
+                    const characterDelay = currentLog.message.length * 35;
+                    const finalDelay = Math.max(800, 400 + characterDelay);
+                    activeLogTimeout = setTimeout(processQueue, finalDelay);
+                }
             } else {
                 // Queue just emptied — clean up and fire callback
                 isProcessingQueue = false;
@@ -264,6 +307,11 @@
                     activeLogTimeout = setTimeout(flushNext, 80);
                 } else {
                     activeLogTimeout = null;
+                    if (typeof onTerminalFinishedCallback === "function") {
+                        const callback = onTerminalFinishedCallback;
+                        onTerminalFinishedCallback = null;
+                        callback();
+                    }
                 }
             };
 
@@ -893,6 +941,13 @@
 
                         if (isModification) {
                             handleChallengeTransition(target);
+                            if (is_collapse_check) {
+                                collapse_pending_target = caseTarget.slice(i + 1);
+                                if (collapse_pending_target.length === 1) {
+                                    collapse_pending_target = collapse_pending_target[0];
+                                }
+                                return;
+                            }
                             i++;
                             // keep looping
                         } 
@@ -3017,15 +3072,15 @@ function resolveConflict() {
     }
 
     if (!player_escaping){ 
-        if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
-            (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
+        if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 0) || 
+            (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 0)) {
             advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
             log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
         } 
     }
     if (!enemy_escaping){
-        if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
-        (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
+        if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 0) || 
+        (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 0)) {
             // CRITICAL FIX HERE:
             enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
             log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
@@ -3141,6 +3196,20 @@ function resolveConflict() {
 
             hidecards(true); 
 
+            if (is_conflict) {
+                enterCollapseConflictMode();
+            }
+
+            // Defer any currently pending proceed target so the collapse check resolves first
+            if (proceed_target !== null) {
+                collapse_pending_proceed_target = collapse_pending_proceed_target || proceed_target;
+                proceed_target = null;
+            }
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            if (proceedPrompt) {
+                proceedPrompt.style.display = "none";
+            }
+
             collapse_resume_callback = onSuccessCallback;
             // Ak onFailureCallback nebol poslaný (napr. v konflikte), zostane null a použije sa predvolené správanie
             collapse_failure_callback = onFailureCallback || null; 
@@ -3235,6 +3304,20 @@ function resolveConflict() {
                     collapse_failure_callback = null; // Vyčistíme aj druhý callback
                     resume(); 
                 }
+
+                if (is_conflict) {
+                    exitCollapseConflictMode();
+                }
+
+                if (collapse_pending_proceed_target !== null) {
+                    const pendingTarget = collapse_pending_proceed_target;
+                    collapse_pending_proceed_target = null;
+                    proceed(pendingTarget);
+                } else if (collapse_pending_target !== null) {
+                    const pendingTarget = collapse_pending_target;
+                    collapse_pending_target = null;
+                    handleChallengeTransition(pendingTarget);
+                }
             } else {
                 // --- AK HOD ZLYHAL ---
                 
@@ -3271,6 +3354,7 @@ function resolveConflict() {
                     }
                 }
             }
+            collapse_pending_proceed_target = null;
         }
 
         function ready() {
@@ -3304,6 +3388,13 @@ function resolveConflict() {
             if (!gameOn) {
                 return;
             }
+            if (is_collapse_check) {
+                if (DEBUG === true) {
+                    log("DEBUG: Collapse active – deferring proceed until check resolves.");
+                }
+                collapse_pending_proceed_target = collapse_pending_proceed_target || target;
+                return;
+            }
             if (typeof target === 'string') {
                 preloadImages(target);
             }
@@ -3321,6 +3412,9 @@ function resolveConflict() {
 
         // Dedicated transition executor
         function executeProceedTransition() {
+            if (is_collapse_check) {
+                return;
+            }
             let delay = 0;
             if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
@@ -4808,324 +4902,362 @@ function resolveConflict() {
             });
         });
 
-document.getElementById("card-tray-container").addEventListener("click", function(e) {
-    if (inputs_frozen) return;
-
-    // =========================================================================
-    // 1. PRIORITNÉ ZISTENIE ELEMENTOV (KARTA A ZÓNA) A SYNCHRONIZÁCIA
-    // =========================================================================
-    const cardContainer = e.target.closest(".card-container");
-    if (!cardContainer) return; // Ak sa kliklo mimo karty, ignorujeme
-    
-    const cardCode = cardContainer.getAttribute("data-card");
-    const zone = e.target.closest(".split-zone");
-
-    // --- SYNCHRONIZÁCIA KLÁVESNICE PODĽA MYŠI ---
-    const allCards = Array.from(document.querySelectorAll("#card-tray-container .card-container"));
-    currentSelectedCardIdx = allCards.indexOf(cardContainer);
-    
-    if (zone) {
-        currentSelectedActionType = zone.getAttribute("data-action");
-    }
-    updateCardKeyboardHighlight();
-
-    // =========================================================================
-    // 2. REŽIM SKÚŠKY KOLAPSU (COLLAPSE CHECK)
-    // =========================================================================
-    if (is_collapse_check) {
-        // Resetujeme skill na 0, pretože collapse check je čistý hod bez bonusov schopností
-        skill = 0; 
-        
-        // Odovzdáme riadenie vyhodnocovaciemu motoru kolapsu
-        resolveCollapseCheck(cardCode);
-        return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
-    }
-
-    // =========================================================================
-    // 3. REŽIM V CONFLIKTE / BOJI (KLIKNUTIE NA KONKRÉTNU POLOVICU)
-    // =========================================================================
-    if (is_conflict) {
-        // V boji striktne vyžadujeme kliknutie na zónu (A alebo D). Ak sa kliklo na kartu ale mimo zóny, nepokračujeme.
-        if (!zone) return;
-        
-        let actionType = currentSelectedActionType; // "A" (Útok) alebo "D" (Čin/Obrana)
-
-        // Načítanie elementov dropdownov a ich hodnôt
-        const skillDropdown = document.getElementById("player-skill-dropdown");
-        const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
-        const upperSkill = selectedSkillName.toUpperCase();
-
-        const weaponDropdown = document.getElementById("player-weapon-dropdown");
-        const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
-
-        // =========================================================================
-        // 0. A. DELEGOVANÁ AKTUALIZÁCIA GLOBÁLNEJ PREMENNEJ weapon (ZBRAŇ)
-        // =========================================================================
-        if (!selectedWeaponName || selectedWeaponName === "placeholder") {
-            weapon = 0; // Globálna premenná zbrane sa vynuluje
-            if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                log("👊  👊 Bojuješ holými rukami (INTENZITA: 0).", "system-msg");
-            }
-        } else {
-            let foundDamage = 0;
-            for (const category in WEAPON_LIST) {
-                if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                    foundDamage = WEAPON_LIST[category][selectedWeaponName];
-                    break;
-                }
-            }
-            weapon = foundDamage; // Nastavenie intenzity do globálnej premennej
-            
-            if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                log(`⚔️ [DEBUG] Pripravená zbraň pre boj: ${selectedWeaponName.toUpperCase()} (INTENZITA: ${weapon})`, "system-msg");
-            }
-        }
-
-        // =========================================================================
-        // 0. B. DELEGOVANÁ VALIDÁCIA SCHOPNOSTÍ PRE BOJ + PRIRADENIE HODNOTY skill
-        // =========================================================================
-        if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-            const skillData = SKILLS_DB[selectedSkillName];
-            const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
-            const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
-                    (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
-            let isPlaceholder = false;
-            if (selectedSkillName == "placeholder") isPlaceholder = true;
-
-            // Ak schopnosť nie je bojová a nie je ani v obranných, nepovolíme s ňou kliknúť na kartu
-            if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
-                log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
-                skill = 0; 
-                return; // Zablokuje vykonanie ťahu
-            }
-
-            // Schopnosť prešla -> bezpečne priradíme jej reálnu číselnú hodnotu z hrdinu
-            const actualHeroValue = HERO.skills[selectedSkillName] || 0;
-            skill = actualHeroValue;
-
-            if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                log(`⚔️ [DEBUG] Pripravená schopnosť: ${selectedSkillName} (+${actualHeroValue})`, "system-msg");
-            }
-        } else {
-            skill = 0; // Ak je vybraný placeholder/none, bonus k hodu je 0
-        }
-
-        // =========================================================================
-        // STÁLE KONTROLY KOMBINÁCIÍ A PODMIENOK (KROKY 1 AŽ 4)
-        // =========================================================================
-
-        // --- NOVÁ FIXNÁ KONTROLA: Vrhanie striktne vyžaduje útok (A) a zbraň (nie placeholder) ---
-        if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
-            if (!WEAPON_LIST["VRHACIE"] || WEAPON_LIST["VRHACIE"][selectedWeaponName] === undefined) {
-                log(`⚠️ ${upperSkill} vyžaduje vrhaciu zbraň (napr. nôž)!`, "error-msg");
-                return;
-            }
-        }
-
-        // --- 2. KROK: KONTROLA EXKLUZIVITY ÚTOK/OBRANA PO KLIKNUTÍ ---
-        if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-            const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
-            const skillData = SKILLS_DB[selectedSkillName];
-            const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
-                (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
-            
-            // A. Ak hráč vybral ÚTOK ("A"), ale má navolený obranný skill (napr. Obratnosť)
-            if (actionType === "A" && !isCombatSkill && isDefenseSkill) {
-                log(`⚠️ Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU! Zmeň schopnosť alebo klikni na ČIN (Obranu).`, "error-msg");
-                return;
-            }
-
-            // B. Ak hráč vybral ČIN ("D"), ale má navolený útočný skill (napr. Boj zblízka) a nie je zároveň obranný
-            if (actionType === "D" && isCombatSkill && !isDefenseSkill) {
-                log(`⚠️ Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE! Zmeň schopnosť alebo klikni na ÚTOK.`, "error-msg");
-                return;
-            }
-        }
-        
-        // --- 3. KROK: KONTROLA KOMBINÁCIE ZBRANE A SCHOPNOSTI ---
-        if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-            const skillData = SKILLS_DB[selectedSkillName];
-            
-            // --- ZABEZPEČENIE PROTI ÚTOKU BEZ ZBRANE ---
-            if (skillData) {
-                const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
-                
-                if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
-                    if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
-                        log(`⚠️ Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
-                        return; // Zablokuje ťah
+        const cardTray = document.getElementById("card-tray-container");
+        if (cardTray && isTouchDevice) {
+            cardTray.addEventListener("touchstart", function(e) {
+                if (inputs_frozen) return;
+                const cardContainer = e.target.closest(".card-container");
+                if (!cardContainer) {
+                    if (touchHoverActive) {
+                        clearCardHoverHighlight();
                     }
-                }
-            }
-
-            // Kontrola WEAPON_SKILLS - Či zvolená schopnosť prislúcha sile zbrane
-            if (selectedWeaponName !== "placeholder") {
-                // Využijeme už vypočítanú hodnotu premennej weapon z Kroku 0.A.
-                const weaponAllowed = WEAPON_SKILLS[String(weapon)] || [];
-                const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
-                if (allowedSkills && !allowedSkills.includes(upperSkill)) {
-                    log(`⚠️ Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje zbraň s intenzitou ${weapon})!`, "error-msg");
                     return;
                 }
 
-                if (skillData && skillData[1]) {
-                    const skillCategory = skillData[1].toUpperCase();
+                const allCards = Array.from(cardTray.querySelectorAll(".card-container"));
+                const touchedIndex = allCards.indexOf(cardContainer);
+                if (touchedIndex === -1) return;
+
+                if (touchPendingCardIdx !== touchedIndex) {
+                    setCardHoverHighlight(touchedIndex);
+                    touchClickSuppressed = true;
+                } else {
+                    touchClickSuppressed = false;
+                }
+            });
+
+            document.addEventListener("touchstart", function(e) {
+                if (inputs_frozen) return;
+                if (!e.target.closest("#card-tray-container .card-container")) {
+                    clearCardHoverHighlight();
+                }
+            });
+        }
+
+        document.getElementById("card-tray-container").addEventListener("click", function(e) {
+            if (inputs_frozen) return;
+
+            // =========================================================================
+            // 1. PRIORITNÉ ZISTENIE ELEMENTOV (KARTA A ZÓNA) A SYNCHRONIZÁCIA
+            // =========================================================================
+            const cardContainer = e.target.closest(".card-container");
+            if (!cardContainer) return; // Ak sa kliklo mimo karty, ignorujeme
+            
+            const allCards = Array.from(document.querySelectorAll("#card-tray-container .card-container"));
+            const cardIdx = allCards.indexOf(cardContainer);
+            if (isTouchDevice && touchClickSuppressed && touchPendingCardIdx === cardIdx) {
+                touchClickSuppressed = false;
+                return; // First tap on mobile should only activate hover
+            }
+
+            const cardCode = cardContainer.getAttribute("data-card");
+            const zone = e.target.closest(".split-zone");
+
+            // --- SYNCHRONIZÁCIA KLÁVESNICE PODĽA MYŠI ---
+            currentSelectedCardIdx = cardIdx;
+            
+            if (zone) {
+                currentSelectedActionType = zone.getAttribute("data-action");
+            }
+            updateCardKeyboardHighlight();
+
+            // =========================================================================
+            // 2. REŽIM SKÚŠKY KOLAPSU (COLLAPSE CHECK)
+            // =========================================================================
+            if (is_collapse_check) {
+                // Resetujeme skill na 0, pretože collapse check je čistý hod bez bonusov schopností
+                skill = 0; 
+                
+                // Odovzdáme riadenie vyhodnocovaciemu motoru kolapsu
+                resolveCollapseCheck(cardCode);
+                return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
+            }
+
+            // =========================================================================
+            // 3. REŽIM V CONFLIKTE / BOJI (KLIKNUTIE NA KONKRÉTNU POLOVICU)
+            // =========================================================================
+            if (is_conflict) {
+                // V boji striktne vyžadujeme kliknutie na zónu (A alebo D). Ak sa kliklo na kartu ale mimo zóny, nepokračujeme.
+                if (!zone) return;
+                
+                let actionType = currentSelectedActionType; // "A" (Útok) alebo "D" (Čin/Obrana)
+
+                // Načítanie elementov dropdownov a ich hodnôt
+                const skillDropdown = document.getElementById("player-skill-dropdown");
+                const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+                const upperSkill = selectedSkillName.toUpperCase();
+
+                const weaponDropdown = document.getElementById("player-weapon-dropdown");
+                const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
+
+                // =========================================================================
+                // 0. A. DELEGOVANÁ AKTUALIZÁCIA GLOBÁLNEJ PREMENNEJ weapon (ZBRAŇ)
+                // =========================================================================
+                if (!selectedWeaponName || selectedWeaponName === "placeholder") {
+                    weapon = 0; // Globálna premenná zbrane sa vynuluje
+                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
+                        log("👊  👊 Bojuješ holými rukami (INTENZITA: 0).", "system-msg");
+                    }
+                } else {
+                    let foundDamage = 0;
+                    for (const category in WEAPON_LIST) {
+                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                            foundDamage = WEAPON_LIST[category][selectedWeaponName];
+                            break;
+                        }
+                    }
+                    weapon = foundDamage; // Nastavenie intenzity do globálnej premennej
                     
-                    if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
-                        if (skillCategory === "BOJ ZBLÍZKA" || skillCategory === "BOJ Z DIAĽKY") {
-                            if (!WEAPON_LIST[skillCategory] || WEAPON_LIST[skillCategory][selectedWeaponName] === undefined) {
-                                log(`⚠️ Zbraň ${selectedWeaponName.toUpperCase()} nie je vhodná pre schopnosť ${upperSkill}!`, "error-msg");
+                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
+                        log(`⚔️ [DEBUG] Pripravená zbraň pre boj: ${selectedWeaponName.toUpperCase()} (INTENZITA: ${weapon})`, "system-msg");
+                    }
+                }
+
+                // =========================================================================
+                // 0. B. DELEGOVANÁ VALIDÁCIA SCHOPNOSTÍ PRE BOJ + PRIRADENIE HODNOTY skill
+                // =========================================================================
+                if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                    const skillData = SKILLS_DB[selectedSkillName];
+                    const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
+                    const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
+                            (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
+                    let isPlaceholder = false;
+                    if (selectedSkillName == "placeholder") isPlaceholder = true;
+
+                    // Ak schopnosť nie je bojová a nie je ani v obranných, nepovolíme s ňou kliknúť na kartu
+                    if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
+                        log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
+                        skill = 0; 
+                        return; // Zablokuje vykonanie ťahu
+                    }
+
+                    // Schopnosť prešla -> bezpečne priradíme jej reálnu číselnú hodnotu z hrdinu
+                    const actualHeroValue = HERO.skills[selectedSkillName] || 0;
+                    skill = actualHeroValue;
+
+                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
+                        log(`⚔️ [DEBUG] Pripravená schopnosť: ${selectedSkillName} (+${actualHeroValue})`, "system-msg");
+                    }
+                } else {
+                    skill = 0; // Ak je vybraný placeholder/none, bonus k hodu je 0
+                }
+
+                // =========================================================================
+                // STÁLE KONTROLY KOMBINÁCIÍ A PODMIENOK (KROKY 1 AŽ 4)
+                // =========================================================================
+
+                // --- NOVÁ FIXNÁ KONTROLA: Vrhanie striktne vyžaduje útok (A) a zbraň (nie placeholder) ---
+                if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
+                    if (!WEAPON_LIST["VRHACIE"] || WEAPON_LIST["VRHACIE"][selectedWeaponName] === undefined) {
+                        log(`⚠️ ${upperSkill} vyžaduje vrhaciu zbraň (napr. nôž)!`, "error-msg");
+                        return;
+                    }
+                }
+
+                // --- 2. KROK: KONTROLA EXKLUZIVITY ÚTOK/OBRANA PO KLIKNUTÍ ---
+                if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                    const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
+                    const skillData = SKILLS_DB[selectedSkillName];
+                    const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
+                        (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
+                    
+                    // A. Ak hráč vybral ÚTOK ("A"), ale má navolený obranný skill (napr. Obratnosť)
+                    if (actionType === "A" && !isCombatSkill && isDefenseSkill) {
+                        log(`⚠️ Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU! Zmeň schopnosť alebo klikni na ČIN (Obranu).`, "error-msg");
+                        return;
+                    }
+
+                    // B. Ak hráč vybral ČIN ("D"), ale má navolený útočný skill (napr. Boj zblízka) a nie je zároveň obranný
+                    if (actionType === "D" && isCombatSkill && !isDefenseSkill) {
+                        log(`⚠️ Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE! Zmeň schopnosť alebo klikni na ÚTOK.`, "error-msg");
+                        return;
+                    }
+                }
+                
+                // --- 3. KROK: KONTROLA KOMBINÁCIE ZBRANE A SCHOPNOSTI ---
+                if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                    const skillData = SKILLS_DB[selectedSkillName];
+                    
+                    // --- ZABEZPEČENIE PROTI ÚTOKU BEZ ZBRANE ---
+                    if (skillData) {
+                        const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
+                        
+                        if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
+                            if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
+                                log(`⚠️ Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
                                 return; // Zablokuje ťah
                             }
                         }
                     }
-                }
-            }
 
-            // Dynamické zistenie kategórie zbrane (BOJ Z DIAĽKY / BOJ ZBLÍZKA / VRHACIE)
-            let weaponCategory = "";
-            for (const category in WEAPON_LIST) {
-                if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                    weaponCategory = category.toUpperCase();
-                    break;
-                }
-            }
-
-            if (skillData && skillData[1]) {
-                const skillCategory = skillData[1].toUpperCase();
-                
-                // STRIKTNÉ PRAVIDLO: Zbraň na diaľku vyžaduje skill obsahujúci "BOJ Z DIAĽKY" (okrem Vrhania/Ťažkých predmetov)
-                if (weaponCategory === "BOJ Z DIAĽKY") {
-                    if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
-                        if (!skillCategory.includes("BOJ Z DIAĽKY")) {
-                            log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
+                    // Kontrola WEAPON_SKILLS - Či zvolená schopnosť prislúcha sile zbrane
+                    if (selectedWeaponName !== "placeholder") {
+                        // Využijeme už vypočítanú hodnotu premennej weapon z Kroku 0.A.
+                        const weaponAllowed = WEAPON_SKILLS[String(weapon)] || [];
+                        const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
+                        if (allowedSkills && !allowedSkills.includes(upperSkill)) {
+                            log(`⚠️ Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje zbraň s intenzitou ${weapon})!`, "error-msg");
                             return;
+                        }
+
+                        if (skillData && skillData[1]) {
+                            const skillCategory = skillData[1].toUpperCase();
+                            
+                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                                if (skillCategory === "BOJ ZBLÍZKA" || skillCategory === "BOJ Z DIAĽKY") {
+                                    if (!WEAPON_LIST[skillCategory] || WEAPON_LIST[skillCategory][selectedWeaponName] === undefined) {
+                                        log(`⚠️ Zbraň ${selectedWeaponName.toUpperCase()} nie je vhodná pre schopnosť ${upperSkill}!`, "error-msg");
+                                        return; // Zablokuje ťah
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    // Dynamické zistenie kategórie zbrane (BOJ Z DIAĽKY / BOJ ZBLÍZKA / VRHACIE)
+                    let weaponCategory = "";
+                    for (const category in WEAPON_LIST) {
+                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                            weaponCategory = category.toUpperCase();
+                            break;
+                        }
+                    }
+
+                    if (skillData && skillData[1]) {
+                        const skillCategory = skillData[1].toUpperCase();
+                        
+                        // STRIKTNÉ PRAVIDLO: Zbraň na diaľku vyžaduje skill obsahujúci "BOJ Z DIAĽKY" (okrem Vrhania/Ťažkých predmetov)
+                        if (weaponCategory === "BOJ Z DIAĽKY") {
+                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                                if (!skillCategory.includes("BOJ Z DIAĽKY")) {
+                                    log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
+                                    return;
+                                }
+                            }
+                        }
+                        
+                        // STRIKTNÉ PRAVIDLO: Zbraň na blízko vyžaduje skill obsahujúci "BOJ ZBLÍZKA"
+                        if (weaponCategory === "BOJ ZBLÍZKA") {
+                            if (!skillCategory.includes("BOJ ZBLÍZKA")) {
+                                log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
+                                return;
+                            }
                         }
                     }
                 }
-                
-                // STRIKTNÉ PRAVIDLO: Zbraň na blízko vyžaduje skill obsahujúci "BOJ ZBLÍZKA"
-                if (weaponCategory === "BOJ ZBLÍZKA") {
-                    if (!skillCategory.includes("BOJ ZBLÍZKA")) {
-                        log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
-                        return;
-                    }
-                }
-            }
-        }
 
-        // --- 4. KROK: KONTROLA MUNÍCIE ---
-        if (actionType === "A" && selectedWeaponName !== "placeholder") {
-            if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                
-                const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
-                const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
-
-                if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                    const currentAmmo = HERO["ammo"][selectedWeaponName];
-
-                    if (currentAmmo === undefined || currentAmmo <= 0) {
-                        log(`⚠️ Nemáš muníciu (alebo zásobu) pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
-                        return;
-                    }
-
-                    HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
-                    log(`Munície pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
-                }
-            }
-        }
-        
-        // --- 5. KROK: REŽIMY PRENASLEDOVANIA A ÚNIKU (CHASE / ESCAPE) ---
-        if (chase_mode || player_escaping || enemy_escaping) {
-
-            if (player_escaping) {
-                if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-                    if (!CHASE_SKILLS.includes(upperSkill)) {
-                        log(`⚠️ Na únik nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
-                        return;
-                    }
-                }
-                handleConflictInput(actionType, cardCode);
-                return;
-            }
-            
-            if (enemy_escaping) {
-                if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-                    if (!CHASE_SKILLS.includes(upperSkill)) {
-                        log(`⚠️ Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
-                        return;
-                    }
-                }
-
-                if (actionType === "A") {
-                    if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
-                        if (enemy_escape_counter >= 1) {
-                            log(`⚠️ Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko. Vyber si zbraň alebo zvoľ ČIN.`, "error-msg");
-                            return;
-                        }
-                    } else {
-                        const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                // --- 4. KROK: KONTROLA MUNÍCIE ---
+                if (actionType === "A" && selectedWeaponName !== "placeholder") {
+                    if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
+                        
+                        const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
                         const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
                         const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
-                        const isThrownAttack = isThrownWeapon && isThrownSkill;
-                        
-                        const canAttackAtDistance = isRanged || isThrownAttack;
-                        
-                        if (canAttackAtDistance || enemy_escape_counter < 1) {
-                            // Útok povolený
-                        } else {
-                            if (isThrownWeapon && !isThrownSkill) {
-                                log(`⚠️ Nepriateľ je príliš ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
-                            } else {
-                                log(`⚠️ Nepriateľ je príliš ďaleko! Použi zbraň na diaľku, alebo zvoľ ČIN.`, "error-msg");
+
+                        if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                            const currentAmmo = HERO["ammo"][selectedWeaponName];
+
+                            if (currentAmmo === undefined || currentAmmo <= 0) {
+                                log(`⚠️ Nemáš muníciu (alebo zásobu) pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
+                                return;
                             }
-                            return;
+
+                            HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
+                            log(`Munície pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
                         }
                     }
                 }
-                handleConflictInput(actionType, cardCode);
-                return;
-            }
-        }
+                
+                // --- 5. KROK: REŽIMY PRENASLEDOVANIA A ÚNIKU (CHASE / ESCAPE) ---
+                if (chase_mode || player_escaping || enemy_escaping) {
 
-        // Vykonanie akcie za štandardných podmienok v boji
-        handleConflictInput(actionType, cardCode);
-    } 
-    // =========================================================================
-    // 4. REŽIM MIMO BOJA (KLIKNUTIE NA CELÚ KARTU)
-    // =========================================================================
-    else {
-        // Načítanie elementov dropdownov a ich hodnôt
-        const skillDropdown = document.getElementById("player-skill-dropdown");
-        const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
-        const weaponDropdown = document.getElementById("player-weapon-dropdown");
-        const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
-        
-        // Aktualizácia premennej weapon mimo boja
-        if (!selectedWeaponName || selectedWeaponName === "placeholder") {
-            weapon = 0;
-        } else {
-            let foundDamage = 0;
-            for (const category in WEAPON_LIST) {
-                if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                    foundDamage = WEAPON_LIST[category][selectedWeaponName];
-                    break;
+                    if (player_escaping) {
+                        if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                            if (!CHASE_SKILLS.includes(upperSkill)) {
+                                log(`⚠️ Na únik nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
+                                return;
+                            }
+                        }
+                        handleConflictInput(actionType, cardCode);
+                        return;
+                    }
+                    
+                    if (enemy_escaping) {
+                        if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                            if (!CHASE_SKILLS.includes(upperSkill)) {
+                                log(`⚠️ Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
+                                return;
+                            }
+                        }
+
+                        if (actionType === "A") {
+                            if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
+                                if (enemy_escape_counter >= 1) {
+                                    log(`⚠️ Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko. Vyber si zbraň alebo zvoľ ČIN.`, "error-msg");
+                                    return;
+                                }
+                            } else {
+                                const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                                const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
+                                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                                const isThrownAttack = isThrownWeapon && isThrownSkill;
+                                
+                                const canAttackAtDistance = isRanged || isThrownAttack;
+                                
+                                if (canAttackAtDistance || enemy_escape_counter < 1) {
+                                    // Útok povolený
+                                } else {
+                                    if (isThrownWeapon && !isThrownSkill) {
+                                        log(`⚠️ Nepriateľ je príliš ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
+                                    } else {
+                                        log(`⚠️ Nepriateľ je príliš ďaleko! Použi zbraň na diaľku, alebo zvoľ ČIN.`, "error-msg");
+                                    }
+                                    return;
+                                }
+                            }
+                        }
+                        handleConflictInput(actionType, cardCode);
+                        return;
+                    }
                 }
+
+                // Vykonanie akcie za štandardných podmienok v boji
+                handleConflictInput(actionType, cardCode);
+            } 
+            // =========================================================================
+            // 4. REŽIM MIMO BOJA (KLIKNUTIE NA CELÚ KARTU)
+            // =========================================================================
+            else {
+                // Načítanie elementov dropdownov a ich hodnôt
+                const skillDropdown = document.getElementById("player-skill-dropdown");
+                const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+                const weaponDropdown = document.getElementById("player-weapon-dropdown");
+                const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
+                
+                // Aktualizácia premennej weapon mimo boja
+                if (!selectedWeaponName || selectedWeaponName === "placeholder") {
+                    weapon = 0;
+                } else {
+                    let foundDamage = 0;
+                    for (const category in WEAPON_LIST) {
+                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                            foundDamage = WEAPON_LIST[category][selectedWeaponName];
+                            break;
+                        }
+                    }
+                    weapon = foundDamage;
+                }
+
+                // Aktualizácia premennej skill mimo boja
+                if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                    skill = HERO.skills[selectedSkillName] || 0;
+                } else {
+                    skill = 0;
+                }
+
+                resolveActionPhase(cardCode);
             }
-            weapon = foundDamage;
-        }
-
-        // Aktualizácia premennej skill mimo boja
-        if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-            skill = HERO.skills[selectedSkillName] || 0;
-        } else {
-            skill = 0;
-        }
-
-        resolveActionPhase(cardCode);
-    }
-});
+        });
 
 
         document.getElementById("escape-btn").addEventListener("click", function() {
@@ -5235,6 +5367,24 @@ document.getElementById("card-tray-container").addEventListener("click", functio
 
             // 4. Prekreslenie UI (posun červeného 'S' indikátora)
             updateUI();
+        }
+
+        function clearCardHoverHighlight() {
+            touchHoverActive = false;
+            touchPendingCardIdx = null;
+            touchClickSuppressed = false;
+            document.querySelectorAll("#card-tray-container .card-container").forEach(card => {
+                card.classList.remove("keyboard-hover");
+                card.children[0].classList.remove("keyboard-hover-zone");
+                card.children[1].classList.remove("keyboard-hover-zone");
+            });
+        }
+
+        function setCardHoverHighlight(idx) {
+            touchHoverActive = true;
+            touchPendingCardIdx = idx;
+            currentSelectedCardIdx = idx;
+            updateCardKeyboardHighlight();
         }
 
         function updateCardKeyboardHighlight() {
