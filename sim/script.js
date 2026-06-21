@@ -1,3 +1,7 @@
+        let keep_testing = false;
+        let test_mode = false;
+        let prev_challenge = null;
+        let stuck_counter = 0;
         let CHALLENGES = {};
         let ENEMY_TYPES = {};
         let HEROES = [];
@@ -8,10 +12,12 @@
         let hero_created = true;
         let gameOn = false;
         let stockHeroesData = [];
+        let combatLoopTimeout = null;
+        let readyPromptTimeout = null;
 
 
-        const MODE = "HARD"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = true;
+        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
+        const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
         let current_challenge_key = "START";
@@ -71,7 +77,7 @@
 
         ITEM_LIST = {
             "SLIVOVICA": {
-                "description":"Nakopne, ale aj upokojí.",
+                "description":"Vydezinfikuje zvnútra aj zvonku, nakopne, aj upokojí.",
                 "effect":"stress-1",
                 "message":"STRESS (-1) \n ALKOHOLIZMUS (+1) \n RIZIKO VZNIKU RAKOVINY (+1) \n RIZIKO CIRHÓZY PEČENE (+1)"
             },
@@ -95,7 +101,9 @@
                 "description": "Už 10 rokov po exspirácii. Snáď aspoň neuškodí, ak aj nepomôže.",
                 "effect":"stress-2",
                  "message":"STRESS (-2) \n Poriadne to páli, tak je ešte asi dobrá."
-
+            },
+            "ZDRAVOTNÉ POMÔCKY": {
+                "description": "Nevyhnutné pre poskytnutie prvej pomoci."
             }
         }
         window.ITEM_LIST = ITEM_LIST;
@@ -173,6 +181,9 @@
         let collapse_pending_target = null;
         let collapse_conflict_mode = false;
         let collapse_savedActionType = "D";
+        let collapse_action_done = false;
+        let is_heal_check = false;
+        let heal_attempts = 0;
 
         function enterCollapseConflictMode() {
             collapse_conflict_mode = true;
@@ -250,12 +261,13 @@
             }
 
             if (logs_pending.length > 0) {
-                if (logs_pending.length > 4) {
+                if (logs_pending.length > 2) {
                     // If too many logs are waiting, flush the backlog quickly.
                     activeLogTimeout = setTimeout(processQueue, 0);
                 } else {
                     const characterDelay = currentLog.message.length * 35;
-                    const finalDelay = Math.max(800, 400 + characterDelay);
+                    let finalDelay = Math.max(800, 400 + characterDelay);
+                    if (test_mode) {finalDelay = 100};
                     activeLogTimeout = setTimeout(processQueue, finalDelay);
                 }
             } else {
@@ -304,7 +316,9 @@
                 }
 
                 if (logs_pending.length > 0) {
-                    activeLogTimeout = setTimeout(flushNext, 80);
+                let delay = 0;
+                if (test_mode) {delay = 100} else {delay = 500};
+                    activeLogTimeout = setTimeout(flushNext, delay);
                 } else {
                     activeLogTimeout = null;
                     if (typeof onTerminalFinishedCallback === "function") {
@@ -319,35 +333,36 @@
         }
 
         document.getElementById("proceed-btn").addEventListener("click", function () {
-            if (!gameOn) return;
-            if (document.getElementById('hero-selection-overlay')) return; // Shared block
+            console.log("PROCEED_HANDLER: click detected");
+            if (!gameOn) {
+                console.log("PROCEED_HANDLER: gameOn is false, returning");
+                return;
+            }
+            if (document.getElementById('hero-selection-overlay')) {
+                console.log("PROCEED_HANDLER: hero-selection-overlay present, returning");
+                return;
+            }
+
+            // Queue is still processing - skip and let test() retry
+            if (logs_pending.length > 0 || isProcessingQueue) {
+                console.log("PROCEED_HANDLER: logs pending (" + logs_pending.length + ") or isProcessingQueue (" + isProcessingQueue + "), skipping - will retry");
+                return;
+            }
 
             const prompt = document.getElementById("proceed-prompt");
 
-            if (logs_pending.length > 0 || isProcessingQueue) {
-                isProcessingQueue = false; 
-                if (logs_pending.length > 0) {
-                    flushLogQueue();
-                } else {
-                    if (prompt) prompt.style.display = "none";
-                    inputs_frozen = true;
-                    const scrollRow = document.querySelector('.card-scroll-row');
-                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
-                    executeProceedTransition();
-                }
-            } else {
-                // Fallback matching the spacebar logic when log queue is empty
-                if (typeof activeLogTimeout !== 'undefined' && activeLogTimeout) {
-                    clearTimeout(activeLogTimeout);
-                    activeLogTimeout = null;
-                }
-                isProcessingQueue = false; 
-                if (prompt) prompt.style.display = "none";
-                inputs_frozen = true;
-                const scrollRow = document.querySelector('.card-scroll-row');
-                if (scrollRow) scrollRow.classList.remove('enable-interaction');
-                executeProceedTransition();
+            // Queue is clear - proceed with transition
+            console.log("PROCEED_HANDLER: no logs pending, executing transition");
+            if (typeof activeLogTimeout !== 'undefined' && activeLogTimeout) {
+                clearTimeout(activeLogTimeout);
+                activeLogTimeout = null;
             }
+            if (prompt) prompt.style.display = "none";
+            inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+            console.log("PROCEED_HANDLER: calling executeProceedTransition");
+            executeProceedTransition();
         });
 
         // --- UNIFIED KEYBOARD CONTROLLER ---
@@ -372,7 +387,7 @@
             const cards = document.querySelectorAll("#card-tray-container .card-container");
             const trayContainer = document.getElementById("card-tray-container");
 
-            if (!inputs_frozen && !isChoiceVisible && !narrative_phase && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
+            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
                 if (cards.length === 0) return;
 
                 // =========================================================================
@@ -535,7 +550,11 @@
             // 2. DROPDOWN HOTKEY CYCLING (ONLY RUNS IF CONTROLS ARE NOT FROZEN)
             // =========================================================================
             if (gameOn) {
-                
+                if (e.key === 'h' || e.key === 'H') {
+                    e.preventDefault();
+                    runHealCheck();
+                    return;
+                }
                 // --- WEAPON SELECTOR: Q (Previous) / A (Next) ---
                 if (e.key === 'q' || e.key === 'Q') {
                     e.preventDefault();
@@ -565,6 +584,16 @@
             // 3. HIGH PRIORITY INTERCEPT: INTERACTION CHOICES PROMPT
             // =========================================================================
             if (isChoiceVisible) {
+                // If there are logs still queued/animating, ArrowRight (and Space) should
+                // flush them instead of cycling/selecting choices.
+                const hasPendingLogs = logs_pending.length > 0 || isProcessingQueue || activeLogTimeout;
+
+                if (hasPendingLogs && (e.code === 'ArrowRight' || e.code === 'Space')) {
+                    e.preventDefault();
+                    flushLogQueue();
+                    return;
+                }
+
                 const data = choicePrompt.userData;
                 if (data && data.validChoices) {
                     const count = data.validChoices.length;
@@ -591,7 +620,6 @@
                     }
                 }
             }
-
             // =========================================================================
             // 3. TERTIARY PRIORITY: PROMPT SPECIFIC SPACE CHECKS
             // =========================================================================
@@ -760,9 +788,15 @@
 
                 // Ak sme úspešne zosúladili buď plný alebo skrátený zápis
                 if (flagKey) {
-                    const currentFlagValue = (typeof FLAGS !== 'undefined' && flagKey in FLAGS) ? FLAGS[flagKey] : false;
+                    let currentFlagValue;
+                    if (typeof FLAGS !== 'undefined' && flagKey in FLAGS) {
+                        currentFlagValue = FLAGS[flagKey];
+                    } else if (typeof CHALLENGES !== 'undefined' && CHALLENGES["ACTIVE"] && flagKey in CHALLENGES["ACTIVE"]) {
+                        currentFlagValue = CHALLENGES["ACTIVE"][flagKey];
+                    } else {
+                        currentFlagValue = false;
+                    }
                     let conditionPassed = false;
-
                     let processedCurrent = currentFlagValue;
                     let processedTarget = rawValue;
 
@@ -770,7 +804,12 @@
                     else if (rawValue.toLowerCase() === 'false') processedTarget = false;
                     else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
 
-                    if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
+                    if (flagKey.toLowerCase().startsWith('item')) {
+                        const itemKey = flagKey.substring(4).replace(/_/g, ' ');
+                        processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
+                            ? HERO.items[itemKey]
+                            : 0;
+                    } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
                         processedCurrent = Number(currentFlagValue);
                     }
 
@@ -843,7 +882,6 @@
                 card.children[1].classList.remove("keyboard-hover-zone");
             });
 
-            // --- UPRAVENÝ BLOK PRE KONTROLU FLAGS (IF-ELSE PARSING) ---
             if (typeof caseTarget === 'string' && caseTarget.startsWith('if_')) {
                 ifCase(caseTarget);
                 return
@@ -861,7 +899,7 @@
                 const steps = parseInt(actualTarget.replace('BACK_ACTION_', ''), 10);
                 
                 if (isNaN(steps) || steps < 1 || challenge_history.length === 0) {
-                    log(`Warning: Invalid BACK_ACTION step count '${actualTarget}'`, "danger-msg", true);
+                    if (DEBUG) log(`Warning: Invalid BACK_ACTION step count '${actualTarget}'`, "danger-msg", true);
                     return;
                 }
 
@@ -870,7 +908,12 @@
                 const destination = challenge_history[targetHistoryIndex];
 
                 if (!destination) {
-                    log(`Warning: BACK_ACTION went past the beginning of history.`, "danger-msg", true);
+                    if (DEBUG) log(`Warning: BACK_ACTION went past the beginning of history.`, "danger-msg", true);
+                    return;
+                }
+
+                if (CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][destination] === false) {
+                    log("Už nie je možné ísť späť.", "danger-msg", true);
                     return;
                 }
 
@@ -909,23 +952,40 @@
                         // 1. Enemy check (unchanged)
                         if (typeof target === 'string' && CHALLENGES[target] && CHALLENGES[target].type) {
                             const enemyType = CHALLENGES[target].type;
-                            if (enemyType in ENEMY_TYPES) {
+                            const isInactiveEnemy = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false;
+
+                            if (enemyType in ENEMY_TYPES && !isInactiveEnemy) {
                                 const remainder = caseTarget.slice(i + 1);
                                 if (remainder.length > 0) {
                                     pending_challenge_key = remainder.length === 1 ? remainder[0] : remainder;
                                 }
                                 handleChallengeTransition(target);
                                 return;
+                            } else if (isInactiveEnemy) {
+                                if (DEBUG === true) {
+                                    log(`Enemy wrapper ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
+                                }
+                                i++;
+                                continue; // fall through to the next array element instead of freezing
                             }
                         } else if (target in ENEMY_TYPES) {
-                            const remainder = caseTarget.slice(i + 1);
-                            if (remainder.length > 0) {
-                                pending_challenge_key = remainder.length === 1 ? remainder[0] : remainder;
-                            }
-                            handleChallengeTransition(target);
-                            return;
-                        }
+                            const isInactiveEnemy = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false;
 
+                            if (!isInactiveEnemy) {
+                                const remainder = caseTarget.slice(i + 1);
+                                if (remainder.length > 0) {
+                                    pending_challenge_key = remainder.length === 1 ? remainder[0] : remainder;
+                                }
+                                handleChallengeTransition(target);
+                                return;
+                            } else {
+                                if (DEBUG === true) {
+                                    log(`Enemy ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
+                                }
+                                i++;
+                                continue; // fall through to the next array element instead of freezing
+                            }
+                        }
                         // 2. Kontrola, či ide o klasickú modifikáciu (bezo zmien)
                         const isModification = typeof target === 'string' && (
                             target.includes('+') ||
@@ -962,6 +1022,19 @@
                             // keep looping bez toho, aby sme zahltili stack volaním handleChallengeTransition znova
                         }
                         else {
+                            // Terminal item — but check if it's inactive first.
+                            // If inactive, skip it and let the loop try the next item
+                            // (e.g. SHACK_1 -> if disabled -> fall through to SHACK_2)
+                            const isInactiveTarget = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false;
+
+                            if (isInactiveTarget) {
+                                if (DEBUG === true) {
+                                    log(`Target ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
+                                }
+                                i++;
+                                continue; // try next element instead of stopping
+                            }
+
                             // Terminal item — hand off and stop
                             i++;
                             onTerminalFinishedCallback = null;
@@ -983,7 +1056,6 @@
                 if (enemyType in ENEMY_TYPES) {
                     instanceKey = actualTarget; 
                     pre_encounter_challenge_key = current_challenge_key; 
-
                     actualTarget = enemyType;   
                 }
             }
@@ -1119,8 +1191,6 @@
                         gameloop(false);
                     });
                 }
-                if(DEBUG) log (`After combat: ${current_challenge_key}`)
-                // ========================================================================= 
                 return;
             }
 
@@ -1143,13 +1213,21 @@
                 
                 const activeChallenge = CHALLENGES[actualTarget];
 
+
                 if (activeChallenge && activeChallenge.next) {
                     proceed(activeChallenge.next);
+                    if (test_mode && !keep_testing) {
+                        keep_testing = true;
+                        test();
+                    }
                     return; 
                 }
                 
-                // --- CLEANED: Replaced with clean centralized helper call ---
                 renderChallengeChoices(activeChallenge);
+                if (test_mode && !keep_testing) {
+                    keep_testing = true;
+                    test();
+                }
                 return;
             }
 
@@ -1300,6 +1378,7 @@
                     
                     if (modifier > 0) {
                         log(`Stúpol ti stres o ${amount}!`, "danger-msg");
+                        heal_attempts = 0;
                     } else {
                         log(`Stres ti klesol o ${amount}.`, "success-msg");
                     }
@@ -1543,7 +1622,10 @@
 
             if (effectTarget === "stress") {
                 HERO.stress = Math.max(0, HERO.stress + modifier);
-                if(modifier<0) flashRed();
+                if(modifier<0) {
+                    flashRed();
+                    heal_attempts = 0
+                }
                 log(modifier < 0 
                     ? `Stres ti klesol o ${amount}. (${HERO.stress})` 
                     : `Stres ti stúpol o ${amount}. (${HERO.stress})`, 
@@ -1585,11 +1667,16 @@
             }
 
             if (activeChallenge.back === true && challenge_history.length > 0) {
-                validChoices.push({
-                    text: "⬅",
-                    target: "BACK_ACTION_1", 
-                    isBack: true
-                });
+                const backDestination = challenge_history[challenge_history.length - 1];
+                const backDestinationInactive = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][backDestination] === false;
+
+                if (!backDestinationInactive) {
+                    validChoices.push({
+                        text: "⬅",
+                        target: "BACK_ACTION_1",
+                        isBack: true
+                    });
+                }
             }
 
             suffixes.forEach(suff => {
@@ -1621,8 +1708,8 @@
                     choicePrompt.id = "choice-prompt";
                     choicePrompt.style.cssText = `
                         position: absolute; bottom: 2%; left: 0; right: 0; margin: 0 auto;
-                        padding: 10px; display: flex; flex-wrap: wrap;
-                        justify-content: center; gap: 10px; z-index: 200; max-width: 650px;
+                        padding: 20px 20px 20px 90px; display: flex; flex-wrap: wrap;
+                        justify-content: center; gap: 10px; z-index: 200; max-width: 100%;
                     `;
                     document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
                 }
@@ -1639,27 +1726,14 @@
                     
                     // Set base styling matching your custom specs
                     if (choice.isBack) {
-                        const isMobile = window.matchMedia("(max-width: 768px)").matches;
 
-                        if (isMobile) {
-                            // Mobile style: Pulls it into a full block width or centers it neatly above/below
-                            btn.style.cssText = `
-                                width: 60px;
-                                margin-bottom: 4px;
-                                height: 46px; 
-                                border-radius: 9px;
-                                background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
-                                color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
-                            `;
-                        } else {
-                            // Desktop style: Glued safely to the absolute left side
-                            btn.style.cssText = `
-                                position: absolute; bottom: 10px; left: -20px; height: 46px;
-                                white-space: nowrap; padding: 0 16px; border-radius: 9px;
-                                background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
-                                color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
-                            `;
-                        }
+                        btn.style.cssText = `
+                            position: absolute; bottom: 0; left: 0; width: 60px; height: 46px;
+                            margin-left:10px;
+                            border-radius: 9px;
+                            background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
+                            color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
+                        `;
                     } else {
                         btn.style.cssText = `
                             height: 46px; white-space: nowrap; padding: 0 16px; border-radius: 9px;
@@ -1691,6 +1765,10 @@
 
                 choicePrompt.style.display = "flex";
                 updateVisualChoiceHighlights(); // Apply initial first element highlight state
+                if (test_mode && !keep_testing) {
+                    keep_testing = true;
+                    test();
+                }
             } else {
                 updateUI();
             }
@@ -1766,7 +1844,6 @@
         function toggleChallengeDisplay(show, data = null) {
             const challengeDisplay = document.getElementById("challenge-stats-display");
             if (!challengeDisplay) return;
-
             if (show) {
                 if (data) {
                     challengeDisplay.innerHTML = `
@@ -1780,6 +1857,7 @@
                 
                 // 2. Force a quick browser reflow so it registers display: flex BEFORE animating
                 void challengeDisplay.offsetWidth; 
+                
                 
                 // 3. Slide it down
                 challengeDisplay.classList.add("show");
@@ -1816,10 +1894,14 @@
             hidecards(true);
 
             const enemyContainer = document.getElementById("enemy-sprite-container");
+            const enemyImg = document.getElementById("enemy-sprite");
+
             if (enemyContainer) {
                 enemyContainer.style.display = "none";
                 enemyContainer.classList.remove("enemy-entrance", "enemy-hit");
             }
+
+            if (enemyImg) enemyImg.src = "";
 
             const tableFloor = document.querySelector('.gaming-table-floor');
             if (tableFloor) {
@@ -1833,20 +1915,33 @@
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
-                // --- Check for and execute matched delayed triggers ---
                 if (activeChallenge.trigger_delayed && Array.isArray(activeChallenge.trigger_delayed)) {
                     for (const effect of activeChallenge.trigger_delayed) {
                         const delayedIndex = DELAYED.indexOf(effect);
                         if (delayedIndex !== -1) {
                             DELAYED.splice(delayedIndex, 1);
+
+                            // NEW: don't commit to this redirect if the target is inactive —
+                            // treat it as already consumed/no-op and keep checking the
+                            // node's own normal flow instead of silently freezing.
+                            const targetIsInactive = typeof effect === 'string' &&
+                                CHALLENGES["ACTIVE"] &&
+                                CHALLENGES["ACTIVE"][effect] === false;
+
+                            if (targetIsInactive) {
+                                if (DEBUG === true) {
+                                    log(`Delayed target ${effect} je neaktívny, ignorujem a pokračujem normálne.`);
+                                }
+                                continue; // try any remaining trigger_delayed entries, then fall through
+                            }
+
                             handleChallengeTransition(effect);
                             if (!effect.includes("+")) {
-                                return true; 
+                                return true;
                             }
                         }
                     }
                 }
-
                 const challengeDisplay = document.getElementById("challenge-stats-display");
                 
                 // --- CORE DETERMINISTIC DISTINCTION ---
@@ -1921,7 +2016,11 @@
 
                 // If it's a narrative choice node with NO multi-message queue, automatically process its choices immediately
                 if (!is_action_phase) {
-                    renderChallengeChoices(activeChallenge);
+                    if (activeChallenge.next) {
+                        proceed(activeChallenge.next);
+                    } else {
+                        renderChallengeChoices(activeChallenge);
+                    }
                     return true;
                 }
 
@@ -1953,6 +2052,12 @@
             }
         }
 
+        function pushDelayed(effect) {
+            if (!effect) return;
+            if (!DELAYED.includes(effect)) {
+                DELAYED.push(effect);
+            }
+        }
 
         // Sledovanie výberu schopnosti hráčom (mimo boja aj počas boja)
         document.getElementById("player-skill-dropdown").addEventListener("change", function(e) {
@@ -2155,8 +2260,6 @@
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }
-
-        
 
         function updateUI() {
             document.getElementById("player-advantage").innerText = advantage;
@@ -2381,7 +2484,7 @@
                         // Slide down and update content
                         toggleChallengeDisplay(true, activeChallenge);
                         is_action_phase = true;
-                    } else if (is_collapse_check) {
+                    } else if (is_collapse_check || is_heal_check) {
                         // Slide down without wiping out content
                         toggleChallengeDisplay(true);
                     } else {
@@ -2425,7 +2528,7 @@
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
             updateUI();
-
+            if (test_mode) skill = 5;
             const activeChallenge = CHALLENGES[current_challenge_key];
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let roll_result = rollDice(card, false, skill);
@@ -2484,7 +2587,6 @@
             // Helper function to handle threat post-processing (mods & transitions)
             const runThreatPostProcessing = () => {
                 resetAdrenalineSelection();
-                inputs_frozen = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
                 if (threat_realized) {
@@ -2591,7 +2693,6 @@
             } else {
                 // If there is no threat evaluation required, proceed immediately
                 resetAdrenalineSelection();
-                inputs_frozen = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
 
@@ -2604,11 +2705,14 @@
         }
 
         function gameloop(success = true) {
+            let delay = 0;
+            if (test_mode) {delay = 100} else {delay = 1000};
+
             if (enemy === null) {
                 if (success) {
                     setTimeout(() => {
                     runActionPhase();
-                    },500)
+                    },Math.max(100,delay - 500))
                 } else {
                     // Fail-safe fallback if state engine defaults
                     enemy = "Skautka";
@@ -2619,135 +2723,50 @@
                     combat_starter = null;
                     setTimeout(() => {
                     runConflictTurn();
-                    },1000)
+                    },delay)
                 }
             } else {
                 setTimeout(() => {
                 runConflictTurn();
-                },300)
+                },Math.max(100,delay - 700))
             }
         }
 
-function resolveConflict() {
-    let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
 
-    let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
-    let player_roll = rollDice(player_action[1], player_action[0] === "A", skill, false);
-    let stress_increased = false;
-    
-    let p_adv_mod = advantage;
-    let p_ad_mod = adrenaline;
-    let e_adv_mod = enemy_advantage;
+        function resolveConflict() {
+            inputs_frozen = true;
+            if (test_mode) {skill = 10; weapon = 3};
+            let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
 
-    let p_adv_text = p_adv_mod > 0 ? `+${p_adv_mod}` : "";
-    let p_ad_text = p_ad_mod > 0 ? `+${p_ad_mod}` : "";
-    let e_adv_text = e_adv_mod > 0 ? `+${e_adv_mod}` : "";
-
-    let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
-    let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
-
-    log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg", true);
-
-    enemy_roll += enemy_advantage;
-    player_roll += (advantage + adrenaline); 
-
-    resetAdrenalineSelection();
-
-    // === CHASE MODE / BOTH ESCAPING ===
-    if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
-        log(`\n🏃Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
-        
-        enemy_escape_counter += 2;
-        log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
-        
-        inputs_frozen = true;
-        const scrollRow = document.querySelector('.card-scroll-row');
-        if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
-        updateUI();
-        
-        onTerminalFinishedCallback = () => {
-            const enemyContainer = document.getElementById("enemy-sprite-container");
-            if (enemyContainer) enemyContainer.style.display = "none";
+            let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
+            let player_roll = rollDice(player_action[1], player_action[0] === "A", skill, false);
+            let stress_increased = false;
             
-            let activeChallenge = CHALLENGES[current_challenge_key];
-            
-            if (activeChallenge && activeChallenge.enemy_escape_delayed) {
-                if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
-                    DELAYED.push(...activeChallenge.enemy_escape_delayed);
-                } else if (activeChallenge.enemy_escape_delayed !== "") {
-                    DELAYED.push(activeChallenge.enemy_escape_delayed);
-                }
-            }
-            
-            if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
-                CHALLENGES[enemy_id].saved_stress = enemy_stress;
-            }
+            let p_adv_mod = advantage;
+            let p_ad_mod = adrenaline;
+            let e_adv_mod = enemy_advantage;
 
-            enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
-            player_escape_counter = 0; enemy_escape_counter = 0;
-            enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-            player_action = null; enemy_action = null; is_conflict = false;
+            let p_adv_text = p_adv_mod > 0 ? `+${p_adv_mod}` : "";
+            let p_ad_text = p_ad_mod > 0 ? `+${p_ad_mod}` : "";
+            let e_adv_text = e_adv_mod > 0 ? `+${e_adv_mod}` : "";
 
-            if (activeChallenge && activeChallenge.enemy_escape) {
-                proceed(activeChallenge.enemy_escape);
-            } else if (pending_challenge_key) {
-                let nextChallenge = pending_challenge_key; 
-                pending_challenge_key = null; 
-                proceed(nextChallenge);
-            } else {
-                proceed(activeChallenge.case_success);
-            }
-        };
+            let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
+            let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
 
-        if (!isProcessingQueue) {
-            const callback = onTerminalFinishedCallback;
-            onTerminalFinishedCallback = null;
-            callback();
-        }
-        
-        return; 
-    }
+            log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg", true);
 
-    if (chase_mode) {
-        if (player_escaping && player_action[0] === "A") {
-            log(`\n⚔️ Zaútočil si počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg");
-            chase_mode = false;
-            player_escaping = false;
-            player_escape_counter = 0;
-        }
-        else if (enemy_escaping && enemy_action[0] === "A") {
-            log(`\n⚔️ Protivník sa otočil a útočí na teba!`, "info-msg");
-            chase_mode = false;
-            enemy_escaping = false;
-            enemy_escape_counter = 0;
-        }
-    }
+            enemy_roll += enemy_advantage;
+            player_roll += (advantage + adrenaline); 
 
-    if (chase_mode) {
-        if (player_escaping) {
-            if (player_roll > enemy_roll) {
-                player_escape_counter++;
-                log(`🏃 Úspešný únikový manéver! (Únik: ${player_escape_counter}/2)`, "success-msg");
-            } 
-            else if (enemy_roll > player_roll) {
-                if (enemy_action[0] === "A") {
-                    if (player_escape_counter < 1) {
-                        log(`🎯 Protivník ťa zasiahol počas úteku!`, "warning-msg");
-                    } else {
-                        log(`🎯 Protivník ťa trafil nadiaľku počas úteku!`, "warning-msg");
-                    }
-                } else {
-                    player_escape_counter = Math.max(0, player_escape_counter - 1);
-                    log(`⚠️ Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg");
-                }
-            }
-            else {
-                log(`🏃 Prenasledovanie pokračuje, držíš si odstup. (Únik: ${player_escape_counter}/2)`, "info-msg");
-            }
+            resetAdrenalineSelection();
 
-            if (player_escape_counter >= 2) {
-                log(`\n Úspešne ujdeš z boja!`, "success-msg");
+            // === CHASE MODE / BOTH ESCAPING ===
+            if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
+                log(`\n🏃Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
+                
+                enemy_escape_counter += 2;
+                log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
+                
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -2756,101 +2775,21 @@ function resolveConflict() {
                 
                 onTerminalFinishedCallback = () => {
                     const enemyContainer = document.getElementById("enemy-sprite-container");
-                    if (enemyContainer) enemyContainer.style.display = "none";
-                    let activeChallenge = CHALLENGES[current_challenge_key];
+                    const enemyImg = document.getElementById("enemy-sprite");
 
-                    if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
-                        CHALLENGES[enemy_id].saved_stress = enemy_stress;
-                    }
+                    if (enemyContainer) enemyContainer.style.display = "none";
+                    if (enemyImg) enemyImg.src = "";
                     
-                    const bothEscaping = player_escaping && enemy_escaping;
-                    enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
-                    player_escape_counter = 0; enemy_escape_counter = 0;
-                    enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                    player_action = null; enemy_action = null; is_conflict = false;
-
-                    if (bothEscaping) {
-                        pre_encounter_challenge_key = null;
-                        if (pending_challenge_key) {
-                            let nextChallenge = pending_challenge_key; 
-                            pending_challenge_key = null; 
-                            proceed(nextChallenge);
-                        } else if (activeChallenge && activeChallenge.case_success) {
-                            proceed(activeChallenge.case_success);
-                        }
-                    } 
-                    else if (pre_encounter_challenge_key) {
-                        let stepsToRetreat = 1; 
-                        if (CHALLENGES[pre_encounter_challenge_key] && CHALLENGES[pre_encounter_challenge_key].type && CHALLENGES[pre_encounter_challenge_key].type in ENEMY_TYPES) {
-                            stepsToRetreat = 2;
-                        }
-                        
-                        pre_encounter_challenge_key = null;
-                        pending_challenge_key = null;
-
-                        document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
-                        const enemyCardContainer = document.getElementById("enemy-card-container");
-                        if (enemyCardContainer) enemyCardContainer.innerHTML = "";
-                        const playerCardContainer = document.getElementById("player-card-container");
-                        if (playerCardContainer) playerCardContainer.innerHTML = "";
-                        
-                        handleChallengeTransition('BACK_ACTION_' + stepsToRetreat);
-                    } 
-                    else if (pending_challenge_key) {
-                        let nextChallenge = pending_challenge_key; 
-                        pending_challenge_key = null; 
-                        proceed(nextChallenge);
-                    } else if (activeChallenge && activeChallenge.case_success) {
-                        proceed(activeChallenge.case_success);
-                    }
-                };
-
-                if (!isProcessingQueue) {
-                    const callback = onTerminalFinishedCallback;
-                    onTerminalFinishedCallback = null;
-                    callback();
-                }
-                return;
-            }
-        }
-        else if (enemy_escaping) {
-            if (enemy_roll > player_roll) {
-                enemy_escape_counter++;
-                log(`🏃 ${enemy.toUpperCase()} sa ti vzďaľuje! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "danger-msg");
-            } 
-            else if (player_roll > enemy_roll) {
-                if (player_action[0] === "A") {
-                    log(`🎯 Triafaš unikajúceho nepriateľa!`, "success-msg");
-                } else {
-                    enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                    log(`🛑 Dobiehaš nepriateľa a skracuješ odstup! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "success-msg");
-                }
-            }
-            else {
-                log(`🏃 Držíte si rovnaké tempo. (Únik nepriateľa: ${enemy_escape_counter}/2)`, "info-msg");
-            }
-
-            if (enemy_escape_counter >= 2) {
-                log(`\n🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
-                HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                log(`Získavaš 1 BR.`, "success-msg");
-                inputs_frozen = true;
-                const scrollRow = document.querySelector('.card-scroll-row');
-                if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
-                updateUI();
-                onTerminalFinishedCallback = () => {
-                    const enemyContainer = document.getElementById("enemy-sprite-container");
-                    if (enemyContainer) enemyContainer.style.display = "none";
-                    let activeChallenge = CHALLENGES[current_challenge_key];                            
+                    let activeChallenge = CHALLENGES[current_challenge_key];
+                    
                     if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                         if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
-                            DELAYED.push(...activeChallenge.enemy_escape_delayed);
+                            activeChallenge.enemy_escape_delayed.forEach(pushDelayed);
                         } else if (activeChallenge.enemy_escape_delayed !== "") {
-                            DELAYED.push(activeChallenge.enemy_escape_delayed);
+                            pushDelayed(activeChallenge.enemy_escape_delayed);
                         }
                     }
-
+                    
                     if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
                         CHALLENGES[enemy_id].saved_stress = enemy_stress;
                     }
@@ -2876,115 +2815,438 @@ function resolveConflict() {
                     onTerminalFinishedCallback = null;
                     callback();
                 }
+                
+                return; 
+            }
+
+            if (chase_mode) {
+                if (player_escaping && player_action[0] === "A") {
+                    log(`\n⚔️ Zaútočil si počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg");
+                    chase_mode = false;
+                    player_escaping = false;
+                    player_escape_counter = 0;
+                }
+                else if (enemy_escaping && enemy_action[0] === "A") {
+                    log(`\n⚔️ Protivník sa otočil a útočí na teba!`, "info-msg");
+                    chase_mode = false;
+                    enemy_escaping = false;
+                    enemy_escape_counter = 0;
+                }
+            }
+
+            if (chase_mode) {
+                if (player_escaping) {
+                    if (player_roll > enemy_roll) {
+                        player_escape_counter++;
+                        log(`🏃 Úspešný únikový manéver! (Únik: ${player_escape_counter}/2)`, "success-msg");
+                    } 
+                    else if (enemy_roll > player_roll) {
+                        if (enemy_action[0] === "A") {
+                            if (player_escape_counter < 1) {
+                                log(`🎯 Protivník ťa zasiahol počas úteku!`, "warning-msg");
+                            } else {
+                                log(`🎯 Protivník ťa trafil nadiaľku počas úteku!`, "warning-msg");
+                            }
+                        } else {
+                            player_escape_counter = Math.max(0, player_escape_counter - 1);
+                            log(`⚠️ Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg");
+                        }
+                    }
+                    else {
+                        log(`🏃 Prenasledovanie pokračuje, držíš si odstup. (Únik: ${player_escape_counter}/2)`, "info-msg");
+                    }
+
+                    if (player_escape_counter >= 2) {
+                        log(`\n Úspešne ujdeš z boja!`, "success-msg");
+                        inputs_frozen = true;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+                        updateUI();
+                        
+                        onTerminalFinishedCallback = () => {
+                            const enemyContainer = document.getElementById("enemy-sprite-container");
+                            const enemyImg = document.getElementById("enemy-sprite");
+                            if (enemyImg) enemyImg.src = "";
+
+                            if (enemyContainer) enemyContainer.style.display = "none";
+                            let activeChallenge = CHALLENGES[current_challenge_key];
+
+                            if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
+                                CHALLENGES[enemy_id].saved_stress = enemy_stress;
+                            }
+                            
+                            const bothEscaping = player_escaping && enemy_escaping;
+                            enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                            player_escape_counter = 0; enemy_escape_counter = 0;
+                            enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                            player_action = null; enemy_action = null; is_conflict = false;
+
+                            if (bothEscaping) {
+                                pre_encounter_challenge_key = null;
+                                if (pending_challenge_key) {
+                                    let nextChallenge = pending_challenge_key; 
+                                    pending_challenge_key = null; 
+                                    proceed(nextChallenge);
+                                } else if (activeChallenge && activeChallenge.case_success) {
+                                    proceed(activeChallenge.case_success);
+                                }
+                            } 
+                            else if (pre_encounter_challenge_key) {
+                                let stepsToRetreat = 0; 
+                                let foundValidTarget = false;
+
+                                if (typeof challenge_history !== 'undefined' && challenge_history.length > 0) {
+                                    
+                                    // Prechádzame históriu od konca (od najnovších po najstaršie)
+                                    for (let i = challenge_history.length - 1; i >= 0; i--) {
+                                        stepsToRetreat++;
+                                        const historicalKey = challenge_history[i];
+                                        const historicalNode = CHALLENGES[historicalKey];
+
+                                        // 1. Kontrola na enemy wrapper (obsahuje vlastnosť 'type')
+                                        const isEnemyWrapper = historicalNode && typeof historicalNode.type !== 'undefined'; 
+
+                                        // 2. Kontrola na neaktívny challenge (presne podľa tvojej logiky z handleChallengeTransition)
+                                        const isInactiveChallenge = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][historicalKey] === false;
+
+                                        if (isEnemyWrapper || isInactiveChallenge) {
+                                            // Ak je to nepriateľ alebo neaktívny uzol, pokračujeme v hľadaní hlbšie do histórie
+                                            continue;
+                                        } else {
+                                            // Našli sme platný príbehový uzol, zastavíme hľadanie
+                                            foundValidTarget = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                // Bezpečný fallback: Ak by bola história prázdna alebo neobsahovala žiadny platný uzol
+                                if (!foundValidTarget) {
+                                    stepsToRetreat = 1;
+                                    if (CHALLENGES[pre_encounter_challenge_key] && CHALLENGES[pre_encounter_challenge_key].type) {
+                                        stepsToRetreat = 2;
+                                    }
+                                }
+                                
+                                // Vyčistenie dočasných stavových premenných
+                                pre_encounter_challenge_key = null;
+                                pending_challenge_key = null;
+
+                                // Vyčistenie DOM / UI elementov
+                                document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
+                                const enemyCardContainer = document.getElementById("enemy-card-container");
+                                if (enemyCardContainer) enemyCardContainer.innerHTML = "";
+                                const playerCardContainer = document.getElementById("player-card-container");
+                                if (playerCardContainer) playerCardContainer.innerHTML = "";
+                                
+                                // Zavolanie prechodu späť s dynamicky vypočítaným počtom krokov
+                                handleChallengeTransition('BACK_ACTION_' + stepsToRetreat);
+                            } 
+                            else if (pending_challenge_key) {
+                                let nextChallenge = pending_challenge_key; 
+                                pending_challenge_key = null; 
+                                proceed(nextChallenge);
+                            } else if (activeChallenge && activeChallenge.case_success) {
+                                proceed(activeChallenge.case_success);
+                            }
+                        };
+
+                        if (!isProcessingQueue) {
+                            const callback = onTerminalFinishedCallback;
+                            onTerminalFinishedCallback = null;
+                            callback();
+                        }
+                        return;
+                    }
+                }
+                else if (enemy_escaping) {
+                    if (enemy_roll > player_roll) {
+                        enemy_escape_counter++;
+                        log(`🏃 ${enemy.toUpperCase()} sa ti vzďaľuje! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "danger-msg");
+                    } 
+                    else if (player_roll > enemy_roll) {
+                        if (player_action[0] === "A") {
+                            log(`🎯 Triafaš unikajúceho nepriateľa!`, "success-msg");
+                        } else {
+                            enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
+                            log(`🛑 Dobiehaš nepriateľa a skracuješ odstup! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "success-msg");
+                        }
+                    }
+                    else {
+                        log(`🏃 Držíte si rovnaké tempo. (Únik nepriateľa: ${enemy_escape_counter}/2)`, "info-msg");
+                    }
+
+                    if (enemy_escape_counter >= 2) {
+                        log(`\n🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
+                        HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                        log(`Získavaš 1 BR.`, "success-msg");
+                        inputs_frozen = true;
+                        const scrollRow = document.querySelector('.card-scroll-row');
+                        if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+                        updateUI();
+                        onTerminalFinishedCallback = () => {
+                            const enemyContainer = document.getElementById("enemy-sprite-container");
+                            if (enemyContainer) enemyContainer.style.display = "none";
+                            const enemyImg = document.getElementById("enemy-sprite");
+                            if (enemyImg) enemyImg.src = "";
+
+                            let activeChallenge = CHALLENGES[current_challenge_key];                            
+                            if (activeChallenge && activeChallenge.enemy_escape_delayed) {
+                                if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
+                                    activeChallenge.enemy_escape_delayed.forEach(pushDelayed);
+                                } else if (activeChallenge.enemy_escape_delayed !== "") {
+                                    pushDelayed(activeChallenge.enemy_escape_delayed);
+                                }
+                            }
+
+                            if (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].type) {
+                                CHALLENGES[enemy_id].saved_stress = enemy_stress;
+                            }
+
+                            enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                            player_escape_counter = 0; enemy_escape_counter = 0;
+                            enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                            player_action = null; enemy_action = null; is_conflict = false;
+
+                            if (activeChallenge && activeChallenge.enemy_escape) {
+                                proceed(activeChallenge.enemy_escape);
+                            } else if (pending_challenge_key) {
+                                let nextChallenge = pending_challenge_key; 
+                                pending_challenge_key = null; 
+                                proceed(nextChallenge);
+                            } else {
+                                proceed(activeChallenge.case_success);
+                            }
+                        };
+
+                        if (!isProcessingQueue) {
+                            const callback = onTerminalFinishedCallback;
+                            onTerminalFinishedCallback = null;
+                            callback();
+                        }
+                        return;
+                    }
+                }
+            }
+
+            let potential_player_damage = 0;
+            let potential_enemy_damage = 0;
+
+            if (player_roll >= enemy_roll && player_action[0] === "A") {
+                let enemy_caution = enemy_action[0] === "D" ? CARDS[enemy_action[1]][0][0] : 0;
+                potential_enemy_damage = Math.max(0, CARDS[player_action[1]][1][0] + weapon - enemy_caution); 
+            }
+
+            if (player_roll <= enemy_roll && enemy_action[0] === "A") {
+                let player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
+                potential_player_damage = Math.max(0, CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"] - player_caution);
+            }
+
+            if (potential_enemy_damage > 0) {
+                enemy_stress += potential_enemy_damage;
+                log(`Zvyšuješ protivníkovi stres o ${potential_enemy_damage}.`, "success-msg");
+                const enemyContainer = document.getElementById("enemy-sprite-container");
+                if (enemyContainer) {
+                    enemyContainer.classList.remove("enemy-hit");
+                    void enemyContainer.offsetWidth; 
+                    enemyContainer.classList.add("enemy-hit");
+                }
+            }
+
+            if (potential_player_damage > 0) {
+                HERO.stress += potential_player_damage;
+                heal_attempts = 0;
+                flashRed();
+                stress_increased = true;
+                log(`Stúpol ti stres o: ${potential_player_damage}.`, "failure-msg");
+            }
+
+            let player_collapse = HERO.stress > stress_thresh;
+            let enemy_dead = enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"];
+
+            // CASE A: Mutual Kill
+            if (player_collapse && enemy_dead) {
+                is_collapse_check = true; 
+                runCollapseCheck(() => {
+                    player_collapse = false; 
+
+                    HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                    log(`\n💥 Ustál si to! Hoci to bolo na hrane, ${enemy.toUpperCase()} padá a ty prežívaš! Získavaš 1 BR.`, "success-msg");
+                    inputs_frozen = true; 
+                    const scrollRow = document.querySelector('.card-scroll-row');
+                    if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+                    updateUI();
+
+                    onTerminalFinishedCallback = () => {
+                        const enemyImg = document.getElementById("enemy-sprite");
+                        if (enemyImg) enemyImg.src = "";
+
+                        const enemyContainer = document.getElementById("enemy-sprite-container");
+                        if (enemyContainer) enemyContainer.style.display = "none";
+
+                        let activeChallenge = CHALLENGES[enemy_id];
+                        if (enemy_id) { 
+                            CHALLENGES["ACTIVE"][enemy_id] = false; 
+                            if (activeChallenge && activeChallenge.on_death) {
+                                handleChallengeTransition(activeChallenge.on_death);
+                            }
+                        }
+
+                        enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                        enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                        player_action = null; enemy_action = null; is_conflict = false;
+
+                        if (pending_challenge_key) {
+                            let nextChallenge = pending_challenge_key; 
+                            pending_challenge_key = null; 
+                            proceed(nextChallenge); 
+                        } else {
+                            proceed(activeChallenge.case_success); 
+                        }
+                    };
+
+                    if (!isProcessingQueue) { 
+                        const callback = onTerminalFinishedCallback; 
+                        onTerminalFinishedCallback = null; 
+                        callback(); 
+                    }
+                });
                 return;
             }
-        }
-    }
 
-    let potential_player_damage = 0;
-    let potential_enemy_damage = 0;
+            // CASE B: Only Player Collapses
+            if (player_collapse) {
+                runCollapseCheck(() => {
+                    player_collapse = false; 
+                    if (player_escape_counter < 1){
+                        player_zero_counter += 1;
+                    } else {
+                        player_zero_counter = 0;
+                    }
 
-    if (player_roll >= enemy_roll && player_action[0] === "A") {
-        let enemy_caution = enemy_action[0] === "D" ? CARDS[enemy_action[1]][0][0] : 0;
-        potential_enemy_damage = Math.max(0, CARDS[player_action[1]][1][0] + weapon - enemy_caution); 
-    }
+                    if (enemy_escape_counter < 1){
+                        enemy_zero_counter += 1;
+                    } else {
+                        enemy_zero_counter = 0;
+                    }
 
-    if (player_roll <= enemy_roll && enemy_action[0] === "A") {
-        let player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
-        potential_player_damage = Math.max(0, CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"] - player_caution);
-    }
+                    if (!player_escaping){ 
+                        if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
+                            (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
+                            advantage += 1;
+                            log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
+                        } 
+                    }
+                    if (!enemy_escaping){
+                        if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
+                        (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
+                            // CRITICAL FIX HERE:
+                            enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
+                            log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
+                        }
+                    }
 
-    if (potential_enemy_damage > 0) {
-        enemy_stress += potential_enemy_damage;
-        log(`Zvyšuješ protivníkovi stres o ${potential_enemy_damage}.`, "success-msg");
-        const enemyContainer = document.getElementById("enemy-sprite-container");
-        if (enemyContainer) {
-            enemyContainer.classList.remove("enemy-hit");
-            void enemyContainer.offsetWidth; 
-            enemyContainer.classList.add("enemy-hit");
-        }
-    }
+                    if (player_action[0] === "D" && enemy_action[0] === "D") {
+                        const capturedPlayerAction = player_action;   
+                        const capturedEnemyAction = enemy_action;     
+                        const capturedPlayerRoll = player_roll;
+                        const capturedEnemyRoll = enemy_roll;
 
-    if (potential_player_damage > 0) {
-        HERO.stress += potential_player_damage;
-        flashRed();
-        stress_increased = true;
-        log(`Stúpol ti stres o: ${potential_player_damage}.`, "failure-msg");
-    }
+                        if (capturedPlayerRoll <= conflict_difficulty) {
+                            checkConflictThreat(capturedPlayerRoll, false, capturedPlayerAction);
+                        }
+                        if (capturedEnemyRoll <= conflict_difficulty) {
+                            checkConflictThreat(capturedEnemyRoll, true, capturedEnemyAction);
+                        }
+                    }
 
-    let player_collapse = HERO.stress > stress_thresh;
-    let enemy_dead = enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"];
+                    move = 0;
+                    round += 1;
+                    player_action = null;
+                    enemy_action = null;
 
-    // CASE A: Mutual Kill
-    if (player_collapse && enemy_dead) {
-        is_collapse_check = true; 
-        runCollapseCheck(() => {
-            player_collapse = false; 
+                    let delay = test_mode ? 100 : 2000; // ✅ Declared in outer scope first
+                    setTimeout(() => {
+                        gameloop(false);
+                    }, delay);
+                });
 
-            HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-            log(`\n💥 Ustál si to! Hoci to bolo na hrane, ${enemy.toUpperCase()} padá a ty prežívaš! Získavaš 1 BR.`, "success-msg");
-            inputs_frozen = true; 
-            const scrollRow = document.querySelector('.card-scroll-row');
-            if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
-            updateUI();
-
-            onTerminalFinishedCallback = () => {
-                const enemyContainer = document.getElementById("enemy-sprite-container");
-                if (enemyContainer) enemyContainer.style.display = "none";
-
-                let activeChallenge = CHALLENGES[current_challenge_key];
-                if (current_challenge_key) { 
-                    CHALLENGES["ACTIVE"][current_challenge_key] = false; 
-                }
-                enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
-                enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                player_action = null; enemy_action = null; is_conflict = false;
-
-                if (pending_challenge_key) {
-                    let nextChallenge = pending_challenge_key; 
-                    pending_challenge_key = null; 
-                    proceed(nextChallenge); 
-                } else {
-                    proceed(activeChallenge.case_success); 
-                }
-            };
-
-            if (!isProcessingQueue) { 
-                const callback = onTerminalFinishedCallback; 
-                onTerminalFinishedCallback = null; 
-                callback(); 
+                return; 
             }
-        });
-        return;
-    }
 
-    // CASE B: Only Player Collapses
-    if (player_collapse) {
-        runCollapseCheck(() => {
-            player_collapse = false; 
+            // CASE C: Only Enemy Collapses
+            if (enemy_dead) { 
+                clearTimeout(combatLoopTimeout);
+                clearTimeout(readyPromptTimeout);
+                HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                log(`\n💥 ${enemy} JE DOLE! Získavaš 1 BR a môžeš pokračovať.`, "success-msg");
+                inputs_frozen = true;
+                const scrollRow = document.querySelector('.card-scroll-row');
+                if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+                updateUI();
+
+                onTerminalFinishedCallback = () => {
+                    const enemyContainer = document.getElementById("enemy-sprite-container");
+                    if (enemyContainer) enemyContainer.style.display = "none";
+                    const enemyImg = document.getElementById("enemy-sprite");
+                    if (enemyImg) enemyImg.src = "";
+
+                    let activeChallenge = CHALLENGES[enemy_id];
+                    if (enemy_id) {
+                        CHALLENGES["ACTIVE"][enemy_id] = false; 
+                        if (activeChallenge && activeChallenge.on_death) {
+                            handleChallengeTransition(activeChallenge.on_death);
+                        }
+                    }
+                    
+                    enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                    enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                    player_action = null; enemy_action = null; is_conflict = false;
+
+                    if (pending_challenge_key) {
+                        let nextChallenge = pending_challenge_key;
+                        pending_challenge_key = null; 
+                        proceed(nextChallenge); 
+                    } else {
+                        proceed(activeChallenge.case_success); 
+                    }
+                };
+
+                if (!isProcessingQueue) {
+                    const callback = onTerminalFinishedCallback;
+                    onTerminalFinishedCallback = null;
+                    callback();
+                }
+                return; // CRITICAL: Stop execution here so the standard loop below doesn't run!
+            }
+
+            // --- 4. ADVANTAGE DETERMINATION & CONTINUATION (Only if both survived) ---
             if (player_escape_counter < 1){
-                player_zero_counter += 1;
+                player_zero_counter += 1
             } else {
-                player_zero_counter = 0;
+                player_zero_counter = 0
             }
 
             if (enemy_escape_counter < 1){
-                enemy_zero_counter += 1;
+                enemy_zero_counter += 1
             } else {
-                enemy_zero_counter = 0;
+                enemy_zero_counter = 0
             }
 
             if (!player_escaping){ 
-                if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
-                    (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
-                    advantage += 1;
+                if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 0) || 
+                    (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 0)) {
+                    advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
                     log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
                 } 
             }
             if (!enemy_escaping){
-                if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
-                (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
+                if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 0) || 
+                (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 0)) {
                     // CRITICAL FIX HERE:
                     enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
                     log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
@@ -3010,107 +3272,15 @@ function resolveConflict() {
             player_action = null;
             enemy_action = null;
 
-            setTimeout(() => {
+            inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+            updateUI();
+            let delay = test_mode ? 100 : 2000; 
+            combatLoopTimeout = setTimeout(() => {
                 gameloop(false);
-            }, 2000);
-        });
-
-        return; 
-    }
-
-    // CASE C: Only Enemy Collapses
-    if (enemy_dead) { 
-        HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-        log(`\n💥 ${enemy} JE DOLE! Získavaš 1 BR a môžeš pokračovať.`, "success-msg");
-        inputs_frozen = true;
-        const scrollRow = document.querySelector('.card-scroll-row');
-        if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
-        updateUI();
-
-        onTerminalFinishedCallback = () => {
-            const enemyContainer = document.getElementById("enemy-sprite-container");
-            if (enemyContainer) enemyContainer.style.display = "none";
-
-            let activeChallenge = CHALLENGES[current_challenge_key];
-            if (current_challenge_key) {
-                CHALLENGES["ACTIVE"][current_challenge_key] = false; 
-            }
-            
-            enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
-            enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-            player_action = null; enemy_action = null; is_conflict = false;
-
-            if (pending_challenge_key) {
-                let nextChallenge = pending_challenge_key;
-                pending_challenge_key = null; 
-                proceed(nextChallenge); 
-            } else {
-                proceed(activeChallenge.case_success); 
-            }
-        };
-
-        if (!isProcessingQueue) {
-            const callback = onTerminalFinishedCallback;
-            onTerminalFinishedCallback = null;
-            callback();
+            }, delay);
         }
-        return; // CRITICAL: Stop execution here so the standard loop below doesn't run!
-    }
-
-    // --- 4. ADVANTAGE DETERMINATION & CONTINUATION (Only if both survived) ---
-    if (player_escape_counter < 1){
-        player_zero_counter += 1
-    } else {
-        player_zero_counter = 0
-    }
-
-    if (enemy_escape_counter < 1){
-        enemy_zero_counter += 1
-    } else {
-        enemy_zero_counter = 0
-    }
-
-    if (!player_escaping){ 
-        if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 0) || 
-            (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 0)) {
-            advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
-            log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
-        } 
-    }
-    if (!enemy_escaping){
-        if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 0) || 
-        (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 0)) {
-            // CRITICAL FIX HERE:
-            enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-            log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
-        }
-    }
-
-    if (player_action[0] === "D" && enemy_action[0] === "D") {
-        const capturedPlayerAction = player_action;   
-        const capturedEnemyAction = enemy_action;     
-        const capturedPlayerRoll = player_roll;
-        const capturedEnemyRoll = enemy_roll;
-
-        if (capturedPlayerRoll <= conflict_difficulty) {
-            checkConflictThreat(capturedPlayerRoll, false, capturedPlayerAction);
-        }
-        if (capturedEnemyRoll <= conflict_difficulty) {
-            checkConflictThreat(capturedEnemyRoll, true, capturedEnemyAction);
-        }
-    }
-
-    move = 0;
-    round += 1;
-    player_action = null;
-    enemy_action = null;
-
-    // Only fire next turn if nobody won or fled
-    setTimeout(() => {
-        gameloop(false);
-    }, 2000);
-}
 
         function checkConflictThreat(roll, isEnemy, action) {
             if (roll > conflict_difficulty) return;
@@ -3145,6 +3315,7 @@ function resolveConflict() {
                     if(chase_mode){
                         HERO.stress = Math.max(0, (HERO.stress || 0) + 1);
                         flashRed();
+                        heal_attempts = 0;
                         if(player_escaping){
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
                             log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg");
@@ -3187,9 +3358,142 @@ function resolveConflict() {
         }
 
 
-        function runCollapseCheck(onSuccessCallback, onFailureCallback) {
+        function runHealCheck() {
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            const isProceedVisible = proceedPrompt && window.getComputedStyle(proceedPrompt).display !== "none";            if (proceedPrompt.style.display === "none") is_proceed_prompt = false;
+
+            if (is_conflict || is_action_phase || is_collapse_check || isProceedVisible) {
+                log("Teraz nie je čas...");
+                return
+            }
+
+            const skillDropdown = document.getElementById("player-skill-dropdown");
+            const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+            if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && selectedSkillName !== "PRVÁ POMOC") {
+                log("Môžeš použiť len schopnosť PRVÁ POMOC.", "danger-msg");
+                return
+            }
+
+            if (typeof ITEM_LIST === 'undefined' || HERO.items["ZDRAVOTNÉ POMÔCKY"] < 1) {
+                log(`Nemáš žiadne ZDRAVORNÉ POMÔCKY.`, "system-msg");      
+                return         
+            }
+
+            if (heal_attempts > 2) {
+                log(`Teraz ti pomôže len čas. Nedá sa nič robiť.`, "system-msg");      
+                return         
+            }
+
+            heal_attempts += 1;
             // Flag the engine that card clicks belong to this sub-system now
+            is_heal_check = true;
+            inputs_frozen = true;
+            const choicePrompt = document.getElementById("choice-prompt");
+            choicePrompt.style.display = "none";
+
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+
+            // Challenge difficulty equals the player's current stress. Threat is hardcoded to 2.
+            current_challenge.difficulty = 9; 
+            current_challenge.threat = 2;
+
+            const challengeDisplay = document.getElementById("challenge-stats-display");
+            if (challengeDisplay) {
+
+                // Passes data and slides down seamlessly
+                toggleChallengeDisplay(true, current_challenge);
+            }
+
+            log("Nie je úplná sranda poskytnúť prvú pomoc sebe.", "error-msg", true);
+
+            inputs_frozen = false;
+            if (scrollRow) scrollRow.classList.add('enable-interaction');
+            updateUI();
+        }
+
+        function resolveHealCheck(card) {
+
+            inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+            let roll_result = rollDice(card, false, 0, false);
+   
+            log(`Výsledok pokusu o prvú pomoc: ${roll_result}`, "error-msg");
+
+            let success = roll_result >= current_challenge.difficulty;
+            let is_tie_or_failure = roll_result <= current_challenge.difficulty;
+
+            if (success) {
+                adjustHeroStress(-1);
+                log("Podarí sa ti ošetriť aspoň to najnutnejšie a cítiš sa lepšie.", "success-msg");
+            } else {
+                log("Prvá pomoc nepomohla. Robíš, čo vieš, ale stále ti je rovnako blbo.", "failure-msg");
+            }
+
+            if (is_tie_or_failure) {
+                let threat_roll = 0;
+                let threatRollsData = [];
+                
+                for (let n = 0; n < current_challenge.threat; n++) {
+                    let r = Math.floor(Math.random() * 2); // 0 or 1
+                    threat_roll += r;
+                    threatRollsData.push({ type: "DH", value: r, isSkillDie: true });
+                }
+
+                // Display threat visual dice pool explicitly tracked away from player pool
+                triggerDiceVisualAnimation(threatRollsData, true); 
+
+                let caution_threshold = CARDS[card][0][0]; 
+                if (threat_roll > caution_threshold) {
+                    log(`Pri ošetrovaní zničíš časť zdravotných pomôcok. \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
+                    executeMods("item_ZDRAVOTNÉ POMÔCKY-1");
+                } else {
+                    log(`Počínaš si šetrne a pomôcky ti zostanú aj pre budúce pokusy. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                }
+            }
+
+            resetAdrenalineSelection();
+
+            const challengeDisplay = document.getElementById("challenge-stats-display");
+            if (challengeDisplay) {
+                toggleChallengeDisplay(false);
+            }     
+
+            is_heal_check = false;
+            inputs_frozen = true;
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+            updateUI();
+            proceed(current_challenge_key);
+        }
+
+        function runCollapseCheck(onSuccessCallback, onFailureCallback) {
+            if (test_mode){
+                const terminal = document.getElementById("terminal-screen");
+                const logText = terminal ? terminal.innerText : "";
+
+                const blob = new Blob([logText], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `terminal-log-${timestamp}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Restart the window/session after the export
+                window.location.reload();
+                return;
+            }
+
             is_collapse_check = true;
+            collapse_action_done = false;
             inputs_frozen = true;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3226,10 +3530,9 @@ function resolveConflict() {
 
             log("⚠️ KONTROLA KOLAPSU! Musíš odolať tlaku nahromadeného stresu.", "danger-msg", true);
 
+            // Allow the player to click a card to resolve the collapse check
             inputs_frozen = false;
-            if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
-
+            if (scrollRow) scrollRow.classList.add('enable-interaction');
             updateUI();
         }
 
@@ -3240,11 +3543,9 @@ function resolveConflict() {
 
             updateUI();
 
-            let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let roll_result = rollDice(card, false, 0, false);
             
             log(`Výsledok kontroly kolapsu: ${roll_result} (+${adrenaline})`, "error-msg");
-            roll_result += adrenaline; 
 
             let success = roll_result > current_challenge.difficulty;
             let is_tie_or_failure = roll_result <= current_challenge.difficulty;
@@ -3354,6 +3655,8 @@ function resolveConflict() {
                     }
                 }
             }
+            // Reset collapse action flag so test() can resume normal behaviour
+            collapse_action_done = false;
             collapse_pending_proceed_target = null;
         }
 
@@ -3386,6 +3689,7 @@ function resolveConflict() {
 
         function proceed(target) {
             if (!gameOn) {
+                log("PROCEED: gameOn is false, returning", "danger-msg");
                 return;
             }
             if (is_collapse_check) {
@@ -3398,7 +3702,7 @@ function resolveConflict() {
             if (typeof target === 'string') {
                 preloadImages(target);
             }
-            proceed_target = target; 
+            proceed_target = target;
             inputs_frozen = true;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3408,16 +3712,27 @@ function resolveConflict() {
             if (prompt) {
                 prompt.style.display = "flex";
             }
+
+            // Start self-play if enabled and not already running
+            if (test_mode && !keep_testing) {
+                keep_testing = true;
+                setTimeout(test, 100); // Give DOM time to update
+            }
         }
 
         // Dedicated transition executor
         function executeProceedTransition() {
-            if (is_collapse_check) {
-                return;
+            if(test_mode){
+                log("EXEC_TRANSITION: called", "system-msg");
+                if (is_collapse_check) {
+                    log("EXEC_TRANSITION: is_collapse_check is true, returning", "danger-msg");
+                    return;
+                }
             }
             let delay = 0;
             if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
+                if (test_mode) log("EXEC_TRANSITION: proceed_target exists, executing after " + delay + "ms", "system-msg");
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
 
                 const enemyCardContainer = document.getElementById("enemy-card-container");
@@ -3433,11 +3748,15 @@ function resolveConflict() {
                     if (playerCardDisplay) playerCardDisplay.innerHTML = "";
 
                     if (typeof proceed_target === 'function') {
+                        if (test_mode) log("EXEC_TRANSITION: calling proceed_target function", "system-msg");
                         proceed_target();
                     } else {
+                        if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + proceed_target + ")", "system-msg");
                         handleChallengeTransition(proceed_target);
                     }
                 }, delay); // Matches your CSS 0.5s transition
+            } else {
+                if (test_mode) log("EXEC_TRANSITION: proceed_target is NOT set, returning", "danger-msg");
             }
         }
 
@@ -3468,9 +3787,11 @@ function resolveConflict() {
                         if (move == 1) {
                             enemyChoice();
                         } else {
-                            setTimeout(() => {
+                            let delay = 0;
+                            if (test_mode) {delay = 100} else {delay = 1000};
+                            readyPromptTimeout = setTimeout(() => {
                             proceed(ready);
-                            },1000);
+                            },delay);
                         }
                     }
 
@@ -3579,10 +3900,11 @@ function resolveConflict() {
             // If EITHER card is showing, strip the 'show' class from BOTH at the exact same instant
             if (isPlayerShowing || isEnemyShowing) {
                 if (playerDisplay) playerDisplay.classList.remove("show");
-                if (enemyDisplay && move === 0) enemyDisplay.classList.remove("show"); // 👈 Safe! Even if it was already hidden.
-                
+                if (enemyDisplay && move === 0) enemyDisplay.classList.remove("show"); 
+                let delay = 0;
+                if (test_mode) {delay = 100} else {delay = 500};
                 // Wait 500ms for both cards to slide off-screen simultaneously
-                setTimeout(proceedWithSelection, 500);
+                setTimeout(proceedWithSelection, delay);
             } else {
                 proceedWithSelection();
             }
@@ -3879,7 +4201,10 @@ function resolveConflict() {
         }
 
         function runGameloopCycle() {
-            setTimeout(() => {gameloop(false, true)},1000);
+            let delay = 0;
+            if (test_mode) {delay = 100} else {delay = 1000};
+
+            setTimeout(() => {gameloop(false, true)},delay);
         }
 
         function preloadImages(targets) {
@@ -3942,7 +4267,9 @@ function resolveConflict() {
 
             // Wait 500ms for the CSS slide-out animation to finish before clearing/moving on
             if (callback) {
-                setTimeout(callback, 500); 
+                let delay = 0;
+                if (test_mode) {delay = 100} else {delay = 500};
+                setTimeout(callback, delay); 
             }
         }
 
@@ -4067,6 +4394,7 @@ function resolveConflict() {
                 if(DEBUG) log(`Default weapons: ${HERO.defaultWeapons} \n Weapons: ${HERO.weapons} \n Default items: ${HERO.defaultItems} `)
                 hero_selected = true;
                 gameOn = true;
+                prev_challenge = current_challenge_key;
                 handleChallengeTransition(current_challenge_key);
                 return; 
             }
@@ -4464,10 +4792,9 @@ function resolveConflict() {
         }
 
 
-        // Funkcia na zobrazenie / skrytie Manažéra Hrdinu
         function toggleBuilder(show) {
             if (show) {
-                if (is_conflict || is_action_phase || is_collapse_check) {
+                if (is_conflict || is_action_phase || is_collapse_check || is_heal_check) {
                     log("Teraz nie je čas...");
                     return;
                 }
@@ -4973,6 +5300,11 @@ function resolveConflict() {
                 return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
             }
 
+            if (is_heal_check) {
+                resolveHealCheck(cardCode);
+                return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
+            }
+
             // =========================================================================
             // 3. REŽIM V CONFLIKTE / BOJI (KLIKNUTIE NA KONKRÉTNU POLOVICU)
             // =========================================================================
@@ -5419,6 +5751,161 @@ function resolveConflict() {
                     zone2.classList.add("keyboard-hover-zone");
                 }
             }
+        }
+
+
+        function test() {
+            if (!keep_testing) {
+                return;
+            }
+            if (isProcessingQueue) {
+                console.log("TEST: terminal still processing queue, waiting");
+                setTimeout(test, 300);
+                return;
+            }
+            if (current_challenge_key.includes("GAME")){
+                const terminal = document.getElementById("terminal-screen");
+                const logText = terminal ? terminal.innerText : "";
+
+                const blob = new Blob([logText], { type: "text/plain" });
+                const url = URL.createObjectURL(blob);
+
+                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+                const a = document.createElement("a");
+                a.href = url;
+                a.download = `terminal-log-${timestamp}.txt`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+
+                // Restart the window/session after the export
+                window.location.reload();
+                return;
+            }
+
+
+            if (prev_challenge !== current_challenge_key) {
+                prev_challenge = current_challenge_key;
+                stuck_counter = 0;
+            } else if (!is_conflict) {
+                stuck_counter += 1;
+            }
+
+            if (stuck_counter > 20) {
+                log("STUCK");
+                keep_testing = false;
+                return;
+            }
+
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            const isProceedVisible = proceedPrompt && window.getComputedStyle(proceedPrompt).display !== "none";
+            const choicePrompt = document.getElementById("choice-prompt");
+            const isChoiceVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none";
+            const overlayVisible = document.getElementById('hero-selection-overlay');
+            const generalPrompt = document.getElementById('general-prompt');
+            const isGeneralVisible = generalPrompt && window.getComputedStyle(generalPrompt).display !== "none";
+
+            // If a general prompt is visible, press its confirm button and retry
+            if (isGeneralVisible) {
+                document.getElementById('gp-confirm-btn')?.click();
+                log('TEST: general prompt visible - pressing confirm');
+                setTimeout(test, 300);
+                return;
+            }
+
+            if (overlayVisible) {
+                console.log("TEST: waiting for hero selection overlay to close");
+                setTimeout(test, 500);
+                return;
+            }
+
+            if (isProceedVisible) {
+                const proceedBtn = document.getElementById('proceed-btn');
+                if (proceedBtn) {
+                    proceedBtn.click();
+                    log("TEST: clicking proceed button");
+                    setTimeout(test, 750); // Wait longer for transition to complete
+                    return;
+                }
+            }
+
+            else if (isChoiceVisible) {
+                const buttons = choicePrompt.querySelectorAll(".adrenaline-select");
+                if (buttons.length > 0) {
+                    const selectedIndex = Math.floor(Math.random() * buttons.length);
+                    const selectedButton = buttons[selectedIndex];
+                    const buttonText = selectedButton ? selectedButton.innerText : "<none>";
+                    if (selectedButton) {
+                        selectedButton.click();
+                        log(`TEST: selecting choice ${selectedIndex + 1}: ${buttonText}`);
+                        setTimeout(test, 500);
+                        return;
+                    }
+                } else {
+                    log("TEST: choice prompt visible but no buttons found");
+                }
+            }
+
+            else if (!inputs_frozen) {
+                const cards = Array.from(document.querySelectorAll("#card-tray-container .card-container"));
+                skill = 4;
+                if (cards.length > 0) {
+                    let targetCard = cards.find(card => card.getAttribute("data-card") === "S");
+                    if (!targetCard) {
+                        targetCard = cards[0];
+                    }
+
+                    const cardIdx = cards.indexOf(targetCard);
+                    if (cardIdx >= 0) {
+                        currentSelectedCardIdx = cardIdx;
+                    }
+
+                    if (is_conflict) {
+                        if (is_collapse_check) {
+                            // During collapse-check, only click once to resolve; then wait for engine to finish
+                            if (collapse_action_done) {
+                                console.log('TEST: collapse action already sent, waiting for resolution');
+                                setTimeout(test, 500);
+                                return;
+                            }
+                            collapse_action_done = true;
+                            const zoneD = targetCard.querySelector('[data-action="D"]');
+                            log(`TEST: collapse-check active, selecting zone D for card ${targetCard.getAttribute("data-card") || "?"}`);
+                            if (zoneD) {
+                                zoneD.click();
+                            } else {
+                                targetCard.click();
+                            }
+                        } else if (enemy_escape_counter > 0) {
+                            const zoneD = targetCard.querySelector('[data-action="D"]');
+                            if (zoneD) {
+                                zoneD.click();
+                            } else {
+                                targetCard.click();
+                            }
+                            log(`TEST: chasing, card ${targetCard.getAttribute("data-card") || "?"}, zone D`);
+                        } else {
+                            const zoneA = targetCard.querySelector('[data-action="A"]');
+                            console.log(`TEST: conflict mode, selecting card ${targetCard.getAttribute("data-card") || "?"} and zone A`);
+                            if (zoneA) {
+                                zoneA.click();
+                            } else {
+                                targetCard.click();
+                            }
+                        }
+                    } else {
+                        console.log(`TEST: selecting card ${targetCard.getAttribute("data-card") || "?"}`);
+                        targetCard.click();
+                    }
+
+                    setTimeout(test, 500);
+                    return;
+                }
+            }
+
+            console.log("TEST: no visible prompts or cards to act on, retrying");
+            setTimeout(test, 500);
         }
 
         // Table Input Management Engine (Zjednodušený cez zdieľanú funkciu)

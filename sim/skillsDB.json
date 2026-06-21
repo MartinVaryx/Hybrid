@@ -361,6 +361,15 @@
         ],
         "Diagnóza a liečenie chorôb a zranení. Zníženie dlhodobého telesného stresu o hodnotu regenerácie."
     ],
+    "CHÉMIA": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "IQ",
+            "ZMYSLY"
+        ],
+        "Vedomosti v oblasti chémie, experimenty, syntéza látok..."
+    ],
     "TERAPIA": [
         2,
         "LIEČENIE",
