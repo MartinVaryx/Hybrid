@@ -9,7 +9,10 @@
     "DISTRACT_PREDATOR": {
         "skills": [
             "VRHANIE",
-            "ZRUČNOSŤ"
+            "ZRUČNOSŤ",
+            "FEROMÓNY",
+            "MIMIKRY",
+            "BIOKAMUFLÁŽ"
         ],
         "difficulty": 10,
         "threat": 4,
@@ -19,17 +22,17 @@
         "threat_msg": "Hádzal si kameň a nevšimol si si, kam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
         "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalil si jej zámer.",
         "failure_msg": "Odhalila ťa, už jej neujdeš.",
-        "case_success": "if_distractBasment:true_CITY_2_else_WRECKS",
+        "case_success": "if_distractBasment:true_CITY_2_else_WRECKS_0",
         "case_threat": "enemy_advantage+1",
         "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
         "case_failure": [
-            "if_distractBasment:true_CITY_2_else_WRECKS",
-            "Predátorka_2"
+            "Predátorka_2",
+            "if_distractBasment:true_CITY_2_else_WRECKS_0"
         ],
         "enemy_escape_delayed": "WRECKS_PREDATOR_2"
     },
     "WRECKS_PREDATOR_2": {
-        "image": "assets/WRECKS_PREDATOR.png",
+        "image": "assets/WRECKS.png",
         "initial_msg": "Opäť ťa objavila predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -49,7 +52,7 @@
         ]
     },
     "WRECKS_PREDATOR": {
-        "image": "assets/WRECKS_PREDATOR.png",
+        "image": "assets/WRECKS.png",
         "initial_msg": "Skautka, ktorú si nezabil, ušla a zanechala pachovú stopu. Vďaka nej ťa teraz našla predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -120,16 +123,16 @@
     },
     "CAR_3": {
         "trigger_delayed": [
-            "BASEMENT_PREDATOR",
-            "WRECKS_PREDATOR",
-            "WRECKS_PREDATOR_2",
-            "PURITÁN_2"
+            "Predátorka_1",
+            "Predátorka_2",
+            "PURITÁN_2",
+            "PURITÁN_3",
+            "PURITÁN_4"
         ],
         "image": "assets/CAR.png",
         "initial_msg": "Máš benzín, nie je to veľa, ale môžeš pokračovať v ceste kým nenájdeš viac.",
         "choice_A": [
-            "Dobre",
-            "poďme na to."
+            "Dobre, poďme na to."
         ],
         "case_A": "CAR_6"
     },
@@ -140,13 +143,8 @@
         "choice_B": "Budem smutne sedieť a plakať.",
         "case_A": "CITY",
         "case_B": "CAR_2",
-        "choice_C": "Idem K vysielaču",
-        "case_C": [
-            "FOREST_PATH_0",
-            "TOWER_1"
-        ],
-        "choice_D": "Idem k chatrči.",
-        "case_D": "SHACK_0",
+        "choice_D": "Idem do lesa.",
+        "case_D": "TOWER_0",
         "choice_E": "Idem pešo.",
         "case_E": "WALK_0"
     },
@@ -155,17 +153,19 @@
             "BASEMENT_PREDATOR"
         ],
         "image": "assets/CITY.png",
-        "initial_msg": "Vydáš sa do centra alebo späť k autu?",
+        "initial_msg": "Si v meste. Kam teraz?",
         "choice_A": "Do centra.",
         "choice_B": "Späť k autu.",
         "case_A": "WRECKS_0",
         "case_B": "CAR_1",
-        "choice_C": "",
-        "case_C": ""
+        "choice_C": "Do lesa.",
+        "case_C": "TOWER_0",
+        "choice_D": "Do garáže na sídlisku.",
+        "case_D": "if_BASEMENT_ENTRANCE:true_BASEMENT_ENTRANCE_else_IN_BASEMENT_0"
     },
     "IN_BASEMENT": {
         "image": "assets/BASEMENT.png",
-        "initial_msg": "Nachádzaš sa v starej garáži. Kedysi sa tu niekto ukrýval, ale už tu dlho nebol. Môžeš to tu skúsiť prehľadať.",
+        "initial_msg": "Mohli to tu pred odchodom upratať...",
         "skills": [
             "ZMYSLY",
             "ŠPEHOVANIE"
@@ -175,8 +175,11 @@
         "success_msg": "Nájdeš sklenené nádoby, plynový horák, bandasku a chemikálie... Tu býval nejaký pyroman! Možno by sa tu dalo namiešať niečo, čo by buchlo.",
         "threat_msg": "Niečo ťa pichlo. Všimneš si, že to bola použitá injekčná striekačka. Môžeš len dúfať, nebola nakazená HIV alebo podobným svinstvom.",
         "threat_avoided_msg": "Pri dôkladnom prehrabávaní si všimneš injekčnú striekačku. Nechýbalo veľa a pichla by ťa do ruky.",
-        "failure_msg": "Nájdeš aspoň bandasku, ale inak nič. Bude lepšie ísť späť.",
         "case_success": [
+            "set_BASEMENT_ENTRANCE_false",
+            "set_IN_BASEMENT_false",
+            "set_MAKE_BOMB_true",
+            "set_MAKE_PHEROMONES_true",
             "flag_container:true",
             "item_BANDASKA+1",
             "set_NO_HOSE_NO_CONTAINER_false",
@@ -184,24 +187,21 @@
             "if_hose:false_set_NO_HOSE_true",
             "if_hose:true_set_WRECKS_true",
             "if_hose:true_set_SUCK_true",
-            "IN_BASEMENT_0",
-            "set_BASEMENT_ENTRANCE_false"
+            "IN_BASEMENT_0"
         ],
         "case_threat": "stress+1",
-        "case_failure": [
-            "flag_container:true",
-            "item_CONTAINER+1",
-            "set_NO_HOSE_NO_CONTAINER_false",
-            "set_NO_CONTAINER_false",
-            "if_hose:false_set_NO_HOSE_true",
-            "if_hose:true_set_WRECKS_true",
-            "if_hose:true_set_SUCK_true",
-            "CITY_2"
-        ]
+        "case_failure": "IN_BASEMENT_0",
+        "failure_msg": "Je tu strašný neporiadok. Zatiaľ nič užitočné."
     },
-    "Skautka_2": {
+    "SKAUTKA_2": {
         "image": "assets/PLACEHOLDER.png",
-        "type": "Skautka"
+        "type": "Skautka",
+        "case_success": [
+            "set_BASEMENT_ENTRANCE_false",
+            "set_IN_BASEMENT_0_true",
+            "IN_BASEMENT_0"
+        ],
+        "initial_msg": "Narazíš na Skautku v garáži."
     },
     "BASEMENT_DISTRACT": {
         "skills": [
@@ -216,13 +216,14 @@
         "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
         "threat_avoided_msg": "Všimneš si, že fľaša je rozbitá a hodíš ju opatrne. Neporežeš sa.",
         "failure_msg": "Skautka kašle na fľašu a ide po tebe.",
-        "case_success": "IN_BASEMENT",
+        "case_success": [
+            "set_BASEMENT_ENTRANCE_false",
+            "set_IN_BASEMENT_0_true",
+            "IN_BASEMENT_0"
+        ],
         "case_success_delayed": "BASEMENT_PREDATOR",
         "case_threat": "stress+1",
-        "case_failure": [
-            "Skautka_2",
-            "IN_BASEMENT"
-        ],
+        "case_failure": "SKAUTKA_2",
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENCOUNTER": {
@@ -231,16 +232,16 @@
         "choice_A": "Odlákať ju preč.",
         "choice_B": "Poďme sa biť.",
         "case_A": "BASEMENT_DISTRACT",
-        "case_B": [
-            "Skautka_2",
-            "IN_BASEMENT"
-        ],
+        "case_B": "SKAUTKA_2",
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "EXPLORE_BASEMENT": {
         "skills": [
             "PLÝŽENIE",
-            "ŠPEHOVANIE"
+            "ŠPEHOVANIE",
+            "BIOKAMUFLÁŽ",
+            "MIMIKRY",
+            "FEROMÓNY"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -250,22 +251,30 @@
         "threat_msg": "Stúpiš na suchú vetvičku a Skautka to počuje. Teraz je na teba pripravená.",
         "threat_avoided_msg": "Takmer stúpiš na suchú vetvičku. To by ťa prezradilo a Skautka by sa na teba stihla pripraviť.",
         "failure_msg": "Vchádzaš dnu a narazíš na Skautku. Priprav sa na boj.",
-        "case_success": "BASEMENT_ENCOUNTER",
+        "case_success": [
+            "set_EXPLORE_BASEMENT_false",
+            "BASEMENT_ENCOUNTER"
+        ],
         "case_success_delayed": "BASEMENT_PREDATOR",
         "case_threat": "enemy_advantage+1",
         "case_failure": [
-            "Skautka_2",
-            "IN_BASEMENT"
+            "set_EXPLORE_BASEMENT_false",
+            "SKAUTKA_2"
         ],
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENTRANCE": {
         "image": "assets/BASEMENT.png",
-        "initial_msg": "Objavíš vstup do pivnice. Zdá sa, že tam niečo šramoce. Ideš dole?",
+        "initial_msg": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom si ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
         "choice_A": "Preskúmať.",
         "choice_B": "Ísť späť.",
-        "case_A": "EXPLORE_BASEMENT",
-        "case_B": "CITY_2"
+        "case_A": [
+            "set_SKAUTKA_2_true",
+            "EXPLORE_BASEMENT"
+        ],
+        "case_B": "CITY_2",
+        "choice_C": "Idem si to rozdať s tou Skautkou!",
+        "case_C": "SKAUTKA_2"
     },
     "CITY": {
         "image": "assets/CITY.png",
@@ -275,20 +284,28 @@
         "case_A": "WRECKS_0",
         "case_B": "BASEMENT_ENTRANCE",
         "choice_C": "Späť k autu.",
-        "case_C": "CAR_1"
+        "case_C": "CAR_1",
+        "choice_D": "Do lesa.",
+        "case_D": "TOWER_0",
+        "choice_E": "Do garáže na sídlisku.",
+        "case_E": "if_BASEMENT_ENTRANCE:true_BASEMENT_ENTRANCE_else_IN_BASEMENT_0"
     },
-    "Skautka_1": {
+    "SKAUTKA_1": {
         "image": "assets/CITY.png",
         "type": "Skautka",
         "on_death": [
             "set_CITY_0_false",
             "set_CITY_true"
-        ]
+        ],
+        "distance": 2
     },
     "SNEAK": {
         "back": true,
         "skills": [
-            "PLÝŽENIE"
+            "PLÝŽENIE",
+            "BIOKAMUFLÁŽ",
+            "MIMIKRY",
+            "FEROMÓNY"
         ],
         "difficulty": 8,
         "threat": 3,
@@ -311,7 +328,7 @@
         "case_failure_delayed": "",
         "case_threat": "stress+1",
         "case_failure": [
-            "Skautka_1",
+            "SKAUTKA_1",
             "if_CITY_0:false_CITY_else_CITY_0"
         ],
         "enemy_escape_delayed": [
@@ -369,8 +386,8 @@
         "case_success": "",
         "case_failure": "",
         "case_A": [
-            "Skautka_1",
-            "if_Skautka_1:false_set_CITY_true",
+            "SKAUTKA_1",
+            "if_SKAUTKA_1:false_set_CITY_true",
             "CITY"
         ],
         "case_B": "SNEAK",
@@ -405,10 +422,10 @@
         "case_A": "SLOPE",
         "choice_B": "Skúsim tú cestu.",
         "case_B": "FOREST_PATH",
-        "choice_C": "Idem radšej späť.",
+        "choice_C": "Idem radšej späť k autu.",
         "case_C": "CAR_1",
-        "choice_D": "",
-        "case_D": ""
+        "choice_D": "Idem rovno k vysielaču.",
+        "case_D": "TOWER_1"
     },
     "WALK_0": {
         "image": "assets/PLACEHOLDER.png",
@@ -436,7 +453,7 @@
         "choice_A": "Idem ďalej.",
         "case_A": "FOREST_PATH_0",
         "choice_B": "Prehľadám chatrč.",
-        "case_B": "SHACK_0",
+        "case_B": "if_SHACK_0:true_SHACK_0_else_FOREST_PATH_1",
         "back": true
     },
     "SLOPE": {
@@ -459,7 +476,7 @@
     "CAR_1": {
         "image": "assets/CAR.png",
         "initial_msg": "Si pri aute a stále nemáš benzín.",
-        "choice_A": "Idem k vysielaču.",
+        "choice_A": "Idem do lesa.",
         "case_A": "TOWER_0",
         "choice_B": "Idem do mesta.",
         "case_B": "if_CITY_0:false_CITY_else_CITY_0",
@@ -536,7 +553,8 @@
         "trigger_delayed": "difficulty+1",
         "skills": [
             "PLÝŽENIE",
-            "OBRATNOSŤ"
+            "OBRATNOSŤ",
+            "MIMIKRY"
         ],
         "difficulty": 7,
         "threat": 4,
@@ -576,7 +594,8 @@
             "PREDSTIERANIE",
             "RÉTORIKA",
             "EQ",
-            "IQ"
+            "IQ",
+            "METAMORFÓZA"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -671,10 +690,7 @@
         "initial_msg": "Ten prekliaty zvonec. Bol to alarm a privolal ďalších.",
         "case_success": "",
         "case_failure": "",
-        "next": [
-            "Puritán",
-            "Puritán"
-        ]
+        "type": "Puritán"
     },
     "FOREST_PATH_2": {
         "initial_msg": "Vidíš, že Puritán váha.",
@@ -717,8 +733,13 @@
         "choice_C": "Použijem lano.",
         "case_C": "CLIFF_CLIMB_0",
         "choice_D": "Idem po chodníku.",
-        "case_D": "TRACK",
-        "back": true
+        "case_D": [
+            "set_BUNKER_true",
+            "TRACK"
+        ],
+        "back": true,
+        "choice_E": "Idem k bunkru.",
+        "case_E": "BUNKER"
     },
     "CLIFF_CLIMB": {
         "initial_msg": "Utrieš si špinavé dlane a vrhneš sa na skaly.",
@@ -727,7 +748,8 @@
         "skills": [
             "OBRATNOSŤ",
             "LEZENIE",
-            "ŠPLHANIE"
+            "ŠPLHANIE",
+            "KRÍDLA"
         ],
         "difficulty": 10,
         "threat": 4,
@@ -755,7 +777,10 @@
         ],
         "choice_D": "Skúsiť kontaktovať inú pevnosť.",
         "case_D": "HACK_TRANSMITTER",
-        "trigger_delayed": "PURITÁN_3"
+        "trigger_delayed": [
+            "PURITÁN_3",
+            "PURITÁN_4"
+        ]
     },
     "SUCK": {
         "initial_msg": "Klasika - hadica a bandaska.",
@@ -784,13 +809,8 @@
         "case_A": "if_CITY_0:false_CITY_else_CITY_0",
         "choice_B": "Idem pešo...",
         "case_B": "WALK_0",
-        "choice_C": "Idem k chatrči.",
-        "case_C": "SHACK_0",
-        "choice_D": "Idem k vysielaču.",
-        "case_D": [
-            "FOREST_PATH_0",
-            "TOWER_1"
-        ]
+        "choice_C": "Idem do lesa.",
+        "case_C": "TOWER_0"
     },
     "SHACK_LOOK_AROUND": {
         "initial_msg": "Kvôli porastu je ťažké pohybovať sa v blízkosti chaty.",
@@ -904,6 +924,8 @@
             "V pivnici je naozaj bordel. Nástroje, ktoré už ani nevieš, načo slúžia - vedrá, debny..."
         ],
         "case_success": [
+            "item_LOPATKA+1",
+            "flag_shovel:true",
             "flag_hose:true",
             "item_HADICA+1",
             "set_NO_HOSE_NO_CONTAINER_false",
@@ -932,9 +954,7 @@
         "difficulty": 7,
         "threat": 2,
         "image": "assets/SHACK.png",
-        "success_msg": [
-            "Zdalo sa, že žiadna z tých harabúrd nebude užitočná, ale aha - objavíš sekeru v celkom fajn stave! A okrem nej záhradnú hadicu."
-        ],
+        "success_msg": "Zdalo sa, že žiadna z tých harabúrd nebude užitočná, ale aha - objavíš sekeru v celkom fajn stave! Zoberieš si aj záhradnú lopatku a hadicu.",
         "threat_msg": "Pri prehľadávaní políc ti niečo spadne na hlavu. Nevieš, na čo to slúži, ale vieš, že keď to človeka trafí do hlavy, bolí to.",
         "threat_avoided_msg": "Pri prehľadávaní políc niečo zhodíš a takmer ti to spadne na hlavu. V poslednej chvíli sa uhneš.",
         "failure_msg": "Nájdeš záhradnú hadicu, ale inak nič, čo by sa dalo využiť.",
@@ -1006,12 +1026,12 @@
             "weapon+brokovnica",
             "weapon+nôž",
             "set_SHACK_EXPLORE_false",
-            "if_bottleBroken:true_SHACK_1_else_SHACK_EXPLORE_2"
+            "if_bottleBroken:true_BACK_ACTION_1_else_SHACK_EXPLORE_2"
         ],
         "case_threat": "flag_bottleBroken:true",
         "case_failure": [
             "set_SHACK_EXPLORE_false",
-            "if_bottleBroken:true_SHACK_1_else_SHACK_EXPLORE_2"
+            "if_bottleBroken:true_BACK_ACTION_1_else_SHACK_EXPLORE_2"
         ],
         "back": true,
         "skills": [
@@ -1138,7 +1158,9 @@
         "case_C": "NO_HOSE_NO_CONTAINER",
         "choice_C": "Pohľadať benzín.",
         "choice_D": "Pohľadať benzín.",
-        "case_D": "NO_HOSE"
+        "case_D": "NO_HOSE",
+        "choice_E": "Idem späť.",
+        "case_E": "if_CITY_2:false_CITY_else_CITY_2"
     },
     "NO_CONTAINER": {
         "image": "assets/PLACEHOLDER.png",
@@ -1297,7 +1319,8 @@
         "skills": [
             "PLÝŽENIE",
             "OBRATNOSŤ",
-            "ŠPRINT"
+            "ŠPRINT",
+            "MIMIKRY"
         ],
         "difficulty": 7,
         "threat": 3,
@@ -1319,10 +1342,17 @@
         "initial_msg": "Prichádzaš k jazeru a hneď si všimneš, že na brehu oproti z neho vyčnieva betónový bunker. Časť bunkra - nevieš, aká veľká - sa nachádza pod vodou.",
         "case_success": "",
         "case_failure": "",
-        "back": true,
         "choice_A": "Idem k bunkru.",
-        "case_A": "BUNKER",
-        "image": "assets/BUNKER.png"
+        "case_A": [
+            "BUNKER",
+            "set_TRACK_false"
+        ],
+        "image": "assets/BUNKER.png",
+        "choice_B": "Idem späť k útesu.",
+        "case_B": [
+            "set_TRACK_false",
+            "CLIFF"
+        ]
     },
     "BUNKER": {
         "initial_msg": "Okno na bunkri je zamrežované, ale dvere sú otvorené. Má to však jeden háčik - bunker je zatopený a budeš mať vodu tak po prsia.",
@@ -1332,13 +1362,18 @@
             "To nevadí",
             "prebrodím sa dnu."
         ],
-        "case_A": "BUNKER_0",
+        "case_A": [
+            "set_BUNKER_0_true",
+            "BUNKER_0"
+        ],
         "back": true,
         "choice_B": "Pohľadám inú cestu.",
         "case_B": "DAM",
-        "choice_C": "",
-        "case_C": "",
-        "image": "assets/BUNKER.png"
+        "choice_C": "Idem dnu.",
+        "case_C": "BUNKER_3",
+        "image": "assets/BUNKER.png",
+        "choice_D": "Idem späť k útesu.",
+        "case_D": "CLIFF"
     },
     "BUNKER_0": {
         "initial_msg": "Dnu preniká trochu svetla, ale aj tak toho veľa nevidíš. Len vrchnú časť stien a strop. Ak je tu niečo zaujímavé, je to pod vodou.",
@@ -1348,7 +1383,9 @@
         "choice_B": "Späť pod vodu!",
         "case_B": "DIVE_0",
         "choice_C": "Ešte tam určite niečo bude.",
-        "case_C": "DIVE_4"
+        "case_C": "DIVE_4",
+        "choice_D": "Idem späť.",
+        "case_D": "BUNKER"
     },
     "DIVE": {
         "initial_msg": "Nadýchneš sa a zmizneš pod hladinou.",
@@ -1356,6 +1393,7 @@
             "item_DEZINFEKCIA+1",
             "set_DIVE_false",
             "set_DIVE_0_true",
+            "set_DAM_false",
             "BUNKER_0"
         ],
         "case_failure": "BUNKER_0",
@@ -1372,25 +1410,18 @@
             "OBRATNOSŤ"
         ]
     },
-    "DIVE_0": {
-        "initial_msg": "Nádych...",
-        "case_success": "BUNKER_1",
+    "BUNKER_1": {
+        "initial_msg": "Niečo sa vznáša na hladine. Bunker nebol až taký opustený, ako sa zdalo. Toto bol asi majiteľ, ale ten už ti nič nepovie.",
+        "case_success": "",
         "case_failure": "",
         "image": "assets/BUNKER.png",
-        "success_msg": "Objavíš vchod do vedľajšej časti a vynoríš sa tam. Našťasie je tam trochu vzduchu."
-    },
-    "DIVE_4": {
-        "initial_msg": "Bunker nebol až taký opustený, ako sa zdalo. Podarí sa ti vyloviť jeho predchádzajúceho majiteľa.",
-        "case_success": "",
-        "case_failure": "",
-        "next": "BUNKER_0",
-        "image": "assets/BUNKER.png"
-    },
-    "BUNKER_1": {
-        "initial_msg": "Nový vytvorený príbehový uzol.",
-        "case_success": "",
-        "case_failure": "",
-        "image": "assets/BUNKER.png"
+        "choice_A": "Idem späť.",
+        "case_A": [
+            "set_BUNKER_false",
+            "set_DIVE_0_false",
+            "set_DIVE_false",
+            "BUNKER_6"
+        ]
     },
     "TUTORIAL": {
         "initial_msg": "Vitaj v hre Hybrid!",
@@ -1590,7 +1621,7 @@
         "case_failure_delayed": "",
         "case_threat": "stress+1",
         "case_failure": [
-            "Skautka_1",
+            "SKAUTKA_1",
             "if_CITY_0:false_CITY_else_CITY_0"
         ],
         "enemy_escape_delayed": [
@@ -1604,7 +1635,7 @@
         "case_failure": "",
         "choice_A": "Dorazím ju.",
         "case_A": [
-            "set_Skautka_1_false",
+            "set_SKAUTKA_1_false",
             "CITY"
         ],
         "choice_B": "Nechám ju tak.",
@@ -1645,7 +1676,13 @@
             "set_LETTERS_REVEALED_true",
             "INTERROGATE_2"
         ],
-        "image": "assets/FOREST.png"
+        "image": "assets/FOREST.png",
+        "trigger_delayed": "PURITÁN_3",
+        "skills": [
+            "INFORMATIKA",
+            "MECHANIKA",
+            "SILA"
+        ]
     },
     "INTERROGATE_1": {
         "initial_msg": "PURITÁN: Dostal to, čo si zaslúži. Osobne som sa o to postaral. Ale predtým sme sa s ním patrične pohrali. Očistili sme ho od hriechu, ktorý z neho vyrastal.",
@@ -1702,7 +1739,7 @@
             "V tých listoch bolo aj to",
             "že by som ti mal rozmlátiť držku. Pozdravuje ťa Svetlana!"
         ],
-        "case_B": "Puritán",
+        "case_B": "PURITÁN_1",
         "choice_C": "A čo sa s ním stalo?",
         "case_C": "INTERROGATE_1",
         "case_A": [
@@ -1752,17 +1789,18 @@
         "image": "assets/CAR.png",
         "initial_msg": "Naleješ benzín do nádrže, otočíš kľúčom a... nič. Auto neštartuje.",
         "choice_A": [
-            "Vymením poistku. Možno sa odpálila",
-            "keď sa minul benzín."
+            "Vymením poistku. Možno sa odpálila, keď sa minul benzín."
         ],
         "case_A": "if_CHANGE_FILTER:false_CHANGE_FUSE_else_CHANGE_FILTER",
         "choice_B": "Vymením palivový filter.",
-        "case_B": "if_hasFilter:true_CHANGE_FILTER_else_CHANGE_FILTER_0",
+        "case_B": "if_item_FILTER>0_CHANGE_FILTER_else_CHANGE_FILTER_0",
         "choice_C": [
             "Otvorím kapotu a zistím",
             "čo sa stalo."
         ],
-        "case_C": "ANALYZE"
+        "case_C": "ANALYZE",
+        "choice_D": "Idem pohľadať filter na vrakovisko.",
+        "case_D": "WRECKS_2"
     },
     "CHANGE_FUSE": {
         "initial_msg": "Našťastie máš záložnú poistku v aute",
@@ -1793,6 +1831,7 @@
         "threat_msg": "Kontroluješ palivový filter a omylom ho vytiahneš a spadne ti na zem. Teraz máš o problém viac.",
         "case_threat": [
             "set_CHANGE_FILTER_true",
+            "set_WRECKS_2_true",
             "set_ANALYZE_false"
         ],
         "threat_avoided_msg": "Pri kontrole filtra ho omylom vytiahneš, ale zarazíš sa.",
@@ -1824,7 +1863,8 @@
         "initial_msg": "Otočíš kľúčom a tentoraz auto začne drnčať. Nedá sa povedať, že motor znie dobre, ale to neznel ani pred tým. Môžeš vyraziť.",
         "case_success": "",
         "case_failure": "",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.png",
+        "next": "DRIVE"
     },
     "CHANGE_FILTER": {
         "initial_msg": "Najskôr treba vymeniť filter.",
@@ -1846,6 +1886,11 @@
         "initial_msg": "Snáď to nepokašleš.",
         "case_success": [
             "set_CHANGE_FILTER_false",
+            "set_CHANGE_FILTER_0_false",
+            "set_ANALYZE_false",
+            "set_ANALYZE_0_false",
+            "set_CHANGE_FUSE_true",
+            "set_WRECKS_2_false",
             "CAR_6"
         ],
         "case_failure": "CAR_6",
@@ -1867,23 +1912,30 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Vyhodím hrádzu do vzduchu.",
-        "case_A": "DESTROY_DAM",
+        "case_A": "if_item_BOMBA>0_DESTROY_DAM_else_NO_BOMB",
         "choice_C": "Nebudem snáď robiť bobrom zle!",
         "case_C": "BUNKER",
-        "choice_B": [
-            "Vykopem kanál",
-            "ktorý hrádzu obtečie."
-        ],
-        "case_B": "MAKE_CANAL",
+        "choice_B": "Vykopem kanál, ktorý hrádzu obtečie.",
+        "case_B": "if_shovel:true_MAKE_CANAL_0_else_MAKE_CANAL",
         "image": "assets/BUNKER.png"
+    },
+    "NO_BOMB": {
+        "initial_msg": "Nemáš žiadnu výbušninu.",
+        "next": "DAM"
     },
     "DESTROY_DAM": {
         "initial_msg": "Aby voda naozaj odtiekla, treba nálož správne umiestniť. Zároveň nesmie zvlhnúť.",
         "case_success": [
+            "set_BUNKER_0_false",
+            "set_BUNKER_3_true",
             "set_DAM_false",
+            "item_BOMBA-1",
             "BUNKER_2"
         ],
-        "case_failure": "DAM",
+        "case_failure": [
+            "item_BOMBA-1",
+            "DAM"
+        ],
         "difficulty": 8,
         "threat": 2,
         "success_msg": "Výbuch - drevo lieta. A voda sa valí preč!",
@@ -1898,16 +1950,23 @@
         "image": "assets/BUNKER.png"
     },
     "BUNKER_2": {
-        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "initial_msg": "Bunker je teraz prístupný. Je v ňom síce stále po kolená vody a bahna, ale môžeš ho bez problémov preskúmať.",
         "case_success": "",
         "case_failure": "",
-        "image": "assets/BUNKER.png"
+        "image": "assets/BUNKER.png",
+        "choice_A": "Idem dnu.",
+        "case_A": "BUNKER_3"
     },
     "MAKE_CANAL": {
         "initial_msg": "Pustíš sa do práce. Bobry to do rána aj tak opravia.",
-        "case_success": "BUNKER_2",
+        "case_success": [
+            "set_DAM_false",
+            "set_BUNKER_0_false",
+            "set_BUNKER_3_true",
+            "BUNKER_2"
+        ],
         "case_failure": "DAM",
-        "difficulty": 8,
+        "difficulty": 9,
         "threat": 2,
         "success_msg": "Dalo to zabrať, ale kanál je hotový a voda pomaly odteká.",
         "skills": [
@@ -1924,6 +1983,7 @@
         "initial_msg": "Nebude to jednoduché, ale na druhú stranu - Puritáni nie sú práve IT odborníci. Aké môžu mať zabezpečenie?",
         "case_success": [
             "flag_contactedFort:true",
+            "set_HACK_TRANSMITTER_false",
             "CALL"
         ],
         "case_failure": "GENERATOR",
@@ -1941,7 +2001,6 @@
         "image": "assets/TOWER.png"
     },
     "PURITÁN_3": {
-        "case_success": "",
         "case_failure": "",
         "type": "Puritán",
         "image": "assets/TOWER.png"
@@ -1960,28 +2019,39 @@
         "image": "assets/TOWER.png"
     },
     "CALL_0": {
-        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "initial_msg": "VYSIELAČ: Počuj, neviem, kto si, ale ak mi sľúbiš, že im odstavíš ten vysielač, dám ti súradnice k našej pevnosti.",
         "case_success": "",
         "case_failure": "",
-        "image": "assets/TOWER.png"
+        "image": "assets/TOWER.png",
+        "choice_A": [
+            "Ok",
+            "urobím to. Ale načo mi budú súradnice? Nemám GPS."
+        ],
+        "case_A": "CALL_1",
+        "choice_B": "Do toho sa radšej nebudem miešať. Do počutia.",
+        "case_B": "GENERATOR"
     },
     "IN_BASEMENT_0": {
-        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "initial_msg": "Nachádzaš sa v starej garáži. Kedysi sa tu niekto ukrýval, ale už tu dlho nebol. Môžeš to tu skúsiť prehľadať.",
         "case_success": "",
         "case_failure": "",
         "choice_A": "Idem späť.",
         "case_A": "CITY_2",
         "choice_B": "Skúsim vyrobiť bombu.",
-        "case_B": [
-            "MAKE_BOMB",
-            "CITY_2"
-        ],
-        "image": "assets/CITY.png"
+        "case_B": "MAKE_BOMB",
+        "image": "assets/CITY.png",
+        "choice_C": "Skúsim vyrobiť feromóny.",
+        "case_C": "if_item_ŽĽAZA SOMORY>0_MAKE_PHEROMONES",
+        "choice_D": "Prehľadám to tu.",
+        "case_D": "IN_BASEMENT"
     },
     "MAKE_BOMB": {
         "initial_msg": "Len aby ti to nebuchlo v rukách...",
-        "case_success": "item_BOMBA+1",
-        "case_failure": "CITY_2",
+        "case_success": [
+            "item_BOMBA+1",
+            "IN_BASEMENT_0"
+        ],
+        "case_failure": "IN_BASEMENT_0",
         "skills": [
             "VÝROBA VÝBUŠNÍN",
             "CHÉMIA"
@@ -2000,17 +2070,17 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Ošetrím sa.",
-        "case_A": [
-            "HEAL",
-            "CAR_3"
-        ],
+        "case_A": "HEAL",
         "choice_B": "Nie je čas. Ide sa ďalej.",
         "case_B": "CAR_3",
         "image": "assets/WRECKS.png"
     },
     "HEAL": {
         "initial_msg": "Hlavne to ešte nezhoršiť...",
-        "case_success": "stress-3",
+        "case_success": [
+            "stress-3",
+            "WRECKS_1"
+        ],
         "case_failure": "WRECKS_1",
         "skills": [
             "LIEČENIE",
@@ -2026,14 +2096,418 @@
         "failure_msg": "Každý pokus tak bolí, že to radšej necháš tak.",
         "image": "assets/PLACEHOLDER.png"
     },
+    "DIVE_0": {
+        "case_success": [
+            "stress+1",
+            "BUNKER_1",
+            "set_DIVE_0_false"
+        ],
+        "case_failure": "BUNKER_0",
+        "image": "assets/BUNKER.png",
+        "difficulty": 9,
+        "threat": 4,
+        "success_msg": "Objavíš vchod do vedľajšej časti a vynoríš sa tam. Našťasie je tam trochu vzduchu. Nanešťastie je ten vzduch sotva dýchateľný. Takmer od toho smradu odpadneš.",
+        "threat_msg": "Pod vodou do niečoho hlavou narazíš.",
+        "case_threat": "stress+1",
+        "threat_avoided_msg": "Šmátraš rukami pred sebou, nech do niečoho nenarazíš.",
+        "failure_msg": "Tento pokus nepriniesol žiadne ovocie.",
+        "skills": [
+            "PLÁVANIE",
+            "OBRATNOSŤ"
+        ],
+        "initial_msg": "Nádych..."
+    },
+    "BUNKER_3": {
+        "initial_msg": "Brodíš sa bahnom. Vnútri je strašný smrad. Všetko je vlhké a obrastené riasami. Vidíš aj vchod do vedľajšej miestnosti.",
+        "case_success": "",
+        "case_failure": "",
+        "image": "assets/BUNKER.png",
+        "choice_A": "Prehľadám to tu.",
+        "case_A": "BUNKER_4",
+        "choice_B": "Idem späť.",
+        "case_B": "BUNKER",
+        "choice_C": "Idem sa pozrieť vedľa.",
+        "case_C": "BUNKER_5"
+    },
+    "BUNKER_4": {
+        "case_success": [
+            "item_DEZINFEKCIA+1",
+            "item_FILTER+1",
+            "flag_hose:true",
+            "set_NO_HOSE_NO_CONTAINER_false",
+            "set_NO_HOSE_false",
+            "if_container:false_set_NO_CONTAINER_true",
+            "if_container:true_set_WRECKS_true",
+            "if_container:true_set_SUCK_true",
+            "item_HADICA+1",
+            "set_BUNKER_4_false",
+            "BUNKER_3"
+        ],
+        "case_failure": [
+            "flag_hose:true",
+            "set_NO_HOSE_NO_CONTAINER_false",
+            "set_NO_HOSE_false",
+            "if_container:false_set_NO_CONTAINER_true",
+            "if_container:true_set_WRECKS_true",
+            "if_container:true_set_SUCK_true",
+            "item_HADICA+1",
+            "BUNKER_3"
+        ],
+        "image": "assets/BUNKER.png",
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ"
+        ],
+        "difficulty": 7,
+        "threat": 2,
+        "success_msg": "Nachádzaš nejaké použiteľné zásoby. Fľaštičku dezinfekcie, hadicu a dokonca palivový filter - zabalený a zdá sa, že nepoškodený.",
+        "case_threat": "stress+1",
+        "threat_msg": "Šmykneš sa, spadneš a narazíš si ruku.",
+        "threat_avoided_msg": "Šmykneš sa a takmer spadneš. Ale len tak-tak udržíš rovnováhu.",
+        "failure_msg": "Z bahna vylovíš len nejakú starú hadicu."
+    },
+    "MAKE_CANAL_0": {
+        "initial_msg": "Ešte že máš tú lopatku! Bude to aspoň trochu ľahšie. Pustíš sa do práce. Bobry to do rána aj tak opravia.",
+        "case_success": [
+            "set_DAM_false",
+            "set_BUNKER_0_false",
+            "set_BUNKER_3_true",
+            "BUNKER_2"
+        ],
+        "case_failure": "DAM",
+        "difficulty": 7,
+        "threat": 2,
+        "success_msg": "Dalo to zabrať, ale kanál je hotový a voda pomaly odteká.",
+        "skills": [
+            "BUDOVANIE",
+            "STAVBA"
+        ],
+        "failure_msg": "Nejde to. Kanál sa stále upcháva, pôda je vlhká, len sa hrabeš v bahne.",
+        "threat_msg": "Zaboríš sa do bahna a keď sa vyhrabeš, zistíš, že topánky tam zostali.",
+        "case_threat": "stress+1",
+        "threat_avoided_msg": "Začneš sa zabárať do bahna, ale včas sa dostaneš na pevnú pôdu.",
+        "image": "assets/BUNKER.png"
+    },
+    "BUNKER_5": {
+        "initial_msg": "Na zemi leží niečo zhruba v tvare človeka. Bunker nebol až taký opustený, ako sa zdalo. Toto bol asi majiteľ, ale ten už ti nič nepovie.",
+        "case_success": "",
+        "case_failure": "",
+        "image": "assets/BUNKER.png",
+        "choice_A": "Idem späť.",
+        "case_A": "if_BUNKER_4:true_BUNKER_3_else_BUNKER_6"
+    },
+    "MAKE_PHEROMONES": {
+        "initial_msg": "Toto nie je veľmi príjemná činnosť.",
+        "case_success": [
+            "item_FEROMÓNY+1",
+            "IN_BASEMENT_0"
+        ],
+        "case_failure": "IN_BASEMENT_0",
+        "skills": [
+            "BIOCHÉMIA",
+            "SYNTÉZA FEROMÓNOV"
+        ],
+        "difficulty": 8,
+        "threat": 4,
+        "success_msg": "Podarilo sa - smrdí to ako Somora!",
+        "threat_msg": "Kontaminuješ vzorku, musíš použiť ďalšiu.",
+        "case_threat": "item_ŽĽAZA SOMORY-1",
+        "threat_avoided_msg": "Nie je to najčistejšie prostredie. Takmer položíš vzorku na misku, na ktorej je akási pleseň, ale včas si to všimneš.",
+        "failure_msg": "Len narobíš neporiadok a nič z toho."
+    },
+    "BUNKER_6": {
+        "initial_msg": "Tu už nemáš čo robiť. Bunker je prehľadaný.",
+        "case_success": "",
+        "case_failure": "",
+        "back": true,
+        "image": "assets/BUNKER.png",
+        "choice_D": "Idem späť k útesu.",
+        "case_D": "CLIFF"
+    },
+    "CALL_1": {
+        "initial_msg": "VYSIELAČ: Si predsa pri ich počítači. Pozrieš si mapu. Ale nie je čas, tu sú súradnice, píš si: 49.727645, 14.116721. A teraz sa postaraj o ten vysielač.",
+        "case_success": "",
+        "case_failure": "",
+        "image": "assets/TOWER.png",
+        "choice_A": "Zničím vysielač.",
+        "case_A": "DESTROY_TRANSMITTER",
+        "choice_B": "Nezničím ho a idem preč.",
+        "case_B": "GENERATOR"
+    },
+    "DESTROY_TRANSMITTER": {
+        "initial_msg": "Ktoré čipy a káble sú asi najpodstatnejšie?",
+        "case_success": [
+            "flag_transmitterDestroyed:true",
+            "GENERATOR"
+        ],
+        "case_failure": "GENERATOR",
+        "skills": [
+            "INFORMATIKA",
+            "KLEPETÁ",
+            "HRYZADLÁ"
+        ],
+        "difficulty": 7,
+        "threat": 3,
+        "success_msg": "Trochu to zaiskrilo a potom všetko zhaslo. To by malo stačiť.",
+        "threat_msg": "Ozve sa nejaký čudný zvuk a máš taký nepríjemný pocit, že to bol alarm.",
+        "case_threat_delayed": "PURITÁN_4",
+        "failure_msg": "Robíš, čo vieš, ale tie krámy sú odolnejšie, ako sa zdá.",
+        "case_threat": "set_PURITÁN_4_true"
+    },
+    "PURITÁN_4": {
+        "case_success": "",
+        "case_failure": "",
+        "type": "Puritán",
+        "image": "assets/TOWER.png"
+    },
+    "DRIVE": {
+        "initial_msg": "Cesta je príšerná, ale to nie je nič nové. Ako vždy dúfaš, že táto kraksňa ešte chvíľu vydrží.",
+        "case_success": "",
+        "case_failure": "",
+        "initial_msg_1": "Do cesty ti však vbehne Skautka.",
+        "choice_A": "Zrazím ju.",
+        "case_A": "RUN_SCOUT_OVER",
+        "choice_B": "Pokúsim sa ju obísť.",
+        "case_B": "AVOID_SCOUT"
+    },
+    "RUN_SCOUT_OVER": {
+        "initial_msg": "Namieriš to rovno do nej.",
+        "case_success": "DRIVE_1",
+        "case_failure": "DRIVE_1",
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠOFÉROVANIE"
+        ],
+        "difficulty": 8,
+        "threat": 4,
+        "success_msg": "Rozpleskne sa ako mucha.",
+        "threat_msg": "Ako sa ju snažíš trafiť, nevšimneš jamu a počuješ nejaké zaškrípanie.",
+        "case_threat": "flag_carDamage:1",
+        "threat_avoided_msg": "V poslednej chvíli si všimneš obrovskú jamu a obídeš ju.",
+        "failure_msg": "Skautke sa podarí uskočiť."
+    },
+    "AVOID_SCOUT": {
+        "initial_msg": "Strhneš volant nabok.",
+        "case_success": "DRIVE_1",
+        "case_failure": [
+            "set_SKAUTKA_4_true",
+            "DRIVE_2"
+        ],
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠOFÉROVANIE"
+        ],
+        "difficulty": 7,
+        "threat": 4,
+        "success_msg": "Tesne sa jej vyhneš.",
+        "threat_msg": "Ako sa ju snažíš obísť, nevšimneš jamu a počuješ nejaké zaškrípanie.",
+        "case_threat": "flag_carDamage:1",
+        "threat_avoided_msg": "V poslednej chvíli si všimneš obrovskú jamu a obídeš ju.",
+        "failure_msg": "Skautka ti vyskočí na auto."
+    },
+    "DRIVE_1": {
+        "initial_msg": "Pokračuješ v ceste. Snáď to bol posledný takýto incident...",
+        "case_success": "",
+        "case_failure": "",
+        "initial_msg_1": "Ale kdeže! O chvíľu sa na ceste objaví Predátorka a rozbehne sa proti tebe.",
+        "choice_A": [
+            "Toto už by moje auto nemuselo prežiť",
+            "obídem ju."
+        ],
+        "case_A": "AVOID_PREDATOR",
+        "choice_B": "Poďme do nej!",
+        "case_B": "HIT_PREDATOR"
+    },
+    "AVOID_PREDATOR": {
+        "initial_msg": "Cesta je úzka, budeš musieť ísť na pole.",
+        "case_success": "DRIVE_3",
+        "case_failure": [
+            "set_PREDÁTORKA_7_true",
+            "CAR_CRASH"
+        ],
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠOFÉROVANIE"
+        ],
+        "difficulty": 8,
+        "threat": 4,
+        "success_msg": "Vyhneš sa jej a zmizne za tebou.",
+        "failure_msg": "Nezvládneš cestu po zlom teréne a tvoje auto sa prevráti.",
+        "threat_msg": "Predátorka ti ostňom prepichne koleso.",
+        "case_threat": "flag_carDamage+1",
+        "threat_avoided_msg": "Predátorka sa zahnala ostňom po aute a takmer ti prebodla koleso."
+    },
+    "HIT_PREDATOR": {
+        "initial_msg": "Kto z koho...",
+        "case_success": "if_scoutOnCar:true_DRIVE_6_else_DRIVE_3",
+        "case_failure": [
+            "set_PREDÁTORKA_7_true",
+            "if_SKAUTKA_4:true_DRIVE_4_else_DRIVE_5"
+        ],
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠOFÉROVANIE"
+        ],
+        "difficulty": 9,
+        "threat": 3,
+        "success_msg": "Napáliš to do nej.",
+        "threat_msg": "Ostňom ti prerazí čelné sklo a bodne ťa do ramena.",
+        "case_threat": "stress+2",
+        "threat_avoided_msg": "Prepichne ti ostňom čelné sklo, tesne uhneš.",
+        "failure_msg": "Vyskočí ti na strechu."
+    },
+    "DRIVE_2": {
+        "initial_msg": "Pokračuješ v ceste a počuješ, ako sa Skautka snaží udržať na streche auta.",
+        "case_success": "",
+        "case_failure": "",
+        "initial_msg_1": "Aby toho nebolo málo, o chvíľu sa na ceste objaví Predátorka a rozbehne sa proti tebe.",
+        "choice_A": [
+            "Toto už by moje auto nemuselo prežiť",
+            "obídem ju."
+        ],
+        "case_A": "AVOID_PREDATOR",
+        "choice_B": "Poďme do nej!",
+        "case_B": "HIT_PREDATOR"
+    },
+    "DRIVE_3": {
+        "initial_msg": "Obe Somory necháš za sebou a pokračuješ v ceste.",
+        "case_success": "",
+        "case_failure": "",
+        "initial_msg_1": "Po chvíli v diaľke zazrieš pevnosť a pred ňou aj nejakých ľudí. A nestrieľajú po tebe! Podarilo sa to! Konečne!",
+        "next": "GAME_OVER"
+    },
+    "DRIVE_4": {
+        "initial_msg": "Teraz ich máš na aute dve a snažia sa dostať dnu.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Skúsim ich striasť.",
+        "case_A": "SHAKE_OFF",
+        "choice_B": "Zastavím a vybavím si to s nimi.",
+        "case_B": "PREDÁTORKA_7"
+    },
+    "DRIVE_5": {
+        "initial_msg": "Stále máš na aute Predátorku.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": [
+            "Budem autom kľučkovať",
+            "aby spadla."
+        ],
+        "case_A": "SHAKE_OFF",
+        "choice_B": "Zastavím a vybavím si to s ňou.",
+        "case_B": "PREDÁTORKA_7"
+    },
+    "CAR_CRASH": {
+        "initial_msg": "Auto je zdemolované.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Pozbieram sa.",
+        "case_A": [
+            "if_SKAUTKA_4:true_SKAUTKA_4_else_PREDÁTORKA_7",
+            "flag_carWrecked:true"
+        ],
+        "choice_B": "",
+        "case_B": ""
+    },
+    "SHAKE_OFF": {
+        "initial_msg": "Ak by ti nešlo o život, bola by to skvelá zábava.",
+        "case_success": "DRIVE_3",
+        "skills": [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠOFÉROVANIE"
+        ],
+        "difficulty": 8,
+        "threat": 3,
+        "success_msg": "Podarilo sa, môžeš pokračovať v jazde.",
+        "case_threat": "carDamage+1",
+        "case_failure": "if_carDamage>2_CAR_CRASH_else_BACK_ACTION_1",
+        "threat_msg": "Na ceste bol nejaký kus dreva alebo veľký kameň, nestihneš uhnúť a zacítiš silný úder.",
+        "threat_avoided_msg": "Na ceste bol nejaký kus dreva, tesne ho obídeš.",
+        "failure_msg": "Tá pliaga sa drží ako kliešť."
+    },
+    "SKAUTKA_4": {
+        "image": "assets/PLACEHOLDER.png",
+        "initial_msg": "Napadne ťa Skautka.",
+        "case_failure": "",
+        "type": "Skautka",
+        "case_success": [
+            "PREDÁTORKA_7",
+            "if_carWrecked:true_ON_FOOT_else_DRIVE_3"
+        ]
+    },
+    "PREDÁTORKA_7": {
+        "image": "assets/PLACEHOLDER.png",
+        "initial_msg": "Ďalšie Somora!",
+        "case_failure": "",
+        "type": "Predátorka",
+        "case_success": [
+            "SKAUTKA_4",
+            "if_carWrecked:true_ON_FOOT_else_DRIVE_3"
+        ]
+    },
+    "DRIVE_6": {
+        "initial_msg": "Stále máš na aute Predátorku.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": [
+            "Budem autom kľučkovať",
+            "aby spadla."
+        ],
+        "case_A": "SHAKE_OFF",
+        "choice_B": "Zastavím a vybavím si to s ňou.",
+        "case_B": "SKAUTKA_4"
+    },
+    "ON_FOOT": {
+        "initial_msg": "Vyrazíš. Dlho sa vlečieš, už ledva zdvíhaš nohy...",
+        "case_success": "",
+        "case_failure": "",
+        "initial_msg_1": "Po niekoľkých hodinách v diaľke zazrieš pevnosť a pred ňou aj nejakých ľudí. A nestrieľajú po tebe! Podarilo sa to! Konečne!",
+        "next": "GAME_OVER"
+    },
+    "WRECKS_2": {
+        "initial_msg": "Si späť na vrakovisku. Možno v nietorom z tých šrotov zabudli filter.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Prehľadám vraky.",
+        "case_A": "FIND_FILTER",
+        "choice_B": "Idem späť.",
+        "case_B": "CAR_6",
+        "image": "assets/WRECKS.png",
+        "trigger_delayed": "Skautka"
+    },
+    "FIND_FILTER": {
+        "initial_msg": "Tak v ktorom by mohol byť?",
+        "case_success": [
+            "item_FILTER+1",
+            "set_WRECKS_2_false",
+            "CHANGE_FILTER"
+        ],
+        "case_failure": "WRECKS_2",
+        "skills": [
+            "ZRUČNOSŤ",
+            "MECHANIKA"
+        ],
+        "difficulty": 7,
+        "threat": 2,
+        "success_msg": "Máš ho! Mal by stačiť.",
+        "threat_msg": "Hluk privolal Somoru. Našťastie je to len Skautka.",
+        "threat_avoided_msg": "Snažíš sa nerobiť priveľký hluk, aby si neprilákal nejaké Somory.",
+        "failure_msg": "Nič...",
+        "case_threat_delayed": "Skautka"
+    },
     "LAYOUT": {
         "GAME_OVER": {
-            "x": 13710,
-            "y": 814
+            "x": 16508,
+            "y": 957
         },
         "DISTRACT_PREDATOR": {
-            "x": 8749,
-            "y": 1996
+            "x": 8727,
+            "y": 1893
         },
         "WRECKS_PREDATOR_2": {
             "x": 8742,
@@ -2064,24 +2538,24 @@
             "y": 2209
         },
         "CAR_3": {
-            "x": 12309,
+            "x": 12192,
             "y": 1264
         },
         "CAR_2": {
-            "x": 10066,
-            "y": 3299
+            "x": 9573,
+            "y": 3343
         },
         "CITY_2": {
-            "x": 9149,
-            "y": 2755
+            "x": 9158,
+            "y": 2757
         },
         "IN_BASEMENT": {
-            "x": 8661,
-            "y": 2931
+            "x": 8333,
+            "y": 2583
         },
-        "Skautka_2": {
-            "x": 8640,
-            "y": 3148
+        "SKAUTKA_2": {
+            "x": 8490,
+            "y": 3007
         },
         "BASEMENT_DISTRACT": {
             "x": 8107,
@@ -2092,18 +2566,18 @@
             "y": 3353
         },
         "EXPLORE_BASEMENT": {
-            "x": 9073,
-            "y": 3174
+            "x": 8884,
+            "y": 3125
         },
         "BASEMENT_ENTRANCE": {
-            "x": 9411,
-            "y": 3028
+            "x": 9222,
+            "y": 2988
         },
         "CITY": {
-            "x": 9665,
-            "y": 2654
+            "x": 9597,
+            "y": 2612
         },
-        "Skautka_1": {
+        "SKAUTKA_1": {
             "x": 10260,
             "y": 2327
         },
@@ -2132,8 +2606,8 @@
             "y": 2553
         },
         "LOOK_AROUND": {
-            "x": 10537,
-            "y": 2971
+            "x": 10736,
+            "y": 2907
         },
         "TOWER_0": {
             "x": 10693,
@@ -2144,20 +2618,20 @@
             "y": 3024
         },
         "FOREST_PATH": {
-            "x": 9752,
-            "y": 3704
+            "x": 10057,
+            "y": 3710
         },
         "SLOPE": {
             "x": 10969,
             "y": 3747
         },
         "CAR_1": {
-            "x": 10366,
-            "y": 3150
+            "x": 10336,
+            "y": 2995
         },
         "WALK_1": {
-            "x": 12094,
-            "y": 3348
+            "x": 12184,
+            "y": 3363
         },
         "TOWER_1": {
             "x": 11746,
@@ -2180,8 +2654,8 @@
             "y": 4301
         },
         "PURITÁN_1": {
-            "x": 11042,
-            "y": 4619
+            "x": 11073,
+            "y": 4742
         },
         "PURITAN_LIE": {
             "x": 10582,
@@ -2244,24 +2718,24 @@
             "y": 4539
         },
         "SHACK_CELLAR": {
-            "x": 8048,
-            "y": 5755
+            "x": 8308,
+            "y": 5548
         },
         "SHACK_1": {
             "x": 9125,
             "y": 4886
         },
         "SHACK_CELLAR_0": {
-            "x": 7694,
-            "y": 5589
+            "x": 7888,
+            "y": 5400
         },
         "UNLOCK_CELLAR": {
             "x": 9489,
             "y": 5085
         },
         "SHACK_ATTIC": {
-            "x": 9180,
-            "y": 5286
+            "x": 9186,
+            "y": 5245
         },
         "SHACK_2": {
             "x": 9577,
@@ -2384,36 +2858,28 @@
             "y": 4492
         },
         "TRACK": {
-            "x": 12664,
-            "y": 3933
+            "x": 12381,
+            "y": 3678
         },
         "LAKE": {
-            "x": 13554,
-            "y": 4283
+            "x": 13195,
+            "y": 3909
         },
         "BUNKER": {
-            "x": 13868,
-            "y": 4442
+            "x": 13870,
+            "y": 4357
         },
         "BUNKER_0": {
-            "x": 14275,
-            "y": 4459
+            "x": 14366,
+            "y": 4389
         },
         "DIVE": {
-            "x": 14343,
-            "y": 4691
-        },
-        "DIVE_0": {
-            "x": 14593,
-            "y": 4600
-        },
-        "DIVE_4": {
-            "x": 14492,
-            "y": 4153
+            "x": 14711,
+            "y": 4415
         },
         "BUNKER_1": {
-            "x": 14944,
-            "y": 4801
+            "x": 14900,
+            "y": 4737
         },
         "TUTORIAL": {
             "x": 16138,
@@ -2488,20 +2954,20 @@
             "y": 5313
         },
         "INTERROGATE_0": {
-            "x": 12878,
-            "y": 5497
+            "x": 12829,
+            "y": 5554
         },
         "INTERROGATE_1": {
-            "x": 12685,
-            "y": 4617
+            "x": 12518,
+            "y": 4704
         },
         "INTERROGATE_2": {
-            "x": 12517,
-            "y": 5296
+            "x": 12540,
+            "y": 5255
         },
         "LETTERS_REVEALED": {
-            "x": 12553,
-            "y": 4878
+            "x": 12424,
+            "y": 4899
         },
         "INTERROGATE_3": {
             "x": 11828,
@@ -2520,7 +2986,7 @@
             "y": 1208
         },
         "CHANGE_FUSE": {
-            "x": 12704,
+            "x": 12790,
             "y": 869
         },
         "ANALYZE": {
@@ -2532,60 +2998,64 @@
             "y": 1516
         },
         "DEPART": {
-            "x": 13235,
-            "y": 790
+            "x": 13201,
+            "y": 726
         },
         "CHANGE_FILTER": {
             "x": 13013,
             "y": 1067
         },
         "CHANGE_FILTER_0": {
-            "x": 13110,
-            "y": 1364
+            "x": 13064,
+            "y": 1315
         },
         "CHANGE_FILTER_1": {
             "x": 13358,
             "y": 1191
         },
         "DAM": {
-            "x": 13881,
-            "y": 4783
+            "x": 13786,
+            "y": 4734
+        },
+        "NO_BOMB": {
+            "x": 13910,
+            "y": 4650
         },
         "DESTROY_DAM": {
-            "x": 13861,
-            "y": 5054
+            "x": 13511,
+            "y": 5134
         },
         "BUNKER_2": {
-            "x": 14300,
-            "y": 5354
+            "x": 14090,
+            "y": 5283
         },
         "MAKE_CANAL": {
-            "x": 14242,
-            "y": 4923
+            "x": 13816,
+            "y": 4991
         },
         "HACK_TRANSMITTER": {
-            "x": 12743,
-            "y": 4385
+            "x": 12831,
+            "y": 4376
         },
         "PURITÁN_3": {
-            "x": 12423,
-            "y": 4226
+            "x": 12477,
+            "y": 4231
         },
         "CALL": {
-            "x": 13129,
-            "y": 4671
+            "x": 13139,
+            "y": 4661
         },
         "CALL_0": {
-            "x": 13396,
-            "y": 4871
+            "x": 13280,
+            "y": 4874
         },
         "IN_BASEMENT_0": {
-            "x": 8187,
-            "y": 2798
+            "x": 8249,
+            "y": 2792
         },
         "MAKE_BOMB": {
-            "x": 8183,
-            "y": 2555
+            "x": 7961,
+            "y": 2515
         },
         "WRECKS_1": {
             "x": 9460,
@@ -2594,6 +3064,118 @@
         "HEAL": {
             "x": 9386,
             "y": 1500
+        },
+        "DIVE_0": {
+            "x": 14653,
+            "y": 4554
+        },
+        "BUNKER_3": {
+            "x": 14533,
+            "y": 5045
+        },
+        "BUNKER_4": {
+            "x": 14493,
+            "y": 5311
+        },
+        "MAKE_CANAL_0": {
+            "x": 14093,
+            "y": 4915
+        },
+        "BUNKER_5": {
+            "x": 14810,
+            "y": 4963
+        },
+        "MAKE_PHEROMONES": {
+            "x": 7759,
+            "y": 2723
+        },
+        "BUNKER_6": {
+            "x": 13600,
+            "y": 4467
+        },
+        "CALL_1": {
+            "x": 13259,
+            "y": 5114
+        },
+        "DESTROY_TRANSMITTER": {
+            "x": 13242,
+            "y": 5311
+        },
+        "PURITÁN_4": {
+            "x": 12790,
+            "y": 4557
+        },
+        "DRIVE": {
+            "x": 13681,
+            "y": 691
+        },
+        "RUN_SCOUT_OVER": {
+            "x": 14017,
+            "y": 597
+        },
+        "AVOID_SCOUT": {
+            "x": 14036,
+            "y": 845
+        },
+        "DRIVE_1": {
+            "x": 14522,
+            "y": 578
+        },
+        "AVOID_PREDATOR": {
+            "x": 14951,
+            "y": 721
+        },
+        "HIT_PREDATOR": {
+            "x": 14938,
+            "y": 490
+        },
+        "DRIVE_2": {
+            "x": 14541,
+            "y": 725
+        },
+        "DRIVE_3": {
+            "x": 15984,
+            "y": 458
+        },
+        "DRIVE_4": {
+            "x": 15325,
+            "y": 844
+        },
+        "DRIVE_5": {
+            "x": 15407,
+            "y": 564
+        },
+        "CAR_CRASH": {
+            "x": 15331,
+            "y": 1143
+        },
+        "SHAKE_OFF": {
+            "x": 15753,
+            "y": 600
+        },
+        "SKAUTKA_4": {
+            "x": 15756,
+            "y": 1035
+        },
+        "PREDÁTORKA_7": {
+            "x": 15754,
+            "y": 772
+        },
+        "DRIVE_6": {
+            "x": 15491,
+            "y": 378
+        },
+        "ON_FOOT": {
+            "x": 16118,
+            "y": 1023
+        },
+        "WRECKS_2": {
+            "x": 12023,
+            "y": 947
+        },
+        "FIND_FILTER": {
+            "x": 11848,
+            "y": 614
         }
     },
     "ACTIVE": {
@@ -2639,8 +3221,8 @@
         "SHACK_LOOK_AROUND": true,
         "SHACK_WINDOW": true,
         "SNEAK": true,
-        "Skautka_1": true,
-        "Skautka_2": true,
+        "SKAUTKA_1": true,
+        "SKAUTKA_2": false,
         "SLOPE": true,
         "START": true,
         "SUCK": false,
@@ -2684,16 +3266,15 @@
         "CLIFF_CLIMB_0": false,
         "TOWER_2": true,
         "PURITAN_ESCAPE": true,
-        "TRACK": false,
+        "TRACK": true,
         "TEST": true,
         "LAKE": true,
         "TEST2": true,
-        "BUNKER": true,
+        "BUNKER": false,
         "BUNKER_0": true,
         "BUNKER_1": true,
         "DIVE": true,
         "DIVE_0": false,
-        "DIVE_4": false,
         "TUTORIAL": true,
         "TUTORIAL_0": true,
         "TUTORIAL_1": true,
@@ -2723,8 +3304,8 @@
         "CHANGE_FUSE": false,
         "ANALYZE": true,
         "ANALYZE_0": false,
-        "DEPART": false,
-        "CHANGE_FILTER": false,
+        "DEPART": true,
+        "CHANGE_FILTER": true,
         "DAM": true,
         "CHANGE_FILTER_0": true,
         "DESTROY_DAM": true,
@@ -2735,9 +3316,37 @@
         "PURITÁN_3": true,
         "CALL": false,
         "CALL_0": true,
-        "IN_BASEMENT_0": true,
-        "MAKE_BOMB": true,
+        "IN_BASEMENT_0": false,
+        "MAKE_BOMB": false,
         "WRECKS_1": true,
-        "HEAL": true
-        }
+        "HEAL": true,
+        "BUNKER_3": false,
+        "BUNKER_4": true,
+        "MAKE_CANAL_0": true,
+        "BUNKER_5": true,
+        "MAKE_PHEROMONES": false,
+        "BUNKER_6": true,
+        "CALL_1": true,
+        "DESTROY_TRANSMITTER": true,
+        "NO_BOMB": true,
+        "PURITÁN_4": false,
+        "DRIVE": true,
+        "RUN_SCOUT_OVER": true,
+        "AVOID_SCOUT": true,
+        "DRIVE_1": true,
+        "DRIVE_2": true,
+        "AVOID_PREDATOR": true,
+        "HIT_PREDATOR": true,
+        "DRIVE_3": true,
+        "DRIVE_4": true,
+        "DRIVE_5": true,
+        "CAR_CRASH": true,
+        "SHAKE_OFF": true,
+        "SKAUTKA_4": false,
+        "PREDÁTORKA_7": false,
+        "DRIVE_6": true,
+        "ON_FOOT": true,
+        "WRECKS_2": true,
+        "FIND_FILTER": true
+    }
 }

@@ -202,6 +202,11 @@
             font-weight: bold;
         }
 
+        #heal {
+            display: flex;
+            justify-content: center;
+        }
+
         #sp-label, #sp {
             font-size: 1.3rem;
             font-weight: bold;
@@ -512,13 +517,6 @@
             z-index: 9999 !important;
         }
 
-        .card-tray .card-container:first-child:hover {
-            transform: scale(1.7) translateY(-20px) translateX(15px);
-        }
-
-        .card-tray .card-container:last-child:hover {
-            transform: scale(1.7) translateY(-20px) translateX(-15px);
-        }
 
         .table-card {
             width: 170px; /* Adjust size for board visibility if needed */

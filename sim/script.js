@@ -1,6 +1,12 @@
+        let test_mode = true;
+        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
+        const DEBUG = true;
+        let current_challenge_key = "WRECKS_1";
+
         let keep_testing = false;
-        let test_mode = false;
         let prev_challenge = null;
+        let pre_encounter_challenge_key = null;
+        let queued_difficulty_target = null;
         let stuck_counter = 0;
         let CHALLENGES = {};
         let ENEMY_TYPES = {};
@@ -16,17 +22,15 @@
         let readyPromptTimeout = null;
 
 
-        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
         const conflict_difficulty = 6;
         const conflict_threat = 2;
-        let current_challenge_key = "START";
         if (DEBUG) { gameOn = true, hero_selected = true};
 
 
         const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
         const ATTACK_SKILLS = ["SILA", "OBRATNOSŤ", "ZMYSLY"]
         const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE"];
+        const SNEAK_SKILLS = ["PLÝŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
 
         const CARDS = {
             "O": [[3, [10]], [1, [10, 4]]],
@@ -104,6 +108,18 @@
             },
             "ZDRAVOTNÉ POMÔCKY": {
                 "description": "Nevyhnutné pre poskytnutie prvej pomoci."
+            },
+            "ŽĽAZA SOMORY": {
+                "description": "Dali by sa z toho syntetizovať feromóny."
+            },
+            "FEROMÓNY": {
+                "description": "Dokážu ovplyvniť správanie Somôr."
+            },
+            "BOMBA":{
+                "description": "Vďaka nej zmiznú veci, ktoré ti prekážajú."
+            },
+            "FILTER":{
+                "description": "Palivový filter. Aby sa do motora nedostalo nejaké svinstvo."
             }
         }
         window.ITEM_LIST = ITEM_LIST;
@@ -126,7 +142,7 @@
 
         // --- Core Engine Architecture Variables ---
         let pending_challenge_key = null;  
-        let pre_encounter_challenge_key = null; // Tracks where the player was before entering combat (for escape)
+        let pending_enemy_key = null;
         let player_escaping = false;
         let player_escape_counter = 0;
         let player_zero_counter = 0
@@ -156,6 +172,8 @@
         let is_action_phase = false;
         let is_conflict = false; 
         let chase_mode = false;
+        let distance_combat_active = false; // true while player has ranged advantage and distance > 0
+        let conflict_distance = 0; // current distance to enemy_id's CHALLENGES entry
         let current_challenge = { difficulty: 7, threat: 2 };
         let inputs_frozen = false;
         let combat_starter = null;
@@ -184,6 +202,252 @@
         let collapse_action_done = false;
         let is_heal_check = false;
         let heal_attempts = 0;
+        let is_elimination_check = false;
+        let elimination_mode = "kill"; // "kill" | "sneak" — set by runElimination()
+
+
+        function elimination(enemyKey) {
+            inputs_frozen = true;
+            if (!enemyKey) return null;
+
+            const hasSilentSkill = HERO.skills["TICHÁ ELIMINÁCIA"] !== undefined && HERO.skills["TICHÁ ELIMINÁCIA"] > 0;
+            const hasRangedSkill = HERO.skills["ELIMINÁCIA Z DIAĽKY"] !== undefined && HERO.skills["ELIMINÁCIA Z DIAĽKY"] > 0;
+            const dist = (CHALLENGES[enemyKey] && CHALLENGES[enemyKey].distance) || 0;
+
+            // Zistenie aktuálne vybranej zbrane a jej poškodenia
+            const weaponDropdown = document.getElementById("player-weapon-dropdown");
+            const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
+
+            let currentWeaponDamage = 0;
+            let isRangedWeapon = false;
+
+            if (selectedWeaponName && selectedWeaponName !== "placeholder") {
+                if (WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined) {
+                    currentWeaponDamage = WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName];
+                    isRangedWeapon = true;
+                } else if (WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined) {
+                    currentWeaponDamage = WEAPON_LIST["VRHACIE"][selectedWeaponName];
+                    isRangedWeapon = true;
+                }
+            }
+
+            // Rovnako ako v boji (KROK 4): zbraň s muníciou v INITIAL_AMMO ju musí mať k dispozícii
+            let hasAmmo = true;
+            if (isRangedWeapon && typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
+                const currentAmmo = HERO["ammo"][selectedWeaponName];
+                hasAmmo = currentAmmo !== undefined && currentAmmo > 0;
+            }
+
+            // Podmienka: Eliminácia z diaľky + strelná/vrhacia zbraň s dmg >= 2 + munícia
+            const canRangedKill = hasRangedSkill && isRangedWeapon && currentWeaponDamage >= 2 && hasAmmo;
+
+            if (dist > 0) {
+                // Nepriateľ je mimo dosahu boja zblízka
+                if (canRangedKill) return "kill";
+                return "sneak"; // bez diaľkovej zbrane sa dá iba nepozorovane priblížiť
+            }
+
+            // Vzdialenosť 0 — boj zblízka je v dosahu
+            if (hasSilentSkill || canRangedKill) {
+                return "kill";
+            }
+
+            is_elimination_check = false;
+            return null;
+        }
+
+        function runElimination(enemyKey, mode = "kill") {
+            inputs_frozen = true;
+            is_elimination_check = true;
+            elimination_mode = mode;
+            pending_enemy_key = enemyKey; // Uložíme si nepriateľa pre prípadné spustenie konfliktu
+
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+            // Nastavenie parametrov výzvy
+            current_challenge.difficulty = 8;
+            current_challenge.threat = 2;
+            currentSelectedActionType = "A";
+
+            const challengeDisplay = document.getElementById("challenge-stats-display");
+            if (challengeDisplay) {
+                toggleChallengeDisplay(true, current_challenge);
+            }
+
+            // Výpis textu okamžite pred spustením výzvy
+            if (mode === "sneak") {
+                log("Nepriateľ je ešte mimo dosahu. Skús sa k nemu nepozorovane priblížiť.", "narrative-msg", true);
+            } else {
+                log("Nepriateľ ťa ešte nevidí, chceš ho skúsiť eliminovať?", "narrative-msg", true);
+            }
+
+            inputs_frozen = false;
+            if (scrollRow) scrollRow.classList.add('enable-interaction');
+            updateUI();
+        }
+
+
+        function resolveEliminationCheck(cardCode, actionType) {
+            inputs_frozen = true;
+            const scrollRow = document.querySelector('.card-scroll-row');
+            if (scrollRow) scrollRow.classList.remove('enable-interaction');
+
+            // --- 1. DETERMINE SKILL BONUS ---
+            const skillDropdown = document.getElementById("player-skill-dropdown");
+            const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+            let chosenSkillBonus = 0;
+            if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                chosenSkillBonus = HERO.skills[selectedSkillName] || 0;
+            }
+
+            let roll_result = rollDice(cardCode, actionType === "A", chosenSkillBonus, false);
+            let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
+
+            roll_result += advantage + adrenaline;
+            resetAdrenalineSelection();
+
+            const targetEnemyKey = pending_enemy_key;
+            const dist = (CHALLENGES[targetEnemyKey] && CHALLENGES[targetEnemyKey].distance) || 0;
+
+            // Get weapon specs for validation
+            const weaponDropdown = document.getElementById("player-weapon-dropdown");
+            const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
+
+            let isRangedWeapon = false;
+            let weaponDmg = 0;
+
+            if (selectedWeaponName && selectedWeaponName !== "placeholder") {
+                if (WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined) {
+                    weaponDmg = WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName];
+                    isRangedWeapon = true;
+                } else if (WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined) {
+                    weaponDmg = WEAPON_LIST["VRHACIE"][selectedWeaponName];
+                    isRangedWeapon = true;
+                } else if (WEAPON_LIST["BOJ ZBLÍZKA"] && WEAPON_LIST["BOJ ZBLÍZKA"][selectedWeaponName] !== undefined) {
+                    weaponDmg = WEAPON_LIST["BOJ ZBLÍZKA"][selectedWeaponName];
+                }
+            }
+            // --- 2. BRANCH BY ACTION TYPE ---
+
+            // ==========================================
+            // ACTION "A" — ATTACK / KILL
+            // ==========================================
+            if (actionType === "A") {
+
+                is_elimination_check = false;
+                if (skillDropdown && skillDropdown.options[0]) skillDropdown.value = skillDropdown.options[0].value;
+
+                // Resolve Attack Roll
+                if (roll_result >= current_challenge.difficulty) {
+                    // Success — Apply damage
+                    let totalDmg = CARDS[cardCode][1][0] + weaponDmg;
+                    if (!CHALLENGES[targetEnemyKey].saved_stress) CHALLENGES[targetEnemyKey].saved_stress = 0;
+                    CHALLENGES[targetEnemyKey].saved_stress += totalDmg;
+                    log(`Zasiahneš nepriateľa zo zálohy. Zvyšuješ mu stres o ${totalDmg}.`, "success-msg");
+
+                    const enemyType = CHALLENGES[targetEnemyKey]?.type || targetEnemyKey;
+                    const maxStress = ENEMY_TYPES[enemyType]?.stress_thresh || 8;
+
+                    if (CHALLENGES[targetEnemyKey].saved_stress > maxStress) {
+                        log(`💥 Nepriateľ bol ticho zneškodnený!`, "success-msg");
+                        HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                        executeMods("item_ŽĽAZA SOMORY+1");
+                        
+                        if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
+                        updateUI();
+
+                        onTerminalFinishedCallback = () => {
+                            const enemyContainer = document.getElementById("enemy-sprite-container");
+                            if (enemyContainer) enemyContainer.style.display = "none";
+                            let activeChallenge = CHALLENGES[targetEnemyKey];
+                            if (targetEnemyKey) CHALLENGES["ACTIVE"][targetEnemyKey] = false;
+
+                            enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
+                            enemy_advantage = 0; advantage = 0; move = 0; round += 1;
+                            player_action = null; enemy_action = null; is_conflict = false;
+
+                            proceed(pending_challenge_key ? pending_challenge_key : activeChallenge.case_success);
+                            pending_challenge_key = null;
+                        };
+                        return;
+                    } else {
+                        log(`\n⚠️ Nepriateľ útok prežil! Odhalil ťa a začína otvorený boj.`, "danger-msg");
+                    }
+                } else {
+                    // Failure — Attack missed
+                    log(`\n⚠️ Minieš! Nepriateľ si ťa všimne a okamžite vyráža do útoku.`, "danger-msg");
+                }
+
+                // Cleanup and transition to regular combat on failure or survived attack
+                pending_enemy_key = null;
+                if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
+                updateUI();
+                proceed(targetEnemyKey);
+                return;
+            }
+
+            // ==========================================
+            // ACTION "D" — SNEAK / POSITION / ADVANTAGE
+            // ==========================================
+            if (actionType === "D") {
+                const isSuccess = roll_result >= current_challenge.difficulty;
+                let caution_threshold = CARDS[cardCode][0][0];
+                let threat_roll = 0;
+                let threatRollsData = [];
+                let enemyAlerted = false;
+
+                if (!isSuccess){
+                    for (let n = 0; n < current_challenge.threat; n++) {
+                        let r = Math.floor(Math.random() * 2);
+                        threat_roll += r;
+                        threatRollsData.push({ type: "DH", value: r, isSkillDie: true });
+                    }
+                    triggerDiceVisualAnimation(threatRollsData, true);
+                    enemyAlerted = threat_roll > caution_threshold
+                }
+
+
+                // Clean UI setup
+                is_elimination_check = false;
+                if (skillDropdown && skillDropdown.options[0]) skillDropdown.value = skillDropdown.options[0].value;
+
+                // 1. Evaluate Success / Failure
+                if (isSuccess) {
+                    advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
+                    if (dist > 0) {
+                        const newDist = Math.max(0, dist - 1);
+                        if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].distance = newDist;
+                        log(`Podarí sa ti nepozorovane priblížiť a získavaš taktickú výhodu! (Vzdialenosť: ${newDist})`, "success-msg");
+                    } else {
+                        log(`Dostaneš sa do lepšej pozície a získavaš výhodu +1 do nadchádzajúceho boja.`, "success-msg");
+                    }
+                } else {
+                    if (dist > 0) {
+                        log(`\n⚠️ Nedarí sa ti nepozorovane priblížiť! Nepriateľ si dáva pozor.`, "danger-msg");
+                    } else {
+                        log(`\n⚠️ Nedarí ti získať výhodnejšiu pozíciu. Začína otvorený boj.`, "danger-msg");
+                    }
+                }
+
+                // 2. Evaluate Threat consequence
+                if (enemyAlerted) {
+                    if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
+                    log(`Nepriateľ si ťa všimne a začína sa boj.`, "danger-msg");
+                }
+
+                if (dist < 1) {
+                    if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
+                }
+
+                pending_enemy_key = null;
+                updateUI();
+
+                proceed(targetEnemyKey);
+                return;
+            }
+        }
+
 
         function enterCollapseConflictMode() {
             collapse_conflict_mode = true;
@@ -349,6 +613,12 @@
                 return;
             }
 
+            // KRITICKÁ OCHRANA: Ak proceed_target nie je pripravený, prerušíme handler, aby sme nezamrzli UI
+            if (typeof proceed_target === 'undefined' || proceed_target === null || proceed_target === "") {
+                console.log("PROCEED_HANDLER: proceed_target is NOT set yet, ignoring click and waiting for engine");
+                return;
+            }
+
             const prompt = document.getElementById("proceed-prompt");
 
             // Queue is clear - proceed with transition
@@ -357,7 +627,6 @@
                 clearTimeout(activeLogTimeout);
                 activeLogTimeout = null;
             }
-            if (prompt) prompt.style.display = "none";
             inputs_frozen = true;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -387,7 +656,7 @@
             const cards = document.querySelectorAll("#card-tray-container .card-container");
             const trayContainer = document.getElementById("card-tray-container");
 
-            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
+            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check || is_elimination_check)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
                 if (cards.length === 0) return;
 
                 // =========================================================================
@@ -418,7 +687,7 @@
                 // =========================================================================
                 // 2. PREPÍNANIE POLOVÍC KARTY (ŠÍPKY HORE / DOLE) - Len počas konfliktu
                 // =========================================================================
-                if (is_conflict && (e.key === "ArrowUp" || e.key === "ArrowDown")) {
+                if ((is_conflict || is_elimination_check) && (e.key === "ArrowUp" || e.key === "ArrowDown" )) {
                     e.preventDefault();
                     
                     // KLÁVESNICA PREBERÁ KONTROLU: Rušíme myšovú dominanciu
@@ -428,6 +697,7 @@
                     updateCardKeyboardHighlight();
                     return;
                 }
+                    
 
                 // =========================================================================
                 // 3. OTOČENIE KARIET (KLÁVESA "F")
@@ -463,7 +733,7 @@
                     const activeCard = cards[currentSelectedCardIdx];
                     if (!activeCard) return;
 
-                    if (!is_conflict) {
+                    if (!is_conflict && !is_elimination_check) {
                         // Mimo boja: Klik na celú kartu
                         activeCard.click();
                     } else {
@@ -639,7 +909,6 @@
                             activeLogTimeout = null;
                         }
                         isProcessingQueue = false; 
-                        proceedPrompt.style.display = "none";
                         inputs_frozen = true;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -746,131 +1015,145 @@
         }
 
 
-        function ifCase(caseTarget, arrayContext = null, currentIndex = null){
-            const parts = caseTarget.split('_else_');
-            if (parts.length >= 1) {
-                const ifPart = parts[0].substring(3); // Odstráni "if_"
-                const falseTarget = parts[1] || null;
+        function ifCase(caseTarget, arrayContext = null, currentIndex = null) {
+            // 1. Vyhodnotíme podmienku a získame finálny cieľový string
+            const finalTarget = evaluateIfCondition(caseTarget);
 
-                let flagKey, operator, rawValue, trueTarget;
-
-                // 1. Pokus o zachytenie plného zápisu s operátorom (napr. door-open==true_TARGET)
-                const match = ifPart.match(/^([a-zA-Z0-9_-]+?)([:=<>\!]+)([^_]+)_(.+)$/);
-
-                if (match) {
-                    flagKey = match[1];
-                    operator = match[2];
-                    rawValue = match[3].trim();
-                    trueTarget = match[4];
-                } else {
-                    // 2. BACKUP: Skrátený zápis bez operátora (napr. door-open_TARGET) -> predvolíme == true
-                    const shortMatch = ifPart.match(/^([a-zA-Z0-9_-]+)_(.+)$/);
-                    if (shortMatch) {
-                        flagKey = shortMatch[1];
-                        operator = '==';
-                        rawValue = 'true';
-                        trueTarget = shortMatch[2];
+            // Interná pomocná funkcia pre posun v sekvenčnom poli
+            const checkAndProceedNextInArray = () => {
+                if (arrayContext && currentIndex !== null && currentIndex + 1 < arrayContext.length) {
+                    const nextTarget = arrayContext[currentIndex + 1];
+                    if (DEBUG === true) {
+                        log(`[ifCase] Detekované sekvenčné pole. Automaticky posúvam na ďalší krok: '${nextTarget}'`);
                     }
+                    handleChallengeTransition(nextTarget);
+                    return true;
                 }
+                return false;
+            };
 
-                // Pomocná interná funkcia: Ak sme v poli, posunie nás na ďalší index. Ak nie, neurobí nič.
-                const checkAndProceedNextInArray = () => {
-                    if (arrayContext && currentIndex !== null && currentIndex + 1 < arrayContext.length) {
-                        const nextTarget = arrayContext[currentIndex + 1];
-                        if (DEBUG === true) {
-                            log(`[ifCase] Detekované sekvenčné pole. Automaticky posúvam na ďalší krok: '${nextTarget}'`);
-                        }
-                        handleChallengeTransition(nextTarget);
-                        return true;
+            if (finalTarget) {
+                const lowerFinal = finalTarget.toLowerCase();
+
+                // --- DETEKCIA SYSTÉMOVÝCH PRÍKAZOV (MÓDOV) ---
+                if (
+                    lowerFinal.startsWith("set_") || 
+                    lowerFinal.startsWith("flag_") || 
+                    lowerFinal.includes("=") || 
+                    lowerFinal.includes("+") || 
+                    lowerFinal.includes("-")
+                ) {
+                    if (DEBUG === true) {
+                        log(`[ifCase] Podmienka splnená. Cieľ '${finalTarget}' bol vyhodnotený ako systémový mod. Spúšťam executeMods().`);
                     }
-                    return false;
-                };
+                    executeMods(finalTarget);
+                    
+                    // Ak máme systémový mod, skontrolujeme, či pole pokračuje ďalším prvkom
+                    if (!checkAndProceedNextInArray()) return;
+                    return;
+                }
+                if (DEBUG === true) {
+                    log(`[ifCase] Podmienka pre '${caseTarget}' Final target: ${finalTarget}.`);
+                }
+                // Ak to nie je systémový mod, vykonáme klasický prechod na novú scénu
+                handleChallengeTransition(finalTarget);
+                return;
+            } else {
+                // Ak podmienka neprešla a chýbala else vetva (finalTarget je null)
+                if (DEBUG === true) {
+                    log(`[ifCase] Podmienka pre '${caseTarget}' neprešla a chýba 'else' vetva.`);
+                }
+                
+                // Dovolíme poľu skočiť na ďalší krok, ak existuje
+                if (!checkAndProceedNextInArray()) return;
+                return;
+            }
+        }            
 
-                // Ak sme úspešne zosúladili buď plný alebo skrátený zápis
-                if (flagKey) {
-                    let currentFlagValue;
-                    if (typeof FLAGS !== 'undefined' && flagKey in FLAGS) {
-                        currentFlagValue = FLAGS[flagKey];
-                    } else if (typeof CHALLENGES !== 'undefined' && CHALLENGES["ACTIVE"] && flagKey in CHALLENGES["ACTIVE"]) {
-                        currentFlagValue = CHALLENGES["ACTIVE"][flagKey];
-                    } else {
-                        currentFlagValue = false;
-                    }
-                    let conditionPassed = false;
-                    let processedCurrent = currentFlagValue;
-                    let processedTarget = rawValue;
+        function evaluateIfCondition(caseTarget) {
+            if (typeof caseTarget !== 'string' || !caseTarget.startsWith('if_')) {
+                return caseTarget;
+            }
+            const parts = caseTarget.split('_else_');
+            const ifPart = parts[0].substring(3); // Odstráni "if_"
+            const falseTarget = parts[1] || null;
 
-                    if (rawValue.toLowerCase() === 'true') processedTarget = true;
-                    else if (rawValue.toLowerCase() === 'false') processedTarget = false;
-                    else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
+            let flagKey, operator, rawValue, trueTarget;
 
-                    if (flagKey.toLowerCase().startsWith('item')) {
-                        const itemKey = flagKey.substring(4).replace(/_/g, ' ');
-                        processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
-                            ? HERO.items[itemKey]
-                            : 0;
-                    } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
-                        processedCurrent = Number(currentFlagValue);
-                    }
-
-                    switch (operator) {
-                        case ':':
-                        case '=':
-                        case '==':  conditionPassed = (processedCurrent === processedTarget); break;
-                        case '!=':  conditionPassed = (processedCurrent !== processedTarget); break;
-                        case '>':   conditionPassed = (processedCurrent > processedTarget); break;
-                        case '<':   conditionPassed = (processedCurrent < processedTarget); break;
-                        case '>=':  conditionPassed = (processedCurrent >= processedTarget); break;
-                        case '<=':  conditionPassed = (processedCurrent <= processedTarget); break;
-                    }
-
-                    // Určíme cieľ na základe výsledku podmienky
-                    const finalTarget = conditionPassed ? trueTarget : falseTarget;
-
-                    if (finalTarget) {
-                        const lowerFinal = finalTarget.toLowerCase();
-
-                        // --- DETEKCIA SYSTÉMOVÝCH PRÍKAZOV (MÓDOV) ---
-                        if (
-                            lowerFinal.startsWith("set_") || 
-                            lowerFinal.startsWith("flag_") || 
-                            lowerFinal.includes("=") || 
-                            lowerFinal.includes("+") || 
-                            lowerFinal.includes("-")
-                        ) {
-                            if (DEBUG === true) {
-                                log(`[ifCase] Podmienka splnená. Cieľ '${finalTarget}' bol vyhodnotený ako systémový mod. Spúšťam executeMods().`);
-                            }
-                            executeMods(finalTarget);
-                            
-                            // KRITICKÁ OPRAVA: Predtým tu bol len return. Teraz skontrolujeme, či máme pokračovať v poli!
-                            if (!checkAndProceedNextInArray()) {
-                                return; 
-                            }
-                            return;
-                        }
-
-                        // Ak to nie je mod, pokračujeme klasickým prechodom na scénu/výzvu
-                        handleChallengeTransition(finalTarget);
-                        return;
-                    } else {
-                        // Ak podmienka neprešla a neexistoval žiadny "_else_"
-                        if (DEBUG === true) {
-                            log(`[ifCase] Podmienka pre '${ifPart}' neprešla a chýba 'else' vetva.`);
-                        }
-                        
-                        // KRITICKÁ OPRAVA: Ak podmienka neprešla (alebo vyhodnotila "false" mod), musíme tiež dovoliť poľu pokračovať ďalej!
-                        if (!checkAndProceedNextInArray()) {
-                            return;
-                        }
-                        return;
-                    }
+            // 1. Pokus o zachytenie plného zápisu s operátorom (napr. door-open==true_TARGET alebo CITY_0:false_CITY)
+            const match = ifPart.match(/^([\p{L}\p{N}_ \-]+?)([:=<>!]+)([^_]+)_(.+)$/u);
+            if (match) {
+                flagKey = match[1];
+                operator = match[2];
+                rawValue = match[3].trim();
+                trueTarget = match[4];
+            } else {
+                // 2. BACKUP: Skrátený zápis bez operátora (napr. door-open_TARGET) -> predvolíme == true
+                const shortMatch = ifPart.match(/^([a-zA-Z0-9_-]+)_(.+)$/);
+                if (shortMatch) {
+                    flagKey = shortMatch[1];
+                    operator = '==';
+                    rawValue = 'true';
+                    trueTarget = shortMatch[2];
                 }
             }
+
+            if (!flagKey) return null;
+
+            // Získanie aktuálnej hodnoty z herného stavu
+            let currentFlagValue;
+            if (typeof FLAGS !== 'undefined' && flagKey in FLAGS) {
+                currentFlagValue = FLAGS[flagKey];
+            } else if (typeof CHALLENGES !== 'undefined' && CHALLENGES["ACTIVE"] && flagKey in CHALLENGES["ACTIVE"]) {
+                currentFlagValue = CHALLENGES["ACTIVE"][flagKey];
+            } else {
+                currentFlagValue = false;
+            }
+
+            let processedCurrent = currentFlagValue;
+            let processedTarget = rawValue;
+
+            // Normalizácia typov (Booleans a Numbers)
+            if (rawValue.toLowerCase() === 'true') processedTarget = true;
+            else if (rawValue.toLowerCase() === 'false') processedTarget = false;
+            else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
+        
+            if (flagKey.toLowerCase().startsWith('item')) {
+                log(`Overujem predmet`)
+                const itemKey = flagKey.substring(5).replace(/_/g, ' ').toUpperCase();
+                log(`Overujem predmet: ${itemKey}`)
+                processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
+                    ? HERO.items[itemKey]
+                    : 0;
+                log(`V inventári: ${HERO.items[itemKey]}`)
+            } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
+                processedCurrent = Number(currentFlagValue);
+            }
+
+            // Vyhodnotenie podmienky podľa operátorov vrátane dvojbodky
+            let conditionPassed = false;
+            switch (operator) {
+                case ':':
+                case '=':
+                case '==':  conditionPassed = (processedCurrent === processedTarget); break;
+                case '!=':  conditionPassed = (processedCurrent !== processedTarget); break;
+                case '>':   conditionPassed = (processedCurrent > processedTarget); break;
+                case '<':   conditionPassed = (processedCurrent < processedTarget); break;
+                case '>=':  conditionPassed = (processedCurrent >= processedTarget); break;
+                case '<=':  conditionPassed = (processedCurrent <= processedTarget); break;
+            }
+
+            return conditionPassed ? trueTarget : falseTarget;
         }
-            
 
         function handleChallengeTransition(caseTarget) {
+            if (test_mode){
+                let mod = 0;
+                let a = 0;
+                a = 30 / HERO.stress
+                mod = Math.min(0,Math.floor(Math.random() * 14 - 1))
+                HERO.stress = Math.max(0, HERO.stress + mod);
+            }
             if (!caseTarget || !gameOn) return;
             if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
                 return; // Early return to completely freeze challenge transitions
@@ -980,7 +1263,7 @@
                                 return;
                             } else {
                                 if (DEBUG === true) {
-                                    log(`Enemy ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
+                                    log(`Nepriateľ ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
                                 }
                                 i++;
                                 continue; // fall through to the next array element instead of freezing
@@ -1000,6 +1283,25 @@
                         const isIfCondition = typeof target === 'string' && target.toLowerCase().startsWith('if_');
 
                         if (isModification) {
+                            const isGenericDifficultyMod = target.toLowerCase().includes("difficulty") &&
+                                !target.toLowerCase().startsWith("difficulty_");
+
+                            if (isGenericDifficultyMod) {
+                                queued_difficulty_target = null;
+                                for (let j = i + 1; j < caseTarget.length; j++) {
+                                    const lookaheadTarget = caseTarget[j];
+                                    if (typeof lookaheadTarget === 'string' &&
+                                        CHALLENGES[lookaheadTarget] &&
+                                        CHALLENGES[lookaheadTarget].difficulty !== undefined) {
+                                        queued_difficulty_target = lookaheadTarget;
+                                        break;
+                                    }
+                                }
+                                if (DEBUG === true && queued_difficulty_target) {
+                                    log(`[executeMods lookahead] Difficulty mod sa naviaže na nasledujúcu výzvu: ${queued_difficulty_target}.`);
+                                }
+                            }
+
                             handleChallengeTransition(target);
                             if (is_collapse_check) {
                                 collapse_pending_target = caseTarget.slice(i + 1);
@@ -1010,7 +1312,7 @@
                             }
                             i++;
                             // keep looping
-                        } 
+                        }
                         else if (isIfCondition) {
                             // Spustíme ifCase synchrónne, ale POZOR: 
                             // ifCase vnútri seba zavolá executeMods(), čo upraví FLAGS/ACTIVE.
@@ -1060,8 +1362,20 @@
                 }
             }
 
-            // 1. If target dictates an explicit Enemy Combat deployment
             if (actualTarget in ENEMY_TYPES) { 
+                if (!is_elimination_check && CHALLENGES[instanceKey] && (!CHALLENGES[instanceKey].alerted)) {                    
+                    challenge_history.push(instanceKey)
+                    const elimKey = instanceKey ? instanceKey : actualTarget;
+                    const elimMode = elimination(elimKey);
+                    conflict_distance = (CHALLENGES[instanceKey].distance > 0)
+                        ? CHALLENGES[instanceKey].distance
+                        : 0;
+                    distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
+                    if (elimMode) {
+                        runElimination(elimKey, elimMode);
+                        return;
+                    }
+                }
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -1084,24 +1398,45 @@
                 }
                 enemy_id = instanceKey ? instanceKey : actualTarget;
 
-                
-
                 // 2. CALCULATE REST MODIFIERS
                 let enemy_rest = 0;
-                if (typeof MODE !== 'undefined') {
-                    if (MODE === "EASY") enemy_rest = 1;
-                    else if (MODE === "NORMAL") enemy_rest = 2;
-                    else enemy_rest = 3;
+
+                // KONTROLA HISTÓRIE: Pozrieme sa na posledné 3 kroky
+                let engaged_recently = false;
+                if (typeof challenge_history !== 'undefined' && challenge_history.length > 0) {
+                    // Vezmeme buď posledné 3 kroky, alebo celú dĺžku, ak je história kratšia
+                    const lookback_depth = Math.min(3, challenge_history.length);
+                    
+                    for (let i = 1; i <= lookback_depth; i++) {
+                        if (challenge_history[challenge_history.length - i] === enemy_id) {
+                            engaged_recently = true;
+                            break;
+                        }
+                    }
+                }
+
+                // Ak bol nepriateľ v posledných 3 krokoch, neodpočíva vůbec (enemy_rest = 0)
+                if (engaged_recently) {
+                    enemy_rest = 0;
                 } else {
-                    enemy_rest = 2; // Default fallback if global game difficulty state is loading out of order
+                    // Štandardný výpočet odpočinku, ak sa hráč vrátil po dlhšom čase
+                    if (typeof MODE !== 'undefined') {
+                        if (MODE === "EASY") enemy_rest = 1;
+                        else if (MODE === "NORMAL") enemy_rest = 2;
+                        else enemy_rest = 3;
+                    } else {
+                        enemy_rest = 2; // Default fallback
+                    }
                 }
 
                 // 3. EXTRACT AND APPLY SAVED STRESS FROM WRAPPER
                 let foundWrapper = CHALLENGES[enemy_id];
-                
+
                 if (foundWrapper && typeof foundWrapper.saved_stress !== 'undefined') {
                     enemy_stress = Math.max(0, foundWrapper.saved_stress - enemy_rest);
-                    if (foundWrapper.saved_stress > 0) {
+                    
+                    // Logujeme odpočinok iba vtedy, ak reálne nejaký bol a nepriateľ mal nejaký stres
+                    if (enemy_rest > 0 && foundWrapper.saved_stress > 0) {
                         log(`Od posledného súboja si nepriateľ odpočinul. Stres mu klesol o ${enemy_rest}. (Aktuálny stres: ${enemy_stress})`, "info-msg");
                     }
                 } else {
@@ -1247,10 +1582,37 @@
         }
         
         function executeMods(caseTarget){
-            const lowerTarget = caseTarget.toLowerCase();
             let modificationExecuted = false;
 
-            if (lowerTarget.startsWith("flag_")) {
+            // 1. KONTROLA PRE ALERTED MODS (Case Sensitive pre challengekey)
+            if (caseTarget.startsWith("alerted_") && caseTarget.includes(":")) {
+                // Odrežeme "alerted_" (8 znakov) z pôvodného reťazca
+                const alertPart = caseTarget.substring(8); 
+                const parts = alertPart.split(":");
+                
+                // challengeKey si zachová presný tvar (napr. "Predátorka_2")
+                const challengeKey = parts[0].trim(); 
+                const rawVal = parts[1].trim().toLowerCase();
+                const booleanState = (rawVal === "true");
+
+                // Poistka pre existenciu objektu CHALLENGES a jeho uzla
+                if (typeof CHALLENGES !== 'undefined' && CHALLENGES[challengeKey]) {
+                    CHALLENGES[challengeKey].alerted = booleanState;
+                    
+                    if (DEBUG === true) {
+                        log(`[ALERTED] Stav ostražitosti pre výzvu '${challengeKey}' bol nastavený na: ${booleanState}`);
+                    }
+                } else if (DEBUG === true) {
+                    log(`[executeMods] Výzva '${challengeKey}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                }
+                modificationExecuted = true;
+            }
+
+            // Vytvoríme lowercase verziu PRE OSTATNÉ VETVY
+            const lowerTarget = caseTarget.toLowerCase();
+
+            // Zmenené na ELSE IF, aby sa po úspešnom spracovaní alerted_ tieto vetvy preskočili
+            if (!modificationExecuted && lowerTarget.startsWith("flag_")) {
                 const flagPart = caseTarget.substring(5); // Odstráni "flag_"
                 
                 // Inicializácia objektu FLAGS, ak by náhodou ešte neexistoval
@@ -1298,7 +1660,7 @@
             // -----------------------------------------------
 
             // --- Handle assignment/reset rules using '=' ---
-            if (lowerTarget.includes("=")) {
+            if (!modificationExecuted && lowerTarget.includes("=")) {
                 const parts = caseTarget.split("=");
                 const key = parts[0].toLowerCase().trim();
                 const val = parts[1].toLowerCase().trim();
@@ -1326,7 +1688,7 @@
                     modificationExecuted = true;
                 }
             }
-            else if (lowerTarget.startsWith("set_")) {
+            else if (!modificationExecuted && lowerTarget.startsWith("set_")) {
                 const lastUnderscore = caseTarget.lastIndexOf('_');
                 
                 if (lastUnderscore !== -1) {
@@ -1353,7 +1715,7 @@
             }
 
             // --- Handle incremental modifications using '+' or '-' ---
-            if (lowerTarget.includes("+") || lowerTarget.includes("-")) {
+            if (!modificationExecuted && lowerTarget.includes("+") || lowerTarget.includes("-")) {
                 const isAddition = lowerTarget.includes("+");
                 const parts = isAddition ? caseTarget.split("+") : caseTarget.split("-");
                 const amount = parts[1] ? parseInt(parts[1]) : 1;
@@ -1492,15 +1854,51 @@
                     }
                     modificationExecuted = true;
                 }
-                else if (lowerTarget.includes("difficulty")) {
-                    current_challenge.difficulty += modifier;
-                    if (current_challenge.difficulty < 0) current_challenge.difficulty = 0; 
-                    
-                    if (modifier > 0) {
-                        log(`Náročnosť výzvy sa zvyšuje o ${amount}!`);
-                    } else {
-                        log(`Náročnosť výzvy klesá o ${amount}.`, "success-msg");
+                else if (lowerTarget.startsWith("difficulty_")) {
+                    const lastUnderscore = caseTarget.lastIndexOf('_');
+
+                    if (lastUnderscore !== -1) {
+                        const amountStr = caseTarget.substring(lastUnderscore + 1).trim();
+                        const targetChallenge = caseTarget.substring("difficulty_".length, lastUnderscore).toUpperCase().trim();
+                        const explicitModifier = parseInt(amountStr);
+
+                        if (targetChallenge && !isNaN(explicitModifier) && CHALLENGES[targetChallenge]) {
+                            const baseDifficulty = CHALLENGES[targetChallenge].difficulty ?? 0;
+                            const newDifficulty = Math.max(0, baseDifficulty + explicitModifier);
+                            CHALLENGES[targetChallenge].difficulty = newDifficulty;
+
+                            if (DEBUG === true) {
+                                log(`Náročnosť výzvy '${targetChallenge}' bola upravená o ${explicitModifier}. Nová základná hodnota: ${newDifficulty}.`);
+                            }
+                            modificationExecuted = true;
+                        } else if (DEBUG === true) {
+                            log(`[executeMods] Neplatný cieľ pre difficulty mod: '${caseTarget}'.`);
+                        }
                     }
+                    return modificationExecuted;
+                }
+                else if (lowerTarget.includes("difficulty")) {
+                    if (queued_difficulty_target && CHALLENGES[queued_difficulty_target]) {
+                        const baseDifficulty = CHALLENGES[queued_difficulty_target].difficulty ?? 0;
+                        const newDifficulty = Math.max(0, baseDifficulty + modifier);
+                        CHALLENGES[queued_difficulty_target].difficulty = newDifficulty;
+
+                        if (modifier > 0) {
+                            log(`Náročnosť nasledujúcej výzvy (${queued_difficulty_target}) sa zvyšuje o ${amount}!`);
+                        } else {
+                            log(`Náročnosť nasledujúcej výzvy (${queued_difficulty_target}) klesá o ${amount}.`, "success-msg");
+                        }
+                    } else {
+                        current_challenge.difficulty += modifier;
+                        if (current_challenge.difficulty < 0) current_challenge.difficulty = 0; 
+
+                        if (modifier > 0) {
+                            log(`Náročnosť výzvy sa zvyšuje o ${amount}!`);
+                        } else {
+                            log(`Náročnosť výzvy klesá o ${amount}.`, "success-msg");
+                        }
+                    }
+                    queued_difficulty_target = null; // single-use, regardless of which branch fired
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("threat")) {
@@ -1656,42 +2054,80 @@
         function renderChallengeChoices(activeChallenge) {
             const suffixes = ['A', 'B', 'C', 'D', 'E', 'F'];
             let validChoices = [];
+            const activeDict = CHALLENGES?.["ACTIVE"] || {};
 
+            document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
+            const enemyCardContainer = document.getElementById("enemy-card-container");
+            if (enemyCardContainer) enemyCardContainer.innerHTML = "";
+            const playerCardContainer = document.getElementById("player-card-container");
+            if (playerCardContainer) playerCardContainer.innerHTML = "";
+
+            // --- 1. PRELOADER OBRÁZKOV ---
             const preloadUrls = suffixes
-            .map(suff => activeChallenge[`case_${suff}`])
-            .filter(target => target && CHALLENGES[target]?.image)
-            .map(target => CHALLENGES[target].image);
+                .map(suff => {
+                    let target = activeChallenge[`case_${suff}`];
+                    if (typeof target === 'string' && target.startsWith('if_')) {
+                        const clean = target.split('_else_');
+                        const match = clean[0].substring(3).match(/_([a-zA-Z0-9_-]+)$/);
+                        target = match ? match[1] : clean[1];
+                    }
+                    return target;
+                })
+                .filter(target => target && CHALLENGES[target]?.image)
+                .map(target => CHALLENGES[target].image);
 
-            if (preloadUrls.length > 0) {
-                preloadImages(preloadUrls); 
-            }
+            if (preloadUrls.length > 0) preloadImages(preloadUrls);
 
+            // --- 2. HISTÓRIA (SPÄŤ) ---
             if (activeChallenge.back === true && challenge_history.length > 0) {
-                const backDestination = challenge_history[challenge_history.length - 1];
-                const backDestinationInactive = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][backDestination] === false;
-
-                if (!backDestinationInactive) {
-                    validChoices.push({
-                        text: "⬅",
-                        target: "BACK_ACTION_1",
-                        isBack: true
-                    });
+                const backDest = challenge_history[challenge_history.length - 1];
+                if (activeDict[backDest] === true) {
+                    validChoices.push({ text: "⬅", target: "BACK_ACTION_1", isBack: true });
                 }
             }
 
+            // --- 3. VYHODNOCOVANIE MOŽNOSTÍ PRE HRÁČA ---
             suffixes.forEach(suff => {
-                if (activeChallenge[`choice_${suff}`] && activeChallenge[`case_${suff}`]) {
-                    const target = activeChallenge[`case_${suff}`];
-                    if (CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false) {
-                        return; 
+                const choiceText = activeChallenge[`choice_${suff}`];
+                let targetValue = activeChallenge[`case_${suff}`];
+
+                if (!choiceText || !targetValue) return;
+
+                let finalTarget = null;
+
+                // Spracovanie poľa (Array)
+                if (Array.isArray(targetValue)) {
+                    for (let item of targetValue) {
+                        if (typeof item === 'string' && item.startsWith('if_')) {
+                            item = evaluateIfCondition(item);
+                        }
+                        // Overenie: Existuje scéna a je v ACTIVE nastavená na true?
+                        if (item && CHALLENGES[item] && activeDict[item] === true) {
+                            finalTarget = targetValue;
+                            break;
+                        }
                     }
+                } 
+                // Spracovanie bežného reťazca (String / "if_")
+                else {
+                    if (typeof targetValue === 'string' && targetValue.startsWith('if_')) {
+                        targetValue = evaluateIfCondition(targetValue);
+                    }
+                    if (targetValue && CHALLENGES[targetValue] && activeDict[targetValue] === true) {
+                        finalTarget = targetValue;
+                    }
+                }
+
+                // Ak cieľ prešiel všetkými overeniami, pridáme voľbu na vykreslenie
+                if (finalTarget) {
                     validChoices.push({
-                        text: activeChallenge[`choice_${suff}`],
-                        target: target
+                        text: choiceText,
+                        target: finalTarget
                     });
                 }
             });
 
+        
             const hasRealChoices = suffixes.some(suff => activeChallenge[`choice_${suff}`]);
 
             if (validChoices.length > 0 && (hasRealChoices || activeChallenge.difficulty === undefined)) {
@@ -1915,33 +2351,45 @@
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
-                if (activeChallenge.trigger_delayed && Array.isArray(activeChallenge.trigger_delayed)) {
-                    for (const effect of activeChallenge.trigger_delayed) {
-                        const delayedIndex = DELAYED.indexOf(effect);
-                        if (delayedIndex !== -1) {
-                            DELAYED.splice(delayedIndex, 1);
+            if (activeChallenge.trigger_delayed && Array.isArray(activeChallenge.trigger_delayed)) {
+                let triggeredEffects = [];
 
-                            // NEW: don't commit to this redirect if the target is inactive —
-                            // treat it as already consumed/no-op and keep checking the
-                            // node's own normal flow instead of silently freezing.
-                            const targetIsInactive = typeof effect === 'string' &&
-                                CHALLENGES["ACTIVE"] &&
-                                CHALLENGES["ACTIVE"][effect] === false;
+                // 1. Gather all delayed challenges currently waiting in the global pool
+                for (const effect of activeChallenge.trigger_delayed) {
+                    const delayedIndex = DELAYED.indexOf(effect);
+                    if (delayedIndex !== -1) {
+                        // Remove it from the pool immediately so it cannot re-trigger
+                        DELAYED.splice(delayedIndex, 1);
 
-                            if (targetIsInactive) {
-                                if (DEBUG === true) {
-                                    log(`Delayed target ${effect} je neaktívny, ignorujem a pokračujem normálne.`);
-                                }
-                                continue; // try any remaining trigger_delayed entries, then fall through
+                        const targetIsInactive = typeof effect === 'string' &&
+                            CHALLENGES["ACTIVE"] &&
+                            CHALLENGES["ACTIVE"][effect] === false;
+
+                        if (targetIsInactive) {
+                            if (DEBUG === true) {
+                                log(`Delayed target ${effect} je neaktívny, ignorujem.`);
                             }
-
-                            handleChallengeTransition(effect);
-                            if (!effect.includes("+")) {
-                                return true;
-                            }
+                            continue; 
                         }
+
+                        triggeredEffects.push(effect);
                     }
                 }
+
+                // 2. If any matching threats were triggered, chain them together sequentially
+                if (triggeredEffects.length > 0) {
+                    if (DEBUG === true) {
+                        log(`[Trigger Delayed] Spúšťam reťazec odložených hrozieb: ${triggeredEffects.join(', ')}`);
+                    }
+
+                    // We build a execution chain: Encounter 1 -> Encounter 2 -> back to Original Card
+                    const executionChain = [...triggeredEffects, current_challenge_key];
+
+                    // Hand over the array sequence to your existing engine routing
+                    handleChallengeTransition(executionChain);
+                    return true; // Stop rendering the current card's UI layout for now
+                }
+            }
                 const challengeDisplay = document.getElementById("challenge-stats-display");
                 
                 // --- CORE DETERMINISTIC DISTINCTION ---
@@ -1990,17 +2438,12 @@
                         if (currentMsgIdx === sequentialMsgs.length - 1) {
                             if (activeChallenge && activeChallenge.next) {
                                 proceed(() => {
-                                    inputs_frozen = false;
-                                    const scrollRow = document.querySelector('.card-scroll-row');
-                                    if (scrollRow) scrollRow.classList.add('enable-interaction');
+                                    inputs_frozen = true;
                                     updateUI();
                                     handleChallengeTransition(activeChallenge.next);
                                 });
                             } else {
                                 proceed(() => {
-                                    inputs_frozen = false;
-                                    const scrollRow = document.querySelector('.card-scroll-row');
-                                    if (scrollRow) scrollRow.classList.add('enable-interaction');
                                     updateUI();
                                     renderChallengeChoices(activeChallenge); // Securely renders choices after message strings
                                 });
@@ -2042,6 +2485,10 @@
                         tableFloor.style.setProperty('--bg-image', `url('${newUrl}')`);
                         tableFloor.classList.add('fade-in');
                         proceedWithPhase(); // Now proceed with narrative UI layout or action checks
+                    };
+                    tempImg.onerror = () => {
+                    if (DEBUG) log(`[IMAGE] Failed to load '${newUrl}', continuing without background swap.`, "danger-msg");
+                        proceedWithPhase(); // don't let a broken/slow asset freeze the whole game
                     };
                     tempImg.src = newUrl; 
                     return true;
@@ -2101,8 +2548,8 @@
             const options = Array.from(el.options);
             if (options.length <= 1) return; // Ak je v zozname len jedna možnosť, niet kam cyklovať
 
-            // Ak nie je konflikt, všetky dostupné možnosti sú automaticky povolené
-            if (typeof is_conflict === 'undefined' || !is_conflict) {
+            // Ak nie je konflikt ani eliminácia, všetky dostupné možnosti sú automaticky povolené
+            if ((typeof is_conflict === 'undefined' || !is_conflict) && !is_elimination_check) {
                 let nextIndex = (el.selectedIndex + direction + options.length) % options.length;
                 while (options[nextIndex].disabled && nextIndex !== el.selectedIndex) {
                     nextIndex = (nextIndex + direction + options.length) % options.length;
@@ -2114,21 +2561,34 @@
                 return;
             }
 
-            /**
-             * Presná kópia overenia z Card Tray Listeneru pre jednu konkrétnu dvojicu
-             */
+
             function simulateActionCheck(actionType, skillVal, weaponVal) {
                 const upperSkill = (skillVal || "").toUpperCase();
                 const isPlaceholderSkill = skillVal === "placeholder" || skillVal === "none" || skillVal === "";
                 const isPlaceholderWeapon = weaponVal === "placeholder" || weaponVal === "";
 
                 const skillData = typeof SKILLS_DB !== 'undefined' ? SKILLS_DB[skillVal] : null;
-                const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
+                
+                // Ak sme v režime eliminácie, preverujeme SNEAK_SKILLS, inak klasické DEFENSE_SKILLS
+                let currentDefenseList = (typeof DEFENSE_SKILLS !== 'undefined') ? DEFENSE_SKILLS : [];
+                if (is_elimination_check) {
+                    currentDefenseList = (typeof SNEAK_SKILLS !== 'undefined') ? SNEAK_SKILLS : [];
+                }
+
+                const isDefenseSkill = currentDefenseList.includes(upperSkill);
                 const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) || 
                                     (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));
+                
+                // Zistenie, či ide o eliminačný skill
+                const isEliminationSkill = upperSkill.includes("ELIMIN");
 
-                // --- 0. B. VALIDÁCIA PRE BOJ ---
-                if (!isCombatSkill && !isDefenseSkill && !isPlaceholderSkill) return false;
+                // --- 0. B. VALIDÁCIA PRE BOJ / ELIMINÁCIU ---
+                // Povolíme bojové skilly, obranné/sneak skilly, placeholdery a POČAS ELIMINÁCIE aj eliminačné skilly
+                if (!isCombatSkill && !isDefenseSkill && !isPlaceholderSkill) {
+                    if (!(is_elimination_check && isEliminationSkill)) {
+                        return false;
+                    }
+                }
 
                 // --- 1. KROK: VRHANIE A ŤAŽKÉ PREDMETY ---
                 if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
@@ -2136,7 +2596,9 @@
                 }
 
                 // --- 2. KROK: KONTROLA EXKLUZIVITY ÚTOK/OBRANA ---
-                if (!isPlaceholderSkill) {
+                // V eliminačnom režime sme striktne na ÚTOKU ("A") alebo "D" (podľa zóny sneak/kill), 
+                // eliminačné skilly preto nesmú byť vyradené pravidlom exkluzivity
+                if (!isPlaceholderSkill && !isEliminationSkill) {
                     if (actionType === "A" && !isCombatSkill && isDefenseSkill) return false;
                     if (actionType === "D" && isCombatSkill && !isDefenseSkill) return false;
                 }
@@ -2161,11 +2623,13 @@
                         
                         const weaponAllowed = WEAPON_SKILLS[String(foundDamage)] || [];
                         const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
-                        if (!allowedSkills.includes(upperSkill)) return false;
+                        
+                        // Ak sme v eliminácii, tak eliminačné skilly automaticky prechádzajú touto kontrolou zbraní
+                        if (!isEliminationSkill && !allowedSkills.includes(upperSkill)) return false;
 
                         if (skillData && skillData[1]) {
                             const skillCategory = skillData[1].toUpperCase();
-                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY" && !isEliminationSkill) {
                                 if (skillCategory === "BOJ ZBLÍZKA" || skillCategory === "BOJ Z DIAĽKY") {
                                     if (!WEAPON_LIST[skillCategory] || WEAPON_LIST[skillCategory][weaponVal] === undefined) return false;
                                 }
@@ -2218,23 +2682,34 @@
             // Zhromaždenie všetkých teoreticky dostupných možností hrdinu pre elimináciu deadlockov
             const playerWeapons = ["placeholder"].concat((HERO && HERO.weapons) || []);
 
-            /**
-             * Kontrola, či kandidát vytvorí validnú kombináciu aspoň s JEDNÝM dostupným prvkom hrdinu
-             */
             function isCandidateValid(candidateValue) {
-                // Unikátna záchrana: Prázdne/placeholder voľby sú povolené vždy ako únikový bod
-                if (candidateValue === "placeholder" || candidateValue === "none" || candidateValue === "") return true;
-
-                // Ak cyklujeme zbrane, automaticky ju schválime (nikdy ich neskipujeme z hernej logiky)
                 if (dropdownId === "player-weapon-dropdown") return true;
 
                 try {
                     if (dropdownId === "player-skill-dropdown") {
+                        const upperCandidate = candidateValue.toUpperCase();
+
+                        // --- 1. KONTROLA: PRESKOČIŤ ELIMINAČNÉ SKILLY V ČISTOM KONFLIKTE ---
+                        if (typeof is_conflict !== 'undefined' && is_conflict && !is_elimination_check) {
+                            if (upperCandidate.includes("ELIMIN")) {
+                                return false;
+                            }
+                        }
+
+                        // Unikátna záchrana: Prázdne/placeholder voľby sú povolené vždy
+                        if (candidateValue === "placeholder" || candidateValue === "none" || candidateValue === "") return true;
+
+                        // --- 2. ÚPRAVA PRE ELIMINAČNÝ REŽIM ---
+                        if (typeof is_elimination_check !== 'undefined' && is_elimination_check) {
+                            if (upperCandidate.includes("ELIMIN")) {
+                                return true; 
+                            }
+                        }
+
                         // Testujeme skill voči všetkým zbraniam, ktoré hrdina reálne vlastní
                         return playerWeapons.some(w => simulateActionCheck("A", candidateValue, w) || simulateActionCheck("D", candidateValue, w));
                     }
                 } catch (err) {
-                    // Defenzívny fallback: Ak zlyhá DB alebo chýba premenná, voľbu radšej prepustíme
                     return true;
                 }
                 return true;
@@ -2260,6 +2735,7 @@
                 el.dispatchEvent(new Event('change', { bubbles: true }));
             }
         }
+
 
         function updateUI() {
             document.getElementById("player-advantage").innerText = advantage;
@@ -2479,12 +2955,15 @@
                 if (tableFloor) tableFloor.classList.remove("combat-mode");
                 
                 if (challengeDisplay) {
+                    if (is_elimination_check){
+                        tray.className = "card-tray conflict-mode";
+                    }
                     const activeChallenge = CHALLENGES[current_challenge_key];
                     if (activeChallenge && activeChallenge.difficulty !== undefined && activeChallenge.threat !== undefined) {
                         // Slide down and update content
                         toggleChallengeDisplay(true, activeChallenge);
                         is_action_phase = true;
-                    } else if (is_collapse_check || is_heal_check) {
+                    } else if (is_collapse_check || is_heal_check || is_elimination_check) {
                         // Slide down without wiping out content
                         toggleChallengeDisplay(true);
                     } else {
@@ -2528,7 +3007,7 @@
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
             updateUI();
-            if (test_mode) skill = 5;
+            if (test_mode) skill = 3;
             const activeChallenge = CHALLENGES[current_challenge_key];
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let roll_result = rollDice(card, false, skill);
@@ -2734,6 +3213,19 @@
 
 
         function resolveConflict() {
+            if (!is_conflict || !enemy || !player_action || !enemy_action) {
+                if (DEBUG === true) {
+                    log(`[resolveConflict] Ignorovaný duplicitný/neplatný vstup (is_conflict=${is_conflict}, enemy=${enemy}).`, "system-msg");
+                }
+                return;
+            }
+            if (enemy_id && CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][enemy_id] === false) {
+                if (DEBUG === true) {
+                    log(`[resolveConflict] Ignorovaný vstup, inštancia ${enemy_id} je už neaktívna.`, "system-msg");
+                }
+                return;
+            }
+
             inputs_frozen = true;
             if (test_mode) {skill = 10; weapon = 3};
             let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
@@ -2759,6 +3251,28 @@
             player_roll += (advantage + adrenaline); 
 
             resetAdrenalineSelection();
+
+            // === DISTANCE / RANGED COMBAT: closing the gap ===
+            if (distance_combat_active) {
+                if (enemy_action[0] === "D" && enemy_roll > player_roll) {
+                    conflict_distance = Math.max(0, conflict_distance - 1);
+                    log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "info-msg");
+                }
+                if (player_action[0] === "D" && player_roll > enemy_roll) {
+                    conflict_distance = Math.max(0, conflict_distance - 1);
+                    log(`👣 Približuješ sa k nepriateľovi! (Vzdialenosť: ${conflict_distance})`, "info-msg");
+                }
+
+                if (enemy_id && CHALLENGES[enemy_id]) {
+                    CHALLENGES[enemy_id].distance = conflict_distance;
+                }
+
+                if (conflict_distance <= 0) {
+                    distance_combat_active = false;
+                    log(`⚔️ Nepriateľ je už nablízku, boj zblízka môže začať!`, "info-msg");
+                }
+            }
+
 
             // === CHASE MODE / BOTH ESCAPING ===
             if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
@@ -2797,7 +3311,7 @@
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     player_escape_counter = 0; enemy_escape_counter = 0;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                    player_action = null; enemy_action = null; is_conflict = false;
+                    player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
                     if (activeChallenge && activeChallenge.enemy_escape) {
                         proceed(activeChallenge.enemy_escape);
@@ -2880,7 +3394,7 @@
                             enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                             player_escape_counter = 0; enemy_escape_counter = 0;
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                            player_action = null; enemy_action = null; is_conflict = false;
+                            player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
                             if (bothEscaping) {
                                 pre_encounter_challenge_key = null;
@@ -3008,7 +3522,7 @@
                             enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                             player_escape_counter = 0; enemy_escape_counter = 0;
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                            player_action = null; enemy_action = null; is_conflict = false;
+                            player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
                             if (activeChallenge && activeChallenge.enemy_escape) {
                                 proceed(activeChallenge.enemy_escape);
@@ -3090,20 +3604,22 @@
                         let activeChallenge = CHALLENGES[enemy_id];
                         if (enemy_id) { 
                             CHALLENGES["ACTIVE"][enemy_id] = false; 
-                            if (activeChallenge && activeChallenge.on_death) {
+                            if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
                                 handleChallengeTransition(activeChallenge.on_death);
                             }
                         }
 
                         enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                         enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                        player_action = null; enemy_action = null; is_conflict = false;
+                        player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
                         if (pending_challenge_key) {
                             let nextChallenge = pending_challenge_key; 
                             pending_challenge_key = null; 
+                            is_collapse_check = false;
                             proceed(nextChallenge); 
                         } else {
+                            is_collapse_check = false;
                             proceed(activeChallenge.case_success); 
                         }
                     };
@@ -3182,6 +3698,7 @@
                 clearTimeout(combatLoopTimeout);
                 clearTimeout(readyPromptTimeout);
                 HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
+                executeMods("item_ŽĽAZA SOMORY+1");
                 log(`\n💥 ${enemy} JE DOLE! Získavaš 1 BR a môžeš pokračovať.`, "success-msg");
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
@@ -3198,14 +3715,14 @@
                     let activeChallenge = CHALLENGES[enemy_id];
                     if (enemy_id) {
                         CHALLENGES["ACTIVE"][enemy_id] = false; 
-                        if (activeChallenge && activeChallenge.on_death) {
+                        if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
                             handleChallengeTransition(activeChallenge.on_death);
                         }
                     }
                     
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
-                    player_action = null; enemy_action = null; is_conflict = false;
+                    player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
                     if (pending_challenge_key) {
                         let nextChallenge = pending_challenge_key;
@@ -3360,9 +3877,10 @@
 
         function runHealCheck() {
             const proceedPrompt = document.getElementById("proceed-prompt");
-            const isProceedVisible = proceedPrompt && window.getComputedStyle(proceedPrompt).display !== "none";            if (proceedPrompt.style.display === "none") is_proceed_prompt = false;
+            const isProceedVisible = proceedPrompt && window.getComputedStyle(proceedPrompt).display !== "none";            
+            if (proceedPrompt.style.display === "none") is_proceed_prompt = false;
 
-            if (is_conflict || is_action_phase || is_collapse_check || isProceedVisible) {
+            if (is_conflict || is_action_phase || is_collapse_check || isProceedVisible || is_elimination_check) {
                 log("Teraz nie je čas...");
                 return
             }
@@ -3472,26 +3990,11 @@
 
         function runCollapseCheck(onSuccessCallback, onFailureCallback) {
             if (test_mode){
-                const terminal = document.getElementById("terminal-screen");
-                const logText = terminal ? terminal.innerText : "";
-
-                const blob = new Blob([logText], { type: "text/plain" });
-                const url = URL.createObjectURL(blob);
-
-                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `terminal-log-${timestamp}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                // Restart the window/session after the export
-                window.location.reload();
+                let statusType;
+                statusType = "DEAD";
+                setTimeout(() => exportNreload(statusType), 200);
                 return;
             }
-
             is_collapse_check = true;
             collapse_action_done = false;
             inputs_frozen = true;
@@ -3542,10 +4045,7 @@
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
             updateUI();
-
             let roll_result = rollDice(card, false, 0, false);
-            
-            log(`Výsledok kontroly kolapsu: ${roll_result} (+${adrenaline})`, "error-msg");
 
             let success = roll_result > current_challenge.difficulty;
             let is_tie_or_failure = roll_result <= current_challenge.difficulty;
@@ -3723,9 +4223,7 @@
         // Dedicated transition executor
         function executeProceedTransition() {
             if(test_mode){
-                log("EXEC_TRANSITION: called", "system-msg");
                 if (is_collapse_check) {
-                    log("EXEC_TRANSITION: is_collapse_check is true, returning", "danger-msg");
                     return;
                 }
             }
@@ -3737,6 +4235,8 @@
 
                 const enemyCardContainer = document.getElementById("enemy-card-container");
                 const playerCardDisplay = document.getElementById("player-card-display");
+                const prompt = document.getElementById("proceed-prompt");
+
 
                 // Trigger visual slide outs
                 if (enemyCardContainer) enemyCardContainer.classList.remove("show");
@@ -3754,7 +4254,10 @@
                         if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + proceed_target + ")", "system-msg");
                         handleChallengeTransition(proceed_target);
                     }
+
                 }, delay); // Matches your CSS 0.5s transition
+                if (prompt) prompt.style.display = "none";
+
             } else {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target is NOT set, returning", "danger-msg");
             }
@@ -3768,14 +4271,24 @@
                 } else {
                     combat_starter = (combat_starter === "p") ? "e" : "p";
                 }
-                
                 turn = combat_starter;
                 log(`${turn === "p" ? "Začínaš ty." : "Začína " + enemy + "."}`);
             }
 
+            // --- DISTANCE / RANGED COMBAT CHECK (runs once, at the true start of the conflict) ---
+            conflict_distance = (enemy_id && CHALLENGES[enemy_id] && CHALLENGES[enemy_id].distance > 0)
+                ? CHALLENGES[enemy_id].distance
+                : 0;
+
+            distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
+
+            if (distance_combat_active) {
+                log("Nepriateľ je ešte ďaleko, môžeš zaútočiť z diaľky alebo sa priblížiť a získať výhodu.");
+            }
+
             updateUI();
 
-            if (move < 2) {
+            if (move < 2 && is_conflict) {
                 if (turn === "e") {
                     inputs_frozen = true;
                     const scrollRow = document.querySelector('.card-scroll-row');
@@ -3823,7 +4336,6 @@
                         inputs_frozen = false;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.add('enable-interaction');
-
                         updateUI(); 
                     };
 
@@ -3908,6 +4420,18 @@
             } else {
                 proceedWithSelection();
             }
+        }
+
+        function playerHasRangedWeapon() {
+            const rangedWeapons = Object.keys(WEAPON_LIST["BOJ Z DIAĽKY"] || {});
+            const thrownWeapons = Object.keys(WEAPON_LIST["VRHACIE"] || {});
+            const rangedCapable = rangedWeapons.concat(thrownWeapons);
+            return !!(HERO && Array.isArray(HERO.weapons) && HERO.weapons.some(w => rangedCapable.includes(w)));
+        }
+
+        function enemyHasRangedWeapon() {
+            const enemyData = ENEMY_TYPES[enemy];
+            return !!(enemyData && enemyData["ranged"] === true);
         }
 
         function enemyChoice() {
@@ -4157,6 +4681,10 @@
                         }
                     }
                 }
+            }
+
+            if (distance_combat_active && enemy_action && enemy_action[0] === "A") {
+                enemy_action = ["D", enemy_action[1]];
             }
 
             // 3. Game-loop and State Engine Execution
@@ -4794,7 +5322,7 @@
 
         function toggleBuilder(show) {
             if (show) {
-                if (is_conflict || is_action_phase || is_collapse_check || is_heal_check) {
+                if (is_conflict || is_action_phase || is_collapse_check || is_heal_check || is_elimination_check) {
                     log("Teraz nie je čas...");
                     return;
                 }
@@ -5268,245 +5796,250 @@
             // 1. PRIORITNÉ ZISTENIE ELEMENTOV (KARTA A ZÓNA) A SYNCHRONIZÁCIA
             // =========================================================================
             const cardContainer = e.target.closest(".card-container");
-            if (!cardContainer) return; // Ak sa kliklo mimo karty, ignorujeme
+            if (!cardContainer) return; 
             
             const allCards = Array.from(document.querySelectorAll("#card-tray-container .card-container"));
             const cardIdx = allCards.indexOf(cardContainer);
             if (isTouchDevice && touchClickSuppressed && touchPendingCardIdx === cardIdx) {
                 touchClickSuppressed = false;
-                return; // First tap on mobile should only activate hover
+                return; 
             }
 
             const cardCode = cardContainer.getAttribute("data-card");
             const zone = e.target.closest(".split-zone");
 
-            // --- SYNCHRONIZÁCIA KLÁVESNICE PODĽA MYŠI ---
             currentSelectedCardIdx = cardIdx;
-            
             if (zone) {
                 currentSelectedActionType = zone.getAttribute("data-action");
             }
             updateCardKeyboardHighlight();
 
             // =========================================================================
-            // 2. REŽIM SKÚŠKY KOLAPSU (COLLAPSE CHECK)
+            // 2. ŠPECIÁLNE REŽIMY (ČISTÉ HODY / BEZ KONTROLY ZBRANÍ)
             // =========================================================================
             if (is_collapse_check) {
-                // Resetujeme skill na 0, pretože collapse check je čistý hod bez bonusov schopností
                 skill = 0; 
-                
-                // Odovzdáme riadenie vyhodnocovaciemu motoru kolapsu
                 resolveCollapseCheck(cardCode);
-                return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
+                return; 
             }
 
             if (is_heal_check) {
                 resolveHealCheck(cardCode);
-                return; // Striktne zastaví prechod do konfliktu alebo fáz mimo boja
+                return; 
             }
 
             // =========================================================================
-            // 3. REŽIM V CONFLIKTE / BOJI (KLIKNUTIE NA KONKRÉTNU POLOVICU)
+            // 3. UNIVERZÁLNA PRÍPRAVA A VALIDÁCIA SCHOPNOSTÍ / ZBRANÍ (PRE BOJ AJ ELIMINÁCIU)
             // =========================================================================
-            if (is_conflict) {
-                // V boji striktne vyžadujeme kliknutie na zónu (A alebo D). Ak sa kliklo na kartu ale mimo zóny, nepokračujeme.
-                if (!zone) return;
+            const actionType = zone ? zone.getAttribute("data-action") : currentSelectedActionType;
+
+            const skillDropdown = document.getElementById("player-skill-dropdown");
+            const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+            const upperSkill = selectedSkillName.toUpperCase();
+
+            const weaponDropdown = document.getElementById("player-weapon-dropdown");
+            const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
+
+            // --- A. AKTUALIZÁCIA GLOBÁLNEJ PREMENNEJ weapon ---
+            if (!selectedWeaponName || selectedWeaponName === "placeholder") {
+                weapon = 0;
+                if (is_conflict && typeof DEBUG !== 'undefined' && DEBUG === true) {
+                    log("👊 Bojuješ holými rukami (INTENZITA: 0).", "system-msg");
+                }
+            } else {
+                let foundDamage = 0;
+                for (const category in WEAPON_LIST) {
+                    if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                        foundDamage = WEAPON_LIST[category][selectedWeaponName];
+                        break;
+                    }
+                }
+                weapon = foundDamage;
                 
-                let actionType = currentSelectedActionType; // "A" (Útok) alebo "D" (Čin/Obrana)
+                if (typeof DEBUG !== 'undefined' && DEBUG === true) {
+                    log(`⚔️ [DEBUG] Pripravená zbraň: ${selectedWeaponName.toUpperCase()} (INTENZITA: ${weapon})`, "system-msg");
+                }
+            }
 
-                // Načítanie elementov dropdownov a ich hodnôt
-                const skillDropdown = document.getElementById("player-skill-dropdown");
-                const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
-                const upperSkill = selectedSkillName.toUpperCase();
+            // --- B. VALIDÁCIA SCHOPNOSTÍ A PRIRADENIE HODNOTY skill ---
+            if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                const skillData = SKILLS_DB[selectedSkillName];
+                const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
+                const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) || 
+                                    (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
+                let isPlaceholder = (selectedSkillName === "placeholder");
 
-                const weaponDropdown = document.getElementById("player-weapon-dropdown");
-                const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
-
-                // =========================================================================
-                // 0. A. DELEGOVANÁ AKTUALIZÁCIA GLOBÁLNEJ PREMENNEJ weapon (ZBRAŇ)
-                // =========================================================================
-                if (!selectedWeaponName || selectedWeaponName === "placeholder") {
-                    weapon = 0; // Globálna premenná zbrane sa vynuluje
-                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                        log("👊  👊 Bojuješ holými rukami (INTENZITA: 0).", "system-msg");
-                    }
-                } else {
-                    let foundDamage = 0;
-                    for (const category in WEAPON_LIST) {
-                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                            foundDamage = WEAPON_LIST[category][selectedWeaponName];
-                            break;
-                        }
-                    }
-                    weapon = foundDamage; // Nastavenie intenzity do globálnej premennej
-                    
-                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                        log(`⚔️ [DEBUG] Pripravená zbraň pre boj: ${selectedWeaponName.toUpperCase()} (INTENZITA: ${weapon})`, "system-msg");
-                    }
+                if (is_conflict && selectedSkillName.includes("ELIMIN")){
+                    log(`⚠️ "${selectedSkillName}" nemôžeš počas boja.`, "error-msg");
+                    skill = 0; 
+                    return;
                 }
 
-                // =========================================================================
-                // 0. B. DELEGOVANÁ VALIDÁCIA SCHOPNOSTÍ PRE BOJ + PRIRADENIE HODNOTY skill
-                // =========================================================================
-                if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-                    const skillData = SKILLS_DB[selectedSkillName];
-                    const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
-                    const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
-                            (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
-                    let isPlaceholder = false;
-                    if (selectedSkillName == "placeholder") isPlaceholder = true;
-
-                    // Ak schopnosť nie je bojová a nie je ani v obranných, nepovolíme s ňou kliknúť na kartu
-                    if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
-                        log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
-                        skill = 0; 
-                        return; // Zablokuje vykonanie ťahu
-                    }
-
-                    // Schopnosť prešla -> bezpečne priradíme jej reálnu číselnú hodnotu z hrdinu
-                    const actualHeroValue = HERO.skills[selectedSkillName] || 0;
-                    skill = actualHeroValue;
-
-                    if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                        log(`⚔️ [DEBUG] Pripravená schopnosť: ${selectedSkillName} (+${actualHeroValue})`, "system-msg");
-                    }
-                } else {
-                    skill = 0; // Ak je vybraný placeholder/none, bonus k hodu je 0
+                if (is_conflict && !isCombatSkill && !isDefenseSkill && !isPlaceholder) {
+                    log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
+                    skill = 0; 
+                    return;
                 }
 
-                // =========================================================================
-                // STÁLE KONTROLY KOMBINÁCIÍ A PODMIENOK (KROKY 1 AŽ 4)
-                // =========================================================================
+                skill = HERO.skills[selectedSkillName] || 0;
 
-                // --- NOVÁ FIXNÁ KONTROLA: Vrhanie striktne vyžaduje útok (A) a zbraň (nie placeholder) ---
+                if (typeof DEBUG !== 'undefined' && DEBUG === true) {
+                    log(`⚔️ [DEBUG] Pripravená schopnosť: ${selectedSkillName} (+${skill})`, "system-msg");
+                }
+            } else {
+                skill = 0;
+            }
+
+            // --- C. KONTROLY KOMBINÁCIÍ (SPOLOČNÉ PRE BOJ AJ ELIMINÁCIU) ---
+            if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+                const skillData = SKILLS_DB[selectedSkillName];
+
+                // Overenie Vrhania
                 if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
                     if (!WEAPON_LIST["VRHACIE"] || WEAPON_LIST["VRHACIE"][selectedWeaponName] === undefined) {
-                        log(`⚠️ ${upperSkill} vyžaduje vrhaciu zbraň (napr. nôž)!`, "error-msg");
+                        log(`⚠️ ${upperSkill} vyžaduje vrhaciu zbraň!`, "error-msg");
                         return;
                     }
                 }
 
-                // --- 2. KROK: KONTROLA EXKLUZIVITY ÚTOK/OBRANA PO KLIKNUTÍ ---
+                // Kontrola vyžadovania zbrane pre strelecké/zbraňové skilly
+                if (skillData) {
+                    const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
+                    if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
+                        if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
+                            log(`⚠️ Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
+                            return;
+                        }
+                    }
+                }
+
+                // Kontrola kombinácie sily zbrane (WEAPON_SKILLS) - iba v boji
+                if (is_conflict && selectedWeaponName !== "placeholder") {
+                    const weaponAllowed = WEAPON_SKILLS[String(weapon)] || [];
+                    const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
+                    if (allowedSkills && !allowedSkills.includes(upperSkill)) {
+                        log(`⚠️ Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje intenzitu ${weapon})!`, "error-msg");
+                        return;
+                    }
+                }
+
+                // Dynamické overenie kategórií zbraní a skillov (Blízko vs Diaľka)
+                let weaponCategory = "";
+                for (const category in WEAPON_LIST) {
+                    if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
+                        weaponCategory = category.toUpperCase();
+                        break;
+                    }
+                }
+
+                // Pomocné premenné pre kontrolu vzdialenosti
+                const isRanged = weaponCategory === "BOJ Z DIAĽKY";
+                const isThrownWeapon = weaponCategory === "VRHACIE";
+                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
+
+
+                if (skillData && skillData[1]) {
+                    const skillCategory = skillData[1].toUpperCase();
+                    
+                    if (weaponCategory === "BOJ Z DIAĽKY" && upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
+                        if (!skillCategory.includes("BOJ Z DIAĽKY")) {
+                            log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
+                            return;
+                        }
+                    }
+                    
+                    if (weaponCategory === "BOJ ZBLÍZKA") {
+                        if (!skillCategory.includes("BOJ ZBLÍZKA")) {
+                            log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
+                            return;
+                        }
+                    }
+                }
+            }
+
+            // --- D. SKUTOČNÁ KONTROLA A SPOTREBA MUNÍCIE ---
+            const isEliminationAttack = is_elimination_check && actionType === "A";
+            
+            if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof distance_combat_active !== 'undefined' && distance_combat_active) {
+                if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
+                    log(`⚠️ Na útok holými rukami je nepriateľ príliš ďaleko.`, "error-msg");
+                    return;
+                } else {
+                    const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                    const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
+
+                    if (!canAttackAtDistance) {
+                        if (isThrownWeapon && !isThrownSkill) {
+                            log(`⚠️ Nepriateľ je ešte ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
+                        } else {
+                            log(`⚠️ Nepriateľ je ešte ďaleko! Použi zbraň na diaľku.`, "error-msg");
+                        }
+                        return;
+                    }
+                }
+            }
+
+
+            if (((is_conflict && actionType === "A") || isEliminationAttack) && selectedWeaponName !== "placeholder") {
+                if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
+                    const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+
+                    if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                        const currentAmmo = HERO["ammo"][selectedWeaponName];
+
+                        if (currentAmmo === undefined || currentAmmo <= 0) {
+                            log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
+                            return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
+                        }
+
+                        // Bezpečné odčítanie - všetky podmienky úspešne prešli!
+                        HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
+                        log(`Munícia pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
+                    }
+                }
+            }
+
+            // =========================================================================
+            // 4. REŽIM ELIMINÁCIE
+            // =========================================================================
+            if (is_elimination_check) {
+                resolveEliminationCheck(cardCode, actionType);
+                return;
+            }
+
+            // =========================================================================
+            // 5. ŠTANDARDNÝ REŽIM V CONFLIKTE / BOJI
+            // =========================================================================
+            if (is_conflict) {
+                if (!zone) return; 
+
                 if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                     const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
                     const skillData = SKILLS_DB[selectedSkillName];
-                    const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
-                        (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
+                    const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) || 
+                                        (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
                     
-                    // A. Ak hráč vybral ÚTOK ("A"), ale má navolený obranný skill (napr. Obratnosť)
                     if (actionType === "A" && !isCombatSkill && isDefenseSkill) {
-                        log(`⚠️ Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU! Zmeň schopnosť alebo klikni na ČIN (Obranu).`, "error-msg");
+                        log(`⚠️ Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU!`, "error-msg");
                         return;
                     }
-
-                    // B. Ak hráč vybral ČIN ("D"), ale má navolený útočný skill (napr. Boj zblízka) a nie je zároveň obranný
                     if (actionType === "D" && isCombatSkill && !isDefenseSkill) {
-                        log(`⚠️ Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE! Zmeň schopnosť alebo klikni na ÚTOK.`, "error-msg");
+                        log(`⚠️ Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE!`, "error-msg");
                         return;
                     }
                 }
                 
-                // --- 3. KROK: KONTROLA KOMBINÁCIE ZBRANE A SCHOPNOSTI ---
-                if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-                    const skillData = SKILLS_DB[selectedSkillName];
-                    
-                    // --- ZABEZPEČENIE PROTI ÚTOKU BEZ ZBRANE ---
-                    if (skillData) {
-                        const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
-                        
-                        if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
-                            if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
-                                log(`⚠️ Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
-                                return; // Zablokuje ťah
-                            }
-                        }
-                    }
-
-                    // Kontrola WEAPON_SKILLS - Či zvolená schopnosť prislúcha sile zbrane
-                    if (selectedWeaponName !== "placeholder") {
-                        // Využijeme už vypočítanú hodnotu premennej weapon z Kroku 0.A.
-                        const weaponAllowed = WEAPON_SKILLS[String(weapon)] || [];
-                        const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
-                        if (allowedSkills && !allowedSkills.includes(upperSkill)) {
-                            log(`⚠️ Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje zbraň s intenzitou ${weapon})!`, "error-msg");
-                            return;
-                        }
-
-                        if (skillData && skillData[1]) {
-                            const skillCategory = skillData[1].toUpperCase();
-                            
-                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
-                                if (skillCategory === "BOJ ZBLÍZKA" || skillCategory === "BOJ Z DIAĽKY") {
-                                    if (!WEAPON_LIST[skillCategory] || WEAPON_LIST[skillCategory][selectedWeaponName] === undefined) {
-                                        log(`⚠️ Zbraň ${selectedWeaponName.toUpperCase()} nie je vhodná pre schopnosť ${upperSkill}!`, "error-msg");
-                                        return; // Zablokuje ťah
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    // Dynamické zistenie kategórie zbrane (BOJ Z DIAĽKY / BOJ ZBLÍZKA / VRHACIE)
-                    let weaponCategory = "";
-                    for (const category in WEAPON_LIST) {
-                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                            weaponCategory = category.toUpperCase();
-                            break;
-                        }
-                    }
-
-                    if (skillData && skillData[1]) {
-                        const skillCategory = skillData[1].toUpperCase();
-                        
-                        // STRIKTNÉ PRAVIDLO: Zbraň na diaľku vyžaduje skill obsahujúci "BOJ Z DIAĽKY" (okrem Vrhania/Ťažkých predmetov)
-                        if (weaponCategory === "BOJ Z DIAĽKY") {
-                            if (upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
-                                if (!skillCategory.includes("BOJ Z DIAĽKY")) {
-                                    log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
-                                    return;
-                                }
-                            }
-                        }
-                        
-                        // STRIKTNÉ PRAVIDLO: Zbraň na blízko vyžaduje skill obsahujúci "BOJ ZBLÍZKA"
-                        if (weaponCategory === "BOJ ZBLÍZKA") {
-                            if (!skillCategory.includes("BOJ ZBLÍZKA")) {
-                                log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
-                                return;
-                            }
-                        }
-                    }
-                }
-
-                // --- 4. KROK: KONTROLA MUNÍCIE ---
-                if (actionType === "A" && selectedWeaponName !== "placeholder") {
-                    if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                        
-                        const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
-                        const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                        const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
-
-                        if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                            const currentAmmo = HERO["ammo"][selectedWeaponName];
-
-                            if (currentAmmo === undefined || currentAmmo <= 0) {
-                                log(`⚠️ Nemáš muníciu (alebo zásobu) pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
-                                return;
-                            }
-
-                            HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
-                            log(`Munície pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
-                        }
-                    }
-                }
                 
-                // --- 5. KROK: REŽIMY PRENASLEDOVANIA A ÚNIKU (CHASE / ESCAPE) ---
                 if (chase_mode || player_escaping || enemy_escaping) {
-
                     if (player_escaping) {
                         if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                             if (!CHASE_SKILLS.includes(upperSkill)) {
-                                log(`⚠️ Na únik nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
+                                log(`⚠️ Na únik nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
                                 return;
                             }
                         }
@@ -5517,32 +6050,27 @@
                     if (enemy_escaping) {
                         if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                             if (!CHASE_SKILLS.includes(upperSkill)) {
-                                log(`⚠️ Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}! \n Skús jednu z týchto: ${CHASE_SKILLS.join(", ")}.`, "error-msg");
+                                log(`⚠️ Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
                                 return;
                             }
                         }
-
                         if (actionType === "A") {
                             if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
                                 if (enemy_escape_counter >= 1) {
-                                    log(`⚠️ Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko. Vyber si zbraň alebo zvoľ ČIN.`, "error-msg");
+                                    log(`⚠️ Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko.`, "error-msg");
                                     return;
                                 }
                             } else {
                                 const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
                                 const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
                                 const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
-                                const isThrownAttack = isThrownWeapon && isThrownSkill;
+                                const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
                                 
-                                const canAttackAtDistance = isRanged || isThrownAttack;
-                                
-                                if (canAttackAtDistance || enemy_escape_counter < 1) {
-                                    // Útok povolený
-                                } else {
+                                if (!(canAttackAtDistance || enemy_escape_counter < 1)) {
                                     if (isThrownWeapon && !isThrownSkill) {
                                         log(`⚠️ Nepriateľ je príliš ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
                                     } else {
-                                        log(`⚠️ Nepriateľ je príliš ďaleko! Použi zbraň na diaľku, alebo zvoľ ČIN.`, "error-msg");
+                                        log(`⚠️ Nepriateľ je príliš ďaleko! Použi zbraň na diaľku.`, "error-msg");
                                     }
                                     return;
                                 }
@@ -5553,40 +6081,12 @@
                     }
                 }
 
-                // Vykonanie akcie za štandardných podmienok v boji
                 handleConflictInput(actionType, cardCode);
             } 
             // =========================================================================
-            // 4. REŽIM MIMO BOJA (KLIKNUTIE NA CELÚ KARTU)
+            // 6. REŽIM MIMO BOJA (AKCIA NA CELÚ KARTU)
             // =========================================================================
             else {
-                // Načítanie elementov dropdownov a ich hodnôt
-                const skillDropdown = document.getElementById("player-skill-dropdown");
-                const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
-                const weaponDropdown = document.getElementById("player-weapon-dropdown");
-                const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
-                
-                // Aktualizácia premennej weapon mimo boja
-                if (!selectedWeaponName || selectedWeaponName === "placeholder") {
-                    weapon = 0;
-                } else {
-                    let foundDamage = 0;
-                    for (const category in WEAPON_LIST) {
-                        if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                            foundDamage = WEAPON_LIST[category][selectedWeaponName];
-                            break;
-                        }
-                    }
-                    weapon = foundDamage;
-                }
-
-                // Aktualizácia premennej skill mimo boja
-                if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
-                    skill = HERO.skills[selectedSkillName] || 0;
-                } else {
-                    skill = 0;
-                }
-
                 resolveActionPhase(cardCode);
             }
         });
@@ -5740,7 +6240,7 @@
             activeCard.classList.add("keyboard-hover");
 
             // 3. Ak je konflikt, musíme navyše nasvietiť správnu polovicu (zónu)
-            if (is_conflict) {
+            if (is_conflict || is_elimination_check) {
                 const zone1 = activeCard.children[0];
                 const zone2 = activeCard.children[1];
 
@@ -5750,9 +6250,107 @@
                 } else if (zone2.getAttribute("data-action") === currentSelectedActionType) {
                     zone2.classList.add("keyboard-hover-zone");
                 }
-            }
+            } 
         }
 
+        function exportNreload(statusType){
+            if (isProcessingQueue) {
+                console.log("TEST: terminal still processing queue, waiting");
+                setTimeout(() => exportNreload(statusType), 200);
+                return;
+            }
+            const terminal = document.getElementById("terminal-screen");
+            const logText = terminal ? terminal.innerText : "";
+            const timestamp = new Date().toISOString();
+
+            // statusType now comes from the caller, captured at the moment
+            // the decision was actually made — no re-read of moving globals.
+
+            const lines = logText.trim() ? logText.trim().split('\n') : [];
+
+            const newRunEntry = {
+                id: crypto.randomUUID ? crypto.randomUUID() : "run-" + Date.now(),
+                timestamp: timestamp,
+                status: statusType,
+                logCount: lines.length,
+                terminalOutput: logText
+
+            };
+
+            
+            // 2. Retrieve existing data structure, safely parse, append, and serialize back
+            let parsedLogs = [];
+            try {
+                const existingRaw = localStorage.getItem("test_runs_json_log");
+                if (existingRaw) {
+                    parsedLogs = JSON.parse(existingRaw);
+                    if (!Array.isArray(parsedLogs)) parsedLogs = [];
+                }
+            } catch (e) {
+                console.error("Failed parsing log structure cache, resetting list.", e);
+                parsedLogs = [];
+            }
+            
+            parsedLogs.push(newRunEntry);
+            
+            try {
+                localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
+            } catch (storageError) {
+                console.error("LocalStorage full! Clean your logs.", storageError);
+            }
+
+            // Restart the window/session immediately without trigger-blocking delays
+            window.location.reload();
+        }
+
+
+        // --- Exploratory test-mode choice selection ---
+        // Tracks the stable id (choice.target) of every choice the test bot has actually clicked, in order.
+        let test_choice_history = [];
+
+        // Score = 10 minus how many times this id appears in the last 10 history entries.
+        // Never-seen (or rarely-seen) choices score highest, so the bot is pushed to explore.
+        function getExploratoryScore(choiceId) {
+            const recentWindow = test_choice_history.slice(-50);
+            const occurrences = recentWindow.filter(id => id === choiceId).length;
+            return 50 - occurrences;
+        }
+
+        // Given a list of stable choice ids, returns the index of the one to pick.
+        // Ties are broken with a per-candidate random draw (NOT by index/order/alphabetical),
+        // so a recurring tie between the same options can't lock into a stable cycle.
+        function pickExploratoryIndex(choiceIds) {
+            const scores = choiceIds.map(id => getExploratoryScore(id));
+            const maxScore = Math.max(...scores);
+            const tiedIndices = scores
+                .map((score, idx) => ({ score, idx }))
+                .filter(s => s.score === maxScore)
+                .map(s => s.idx);
+
+            if (tiedIndices.length === 1) return tiedIndices[0];
+
+            // Independent random draw per tied candidate; highest draw wins.
+            // This avoids any positional bias (first/last/alphabetical) that could create a loop.
+            let winnerIdx = tiedIndices[0];
+            let winnerDraw = Math.random();
+            for (let i = 1; i < tiedIndices.length; i++) {
+                const draw = Math.random();
+                if (draw > winnerDraw) {
+                    winnerDraw = draw;
+                    winnerIdx = tiedIndices[i];
+                }
+            }
+            return winnerIdx;
+        }
+
+        function recordExploratoryChoice(choiceId) {
+            test_choice_history.push(choiceId);
+            // Only the last 10 entries ever matter for scoring, but keep a bigger trailing
+            // buffer around so the array doesn't get reallocated/trimmed on every single push.
+            if (test_choice_history.length > 300) {
+                test_choice_history = test_choice_history.slice(-300);
+            }
+        }
 
         function test() {
             if (!keep_testing) {
@@ -5763,27 +6361,18 @@
                 setTimeout(test, 300);
                 return;
             }
-            if (current_challenge_key.includes("GAME")){
-                const terminal = document.getElementById("terminal-screen");
-                const logText = terminal ? terminal.innerText : "";
 
-                const blob = new Blob([logText], { type: "text/plain" });
-                const url = URL.createObjectURL(blob);
-
-                const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
-                const a = document.createElement("a");
-                a.href = url;
-                a.download = `terminal-log-${timestamp}.txt`;
-                document.body.appendChild(a);
-                a.click();
-                document.body.removeChild(a);
-                URL.revokeObjectURL(url);
-
-                // Restart the window/session after the export
-                window.location.reload();
+            if (current_challenge_key.includes("GAME")) {
+                setTimeout(() => exportNreload("GAME OVER"), 200);
                 return;
             }
-
+            if (HERO.stress > 8) {
+                setTimeout(() => exportNreload("DEAD"), 200);
+                return;
+            }
+            if (stuck_counter > 20) {
+                setTimeout(() => exportNreload("STUCK"), 700);
+            }
 
             if (prev_challenge !== current_challenge_key) {
                 prev_challenge = current_challenge_key;
@@ -5794,7 +6383,8 @@
 
             if (stuck_counter > 20) {
                 log("STUCK");
-                keep_testing = false;
+                setTimeout(test, 2000);
+                if (stuck_counter > 30) keep_testing = false;
                 return;
             }
 
@@ -5810,13 +6400,13 @@
             if (isGeneralVisible) {
                 document.getElementById('gp-confirm-btn')?.click();
                 log('TEST: general prompt visible - pressing confirm');
-                setTimeout(test, 300);
+                setTimeout(test, 100);
                 return;
             }
 
             if (overlayVisible) {
                 console.log("TEST: waiting for hero selection overlay to close");
-                setTimeout(test, 500);
+                setTimeout(test, 100);
                 return;
             }
 
@@ -5824,8 +6414,7 @@
                 const proceedBtn = document.getElementById('proceed-btn');
                 if (proceedBtn) {
                     proceedBtn.click();
-                    log("TEST: clicking proceed button");
-                    setTimeout(test, 750); // Wait longer for transition to complete
+                    setTimeout(test, 200);
                     return;
                 }
             }
@@ -5833,13 +6422,25 @@
             else if (isChoiceVisible) {
                 const buttons = choicePrompt.querySelectorAll(".adrenaline-select");
                 if (buttons.length > 0) {
-                    const selectedIndex = Math.floor(Math.random() * buttons.length);
+                    // Prefer the real choice.target as the stable id (set when the prompt was built),
+                    // falling back to button text if userData isn't present for some reason.
+                    const validChoices = choicePrompt.userData && choicePrompt.userData.validChoices;
+                    const choiceIds = Array.from(buttons).map((btn, i) => {
+                        if (validChoices && validChoices[i] && validChoices[i].target !== undefined) {
+                            return JSON.stringify(validChoices[i].target);
+                        }
+                        return btn.innerText;
+                    });
+
+                    const selectedIndex = pickExploratoryIndex(choiceIds);
                     const selectedButton = buttons[selectedIndex];
                     const buttonText = selectedButton ? selectedButton.innerText : "<none>";
                     if (selectedButton) {
+                        const scoreAtPick = getExploratoryScore(choiceIds[selectedIndex]);
                         selectedButton.click();
-                        log(`TEST: selecting choice ${selectedIndex + 1}: ${buttonText}`);
-                        setTimeout(test, 500);
+                        recordExploratoryChoice(choiceIds[selectedIndex]);
+                        log(`TEST: selecting choice ${selectedIndex + 1} (score ${scoreAtPick}): ${buttonText}`);
+                        setTimeout(test, 200);
                         return;
                     }
                 } else {
@@ -5861,12 +6462,12 @@
                         currentSelectedCardIdx = cardIdx;
                     }
 
-                    if (is_conflict) {
+                    if (is_conflict || is_elimination_check) {
                         if (is_collapse_check) {
                             // During collapse-check, only click once to resolve; then wait for engine to finish
                             if (collapse_action_done) {
                                 console.log('TEST: collapse action already sent, waiting for resolution');
-                                setTimeout(test, 500);
+                                setTimeout(test, 200);
                                 return;
                             }
                             collapse_action_done = true;
@@ -5877,7 +6478,7 @@
                             } else {
                                 targetCard.click();
                             }
-                        } else if (enemy_escape_counter > 0) {
+                        } else if (enemy_escape_counter > 0 || conflict_distance > 0) {
                             const zoneD = targetCard.querySelector('[data-action="D"]');
                             if (zoneD) {
                                 zoneD.click();
@@ -5899,13 +6500,13 @@
                         targetCard.click();
                     }
 
-                    setTimeout(test, 500);
+                    setTimeout(test, 200);
                     return;
                 }
             }
 
             console.log("TEST: no visible prompts or cards to act on, retrying");
-            setTimeout(test, 500);
+            setTimeout(test, 200);
         }
 
         // Table Input Management Engine (Zjednodušený cez zdieľanú funkciu)
@@ -5921,7 +6522,7 @@
 
         document.getElementById("player-weapon-dropdown").addEventListener("change", function(e) {
             const selectedWeaponName = e.target.value;
-            if (!is_conflict) {
+            if (!is_conflict && !is_elimination_check) {
                 log("Teraz nepotrebuješ zbraň.", "system-msg");
                 return
             }
@@ -6021,7 +6622,7 @@
                 return response.json();
             }),
             // NAČÍTANIE SKILLS DB Z ROOTOVÉHO PRIEČINKA:
-            fetch('../skillsDB.json').then(response => {
+            fetch('./skillsDB.json').then(response => {
                 if (!response.ok) throw new Error('Nepodarilo sa načítať súbor skillsDB.json');
                 return response.json();
             })
