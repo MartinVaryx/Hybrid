@@ -1,7 +1,7 @@
-        let test_mode = true;
+        let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = true;
-        let current_challenge_key = "WRECKS_1";
+        const DEBUG = false;
+        let current_challenge_key = "START";
 
         let keep_testing = false;
         let prev_challenge = null;
