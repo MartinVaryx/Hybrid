@@ -1372,6 +1372,23 @@
                         : 0;
                     distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
                     if (elimMode) {
+                        const enemyContainer = document.getElementById("enemy-sprite-container");
+                        const enemyImg = document.getElementById("enemy-sprite");
+                        
+                        if (enemyContainer && enemyImg && ENEMY_TYPES[actualTarget].image) {
+                            // Ensure correct scaling states are applied regardless of round
+                            enemyContainer.classList.add("elimination-mode");
+                            enemyContainer.classList.remove("distance-mode");
+
+                            // ONLY run the setup/entrance code if the sprite isn't already active on screen
+                            if (enemyContainer.style.display !== "block" || enemyImg.getAttribute('src') !== ENEMY_TYPES[actualTarget].image) {
+                                enemyImg.src = ENEMY_TYPES[actualTarget].image;
+                                enemyContainer.style.display = "block";
+                                enemyContainer.classList.remove("enemy-entrance", "enemy-hit");
+                                void enemyContainer.offsetWidth; // Force reflow for clean animation
+                                enemyContainer.classList.add("enemy-entrance");
+                            }
+                        }
                         runElimination(elimKey, elimMode);
                         return;
                     }
@@ -1453,6 +1470,19 @@
                 if (enemyContainer && enemyImg && ENEMY_TYPES[actualTarget].image) {
                     enemyImg.src = ENEMY_TYPES[actualTarget].image;
                     enemyContainer.style.display = "block";
+                    
+                    // --- ADDED: Manage distance/elimination scale classes ---
+                    if (is_elimination_check || (typeof elimination_mode !== 'undefined' && elimination_mode !== "kill" && elimination_mode !== null)) {
+                        enemyContainer.classList.add("elimination-mode");
+                        enemyContainer.classList.remove("distance-mode");
+                    } else if (distance_combat_active) {
+                        enemyContainer.classList.add("distance-mode");
+                        enemyContainer.classList.remove("elimination-mode");
+                    } else {
+                        enemyContainer.classList.remove("distance-mode", "elimination-mode");
+                    }
+                    // -------------------------------------------------------
+
                     enemyContainer.classList.remove("enemy-entrance", "enemy-hit");
                     void enemyContainer.offsetWidth;
                     enemyContainer.classList.add("enemy-entrance");
@@ -3270,6 +3300,13 @@
                 if (conflict_distance <= 0) {
                     distance_combat_active = false;
                     log(`⚔️ Nepriateľ je už nablízku, boj zblízka môže začať!`, "info-msg");
+                    
+                    // --- ADDED: Smoothly remove distance scale when gap is closed ---
+                    const enemyContainer = document.getElementById("enemy-sprite-container");
+                    if (enemyContainer) {
+                        enemyContainer.classList.remove("distance-mode");
+                    }
+                    // ----------------------------------------------------------------
                 }
             }
 

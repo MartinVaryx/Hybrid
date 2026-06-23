@@ -656,6 +656,18 @@
             80% { transform: translateY(-50%) translateX(5px) rotate(1deg); }
         }
 
+        #enemy-sprite-container.distance-mode img {
+            transform: scale(0.65); /* Shrunk down for distance combat */
+            transform-origin: center;
+            transition: transform 0.3s ease;
+        }
+
+        #enemy-sprite-container.elimination-mode img {
+            transform: scale(0.5); /* Even smaller for elimination mode */
+            transform-origin: center;
+            transition: transform 0.3s ease;
+        }
+
         .track-table {
             width: 100%;
             border-collapse: separate;
