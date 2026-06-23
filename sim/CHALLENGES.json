@@ -1842,10 +1842,13 @@
         "initial_msg": "Vyhrnieš si rukávy a ideš na to.",
         "case_success": [
             "set_CHANGE_FUSE_true",
-            "set_ANALYZE_false",
             "CAR_6"
         ],
-        "case_failure": "CAR_6",
+        "case_failure": [
+            "set_ANALYZE_true",
+            "set_ANALYZE_0_false",
+            "CAR_6"
+        ],
         "skills": [
             "OPRAVA",
             "MECHANIKA"
@@ -2982,8 +2985,8 @@
             "y": 4913
         },
         "CAR_6": {
-            "x": 12665,
-            "y": 1208
+            "x": 12518,
+            "y": 1201
         },
         "CHANGE_FUSE": {
             "x": 12790,
@@ -2994,24 +2997,24 @@
             "y": 1467
         },
         "ANALYZE_0": {
-            "x": 12921,
-            "y": 1516
+            "x": 13033,
+            "y": 1614
         },
         "DEPART": {
             "x": 13201,
             "y": 726
         },
         "CHANGE_FILTER": {
-            "x": 13013,
-            "y": 1067
+            "x": 13163,
+            "y": 1039
         },
         "CHANGE_FILTER_0": {
-            "x": 13064,
-            "y": 1315
+            "x": 13055,
+            "y": 1350
         },
         "CHANGE_FILTER_1": {
-            "x": 13358,
-            "y": 1191
+            "x": 13381,
+            "y": 1270
         },
         "DAM": {
             "x": 13786,
@@ -3302,8 +3305,8 @@
         "INTERROGATE_4": true,
         "CAR_6": true,
         "CHANGE_FUSE": false,
-        "ANALYZE": true,
-        "ANALYZE_0": false,
+        "ANALYZE": false,
+        "ANALYZE_0": true,
         "DEPART": true,
         "CHANGE_FILTER": true,
         "DAM": true,
@@ -3346,7 +3349,7 @@
         "PREDÁTORKA_7": false,
         "DRIVE_6": true,
         "ON_FOOT": true,
-        "WRECKS_2": true,
+        "WRECKS_2": false,
         "FIND_FILTER": true
     }
 }
