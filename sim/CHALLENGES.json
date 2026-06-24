@@ -1441,7 +1441,10 @@
         "case_A": "TUTORIAL_1",
         "choice_B": "Preskočiť tutoriál.",
         "case_B": "START",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/PLACEHOLDER.png",
+        "initial_msg_1": "Hra Hybrid zasadená do postapokalyptického sveta v blízkej budúcnosti. Na Zemi sa rozšíril neznámy druh gigantického ľudožravého hmyzu bežne nazývaného Somory.",
+        "initial_msg_2": "Názov Hybrid sa viaže k postavám, ktoré sa nachádzajú na pomedzí tohto hmyzu a človeka. Dokážu získať schopnosti Somôr, vďaka ktorým sa napríklad vedia pohybovať medzi nimi bez toho, aby na nich útočili. Aby schopnosti získali, musia sa vzdať svojej ľudskosti skonzumovaním ľudského mäsa. Ľudia nimi preto opovrhujú.",
+        "initial_msg_3": "Ty sa ujmeš práve roly Hybrida."
     },
     "TUTORIAL_1": {
         "initial_msg": "V tomto tutoriále sa dozvieš všetko podstatné. Ak si ho budeš chcieť zopakovať, nájdeš ho v MENU.",
@@ -1467,15 +1470,16 @@
         "image": "assets/PLACEHOLDER.png"
     },
     "TUTORIAL_3": {
-        "initial_msg": "Hlavnú mechaniku hry ale tvorí systém kariet: OPATRNE, RÁZNE, SMELO a BEZHLAVO.",
+        "initial_msg": "Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky.",
         "case_success": "",
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_4",
         "choice_B": "Preskočiť tutoriál.",
         "case_B": "START",
-        "initial_msg_1": "Voľbou karty si vyberáš spôsob, ako budeš konať a každá má svoje výhody aj nevýhody.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/PLACEHOLDER.png",
+        "initial_msg_2": "Každá karta má svoje výhody aj nevýhody. Pri ČINE (neútočná akcia, ktorou chceš niečo dosiahnuť, väčšinou bez protivníka) sa rozhoduješ doslova medzi OPATRNOSŤOU a šancou na úspech. Pri útoku zase medzi jeho INTENZITOU a šancou na zásah.",
+        "initial_msg_1": "Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa budeš rozhodovať, ako tvoj hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Je na tebe, čo je pre tvojho hrdinu v danej chvíli podstatnejšie."
     },
     "TUTORIAL_4": {
         "initial_msg": "V pravom hornom rohu je MOTIVÁCIA. Tá určuje kocky, ktorými hodíš pri výbere danej karty. Čím vyššia celková hodnota kociek, tým máš väčšiu šancu na úspech.",
@@ -2503,6 +2507,106 @@
         "failure_msg": "Nič...",
         "case_threat_delayed": "Skautka"
     },
+    "WORLD": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SOMORY",
+        "case_A": "SOMORAS",
+        "choice_B": "HYBRIDI",
+        "case_B": "HYBRIDS",
+        "choice_C": "V4 - Za Novou železnou oponou",
+        "case_C": "V4",
+        "choice_D": "FRAKCIE",
+        "case_D": "FACTIONS",
+        "choice_E": "SPÄŤ DO HRY",
+        "case_E": "BACK_TO_GAME"
+    },
+    "SOMORAS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "HYBRIDS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "V4": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "FACTIONS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "PRAGMATICI",
+        "case_A": "PRAGMATICS",
+        "choice_B": "PURITÁNI",
+        "case_B": "PURITANS",
+        "choice_C": "NOMÁDI",
+        "case_C": "NOMADS",
+        "choice_D": "HIGH BREED",
+        "case_D": "HIGH_BREED",
+        "choice_E": "SPÄŤ DO HRY",
+        "case_E": "BACK_TO_GAME"
+    },
+    "PRAGMATICS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "PURITANS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "NOMADS": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "HIGH_BREED": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME"
+    },
+    "WELCOME": {
+        "initial_msg": " ",
+        "case_success": "",
+        "case_failure": "",
+        "next": "TUTORIAL",
+        "image": "assets/WELCOME.png"
+    },
+    "ABOUT": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "SPÄŤ DO HRY",
+        "case_A": "BACK_TO_GAME",
+        "choice_B": "REÁLIE",
+        "case_B": "WORLD"
+    },
+    "BACK_TO_GAME": {
+        "initial_msg": "Nový vytvorený príbehový uzol.",
+        "case_success": "",
+        "case_failure": ""
+    },
     "LAYOUT": {
         "GAME_OVER": {
             "x": 16508,
@@ -3179,6 +3283,54 @@
         "FIND_FILTER": {
             "x": 11848,
             "y": 614
+        },
+        "WORLD": {
+            "x": 17414,
+            "y": 3185
+        },
+        "SOMORAS": {
+            "x": 17175,
+            "y": 2803
+        },
+        "HYBRIDS": {
+            "x": 17202,
+            "y": 3071
+        },
+        "V4": {
+            "x": 17384,
+            "y": 3364
+        },
+        "FACTIONS": {
+            "x": 17968,
+            "y": 3589
+        },
+        "PRAGMATICS": {
+            "x": 17719,
+            "y": 3758
+        },
+        "PURITANS": {
+            "x": 17876,
+            "y": 3950
+        },
+        "NOMADS": {
+            "x": 18112,
+            "y": 4088
+        },
+        "HIGH_BREED": {
+            "x": 18379,
+            "y": 4155
+        },
+        "WELCOME": {
+            "x": 17449,
+            "y": 2222
+        },
+        "ABOUT": {
+            "x": 16499,
+            "y": 3463
+        },
+        "BACK_TO_GAME": {
+            "x": 16691,
+            "y": 4157
         }
     },
     "ACTIVE": {
@@ -3350,6 +3502,18 @@
         "DRIVE_6": true,
         "ON_FOOT": true,
         "WRECKS_2": false,
-        "FIND_FILTER": true
+        "FIND_FILTER": true,
+        "WELCOME": true,
+        "WORLD": true,
+        "SOMORAS": true,
+        "HYBRIDS": true,
+        "V4": true,
+        "FACTIONS": true,
+        "PRAGMATICS": true,
+        "PURITANS": true,
+        "NOMADS": true,
+        "HIGH_BREED": true,
+        "ABOUT": true,
+        "BACK_TO_GAME": true
     }
 }

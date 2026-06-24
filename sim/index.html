@@ -145,8 +145,13 @@
                         <button id="ready-btn" class="adrenaline-select" style="width: 150px;margin: 10px; background: var(--hybrid-green);">SOM READY!</button>
                     </div>
 
-                         <div id="proceed-prompt">
-                            <button id="proceed-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">POKRAČOVAŤ</button>
+                         <div id="proceed-prompt"  class="next-prompt">
+                            <button id="proceed-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
+                                POKRAČOVAŤ</button>
+                        </div>
+                        <div id="back-to-game-prompt" class="next-prompt">
+                            <button id="back-to-game-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
+                                SPÄŤ DO HRY</button>
                         </div>
                 <div class="panel" id="enemy-panel">
                     <h3><span id="enemy-heading-type">ENEMY</span> </h3>
@@ -176,11 +181,40 @@
             </div>
             
             <div style="display: flex; flex-direction: column; gap: 15px; justify-content: center; width: 100%; align-items: center;">
-                <button class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">ÁNO</button>
+                <button onclick="showSettings()" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    NASTAVENIA</button>
+                <button id="launch-tutorial-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    POMOC</button>
+                <button onclick="about()" id="about-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    O HYBRIDE</button>
                 <button id="restart-btn" onclick="restartGame(true)" class="adrenaline-select" style="width: 140px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-red); cursor: pointer;">REŠTARTOVAŤ</button>
             </div>
         </div>
         </div>                 
+    </div>
+    <div id="settings" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
+
+        <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
+            
+            <button onclick="hideSettings()" class="adrenaline-select" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">
+                X
+            </button>
+            
+            <div style="font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: #fff; margin-bottom: 25px; text-transform: uppercase;">
+                NASTAVENIA
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; justify-content: center; width: 100%; align-items: center;">
+                
+                <label style="display: flex; align-items: center; gap: 12px; color: #ffffff; font-weight: bold; height: 40px; cursor: pointer; user-select: none; font-size: 1.1rem;">
+                    <span>TUTORIÁL</span>
+                    <input type="checkbox" id="tutorial-checkbox" onchange="toggleTutorial()" style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--hybrid-green);">
+                </label>
+                    
+                <button onclick="hideSettings()" id="about-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    SPÄŤ</button>
+            </div>
+        </div>
     </div>
     <div id="builder-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999;">
     
@@ -192,7 +226,7 @@
     </div>
     <div id="general-prompt" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 10100; flex-direction: column; align-items: center; justify-content: center;">  
         <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
-            <div id="general-prompt-text" style="font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: #fff; margin-bottom: 25px;">Otázka</div>
+            <div id="general-prompt-text" style="font-family: 'Archivo Black', sans-serif; font-size: 1.2rem; color: #fff; margin-bottom: 25px;">Otázka</div>
             <input id="general-prompt-input" type="text" placeholder="" style="display: none; width: 80%; margin-bottom: 20px; padding: 8px 12px; font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; background: #2a2a2a; color: #fff; border: 2px solid #555; border-radius: 4px; outline: none;">
             <div style="display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%;">
                 <button id="gp-confirm-btn" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-green);">Áno.</button>

@@ -339,7 +339,7 @@
         }
 
         /* Ready Box - Now anchored to the top-left */
-        #proceed-prompt {
+        .next-prompt {
             position: absolute;
             bottom: 10px;
             right: 10px;
@@ -1231,7 +1231,7 @@
         width: auto !important;      /* Resolves the rigid 270px wide desk layout overflow */
     }
 
-    #proceed-prompt {
+    .next-prompt {
         position: absolute !important;
         top: 10px !important;
         left: 10px !important;
@@ -1294,7 +1294,7 @@
         gap: 2px 10px !important;
     }
 
-    #proceed-prompt {
+    .next-prompt {
             left: -360px;
             top: 5px;
         }

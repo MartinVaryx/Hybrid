@@ -1,8 +1,9 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
-        let current_challenge_key = "START";
+        const DEBUG = true;
+        let current_challenge_key = "WELCOME";
 
+        let back_to_game = "START";
         let keep_testing = false;
         let prev_challenge = null;
         let pre_encounter_challenge_key = null;
@@ -17,6 +18,7 @@
         let sequential_msgs_done = false;
         let hero_created = true;
         let gameOn = false;
+        let welcome = true;
         let stockHeroesData = [];
         let combatLoopTimeout = null;
         let readyPromptTimeout = null;
@@ -25,6 +27,11 @@
         const conflict_difficulty = 6;
         const conflict_threat = 2;
         if (DEBUG) { gameOn = true, hero_selected = true};
+
+        const SYSTEM_COMMANDS = ["BACK_TO_GAME", "ABOUT"];
+        let SETTINGS = {
+            "tutorial": true,
+        };
 
 
         const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
@@ -636,7 +643,7 @@
 
         // --- UNIFIED KEYBOARD CONTROLLER ---
         window.addEventListener('keydown', (e) => {
-            if (!gameOn) return;
+            if (!gameOn && !welcome) return;
 
             // Check visibility states for all elements
             const generalPrompt = document.getElementById('general-prompt');
@@ -819,7 +826,7 @@
             // =========================================================================
             // 2. DROPDOWN HOTKEY CYCLING (ONLY RUNS IF CONTROLS ARE NOT FROZEN)
             // =========================================================================
-            if (gameOn) {
+            if (gameOn || welcome) {
                 if (e.key === 'h' || e.key === 'H') {
                     e.preventDefault();
                     runHealCheck();
@@ -1000,19 +1007,80 @@
         }
 
         function showMenu() {
-            // Zobrazíme pripravený HTML panel pre reštart
             const main_menu = document.getElementById("main-menu");
             if (main_menu) {
                 main_menu.style.display = "flex";
             }
         }
 
-
-
         function hideMenu() {
-            // Zobrazíme pripravený HTML panel pre reštart
             document.getElementById('main-menu').style.display = 'none';
         }
+
+        function showSettings() {
+            const settings = document.getElementById("settings");
+            if (settings) {
+                settings.style.display = "flex";
+            }
+            hideMenu();
+
+            syncUIWithSettings();
+        }
+
+        function syncUIWithSettings() {
+            if (typeof SETTINGS === 'undefined') return;
+
+            const tutorialCheckbox = document.getElementById('tutorial-checkbox');
+            if (tutorialCheckbox) {
+                tutorialCheckbox.checked = !!SETTINGS.tutorial;
+            }
+        }
+
+        function hideSettings() {
+            document.getElementById('settings').style.display = 'none';
+        }
+
+        function saveSettings() {
+            try {
+                if (typeof SETTINGS !== 'undefined') {
+                    localStorage.setItem('SETTINGS', JSON.stringify(SETTINGS));
+                    console.log("Nastavenia boli úspešne uložené do localStorage.");
+                } else {
+                    console.warn("Globálna premenná SETTINGS nie je definovaná.");
+                }
+            } catch (error) {
+                console.error("Nepodarilo sa uložiť nastavenia do localStorage:", error);
+            }
+        }
+
+        function toggleTutorial() {
+            const checkbox = document.getElementById('tutorial-checkbox');
+            if (!checkbox) return;
+
+            if (typeof SETTINGS === 'undefined') {
+                window.SETTINGS = {};
+            }
+
+            // Set the setting explicitly to match the checkbox state
+            SETTINGS.tutorial = checkbox.checked;
+
+            if (typeof saveSettings === 'function') {
+                saveSettings();
+            }
+        }
+
+        function updateTutorialVisual() {
+            const checkbox = document.getElementById('tutorial-checkbox');
+            if (!checkbox) return;
+
+            // Force the checkbox UI to match the current data structure state
+            if (typeof SETTINGS !== 'undefined' && SETTINGS.tutorial) {
+                checkbox.checked = true;
+            } else {
+                checkbox.checked = false;
+            }
+        }
+
 
 
         function ifCase(caseTarget, arrayContext = null, currentIndex = null) {
@@ -1146,7 +1214,50 @@
             return conditionPassed ? trueTarget : falseTarget;
         }
 
+        function resetStateFlags(){
+            is_conflict = false;
+            is_elimination_check = false;
+            is_collapse_check = false;
+            is_heal_check = false;
+            is_action_phase = false;
+            inputs_frozen = true
+        }
+
+        function about(){
+            if (is_collapse_check){
+                showGeneralPrompt("Teraz to nie je možné.")
+            }
+            const choicePrompt = document.getElementById("choice-prompt");
+            const isChoicePromptVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none";
+            hideMenu();
+            if (!isChoicePromptVisible){
+                showGeneralPrompt(
+                `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
+                () => {
+                    runAbout()})
+            } else {
+                runAbout()
+            }
+        }
+        
+        function runAbout(){
+            resetStateFlags(); 
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            if (proceedPrompt) {
+                proceedPrompt.style.display = "none";
+            };
+            target = "ABOUT";
+            back_to_game = current_challenge_key;
+            handleChallengeTransition(target)
+        }
+
         function handleChallengeTransition(caseTarget) {
+            if (caseTarget == "BACK_TO_GAME"){
+                updateUI;
+                handleChallengeTransition(back_to_game);
+
+                return
+            }
             if (test_mode){
                 let mod = 0;
                 let a = 0;
@@ -1154,7 +1265,7 @@
                 mod = Math.min(0,Math.floor(Math.random() * 14 - 1))
                 HERO.stress = Math.max(0, HERO.stress + mod);
             }
-            if (!caseTarget || !gameOn) return;
+            if (!caseTarget || (!gameOn && !welcome)) return;
             if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
                 return; // Early return to completely freeze challenge transitions
             }
@@ -1362,7 +1473,7 @@
                 }
             }
 
-            if (actualTarget in ENEMY_TYPES) { 
+            if (actualTarget in ENEMY_TYPES && !(actualTarget in SYSTEM_COMMANDS)) { 
                 if (!is_elimination_check && CHALLENGES[instanceKey] && (!CHALLENGES[instanceKey].alerted)) {                    
                     challenge_history.push(instanceKey)
                     const elimKey = instanceKey ? instanceKey : actualTarget;
@@ -1560,7 +1671,7 @@
             }
 
             // 2. If target moves the user forward to another challenge map node
-            if (actualTarget in CHALLENGES) { 
+            if (actualTarget in CHALLENGES && !(actualTarget in SYSTEM_COMMANDS)) { 
                 if (current_challenge_key && current_challenge_key !== actualTarget && typeof caseTarget === 'string' && !caseTarget.startsWith('BACK_ACTION_')) {
                     challenge_history.push(current_challenge_key);
                 }
@@ -2438,8 +2549,6 @@
 
                 if (activeChallenge.initial_msg) {
                     log(activeChallenge.initial_msg, "system-msg", true);
-                } else {
-                    log(`${current_challenge_key}`, "system-msg");
                 }
                 
                 
@@ -4225,7 +4334,7 @@
 
 
         function proceed(target) {
-            if (!gameOn) {
+            if (!gameOn && !welcome) {
                 log("PROCEED: gameOn is false, returning", "danger-msg");
                 return;
             }
@@ -4264,17 +4373,29 @@
                     return;
                 }
             }
+            const enemyCardContainer = document.getElementById("enemy-card-container");
+            const playerCardDisplay = document.getElementById("player-card-display");
+            const prompt = document.getElementById("proceed-prompt");
+
+            if (welcome){
+                if (enemyCardContainer) enemyCardContainer.classList.remove("show");
+                if (playerCardDisplay) playerCardDisplay.classList.remove("show");
+                if (prompt) prompt.style.display = "none";
+
+                welcome = false;
+                if(SETTINGS.tutorial){
+                    current_challenge_key = "TUTORIAL"
+                } else {
+                    current_challenge_key = "START"
+                }
+                selectHero();
+                return
+            }
             let delay = 0;
             if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target exists, executing after " + delay + "ms", "system-msg");
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
-
-                const enemyCardContainer = document.getElementById("enemy-card-container");
-                const playerCardDisplay = document.getElementById("player-card-display");
-                const prompt = document.getElementById("proceed-prompt");
-
-
                 // Trigger visual slide outs
                 if (enemyCardContainer) enemyCardContainer.classList.remove("show");
                 if (playerCardDisplay) playerCardDisplay.classList.remove("show");
@@ -5591,6 +5712,8 @@
                 gp_input.style.display = 'none';
                 confirmBtn.innerText = 'Áno.';
                 cancelBtn.style.display = 'none';
+                cancelBtn.style.display = 'block';
+                cancelBtn.innerText = 'Zrušiť'
             } else {
                 gp_input.style.display = 'none';
                 confirmBtn.innerText = 'Áno.';
@@ -6662,14 +6785,33 @@
             fetch('./skillsDB.json').then(response => {
                 if (!response.ok) throw new Error('Nepodarilo sa načítať súbor skillsDB.json');
                 return response.json();
+            }),
+            fetch('./SETTINGS.json').then(response => {
+                if (!response.ok) throw new Error('Nepodarilo sa načítať súbor SETTINGS.json');
+                return response.json();
             })
         ])
-        .then(([challengesData, enemyTypesData, heroesData, skillsDbData]) => {
+        .then(([challengesData, enemyTypesData, heroesData, skillsDbData, settingsData]) => {
             CHALLENGES = challengesData;
             ENEMY_TYPES = enemyTypesData;
             SKILLS_DB = skillsDbData;
             stockHeroesData = heroesData;
             window.SKILLS_DB = skillsDbData;
+            defaultSettings = settingsData;
+
+            // --- SETTINGS LOADING LOGIC ---
+            const localSettings = localStorage.getItem('SETTINGS');
+            if (localSettings) {
+                try {
+                    SETTINGS = JSON.parse(localSettings);
+                } catch (e) {
+                    console.error("Chyba pri parsovaní SETTINGS z localStorage, nahrávam záložné nastavenia:", e);
+                    if (settingsData) SETTINGS = settingsData;
+                }
+            } else if (settingsData) {
+                SETTINGS = settingsData;
+            }
+
 
             const savedCharacters = JSON.parse(localStorage.getItem('characters')) || [];
             const savedNames = new Set(savedCharacters.map(c => c.name.toUpperCase()));
@@ -6734,8 +6876,14 @@
                     defaultItems:   char.defaultItems   ? {...char.defaultItems}   : {}
                 }));
             }
-
-            selectHero();
+            if (test_mode){
+                current_challenge_key = "START";
+                welcome = false;
+                selectHero();
+                return;
+            } else {
+                handleChallengeTransition(current_challenge_key);
+            }
         })
         .catch(error => {
             console.error("Chyba pri inicializácii hry:", error);
