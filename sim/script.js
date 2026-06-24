@@ -1,6 +1,6 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = true;
+        const DEBUG = false;
         let current_challenge_key = "WELCOME";
 
         let back_to_game = "START";
