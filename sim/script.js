@@ -1,7 +1,7 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = false;
-        let debug_start = "CITY_0"
+        let debug_start = "START"
 
 
         let current_challenge_key = "WELCOME";
@@ -1254,8 +1254,12 @@
 
         function handleChallengeTransition(caseTarget) {
             if (caseTarget == "BACK_TO_GAME"){
+                let final_target = [];
+                stress_reset = "stress-10";
+                if (back_to_game.includes("START")) final_target.push(stress_reset);
+                final_target.push(back_to_game);
                 updateUI;
-                handleChallengeTransition(back_to_game);
+                handleChallengeTransition(final_target);
 
                 return
             }
@@ -1315,9 +1319,6 @@
                 // 1. Odrežeme históriu presne pred cieľovou lokáciou
                 challenge_history.splice(targetHistoryIndex);
                 
-                // 2. Dočasne nastavíme current_challenge_key na cieľ.
-                // Tým pádom podmienka (current_challenge_key !== actualTarget) zlyhá 
-                // a engine nepushne žiadnu starú lokáciu späť do poľa histórie.
                 current_challenge_key = destination;
                 
                 // Reset počítadla kôl

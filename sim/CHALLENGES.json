@@ -192,7 +192,10 @@
             "IN_BASEMENT_0"
         ],
         "case_threat": "stress+1",
-        "case_failure": ["set_IN_BASEMENT_0_true","IN_BASEMENT_0"],
+        "case_failure": [
+            "set_IN_BASEMENT_0_true",
+            "IN_BASEMENT_0"
+        ],
         "failure_msg": "Je tu strašný neporiadok. Zatiaľ nič užitočné."
     },
     "SKAUTKA_2": {
@@ -1879,7 +1882,7 @@
         "next": "DRIVE"
     },
     "CHANGE_FILTER": {
-        "initial_msg": "Najskôr treba vymeniť filter.",
+        "initial_msg": "Filter máš, teraz ho treba namontovať.",
         "case_success": "",
         "case_failure": "",
         "choice_A": "Tak poďme na to...",
@@ -1897,6 +1900,7 @@
     "CHANGE_FILTER_1": {
         "initial_msg": "Snáď to nepokašleš.",
         "case_success": [
+            "flag_brokenFilter:false",
             "set_CHANGE_FILTER_false",
             "set_CHANGE_FILTER_0_false",
             "set_ANALYZE_false",
@@ -2495,13 +2499,17 @@
         "choice_B": "Idem späť.",
         "case_B": "CAR_6",
         "image": "assets/WRECKS.png",
-        "trigger_delayed": ["SKAUTKA_5"]
+        "trigger_delayed": [
+            "SKAUTKA_5"
+        ]
     },
     "FIND_FILTER": {
         "initial_msg": "Tak v ktorom by mohol byť?",
         "case_success": [
             "item_FILTER+1",
             "set_WRECKS_2_false",
+            "set_CHANGE_FILTER_true",
+            "set_CHANGE_FILTER_0_false",
             "CHANGE_FILTER"
         ],
         "case_failure": "WRECKS_2",
@@ -2515,13 +2523,19 @@
         "threat_msg": "Hluk privolal Somoru. Našťastie je to len Skautka.",
         "threat_avoided_msg": "Snažíš sa nerobiť priveľký hluk, aby si neprilákal nejaké Somory.",
         "failure_msg": "Nič...",
-        "case_threat_delayed": ["SKAUTKA_5","set_SKAUTKA_5_true"],
-        "trigger_delayed": ["SKAUTKA_5", "set_SKAUTKA_5_true"]
+        "case_threat_delayed": [
+            "SKAUTKA_5",
+            "set_SKAUTKA_5_true"
+        ],
+        "trigger_delayed": [
+            "SKAUTKA_5",
+            "set_SKAUTKA_5_true"
+        ]
     },
-    "SKAUTKA_5":{
+    "SKAUTKA_5": {
         "type": "Skautka",
-        "case_success":"set_SKAUTKA_5_true",
-        "alerted":true
+        "case_success": "set_SKAUTKA_5_true",
+        "alerted": true
     },
     "WORLD": {
         "initial_msg": "Nový vytvorený príbehový uzol.",
@@ -3037,24 +3051,24 @@
             "y": 618
         },
         "TUTORIAL_7": {
-            "x": 18096,
-            "y": 504
+            "x": 18002,
+            "y": 495
         },
         "TUTORIAL_8": {
             "x": 17961,
             "y": 716
         },
         "SCOUT_DUMMY": {
-            "x": 18479,
-            "y": 603
+            "x": 18281,
+            "y": 612
         },
         "TUTORIAL_9": {
             "x": 18188,
             "y": 815
         },
         "SCOUT_DUMMY_0": {
-            "x": 18709,
-            "y": 756
+            "x": 18561,
+            "y": 728
         },
         "TUTORIAL_10": {
             "x": 18450,
@@ -3300,6 +3314,10 @@
             "x": 11848,
             "y": 614
         },
+        "SKAUTKA_5": {
+            "x": 150,
+            "y": 150
+        },
         "WORLD": {
             "x": 17414,
             "y": 3185
@@ -3531,6 +3549,6 @@
         "HIGH_BREED": true,
         "ABOUT": true,
         "BACK_TO_GAME": true,
-        "SKAUTKA_5":true
+        "SKAUTKA_5": true
     }
 }
