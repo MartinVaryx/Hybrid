@@ -26,6 +26,7 @@
         "case_threat": "enemy_advantage+1",
         "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
         "case_failure": [
+            "alerted_Predátorka_2:true",
             "Predátorka_2",
             "if_distractBasment:true_CITY_2_else_WRECKS_0"
         ],
@@ -161,7 +162,7 @@
         "choice_C": "Do lesa.",
         "case_C": "TOWER_0",
         "choice_D": "Do garáže na sídlisku.",
-        "case_D": "if_BASEMENT_ENTRANCE:true_BASEMENT_ENTRANCE_else_IN_BASEMENT_0"
+        "case_D": "IN_BASEMENT_0"
     },
     "IN_BASEMENT": {
         "image": "assets/BASEMENT.png",
@@ -187,10 +188,11 @@
             "if_hose:false_set_NO_HOSE_true",
             "if_hose:true_set_WRECKS_true",
             "if_hose:true_set_SUCK_true",
+            "set_IN_BASEMENT_0_true",
             "IN_BASEMENT_0"
         ],
         "case_threat": "stress+1",
-        "case_failure": "IN_BASEMENT_0",
+        "case_failure": ["set_IN_BASEMENT_0_true","IN_BASEMENT_0"],
         "failure_msg": "Je tu strašný neporiadok. Zatiaľ nič užitočné."
     },
     "SKAUTKA_2": {
@@ -256,7 +258,7 @@
             "BASEMENT_ENCOUNTER"
         ],
         "case_success_delayed": "BASEMENT_PREDATOR",
-        "case_threat": "enemy_advantage+1",
+        "case_threat": "alerted_SKAUTKA_2:true",
         "case_failure": [
             "set_EXPLORE_BASEMENT_false",
             "SKAUTKA_2"
@@ -288,7 +290,7 @@
         "choice_D": "Do lesa.",
         "case_D": "TOWER_0",
         "choice_E": "Do garáže na sídlisku.",
-        "case_E": "if_BASEMENT_ENTRANCE:true_BASEMENT_ENTRANCE_else_IN_BASEMENT_0"
+        "case_E": "IN_BASEMENT_0"
     },
     "SKAUTKA_1": {
         "image": "assets/CITY.png",
@@ -1427,8 +1429,8 @@
         "initial_msg": "Vitaj v hre Hybrid!",
         "case_success": "",
         "case_failure": "",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_0",
         "image": "assets/PLACEHOLDER.png"
@@ -1439,8 +1441,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_1",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "image": "assets/PLACEHOLDER.png",
         "initial_msg_1": "Hra Hybrid zasadená do postapokalyptického sveta v blízkej budúcnosti. Na Zemi sa rozšíril neznámy druh gigantického ľudožravého hmyzu bežne nazývaného Somory.",
         "initial_msg_2": "Názov Hybrid sa viaže k postavám, ktoré sa nachádzajú na pomedzí tohto hmyzu a človeka. Dokážu získať schopnosti Somôr, vďaka ktorým sa napríklad vedia pohybovať medzi nimi bez toho, aby na nich útočili. Aby schopnosti získali, musia sa vzdať svojej ľudskosti skonzumovaním ľudského mäsa. Ľudia nimi preto opovrhujú.",
@@ -1452,8 +1454,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_2",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Toto okno je scrollovateľné, takže ak ti ujde nejaká správa alebo si ju budeš chcieť pripomenúť, všetko nájdeš vyššie.",
         "image": "assets/PLACEHOLDER.png"
     },
@@ -1463,8 +1465,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_3",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Pod ním sa nachádza ukazovateľ adrenalínu. Ten poskytne jednorazový bonus, ale okamžite ti zvýši stres na hodnotu nad ním. Môžeš ho použiť, ak veľmi potrebuješ uspieť pri niektorej skúške. Pokojne si to teraz vyskúšaj.",
         "initial_msg_2": "",
         "image": "assets/PLACEHOLDER.png"
@@ -1475,8 +1477,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_4",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "image": "assets/PLACEHOLDER.png",
         "initial_msg_2": "Každá karta má svoje výhody aj nevýhody. Pri ČINE (neútočná akcia, ktorou chceš niečo dosiahnuť, väčšinou bez protivníka) sa rozhoduješ doslova medzi OPATRNOSŤOU a šancou na úspech. Pri útoku zase medzi jeho INTENZITOU a šancou na zásah.",
         "initial_msg_1": "Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa budeš rozhodovať, ako tvoj hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Je na tebe, čo je pre tvojho hrdinu v danej chvíli podstatnejšie."
@@ -1487,8 +1489,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_5",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Motivácia sa porovnáva s NÁROČNOSŤOU. To je jednoducho číslo, ktoré potrebuješ hodiť. Náročnosť býva v rozmedzí 6 až 12. Ak na kockách padne menej, zlyháš.",
         "image": "assets/PLACEHOLDER.png"
     },
@@ -1508,8 +1510,8 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_7",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Ak je tvoj hod nižší ako NÁROČNOSŤ, čelíš HROZBE. To znamená, že sa hodí kockami hrozby (toľko kociek, koľko je hodnota hrozby) a ak sa hrozba naplní, čelíš následkom.",
         "initial_msg_2": "Kockami hrozby sa hádže, aj keď je tvoj hod rovný  náročnosti (vtedy aj uspeješ, aj čelíš hrozbe).",
         "initial_msg_3": "Pred hrozbou ťa ale chráni OPATRNOSŤ ľavom rohu karty. Hrozba sa naplní len v prípade, že na kockách hrozby padne VIAC, ako je tvoja OPATRNOSŤ. Vyskúšaj si to.",
@@ -1535,8 +1537,8 @@
             "SCOUT_DUMMY",
             "TUTORIAL_9"
         ],
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
         "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
         "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
@@ -1558,8 +1560,8 @@
             "SCOUT_DUMMY_0",
             "TUTORIAL_10"
         ],
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Ak zlyháš a nepriateľ ťa zasiahne počas manévru, zvýšenie stresu, ktoré ti spôsobí, bude stlmené tvojou OPATRNOSŤOU. (Pozor na kartu BEZHLAVO! Tá má \"neopatrnosť\" a súperov útok ešte zosilní, ak ťa trafí.)",
         "image": "assets/PLACEHOLDER.png"
     },
@@ -1576,24 +1578,19 @@
         "case_failure": "",
         "choice_A": "Pokračovať.",
         "case_A": "TUTORIAL_11",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
         "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
         "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
         "image": "assets/PLACEHOLDER.png"
     },
     "TUTORIAL_11": {
-        "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
+        "initial_msg": "To je všetko.",
         "case_success": "",
         "case_failure": "",
-        "choice_A": "Pokračovať.",
-        "case_A": "TUTORIAL_11",
-        "choice_B": "Preskočiť tutoriál.",
-        "case_B": "START",
-        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
-        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
-        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
+        "choice_B": "Ukončiť tutoriál.",
+        "case_B": "BACK_TO_GAME",
         "image": "assets/PLACEHOLDER.png"
     },
     "SNEAK_0": {
@@ -1640,6 +1637,7 @@
         "choice_A": "Dorazím ju.",
         "case_A": [
             "set_SKAUTKA_1_false",
+            "item_ŽĽAZA SOMORY+1",
             "CITY"
         ],
         "choice_B": "Nechám ju tak.",
@@ -1795,16 +1793,21 @@
         "choice_A": [
             "Vymením poistku. Možno sa odpálila, keď sa minul benzín."
         ],
-        "case_A": "if_CHANGE_FILTER:false_CHANGE_FUSE_else_CHANGE_FILTER",
+        "case_A": "if_brokenFilter:true_CHANGE_FILTER_else_CHANGE_FUSE",
         "choice_B": "Vymením palivový filter.",
         "case_B": "if_item_FILTER>0_CHANGE_FILTER_else_CHANGE_FILTER_0",
         "choice_C": [
             "Otvorím kapotu a zistím",
             "čo sa stalo."
         ],
-        "case_C": "ANALYZE",
+        "case_C": "ANALYZE_0",
         "choice_D": "Idem pohľadať filter na vrakovisko.",
-        "case_D": "WRECKS_2"
+        "case_D": "WRECKS_2",
+        "choice_E": [
+            "Idem pod auto a skúsim zistiť",
+            "kde je problém."
+        ],
+        "case_E": "ANALYZE"
     },
     "CHANGE_FUSE": {
         "initial_msg": "Našťastie máš záložnú poistku v aute",
@@ -1834,9 +1837,10 @@
         "success_msg": "Problém odhalený. Odišla poistka.",
         "threat_msg": "Kontroluješ palivový filter a omylom ho vytiahneš a spadne ti na zem. Teraz máš o problém viac.",
         "case_threat": [
-            "set_CHANGE_FILTER_true",
+            "set_ANALYZE_false",
             "set_WRECKS_2_true",
-            "set_ANALYZE_false"
+            "if_item_FILTER>0_set_CHANGE_FILTER_true_else_set_CHANGE_FILTER_0_true",
+            "if_item_FILTER<1_flag_brokenFilter:true"
         ],
         "threat_avoided_msg": "Pri kontrole filtra ho omylom vytiahneš, ale zarazíš sa.",
         "failure_msg": "Vôbec netušíš, kde je problém.",
@@ -1846,6 +1850,7 @@
         "initial_msg": "Vyhrnieš si rukávy a ideš na to.",
         "case_success": [
             "set_CHANGE_FUSE_true",
+            "set_ANALYZE_0_false",
             "CAR_6"
         ],
         "case_failure": [
@@ -2058,7 +2063,10 @@
             "item_BOMBA+1",
             "IN_BASEMENT_0"
         ],
-        "case_failure": "IN_BASEMENT_0",
+        "case_failure": [
+            "set_MAKE_BOMB_false",
+            "IN_BASEMENT_0"
+        ],
         "skills": [
             "VÝROBA VÝBUŠNÍN",
             "CHÉMIA"
@@ -2086,6 +2094,8 @@
         "initial_msg": "Hlavne to ešte nezhoršiť...",
         "case_success": [
             "stress-3",
+            "flag_usedMedkit+1",
+            "if_usedMedkit>1_set_HEAL_false",
             "WRECKS_1"
         ],
         "case_failure": "WRECKS_1",
@@ -2485,7 +2495,7 @@
         "choice_B": "Idem späť.",
         "case_B": "CAR_6",
         "image": "assets/WRECKS.png",
-        "trigger_delayed": "Skautka"
+        "trigger_delayed": ["SKAUTKA_5"]
     },
     "FIND_FILTER": {
         "initial_msg": "Tak v ktorom by mohol byť?",
@@ -2505,7 +2515,13 @@
         "threat_msg": "Hluk privolal Somoru. Našťastie je to len Skautka.",
         "threat_avoided_msg": "Snažíš sa nerobiť priveľký hluk, aby si neprilákal nejaké Somory.",
         "failure_msg": "Nič...",
-        "case_threat_delayed": "Skautka"
+        "case_threat_delayed": ["SKAUTKA_5","set_SKAUTKA_5_true"],
+        "trigger_delayed": ["SKAUTKA_5", "set_SKAUTKA_5_true"]
+    },
+    "SKAUTKA_5":{
+        "type": "Skautka",
+        "case_success":"set_SKAUTKA_5_true",
+        "alerted":true
     },
     "WORLD": {
         "initial_msg": "Nový vytvorený príbehový uzol.",
@@ -3041,12 +3057,12 @@
             "y": 756
         },
         "TUTORIAL_10": {
-            "x": 18414,
-            "y": 911
+            "x": 18450,
+            "y": 919
         },
         "TUTORIAL_11": {
-            "x": 18688,
-            "y": 1027
+            "x": 18727,
+            "y": 1055
         },
         "SNEAK_0": {
             "x": 10248,
@@ -3113,8 +3129,8 @@
             "y": 1039
         },
         "CHANGE_FILTER_0": {
-            "x": 13055,
-            "y": 1350
+            "x": 13061,
+            "y": 1324
         },
         "CHANGE_FILTER_1": {
             "x": 13381,
@@ -3460,9 +3476,9 @@
         "ANALYZE": false,
         "ANALYZE_0": true,
         "DEPART": true,
-        "CHANGE_FILTER": true,
+        "CHANGE_FILTER": false,
         "DAM": true,
-        "CHANGE_FILTER_0": true,
+        "CHANGE_FILTER_0": false,
         "DESTROY_DAM": true,
         "CHANGE_FILTER_1": true,
         "BUNKER_2": true,
@@ -3514,6 +3530,7 @@
         "NOMADS": true,
         "HIGH_BREED": true,
         "ABOUT": true,
-        "BACK_TO_GAME": true
+        "BACK_TO_GAME": true,
+        "SKAUTKA_5":true
     }
 }

@@ -1,8 +1,10 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = false;
-        let current_challenge_key = "WELCOME";
+        let debug_start = "CITY_0"
 
+
+        let current_challenge_key = "WELCOME";
         let back_to_game = "START";
         let keep_testing = false;
         let prev_challenge = null;
@@ -61,6 +63,7 @@
         };
 
         const DELAYED = [];
+        const DELAYED_COOLDOWN = [];
 
         const WEAPON_LIST = {
             "BOJ Z DIAĽKY": {
@@ -605,7 +608,7 @@
 
         document.getElementById("proceed-btn").addEventListener("click", function () {
             console.log("PROCEED_HANDLER: click detected");
-            if (!gameOn) {
+            if (!gameOn && !welcome) {
                 console.log("PROCEED_HANDLER: gameOn is false, returning");
                 return;
             }
@@ -1187,9 +1190,7 @@
             else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
         
             if (flagKey.toLowerCase().startsWith('item')) {
-                log(`Overujem predmet`)
                 const itemKey = flagKey.substring(5).replace(/_/g, ' ').toUpperCase();
-                log(`Overujem predmet: ${itemKey}`)
                 processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
                     ? HERO.items[itemKey]
                     : 0;
@@ -1360,7 +1361,7 @@
                                     log(`Enemy wrapper ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
                                 }
                                 i++;
-                                continue; // fall through to the next array element instead of freezing
+                                continue; 
                             }
                         } else if (target in ENEMY_TYPES) {
                             const isInactiveEnemy = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false;
@@ -1377,20 +1378,24 @@
                                     log(`Nepriateľ ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
                                 }
                                 i++;
-                                continue; // fall through to the next array element instead of freezing
+                                continue; 
                             }
                         }
-                        // 2. Kontrola, či ide o klasickú modifikáciu (bezo zmien)
+
+                        // 2. KONTROLA MODIFIKÁCIÍ - PLNE AKTUALIZOVANÁ A ZABEZPEČENÁ
                         const isModification = typeof target === 'string' && (
                             target.includes('+') ||
                             target.includes('-') ||
                             target.includes('=') ||
+                            target.includes(':') ||                     // Pre alerted_...:true a flag_...:hodnota
                             target.toLowerCase().includes('weapon+') ||
+                            target.toLowerCase().includes('item_') ||   // PRIDANÉ: Bezpečné zachytenie predmetov
                             target.toLowerCase().startsWith('set_') ||
-                            target.toLowerCase().startsWith('flag_') 
+                            target.toLowerCase().startsWith('flag_') ||
+                            target.toLowerCase().startsWith('alerted_') // PRIDANÉ: Ostražitosť nepriateľov
                         );
 
-                        // 3. NOVÝ PRÍDAVOK: Špeciálna izolovaná kontrola pre podmienky (if_)
+                        // 3. Špeciálna izolovaná kontrola pre podmienky (if_)
                         const isIfCondition = typeof target === 'string' && target.toLowerCase().startsWith('if_');
 
                         if (isModification) {
@@ -1425,19 +1430,14 @@
                             // keep looping
                         }
                         else if (isIfCondition) {
-                            // Spustíme ifCase synchrónne, ale POZOR: 
-                            // ifCase vnútri seba zavolá executeMods(), čo upraví FLAGS/ACTIVE.
-                            // Tým pádom podmienka prebehne, ale nespustí handleChallengeTransition pre finálnu kartu predčasne.
                             if (typeof ifCase === "function") {
                                 ifCase(target);
                             }
-                            i++; // Posunieme sa na ďalší prvok v poli (v našom prípade na "CITY")
-                            // keep looping bez toho, aby sme zahltili stack volaním handleChallengeTransition znova
+                            i++; 
+                            // keep looping
                         }
                         else {
                             // Terminal item — but check if it's inactive first.
-                            // If inactive, skip it and let the loop try the next item
-                            // (e.g. SHACK_1 -> if disabled -> fall through to SHACK_2)
                             const isInactiveTarget = CHALLENGES["ACTIVE"] && CHALLENGES["ACTIVE"][target] === false;
 
                             if (isInactiveTarget) {
@@ -1445,7 +1445,7 @@
                                     log(`Target ${target} je neaktívny (false), skúšam ďalší prvok v poli.`);
                                 }
                                 i++;
-                                continue; // try next element instead of stopping
+                                continue; 
                             }
 
                             // Terminal item — hand off and stop
@@ -1459,7 +1459,7 @@
                     updateUI();
                 }
 
-                processNextElement(); // Spustíme asynchrónnu reťaz
+                processNextElement(); 
                 return; 
             }
 
@@ -1742,9 +1742,11 @@
                     
                     if (DEBUG === true) {
                         log(`[ALERTED] Stav ostražitosti pre výzvu '${challengeKey}' bol nastavený na: ${booleanState}`);
+                        return true
                     }
                 } else if (DEBUG === true) {
                     log(`[executeMods] Výzva '${challengeKey}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                    return false
                 }
                 modificationExecuted = true;
             }
@@ -1848,7 +1850,6 @@
                         CHALLENGES["ACTIVE"][challengeName] = booleanState;
                         modificationExecuted = true;
                         if (DEBUG === true) {
-                            const state = CHALLENGES["ACTIVE"][challengeName];
                             log(`Stav výzvy ${challengeName} bol zmenený na ${booleanState}.`);
                         }
                     }
@@ -1856,7 +1857,7 @@
             }
 
             // --- Handle incremental modifications using '+' or '-' ---
-            if (!modificationExecuted && lowerTarget.includes("+") || lowerTarget.includes("-")) {
+            if (!modificationExecuted && (lowerTarget.includes("+") || lowerTarget.includes("-"))) {
                 const isAddition = lowerTarget.includes("+");
                 const parts = isAddition ? caseTarget.split("+") : caseTarget.split("-");
                 const amount = parts[1] ? parseInt(parts[1]) : 1;
@@ -1890,8 +1891,6 @@
                     if (HERO.stress > stress_thresh) {
                         is_collapse_check = true;
 
-                        // Do runCollapseCheck pošleme dva callbacky: 
-                        // 1. pre ÚSPECH (ak sa zachráni), 2. pre ZLYHANIE (ak nezvládne hod)
                         runCollapseCheck(
                             // --- CALLBACK PRE ÚSPECH ---
                             () => {
@@ -1915,13 +1914,10 @@
                                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
                                 log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
                                 
-                                // Keďže cez mody hrozí prepísanie fronty, zavoláme reštart hneď,
-                                // ako dobehne posledná osudná správa
                                 onTerminalFinishedCallback = () => { 
                                     restartGame(); 
                                 };
 
-                                // Poistka: ak terminál práve nespracováva žiadny text, reštartujeme okamžite
                                 if (typeof isProcessingQueue !== 'undefined' && !isProcessingQueue) {
                                     restartGame();
                                 }
@@ -1951,16 +1947,13 @@
                     // AKTUALIZÁCIA V LOKÁLNOM SÚBORE (localStorage)
                     const savedCharacters = JSON.parse(localStorage.getItem('characters'));
                     if (savedCharacters && savedCharacters.length > 0) {
-                        // Nájdeme postavu v localStorage podľa mena (ignorujeme veľkosť písmen)
                         const charIndex = savedCharacters.findIndex(char => char.name.toUpperCase() === HERO.name.toUpperCase());
                         
                         if (charIndex !== -1) {
-                            // Inicializácia sp v databáze, ak neexistuje, a pripočítanie modifikátora
                             const currentDbSp = savedCharacters[charIndex].sp || 0;
                             savedCharacters[charIndex].sp = currentDbSp + modifier;
                             if (savedCharacters[charIndex].sp < 0) savedCharacters[charIndex].sp = 0;
 
-                            // Uloženie aktualizovaného poľa postáv späť do localStorage
                             localStorage.setItem('characters', JSON.stringify(savedCharacters));
                             if (typeof characters !== 'undefined') {
                                 characters = savedCharacters;
@@ -2016,7 +2009,6 @@
                             log(`[executeMods] Neplatný cieľ pre difficulty mod: '${caseTarget}'.`);
                         }
                     }
-                    return modificationExecuted;
                 }
                 else if (lowerTarget.includes("difficulty")) {
                     if (queued_difficulty_target && CHALLENGES[queued_difficulty_target]) {
@@ -2039,7 +2031,7 @@
                             log(`Náročnosť výzvy klesá o ${amount}.`, "success-msg");
                         }
                     }
-                    queued_difficulty_target = null; // single-use, regardless of which branch fired
+                    queued_difficulty_target = null;
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("threat")) {
@@ -2056,6 +2048,7 @@
                 else if (lowerTarget.includes("weapon+")) {
                     const weaponName = lowerTarget.split("weapon+")[1].trim().split(" ")[0].toLowerCase();
                     
+                    // POISTKA: Bezpečne inicializuje zbrane ak chýbajú
                     if (!HERO.weapons || !Array.isArray(HERO.weapons)) {
                         HERO.weapons = [];
                     }
@@ -2072,70 +2065,74 @@
                     }
                     modificationExecuted = true;
                 }
-            else if (
-                    (() => {
-                        const targetWeaponName = parts[0].trim().toLowerCase();
-                        // 2. Prejdeme WEAPON_LIST a zistíme, či táto zbraň vôbec existuje
-                        for (const category in WEAPON_LIST) {
-                            if (WEAPON_LIST[category] && WEAPON_LIST[category][targetWeaponName] !== undefined) {
-                                return true; // Našli sme ju, podmienka platí
-                            }
-                        }
-                        return false; // Nie je to zbraň, táto vetva sa preskočí
-                    })()
-                ) {
-                    // Keďže vieme, že podmienka prešla, môžeme bezpečne vykonať úpravu munície
-                    const targetWeaponName = parts[0].trim().toLowerCase();
-                    const currentWeaponAmmo = HERO["ammo"][targetWeaponName] || 0;
-                    const newAmmoValue = Math.max(0, currentWeaponAmmo + modifier);
-                    
-                    HERO["ammo"][targetWeaponName] = newAmmoValue;
+                else if (lowerTarget.includes("item_")) {
+                    const itemName = parts[0].split("item_")[1].trim().toUpperCase();
 
-                    if (modifier > 0) {
-                        log(`Získavaš muníciu pre ${targetWeaponName.toUpperCase()}: +${amount} ks. (Celkovo: ${newAmmoValue})`, "success-msg");
-                    } else {
-                        log(`Strácaš muníciu pre ${targetWeaponName.toUpperCase()}: -${amount} ks. (Celkovo: ${newAmmoValue})`, "danger-msg");
+                    // POISTKA: Bezpečne inicializuje predmety ak chýbajú
+                    if (!HERO.items || typeof HERO.items !== 'object') {
+                        HERO.items = {};
                     }
 
+                    if (typeof ITEM_LIST !== 'undefined' && ITEM_LIST[itemName] !== undefined) {
+                        const current = HERO.items[itemName] || 0;
+                        const newVal = Math.max(0, current + modifier);
+                        HERO.items[itemName] = newVal;
+
+                        if (modifier > 0) {
+                            log(`Získavaš predmet: ${itemName} (${newVal})!`, "success-msg");
+                        } else {
+                            log(`Strácaš predmet: ${itemName} (zostatok: ${newVal}).`, "danger-msg");
+                        }
+                    } else {
+                        const current = HERO.items[itemName] || 0;
+                        HERO.items[itemName] = Math.max(0, current + modifier);
+                        log(`[Zmena] ${itemName}: ${HERO.items[itemName]}`, "system-msg");
+                        
+                        if (DEBUG === true) {
+                            log(`Predmet ${itemName} neexistuje v ITEM_LIST.`, "danger-msg");
+                        }
+                    }
                     modificationExecuted = true;
                 }
-            // --- Inside executeMods() under lowerTarget.includes("item_") ---
-            else if (lowerTarget.includes("item_")) {
-                const itemName = parts[0].split("item_")[1].trim().toUpperCase();
+                else {
+                    // MUNÍCIA BLOK: Ak string nebol item ani weapon+, overíme či ide o registrovanú zbraň z WEAPON_LIST
+                    const targetWeaponName = parts[0].trim().toLowerCase();
+                    let isKnownWeapon = false;
 
-                if (!HERO.items || typeof HERO.items !== 'object') {
-                    HERO.items = {};
-                }
-
-                // FIX: Safe check to ensure ITEM_LIST exists and contains the item
-                if (typeof ITEM_LIST !== 'undefined' && ITEM_LIST[itemName] !== undefined) {
-                    const current = HERO.items[itemName] || 0;
-                    const newVal = Math.max(0, current + modifier);
-                    HERO.items[itemName] = newVal;
-
-                    if (modifier > 0) {
-                        log(`Získavaš predmet: ${itemName} (${newVal})!`, "success-msg");
-                    } else {
-                        log(`Strácaš predmet: ${itemName} (zostatok: ${newVal}).`, "danger-msg");
+                    if (typeof WEAPON_LIST !== 'undefined') {
+                        for (const category in WEAPON_LIST) {
+                            if (WEAPON_LIST[category] && WEAPON_LIST[category][targetWeaponName] !== undefined) {
+                                isKnownWeapon = true;
+                                break;
+                            }
+                        }
                     }
-                } else {
-                    // Fallback: Mutate the data anyway and force a print statement to clear the queue
-                    const current = HERO.items[itemName] || 0;
-                    HERO.items[itemName] = Math.max(0, current + modifier);
-                    log(`[Zmena] ${itemName}: ${HERO.items[itemName]}`, "system-msg");
-                    
-                    if (DEBUG === true) {
-                        log(`Predmet ${itemName} neexistuje v ITEM_LIST.`, "danger-msg");
+
+                    if (isKnownWeapon) {
+                        // POISTKA: Bezpečne inicializuje ammo objekt ak chýba
+                        if (!HERO.ammo || typeof HERO.ammo !== 'object') {
+                            HERO.ammo = {};
+                        }
+
+                        const currentWeaponAmmo = HERO.ammo[targetWeaponName] || 0;
+                        const newAmmoValue = Math.max(0, currentWeaponAmmo + modifier);
+                        
+                        HERO.ammo[targetWeaponName] = newAmmoValue;
+
+                        if (modifier > 0) {
+                            log(`Získavaš muníciu pre ${targetWeaponName.toUpperCase()}: +${amount} ks. (Celkovo: ${newAmmoValue})`, "success-msg");
+                        } else {
+                            log(`Strácaš muníciu pre ${targetWeaponName.toUpperCase()}: -${amount} ks. (Celkovo: ${newAmmoValue})`, "danger-msg");
+                        }
+                        modificationExecuted = true;
                     }
                 }
-
-                modificationExecuted = true;
-            }
             }
 
             if (modificationExecuted) {
                 return true;
             }
+            return false;
         }
     
 
@@ -2492,45 +2489,61 @@
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
-            if (activeChallenge.trigger_delayed && Array.isArray(activeChallenge.trigger_delayed)) {
-                let triggeredEffects = [];
+                // 1. Trigger delayed even if it's not an array (handles string or array)
+                if (activeChallenge.trigger_delayed) {
+                    const delayedTargets = Array.isArray(activeChallenge.trigger_delayed)
+                        ? activeChallenge.trigger_delayed
+                        : [activeChallenge.trigger_delayed];
 
-                // 1. Gather all delayed challenges currently waiting in the global pool
-                for (const effect of activeChallenge.trigger_delayed) {
-                    const delayedIndex = DELAYED.indexOf(effect);
-                    if (delayedIndex !== -1) {
-                        // Remove it from the pool immediately so it cannot re-trigger
-                        DELAYED.splice(delayedIndex, 1);
+                    let triggeredEffects = [];
 
-                        const targetIsInactive = typeof effect === 'string' &&
-                            CHALLENGES["ACTIVE"] &&
-                            CHALLENGES["ACTIVE"][effect] === false;
-
-                        if (targetIsInactive) {
-                            if (DEBUG === true) {
-                                log(`Delayed target ${effect} je neaktívny, ignorujem.`);
-                            }
+                    // Gather all delayed challenges currently waiting in the global pool
+                    for (const effect of delayedTargets) {
+                        
+                        // 2. If triggered effect is in COOLDOWN, skip it and remove it from COOLDOWN
+                        const cooldownIndex = DELAYED_COOLDOWN.indexOf(effect);
+                        if (cooldownIndex !== -1) {
+                            DELAYED_COOLDOWN.splice(cooldownIndex, 1);
                             continue; 
                         }
 
-                        triggeredEffects.push(effect);
+                        const delayedIndex = DELAYED.indexOf(effect);
+                        if (delayedIndex !== -1) {
+                            // Remove it from the pool immediately so it cannot re-trigger
+                            DELAYED.splice(delayedIndex, 1);
+
+                            const targetIsInactive = typeof effect === 'string' &&
+                                CHALLENGES["ACTIVE"] &&
+                                CHALLENGES["ACTIVE"][effect] === false;
+
+                            if (targetIsInactive) {
+                                if (DEBUG === true) {
+                                    log(`Delayed target ${effect} je neaktívny, ignorujem.`);
+                                }
+                                continue; 
+                            }
+
+                            triggeredEffects.push(effect);
+                            
+                            // 3. Add successfully triggered effects to DELAYED_COOLDOWN
+                            DELAYED_COOLDOWN.push(effect);
+                        }
+                    }
+
+                    // If any matching threats were triggered, chain them together sequentially
+                    if (triggeredEffects.length > 0) {
+                        if (DEBUG === true) {
+                            log(`[Trigger Delayed] Spúšťam reťazec odložených hrozieb: ${triggeredEffects.join(', ')}`);
+                        }
+
+                        // We build an execution chain: Encounter 1 -> Encounter 2 -> back to Original Card
+                        const executionChain = [...triggeredEffects, current_challenge_key];
+
+                        // Hand over the array sequence to your existing engine routing
+                        handleChallengeTransition(executionChain);
+                        return true; // Stop rendering the current card's UI layout for now
                     }
                 }
-
-                // 2. If any matching threats were triggered, chain them together sequentially
-                if (triggeredEffects.length > 0) {
-                    if (DEBUG === true) {
-                        log(`[Trigger Delayed] Spúšťam reťazec odložených hrozieb: ${triggeredEffects.join(', ')}`);
-                    }
-
-                    // We build a execution chain: Encounter 1 -> Encounter 2 -> back to Original Card
-                    const executionChain = [...triggeredEffects, current_challenge_key];
-
-                    // Hand over the array sequence to your existing engine routing
-                    handleChallengeTransition(executionChain);
-                    return true; // Stop rendering the current card's UI layout for now
-                }
-            }
                 const challengeDisplay = document.getElementById("challenge-stats-display");
                 
                 // --- CORE DETERMINISTIC DISTINCTION ---
@@ -2649,14 +2662,15 @@
         document.getElementById("player-skill-dropdown").addEventListener("change", function(e) {
             const selectedSkillName = e.target.value;
             let chosenSkillValue = 0;
+            let isPlaceholder = false;
+            if (selectedSkillName == "placeholder") isPlaceholder = true;
+
             // --- REŽIM BOJA (COMBAT) ---
             if (enemy) {
                 const skillData = SKILLS_DB[selectedSkillName];
                 const isDefenseSkill = DEFENSE_SKILLS.includes(selectedSkillName.toUpperCase());
                 const isCombatSkill = ATTACK_SKILLS.includes(selectedSkillName.toUpperCase()) || 
                         (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
-                let isPlaceholder = false;
-                if (selectedSkillName == "placeholder") isPlaceholder = true;
                 // PRVÝ KROK: Ak schopnosť nie je bojová a nie je ani v obranných, vyhodíme ju
                 if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
                     log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
@@ -2668,9 +2682,9 @@
             const actualHeroValue = HERO.skills[selectedSkillName] || 0;
 
             if (activeChallenge && activeChallenge.skills && activeChallenge.skills.length > 0) {
-                if (!activeChallenge.skills.includes(selectedSkillName)) {
+                if (!activeChallenge.skills.includes(selectedSkillName) && !isPlaceholder) {
                     log(`⚠️ Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
-                } else {
+                } else if(!isPlaceholder){
                     log(`✅ ${selectedSkillName} (+${actualHeroValue}) je vhodná schopnosť!`, "success-msg");
                 }
             } else if (challengeDisplay) {
@@ -3179,6 +3193,7 @@
 
             // Bezpečne posielame hráča na výslednú lokáciu až po dobehnutí všetkých logov
             const doTransition = () => {
+                let followupTarget;
                 if (success) {
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                     log("Získavaš 1 BR!", "success-msg");
@@ -3189,7 +3204,7 @@
                             DELAYED.push(activeChallenge.case_success_delayed);
                         }
                     }
-                    proceed(activeChallenge.case_success);
+                    followupTarget = activeChallenge.case_success;
                 } else {
                     if (activeChallenge.case_failure_delayed) {
                         if (Array.isArray(activeChallenge.case_failure_delayed)) {
@@ -3198,74 +3213,39 @@
                             DELAYED.push(activeChallenge.case_failure_delayed);
                         }
                     }
-                    proceed(activeChallenge.case_failure);
+                    followupTarget = activeChallenge.case_failure;
+                }
+
+                if (threat_realized && activeChallenge.case_threat_delayed) {
+                    if (Array.isArray(activeChallenge.case_threat_delayed)) {
+                        DELAYED.push(...activeChallenge.case_threat_delayed);
+                    } else {
+                        DELAYED.push(activeChallenge.case_threat_delayed);
+                    }
+                }
+
+                if (threat_realized && activeChallenge.case_threat) {
+                    const threatChain = Array.isArray(activeChallenge.case_threat)
+                        ? [...activeChallenge.case_threat]
+                        : [activeChallenge.case_threat];
+
+                    if (Array.isArray(followupTarget)) {
+                        threatChain.push(...followupTarget);
+                    } else if (followupTarget) {
+                        threatChain.push(followupTarget);
+                    }
+
+                    proceed(threatChain);
+                } else {
+                    proceed(followupTarget);
                 }
             };
-
             // Helper function to handle threat post-processing (mods & transitions)
             const runThreatPostProcessing = () => {
                 resetAdrenalineSelection();
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
-                if (threat_realized) {
-                    if (activeChallenge.case_threat_delayed) {
-                        if (Array.isArray(activeChallenge.case_threat_delayed)) {
-                            DELAYED.push(...activeChallenge.case_threat_delayed);
-                        } else {
-                            DELAYED.push(activeChallenge.case_threat_delayed);
-                        }
-                    }
 
-                    if (typeof activeChallenge.case_threat === 'string') {
-                        if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                            const executed = executeMods(activeChallenge.case_threat);
-                            if (executed) log("DEBUG: Threat modifications executed.");
-                            else log(`DEBUG: Threat modifications not executed. Case threat: ${activeChallenge.case_threat}`, "info-msg");
-                        } else {
-                            executeMods(activeChallenge.case_threat);
-                        }
-                        updateUI();
-
-                    } else if (Array.isArray(activeChallenge.case_threat)) {
-                        let i = 0;
-                        const threatMods = activeChallenge.case_threat;
-
-                        function processNextThreatMod() {
-                            if (i >= threatMods.length) {
-                                updateUI();
-                                return;
-                            }
-
-                            const mod = threatMods[i];
-                            const isModification = typeof mod === 'string' &&
-                                (mod.includes('+') || mod.includes('-') || mod.includes('=') || mod.toLowerCase().includes('weapon+'));
-
-                            if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                                let executed = executeMods(mod);
-                                if (executed) log("DEBUG: Threat modifications executed.");
-                                else log(`DEBUG: Threat modifications not executed. Case threat: ${mod}`, "info-msg");
-                            } else {
-                                executeMods(mod);
-                            }
-
-                            i++;
-
-                            if (isModification && i < threatMods.length) {
-                                updateUI();
-                                if (logs_pending.length > 0 || isProcessingQueue) {
-                                    onTerminalFinishedCallback = () => { processNextThreatMod(); };
-                                } else {
-                                    processNextThreatMod(); 
-                                }
-                            } else {
-                                processNextThreatMod();
-                            }
-                        }
-                        processNextThreatMod();
-                    }
-                }
-
-                // Wait for threat outcome messages to finish printing before transitioning map nodes
                 if (logs_pending.length > 0 || isProcessingQueue) {
                     onTerminalFinishedCallback = doTransition;
                 } else {
@@ -5080,8 +5060,8 @@
                 if(DEBUG) log(`Default weapons: ${HERO.defaultWeapons} \n Weapons: ${HERO.weapons} \n Default items: ${HERO.defaultItems} `)
                 hero_selected = true;
                 gameOn = true;
-                prev_challenge = current_challenge_key;
-                handleChallengeTransition(current_challenge_key);
+                prev_challenge = debug_start;
+                handleChallengeTransition(debug_start);
                 return; 
             }
 
@@ -5992,10 +5972,12 @@
             // 3. UNIVERZÁLNA PRÍPRAVA A VALIDÁCIA SCHOPNOSTÍ / ZBRANÍ (PRE BOJ AJ ELIMINÁCIU)
             // =========================================================================
             const actionType = zone ? zone.getAttribute("data-action") : currentSelectedActionType;
-
+            const isEliminationAttack = is_elimination_check && actionType === "A";
             const skillDropdown = document.getElementById("player-skill-dropdown");
             const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
             const upperSkill = selectedSkillName.toUpperCase();
+            const activeChallenge = CHALLENGES[current_challenge_key];
+            const isPlaceholder = (selectedSkillName === "placeholder");
 
             const weaponDropdown = document.getElementById("player-weapon-dropdown");
             const selectedWeaponName = weaponDropdown ? weaponDropdown.value : "placeholder";
@@ -6015,10 +5997,6 @@
                     }
                 }
                 weapon = foundDamage;
-                
-                if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                    log(`⚔️ [DEBUG] Pripravená zbraň: ${selectedWeaponName.toUpperCase()} (INTENZITA: ${weapon})`, "system-msg");
-                }
             }
 
             // --- B. VALIDÁCIA SCHOPNOSTÍ A PRIRADENIE HODNOTY skill ---
@@ -6027,7 +6005,8 @@
                 const isDefenseSkill = DEFENSE_SKILLS.includes(upperSkill);
                 const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) || 
                                     (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
-                let isPlaceholder = (selectedSkillName === "placeholder");
+
+
 
                 if (is_conflict && selectedSkillName.includes("ELIMIN")){
                     log(`⚠️ "${selectedSkillName}" nemôžeš počas boja.`, "error-msg");
@@ -6043,15 +6022,12 @@
 
                 skill = HERO.skills[selectedSkillName] || 0;
 
-                if (typeof DEBUG !== 'undefined' && DEBUG === true) {
-                    log(`⚔️ [DEBUG] Pripravená schopnosť: ${selectedSkillName} (+${skill})`, "system-msg");
-                }
             } else {
                 skill = 0;
             }
 
             // --- C. KONTROLY KOMBINÁCIÍ (SPOLOČNÉ PRE BOJ AJ ELIMINÁCIU) ---
-            if (selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+            if ((is_conflict  || isEliminationAttack) && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                 const skillData = SKILLS_DB[selectedSkillName];
 
                 // Overenie Vrhania
@@ -6119,7 +6095,6 @@
             }
 
             // --- D. SKUTOČNÁ KONTROLA A SPOTREBA MUNÍCIE ---
-            const isEliminationAttack = is_elimination_check && actionType === "A";
             
             if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof distance_combat_active !== 'undefined' && distance_combat_active) {
                 if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
@@ -6244,9 +6219,18 @@
                 handleConflictInput(actionType, cardCode);
             } 
             // =========================================================================
-            // 6. REŽIM MIMO BOJA (AKCIA NA CELÚ KARTU)
-            // =========================================================================
             else {
+                if (is_action_phase) {
+                    const skillRestricted = activeChallenge &&
+                        Array.isArray(activeChallenge.skills) &&
+                        activeChallenge.skills.length > 0;
+
+                    if (skillRestricted && !isPlaceholder && !activeChallenge.skills.includes(selectedSkillName)) {
+                        log(`⚠️ Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
+                        return;
+                    }
+                }
+
                 resolveActionPhase(cardCode);
             }
         });
@@ -6877,7 +6861,7 @@
                 }));
             }
             if (test_mode){
-                current_challenge_key = "START";
+                current_challenge_key = debug_start;
                 welcome = false;
                 selectHero();
                 return;
