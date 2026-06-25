@@ -287,9 +287,9 @@
 
             // Výpis textu okamžite pred spustením výzvy
             if (mode === "sneak") {
-                log("Nepriateľ je ešte mimo dosahu. Skús sa k nemu nepozorovane priblížiť.", "narrative-msg", true);
+                log("Nepriateľ je ešte mimo dosahu. Skús sa k nemu nepozorovane priblížiť.", "system-msg", true);
             } else {
-                log("Nepriateľ ťa ešte nevidí, chceš ho skúsiť eliminovať?", "narrative-msg", true);
+                log("Nepriateľ ťa ešte nevidí, chceš ho skúsiť eliminovať?", "system-msg", true);
             }
 
             inputs_frozen = false;
@@ -360,7 +360,7 @@
                     const maxStress = ENEMY_TYPES[enemyType]?.stress_thresh || 8;
 
                     if (CHALLENGES[targetEnemyKey].saved_stress > maxStress) {
-                        log(`💥 Nepriateľ bol ticho zneškodnený!`, "success-msg");
+                        log(`Nepriateľ bol ticho zneškodnený!`, "success-msg");
                         HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                         executeMods("item_ŽĽAZA SOMORY+1");
                         
@@ -382,11 +382,11 @@
                         };
                         return;
                     } else {
-                        log(`\n⚠️ Nepriateľ útok prežil! Odhalil ťa a začína otvorený boj.`, "danger-msg");
+                        log(`⚠️ Nepriateľ útok prežil! Odhalil ťa a začína otvorený boj.`, "failure-msg");
                     }
                 } else {
                     // Failure — Attack missed
-                    log(`\n⚠️ Minieš! Nepriateľ si ťa všimne a okamžite vyráža do útoku.`, "danger-msg");
+                    log(`⚠️ Minieš! Nepriateľ si ťa všimne a okamžite vyráža do útoku.`, "failure-msg");
                 }
 
                 // Cleanup and transition to regular combat on failure or survived attack
@@ -424,26 +424,29 @@
 
                 // 1. Evaluate Success / Failure
                 if (isSuccess) {
+                    let adv_before = advantage;
                     advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
                     if (dist > 0) {
                         const newDist = Math.max(0, dist - 1);
                         if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].distance = newDist;
-                        log(`Podarí sa ti nepozorovane priblížiť a získavaš taktickú výhodu! (Vzdialenosť: ${newDist})`, "success-msg");
+                        log(`Podarí sa ti nepozorovane priblížiť. (Vzdialenosť: ${newDist})`, "success-msg");
+                        if (advantage > adv_before) log(`Získavaš výhodu +1!`, "success-msg", false,false,true);
                     } else {
-                        log(`Dostaneš sa do lepšej pozície a získavaš výhodu +1 do nadchádzajúceho boja.`, "success-msg");
+                        log(`Dostaneš sa do lepšej pozície.`, "success-msg");
+                        if (advantage > adv_before) log(`Získavaš výhodu +1!`, "success-msg", false,false,true);
                     }
                 } else {
                     if (dist > 0) {
-                        log(`\n⚠️ Nedarí sa ti nepozorovane priblížiť! Nepriateľ si dáva pozor.`, "danger-msg");
+                        log(`⚠️ Nedarí sa ti nepozorovane priblížiť! Nepriateľ si dáva pozor.`, "failure-msg");
                     } else {
-                        log(`\n⚠️ Nedarí ti získať výhodnejšiu pozíciu. Začína otvorený boj.`, "danger-msg");
+                        log(`⚠️ Nedarí ti získať výhodnejšiu pozíciu. Začína otvorený boj.`, "failure-msg");
                     }
                 }
 
                 // 2. Evaluate Threat consequence
                 if (enemyAlerted) {
                     if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
-                    log(`Nepriateľ si ťa všimne a začína sa boj.`, "danger-msg");
+                    log(`Nepriateľ si ťa všimne a začína sa boj.`, "failure-msg");
                 }
 
                 if (dist < 1) {
@@ -488,16 +491,32 @@
         }
 
 
-        function log(message, className = "", extraSpacing = true, extraSpacingB = false) {
+        function log(message, className = "", extraSpacing = true, extraSpacingB = false, isInline = false) {
             if (/(danger|failure|error|success)/i.test(className)) {
                 extraSpacing = false;
                 extraSpacingB = false;
             }
             
-            logs_pending.push({ message, className, extraSpacing, extraSpacingB });
+            let needsSeparator = false;
+            if (isInline) {
+                const lastQueuedItem = logs_pending[logs_pending.length - 1];
+                if (lastQueuedItem && !lastQueuedItem.isSeparator) {
+                    const lastMsg = lastQueuedItem.message || "";
+                    if (!lastMsg.trim().endsWith("...")) {
+                        needsSeparator = true;
+                    }
+                }
+                if (message && !message.endsWith(" ")) {
+                    message += " ";
+                }
+            }
+            
+            // Pass the instruction safely inside ONE flat object layer
+            logs_pending.push({ message, className, extraSpacing, extraSpacingB, isInline, needsSeparator });
+            
             if (!isProcessingQueue) {
                 isProcessingQueue = true;
-                activeLogTimeout = setTimeout(processQueue, 0); // async — lets all synchronous log() calls pile up first
+                activeLogTimeout = setTimeout(processQueue, 0); 
             }
         }
 
@@ -518,34 +537,57 @@
             const scrollContainer = terminal.parentElement;
 
             if (currentLog.message !== "") {
-                const line = document.createElement("div");
+                if (currentLog.isInline && terminal.lastElementChild) {
+                    
+                    // 1. IF THE LOG WAS FLAGGED AS NEEDING A SEPARATOR, INJECT IT FIRST
+                    if (currentLog.needsSeparator) {
+                        const separator = document.createElement("span");
+                        separator.className = "terminal-inline-segment";
+                        separator.innerText = "... ";
+                        terminal.lastElementChild.appendChild(separator);
+                    }
 
-                let bottomSpaceClass = '';
-                if (currentLog.extraSpacingB || currentLog.message.length < 90) {
-                    bottomSpaceClass = 'spacing-bottom';
-                } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
-                    bottomSpaceClass = 'spacing-bottom-medium';
+                    // 2. Then append the actual inline text span
+                    const span = document.createElement("span");
+                    span.className = `terminal-inline-segment ${currentLog.className}`.trim();
+                    span.innerText = currentLog.message;
+                    terminal.lastElementChild.appendChild(span);
+                    
+                } else {
+                    // Standard new block line behavior
+                    const line = document.createElement("div");
+
+                    let bottomSpaceClass = '';
+                    if (currentLog.extraSpacingB || currentLog.message.length < 90) {
+                        bottomSpaceClass = 'spacing-bottom';
+                    } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
+                        bottomSpaceClass = 'spacing-bottom-medium';
+                    }
+
+                    line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
+                    line.innerText = currentLog.message;
+
+                    terminal.appendChild(line);
                 }
-
-                line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
-                line.innerText = currentLog.message;
-
-                terminal.appendChild(line);
+                
                 scrollContainer.scrollTop = scrollContainer.scrollHeight;
             }
 
+            // Determine timing for the next item in the queue (Original version behavior)
             if (logs_pending.length > 0) {
-                if (logs_pending.length > 2) {
-                    // If too many logs are waiting, flush the backlog quickly.
+                if (logs_pending.length > 5) {
                     activeLogTimeout = setTimeout(processQueue, 0);
                 } else {
-                    const characterDelay = currentLog.message.length * 35;
-                    let finalDelay = Math.max(800, 400 + characterDelay);
-                    if (test_mode) {finalDelay = 100};
+                    let finalDelay;
+                    if (test_mode) {
+                        finalDelay = 0;
+                    }  else {
+                        const characterDelay = currentLog.message.length * 35;
+                        finalDelay = Math.max(800, 400 + characterDelay);
+                    }
                     activeLogTimeout = setTimeout(processQueue, finalDelay);
                 }
             } else {
-                // Queue just emptied — clean up and fire callback
                 isProcessingQueue = false;
                 activeLogTimeout = null;
                 if (typeof onTerminalFinishedCallback === "function") {
@@ -556,7 +598,6 @@
             }
         }
 
-        // Define once, outside both handlers
         function flushLogQueue() {
             if (activeLogTimeout) {
                 clearTimeout(activeLogTimeout);
@@ -576,22 +617,37 @@
                 const scrollContainer = terminal.parentElement;
 
                 if (currentLog.message !== "") {
-                    const line = document.createElement("div");
-                    let bottomSpaceClass = '';
-                    if (currentLog.extraSpacingB || currentLog.message.length < 90) {
-                        bottomSpaceClass = 'spacing-bottom';
-                    } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
-                        bottomSpaceClass = 'spacing-bottom-medium';
+                    if (currentLog.isInline && terminal.lastElementChild) {
+                        
+                        // FIXED: Use the flat flag check instead of blindly injecting the separator
+                        if (currentLog.needsSeparator) {
+                            const separator = document.createElement("span");
+                            separator.className = "terminal-inline-segment";
+                            separator.innerText = "... ";
+                            terminal.lastElementChild.appendChild(separator);
+                        }
+
+                        const span = document.createElement("span");
+                        span.className = `terminal-inline-segment ${currentLog.className}`.trim();
+                        span.innerText = currentLog.message;
+                        terminal.lastElementChild.appendChild(span);
+                    } else {
+                        const line = document.createElement("div");
+                        let bottomSpaceClass = '';
+                        if (currentLog.extraSpacingB || currentLog.message.length < 90) {
+                            bottomSpaceClass = 'spacing-bottom';
+                        } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
+                            bottomSpaceClass = 'spacing-bottom-medium';
+                        }
+                        line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
+                        line.innerText = currentLog.message;
+                        terminal.appendChild(line);
                     }
-                    line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
-                    line.innerText = currentLog.message;
-                    terminal.appendChild(line);
                     scrollContainer.scrollTop = scrollContainer.scrollHeight;
                 }
 
                 if (logs_pending.length > 0) {
-                let delay = 0;
-                if (test_mode) {delay = 100} else {delay = 500};
+                    let delay = test_mode ? 100 : 500;
                     activeLogTimeout = setTimeout(flushNext, delay);
                 } else {
                     activeLogTimeout = null;
@@ -1194,7 +1250,6 @@
                 processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
                     ? HERO.items[itemKey]
                     : 0;
-                log(`V inventári: ${HERO.items[itemKey]}`)
             } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
                 processedCurrent = Number(currentFlagValue);
             }
@@ -1566,7 +1621,7 @@
                     
                     // Logujeme odpočinok iba vtedy, ak reálne nejaký bol a nepriateľ mal nejaký stres
                     if (enemy_rest > 0 && foundWrapper.saved_stress > 0) {
-                        log(`Od posledného súboja si nepriateľ odpočinul. Stres mu klesol o ${enemy_rest}. (Aktuálny stres: ${enemy_stress})`, "info-msg");
+                        log(`Od posledného súboja si nepriateľ odpočinul. Stres mu klesol o ${enemy_rest}. (Aktuálny stres: ${enemy_stress})`, "system-msg");
                     }
                 } else {
                     enemy_stress = 0;
@@ -1972,17 +2027,18 @@
                     if (enemy_advantage < 0) enemy_advantage = 0; 
                     
                     if (modifier > 0) {
-                        log(`Nepriateľ získava výhodu +${amount}!`, "danger-msg");
+                        log(`Nepriateľ získava výhodu +1!`, "danger-msg");
                     } else {
-                        log(`Nepriateľovi klesla výhoda o ${amount}.`);
+                        log(`Nepriateľovi klesla výhoda o 1.`);
                     }
                     modificationExecuted = true;
                 }
                 else if (lowerTarget.includes("advantage")) {
+                    let adv_before = advantage;
                     advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
                     if (advantage < 0) advantage = 0; 
                     
-                    if (modifier > 0) {
+                    if (modifier > 0 && advantage > adv_before) {
                         log(`Získavaš výhodu +${amount}!`);
                     } else {
                         log(`Klesla ti výhoda o ${amount}.`, "danger-msg");
@@ -2169,7 +2225,7 @@
                     modifier < 0 ? "success-msg" : "danger-msg");
             } 
             else if (effectTarget === "advantage") {
-                advantage = Math.max(0, Math.min(advantage + modifier, ADVANTAGE_CAP));;
+                advantage = Math.max(0, Math.min(advantage + modifier, ADVANTAGE_CAP));
                 log(modifier > 0 
                     ? `Získavaš +${amount} k výhode. (${advantage})` 
                     : `Strácaš ${amount} z výhody. (${advantage})`, 
@@ -3166,7 +3222,7 @@
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let roll_result = rollDice(card, false, skill);
             
-            log(`Celkový výsledok: ${roll_result} (+${adrenaline})`, "error-msg", true);
+            log(`VÝSLEDOK: ${roll_result} (+${adrenaline})`, "error-msg", true);
 
             roll_result += adrenaline; 
 
@@ -3177,16 +3233,16 @@
             let threat_realized = false;
 
             if (is_tie){
-                log("Hod rovný náročnosti. Vyhodnocujem hrozbu...", "error-msg");
+                log("Vyhodnocujem hrozbu...", "error-msg",false, false, true);
             } else if (is_failure) {
-                log("Hod nižší ako náročnosť. Vyhodnocujem hrozbu...", "error-msg");
+                log("Vyhodnocujem hrozbu...", "error-msg",false, false, true);
             }
 
             // 1. Log baseline success or failure text
             if (success) {
-                log(activeChallenge.success_msg || "💪 Úspech!", "success-msg");
+                log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
             } else {
-                log(activeChallenge.failure_msg || "❌ Zlyhanie!", "failure-msg");
+                log(activeChallenge.failure_msg || "ZLYHANIE!", "failure-msg", false, false, true);
             }
 
 
@@ -3197,7 +3253,7 @@
                 let followupTarget;
                 if (success) {
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                    log("Získavaš 1 BR!", "success-msg");
+                    log(" (+1 BR!)", "success-msg", false, false, true);
                     if (activeChallenge.case_success_delayed) {
                         if (Array.isArray(activeChallenge.case_success_delayed)) {
                             DELAYED.push(...activeChallenge.case_success_delayed);
@@ -3272,10 +3328,10 @@
 
                     let caution_threshold = CARDS[card][0][0];
                     if (threat_roll > caution_threshold) {
-                        log(`${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"} \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
+                        log(`${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"} - (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg",false, false, true);
                         threat_realized = true;
                     } else {
-                        log(`${activeChallenge.threat_avoided_msg || "Vyhneš sa hrozbe."} (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                        log(`${activeChallenge.threat_avoided_msg || "Vyhneš sa hrozbe."} - (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg", false, false, true);
                     }
 
                     // Continue executing modifications and transition setups
@@ -3365,7 +3421,7 @@
             let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
             let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
 
-            log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg", true);
+            log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
 
             enemy_roll += enemy_advantage;
             player_roll += (advantage + adrenaline); 
@@ -3376,11 +3432,11 @@
             if (distance_combat_active) {
                 if (enemy_action[0] === "D" && enemy_roll > player_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
-                    log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "info-msg");
+                    log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "error-msg");
                 }
                 if (player_action[0] === "D" && player_roll > enemy_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
-                    log(`👣 Približuješ sa k nepriateľovi! (Vzdialenosť: ${conflict_distance})`, "info-msg");
+                    log(`👣 Približuješ sa k nepriateľovi! (Vzdialenosť: ${conflict_distance})`, "error-msg");
                 }
 
                 if (enemy_id && CHALLENGES[enemy_id]) {
@@ -3389,7 +3445,7 @@
 
                 if (conflict_distance <= 0) {
                     distance_combat_active = false;
-                    log(`⚔️ Nepriateľ je už nablízku, boj zblízka môže začať!`, "info-msg");
+                    log(`⚔️ Nepriateľ je pri tebe, boj zblízka môže začať!`, "info-msg");
                     
                     // --- ADDED: Smoothly remove distance scale when gap is closed ---
                     const enemyContainer = document.getElementById("enemy-sprite-container");
@@ -3403,7 +3459,7 @@
 
             // === CHASE MODE / BOTH ESCAPING ===
             if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
-                log(`\n🏃Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
+                log(`🏃Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
                 
                 enemy_escape_counter += 2;
                 log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
@@ -3462,13 +3518,13 @@
 
             if (chase_mode) {
                 if (player_escaping && player_action[0] === "A") {
-                    log(`\n⚔️ Zaútočil si počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg");
+                    log(`⚔️ Zaútočíš počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg", false,false,true);
                     chase_mode = false;
                     player_escaping = false;
                     player_escape_counter = 0;
                 }
                 else if (enemy_escaping && enemy_action[0] === "A") {
-                    log(`\n⚔️ Protivník sa otočil a útočí na teba!`, "info-msg");
+                    log(`⚔️ Protivník sa otočil a útočí na teba!`, "info-msg", false,false,true);
                     chase_mode = false;
                     enemy_escaping = false;
                     enemy_escape_counter = 0;
@@ -3479,26 +3535,26 @@
                 if (player_escaping) {
                     if (player_roll > enemy_roll) {
                         player_escape_counter++;
-                        log(`🏃 Úspešný únikový manéver! (Únik: ${player_escape_counter}/2)`, "success-msg");
+                        log(`🏃 Úspešný únikový manéver! (Únik: ${player_escape_counter}/2)`, "success-msg", false,false,true);
                     } 
                     else if (enemy_roll > player_roll) {
                         if (enemy_action[0] === "A") {
                             if (player_escape_counter < 1) {
-                                log(`🎯 Protivník ťa zasiahol počas úteku!`, "warning-msg");
+                                log(`🎯 Protivník ťa zasiahol počas úteku!`, "warning-msg", false,false,true);
                             } else {
-                                log(`🎯 Protivník ťa trafil nadiaľku počas úteku!`, "warning-msg");
+                                log(`🎯 Protivník ťa trafil nadiaľku počas úteku!`, "warning-msg", false,false,true);
                             }
                         } else {
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
-                            log(`⚠️ Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg");
+                            log(`⚠️ Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg", false,false,true);
                         }
                     }
                     else {
-                        log(`🏃 Prenasledovanie pokračuje, držíš si odstup. (Únik: ${player_escape_counter}/2)`, "info-msg");
+                        log(`🏃 Držíš si odstup. (Únik: ${player_escape_counter}/2)`, "info-msg", false,false,true);
                     }
 
                     if (player_escape_counter >= 2) {
-                        log(`\n Úspešne ujdeš z boja!`, "success-msg");
+                        log(`\n Úspešne ujdeš z boja!`, "success-msg", false,false,true);
                         inputs_frozen = true;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3604,24 +3660,24 @@
                 else if (enemy_escaping) {
                     if (enemy_roll > player_roll) {
                         enemy_escape_counter++;
-                        log(`🏃 ${enemy.toUpperCase()} sa ti vzďaľuje! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "danger-msg");
+                        log(`🏃 ${enemy.toUpperCase()} sa ti vzďaľuje! (Únik: ${enemy_escape_counter}/2)`, "danger-msg", false,false,true);
                     } 
                     else if (player_roll > enemy_roll) {
                         if (player_action[0] === "A") {
-                            log(`🎯 Triafaš unikajúceho nepriateľa!`, "success-msg");
+                            log(`🎯 Triafaš unikajúceho nepriateľa!`, "success-msg", false,false,true);
                         } else {
                             enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                            log(`🛑 Dobiehaš nepriateľa a skracuješ odstup! (Únik nepriateľa: ${enemy_escape_counter}/2)`, "success-msg");
+                            log(`🛑 Dobiehaš nepriateľa! (Únik: ${enemy_escape_counter}/2)`, "success-msg", false,false,true);
                         }
                     }
                     else {
-                        log(`🏃 Držíte si rovnaké tempo. (Únik nepriateľa: ${enemy_escape_counter}/2)`, "info-msg");
+                        log(`🏃 Držíte si rovnaké tempo. (Únik: ${enemy_escape_counter}/2)`, "info-msg", false,false,true);
                     }
 
                     if (enemy_escape_counter >= 2) {
-                        log(`\n🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
+                        log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg", false,false,true);
                         HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                        log(`Získavaš 1 BR.`, "success-msg");
+                        log(`(+1 BR)`, "success-msg", false,false,true);
                         inputs_frozen = true;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3687,7 +3743,7 @@
 
             if (potential_enemy_damage > 0) {
                 enemy_stress += potential_enemy_damage;
-                log(`Zvyšuješ protivníkovi stres o ${potential_enemy_damage}.`, "success-msg");
+                log(`${enemy.toUpperCase()}: STRESS +${potential_enemy_damage}.`, "success-msg", false,false,true);
                 const enemyContainer = document.getElementById("enemy-sprite-container");
                 if (enemyContainer) {
                     enemyContainer.classList.remove("enemy-hit");
@@ -3701,7 +3757,7 @@
                 heal_attempts = 0;
                 flashRed();
                 stress_increased = true;
-                log(`Stúpol ti stres o: ${potential_player_damage}.`, "failure-msg");
+                log(`TVOJ STRESS: +${potential_player_damage}.`, "failure-msg", false, false, true);
             }
 
             let player_collapse = HERO.stress > stress_thresh;
@@ -3714,7 +3770,7 @@
                     player_collapse = false; 
 
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                    log(`\n💥 Ustál si to! Hoci to bolo na hrane, ${enemy.toUpperCase()} padá a ty prežívaš! Získavaš 1 BR.`, "success-msg");
+                    log(`${enemy.toUpperCase()} padá a ty prežívaš! (+1 BR).`, "success-msg");
                     inputs_frozen = true; 
                     const scrollRow = document.querySelector('.card-scroll-row');
                     if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3779,16 +3835,17 @@
                     if (!player_escaping){ 
                         if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 1) || 
                             (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 1)) {
-                            advantage += 1;
-                            log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
+                            let adv_before = advantage;
+                            advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
+                            if (advantage>adv_before) log("Získavaš výhodu +1","",false,false,true)
                         } 
                     }
                     if (!enemy_escaping){
                         if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 1) || 
                         (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
-                            // CRITICAL FIX HERE:
+                            let adv_before = enemy_advantage;
                             enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-                            log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
+                            if(enemy_advantage>adv_before)log(`🛡️ Nepriateľ získava výhodu +1.`,"", false,false,true);
                         }
                     }
 
@@ -3826,7 +3883,7 @@
                 clearTimeout(readyPromptTimeout);
                 HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                 executeMods("item_ŽĽAZA SOMORY+1");
-                log(`\n💥 ${enemy} JE DOLE! Získavaš 1 BR a môžeš pokračovať.`, "success-msg");
+                log(`${enemy} JE DOLE! (+1 BR).`, "success-msg", false,false,true);
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3884,16 +3941,21 @@
             if (!player_escaping){ 
                 if ((player_roll > enemy_roll && player_action[0] === "D" && enemy_zero_counter > 0) || 
                     (player_roll === enemy_roll && player_action[0] === "D" && enemy_action[0] === "A" && enemy_zero_counter > 0)) {
+                    let adv_before = advantage;
                     advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
-                    log("Dostaneš sa do lepšej pozície a získavaš výhodu +1 do ďalšieho kola.");
+                    if (advantage > adv_before){
+                        log("Získavaš výhodu +1.","", false,false,true);
+                    } else {
+                        log("Už máš maximálnu výhodu.","", false,false,true)
+                    }
                 } 
             }
             if (!enemy_escaping){
                 if ((player_roll < enemy_roll && enemy_action[0] === "D" && player_zero_counter > 0) || 
                 (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 0)) {
-                    // CRITICAL FIX HERE:
+                    let adv_before = enemy_advantage;
                     enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-                    log(`🛡️ Nepriateľ uskočil do výhodnejšej pozície! Získava výhodu +1 do ďalšieho kola.`);
+                    if(enemy_advantage>adv_before) log(`Nepriateľ získava výhodu +1.`,"", false,false,true);
                 }
             }
 
@@ -3946,14 +4008,16 @@
                         enemy_stress += 1;
                         if(enemy_escaping){
                             enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg");
+                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg",false,false,true);
                         } else {
                             player_escape_counter += 1 ;
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg");
+                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
-                        advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
-                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Nepriateľ sa dostal do horšej pozície, získavaš výhodu.`, "danger-msg");
+                        let adv_before = advantage;
+                        advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
+                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa dostal do horšej pozície.`, "danger-msg",false,false,true);
+                        if (advantage>adv_before) log("Získavaš výhodu +1","",false,false,true)
                     }
                 } else {
                     if(chase_mode){
@@ -3962,14 +4026,16 @@
                         heal_attempts = 0;
                         if(player_escaping){
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg");
+                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg",false,false,true);
                         } else {
                             enemy_escape_counter += 1;
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg");
+                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
-                        enemy_advantage = Math.min(advantage + 1, ADVANTAGE_CAP);;
-                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Dostaneš sa do horšej pozície, nepriateľ získava výhodu.`, "danger-msg");
+                        let adv_before = enemy_advantage;
+                        enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
+                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \⚠️ Dostaneš sa do horšej pozície.`, "danger-msg",false,false,true);
+                        if(enemy_advantage>adv_before) log(`🛡️ Nepriateľ získava výhodu +1.`,"", false,false,true);
                     }
                     
                     // --- NOVÁ ÚPRAVA: INTERCEPCIA KOLAPSU V SÚBOJI ---
@@ -4008,7 +4074,7 @@
             if (proceedPrompt.style.display === "none") is_proceed_prompt = false;
 
             if (is_conflict || is_action_phase || is_collapse_check || isProceedVisible || is_elimination_check) {
-                log("Teraz nie je čas...");
+                log("Teraz nie je čas...","error-msg",false,false,true);
                 return
             }
 
@@ -4288,7 +4354,7 @@
         }
 
         function ready() {
-            log("Ok, pokračujeme...", "", true);
+            log("Ok, pokračujeme...", "error-msg");
             
             inputs_frozen = true;
             const scrollRow = document.querySelector('.card-scroll-row');
@@ -4411,7 +4477,7 @@
                     combat_starter = (combat_starter === "p") ? "e" : "p";
                 }
                 turn = combat_starter;
-                log(`${turn === "p" ? "Začínaš ty." : "Začína " + enemy + "."}`);
+                log(`${turn === "p" ? "Začínaš ty." : "Začína " + enemy + "."}`,"error-msg");
             }
 
             // --- DISTANCE / RANGED COMBAT CHECK (runs once, at the true start of the conflict) ---
@@ -4422,7 +4488,7 @@
             distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
 
             if (distance_combat_active) {
-                log("Nepriateľ je ešte ďaleko, môžeš zaútočiť z diaľky alebo sa priblížiť a získať výhodu.");
+                log("Nepriateľ je ešte ďaleko, môžeš zaútočiť z diaľky alebo sa priblížiť a získať výhodu.","error-msg");
             }
 
             updateUI();
@@ -4458,11 +4524,11 @@
                     }
                 } else {
                     if (enemy_escaping) {
-                        log("Si na ťahu (prenasleduješ).", "", true);
+                        log("Si na ťahu (prenasleduješ).", "", false, false, true);
                     } else if (player_escaping) {
-                        log("Si na ťahu (unikáš).", "", true);
+                        log("Si na ťahu (unikáš).", "", false, false, true);
                     } else {
-                        log("Si na ťahu. Vyber si kartu a spôsob (ÚTOK/ČIN).", "", true);
+                        log("Si na ťahu. Vyber si kartu a spôsob (ÚTOK/ČIN).", "", false, false, true);
                     }
 
                     inputs_frozen = true;

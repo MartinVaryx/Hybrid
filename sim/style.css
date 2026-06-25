@@ -419,8 +419,6 @@
             margin-top: 20px !important; /* Adjust this to change space at the top */
         }
 
-        /* TARGETS ONLY THE CURRENT LAST LINE — BUT ONLY IF IT ISN'T A SHORT MESSAGE */
-        /* 1. Normal final lines get the tight hammer */
         .terminal-line:last-child:not(.spacing-bottom):not(.spacing-bottom-medium) {
             margin-bottom: -10px !important; 
         }
@@ -440,11 +438,18 @@
             margin-bottom: 0px !important;
         }
 
-        .system-msg  { color: #171717; } 
-        .success-msg { color: var(--hybrid-green); text-shadow:  0px 0.5px 0.5px rgb(0, 0, 0); }
-        .failure-msg { color: var(--hybrid-red); text-shadow:  0px 0.5px 0.5px rgb(0, 0, 0); }
-        .danger-msg  { color: #c37e07; text-shadow: 0px 0.5px 0.5px rgb(0, 0, 0); }
-        .error-msg   { color: #d3cc07; text-shadow: 0.5px 1px 0.5px rgb(0, 0, 0); }
+        .system-msg  { color: #000000cf; } 
+        .success-msg { color: #61ff416a; text-shadow:  0px 0.5px 0.5px rgb(0, 0, 0); }
+        .failure-msg { color: #ff8a41a4; text-shadow:  0.5px 0.5px 0.5px rgb(0, 0, 0); }
+        .danger-msg  { color: #000000cf;  }
+        .error-msg   { color: #000000cf;}
+
+        /* New style for inline segments */
+        .terminal-inline-segment {
+            display: inline;
+            margin: 0 !important;
+            padding: 0;
+        }
 
         /* Controls Section */
         .controls-panel {

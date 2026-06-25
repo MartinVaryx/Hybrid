@@ -228,7 +228,7 @@
         ],
         "case_success_delayed": "BASEMENT_PREDATOR",
         "case_threat": "stress+1",
-        "case_failure": "SKAUTKA_2",
+        "case_failure": ["alerted_SKAUTKA_2:true","SKAUTKA_2"],
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENCOUNTER": {
@@ -333,6 +333,7 @@
         "case_failure_delayed": "",
         "case_threat": "stress+1",
         "case_failure": [
+            "alerted_SKAUTKA_1:true",
             "SKAUTKA_1",
             "if_CITY_0:false_CITY_else_CITY_0"
         ],
