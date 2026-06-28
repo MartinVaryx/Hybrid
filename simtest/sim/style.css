@@ -335,6 +335,7 @@
             gap: 5px;
             z-index: 200;
         }
+
         /* LAYER 1: The Outer Frame */
         .terminal-border-box {
             flex: 1;
@@ -979,6 +980,53 @@
             font-size: 1.1rem;
         }
 
+/* Base styles (Place outside media queries) */
+#choice-prompt {
+    position: absolute;
+    bottom: 2%;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    padding: 20px 20px 20px 90px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    z-index: 200;
+    max-width: 100%;
+}
+
+.choice-btn {
+    height: 46px;
+    white-space: nowrap;
+    padding: 0 16px;
+    border-radius: 9px;
+    background: rgb(231, 231, 231);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 3px solid rgba(25, 25, 25, 0.96);
+    color: rgb(0, 0, 0);
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.choice-btn.back-btn {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 46px;
+    margin-left: 10px;
+    border-radius: 9px;
+    background: rgb(0, 0, 0);
+    border: 3px solid rgba(201, 201, 201, 0.96);
+    color: rgb(224, 224, 224);
+    font-size: 1.2em;
+}
+
+
+
         
 
         /* Animation Keyframe translating up to roughly 1/3 of the field height and staying */
@@ -1012,82 +1060,490 @@
 
         }
 
+/* =============================================================
+   CLEANED MOBILE VIEW: FLUID FLEX OVERRIDES (NO HORIZONTAL SCROLL)
+   ============================================================= */
+@media (max-width: 968px) {
 
 
-@media (max-width: 768px) {
 
-
-    .card-tray-wrapper {
-        overflow: visible !important;
+    /* --- Global Elements Hard Clamp --- */
+    *, *::before, *::after {
+        box-sizing: border-box !important; /* Forces paddings/borders to stay INSIDE widths */
     }
 
+    html, body {
+        overflow-x: hidden !important; /* Hard lockdown against layout leaking */
+        overflow-y: hidden !important;
+        height: 100% !important;
+        width: 100% !important;
+        padding: 0 !important;        /* Clears out desktop body bloating margins */
+        margin: 0 !important;
+    }
+
+    /* --- Fluid Non-Strict Layout Columns Grid --- */
+    .game-container {
+        display: flex;
+        flex-direction: row;  
+        flex-wrap: nowrap;     
+        width: 100%;
+        height: 100%;
+        gap: 10px;            
+        align-items: stretch; 
+        overflow: hidden !important; 
+        padding: 6px !important;       
+    }
+
+    /* Left Column: Orients at ~33% space, but allowed to shrink smaller to fit */
+    .left-column {
+        flex: 0 1 33.333%;   
+        min-width: 0 !important; 
+        max-width: 35% !important;  
+        height: 100%;            
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        overflow: hidden !important; 
+    }
+
+    /* Right Column: FLUIDLY scales up/down to take up all remaining available width */
+    .right-column {
+        flex: 1 1 auto !important; /* Dynamic adjustment: grows and shrinks dynamically */
+        min-width: 0 !important;   /* Disables default flex layout min-content boundaries */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow: hidden !important;
+    }
+
+    /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
+    .right-top-row,
+    .terminal-border-box {
+        width: 100% !important;
+        min-width: 0 !important;       
+    }
+
+    /* --- FIX: FLUID FLOORS (PREVENTS PROMPT FROM CUTTING OFF) --- */
+    .gaming-table-floor {
+        width: 100% !important;
+        min-width: 0 !important;       
+        min-height: 0 !important;
+        aspect-ratio: auto !important; /* Removes desktop aspect ratio blowout so bottom won't chop */
+        flex-grow: 1 !important;       /* Instructs floor to stretch perfectly to the screen height floor bounds */
+        height: auto !important;
+    }
+
+    /* --- DECREASED TERMINAL HEIGHT BY ~15% --- */
+    .terminal-border-box {
+        height: 108px !important; 
+    }
+
+    /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
+    .controls-panel {
+        padding: 4px 6px !important;       
+        display: flex !important;
+        flex-direction: row !important;    
+        flex-wrap: nowrap !important;      /* Enforces tracks to sit on a single line */
+        justify-content: flex-start !important; 
+        align-items: center !important;
+        overflow-x: auto !important;       /* Re-activates horizontal scrollbar inside the component */
+        overflow-y: hidden !important;
+        white-space: nowrap !important;    /* Keeps tracking rows perfectly linear */
+        gap: 4px !important;               
+        -webkit-overflow-scrolling: touch; /* Liquid swiping support on mobile devices */
+    }
+
+    .panel {
+        padding: 4px 6px !important;
+    }
+
+    .stat-row {
+        margin-bottom: 2px !important;
+        font-size: 0.72rem !important;  
+        display: flex !important;
+        gap: 4px !important;
+    }
+
+    .stat-row span {
+        font-size: 0.72rem !important;
+    }
+
+    /* --- COMPACT BUTTONS THAT FIT INSIDE THE MODIFIED FLEX COLUMN --- */
+    .adrenaline-select, 
+    select, 
+    button,
+    #player-skill-dropdown,
+    #player-weapon-dropdown {
+        width: 100% !important;          /* Sets width boundaries back inside columns */
+        max-width: 100% !important;
+        font-size: 0.72rem !important; 
+        padding: 3px 4px !important;     
+        margin: 0 !important;            
+        height: 24px !important;
+    }
+
+    /* Heal button dimensions reduced */
     #heal {
-        width:65px !important;
-        font-size: 0.6rem;
+        width: 100% !important;
+        max-width: 100% !important;    
+        font-size: 0.7rem !important;
+        padding: 2px 4px !important;
+        margin: 0 !important;
+        height: 22px !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+    
+    #choice-prompt {
+        padding: 12px 12px 65px 12px; /* Uniform spacing with bottom room for Back button */
+        bottom: 1%;
+        gap: 8px;
+    }
+
+    .choice-btn {
+        width: auto !important;       /* FORCE override against the generic button rule */
+        flex: 1 1 auto !important;    /* Allows buttons to size naturally or expand to fill row rows nicely side-by-side */
+        height: auto;
+        min-height: 42px;
+        white-space: normal;          /* Allows long choices to wrap text beautifully */
+        padding: 8px 14px;
+        font-size: 1rem;
+        max-width: 100%;
+        text-align: center;
+    }
+
+    .choice-btn.back-btn {
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        margin-left: 0;
+        width: 40px !important;
+        height: 40px;
+    }
+
+    .choice-btn:hover,
+    .choice-btn.choice-hover-highlight {
+        transform: scale(1.03);
+    }
+    
+    .choice-btn.back-btn:hover,
+    .choice-btn.back-btn.choice-hover-highlight {
+        transform: translateX(-50%) scale(1.03);
+    }
+
+    
+    #heal img {
+        height: 0.85em !important;
+        margin-right: 2px !important;
+    }
+
+    .left-column button {
+        width: 100% !important; 
+        margin: 0 !important;
+    }
+
+
+    .card-container,
+    .enemy-card-visual,
+    .table-card,
+    .combat-card,
+    .enemy-cards .card-container,
+    .enemy-hand .card-container,
+    .card-tray .card-container {
+        width: 117px !important;    /* 1.5x of 78px */
+        height: 198px !important;   /* 1.5x of 132px */
+        min-width: 117px !important;
+        min-height: 198px !important;
+        max-width: 117px !important;
+        max-height: 198px !important;
+        flex-shrink: 0 !important;
+        position: relative !important;
+        overflow: hidden !important; /* Clips anything trying to bulge outward */
+        border-radius: 4px !important;
+        margin: 0 2px !important;
+    }
+
+    /* 2. RE-SCALE INNER IMAGES & ART ASSETS BOUNDARIES */
+    /* Destroys desktop aspect ratio rules so images adapt to the 78x132 bounds */
+    .card-container img,
+    .card-img,
+    .enemy-card-visual img,
+    .table-card img {
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        object-fit: cover !important; /* Fills the portrait rectangle without squeezing distortion */
+    }
+
+    /* 3. MOBILE ROTATIONS AND FAN-LAYOUT CORRECTIONS */
+    /* Clears aggressive desktop translate coordinates that displace small cards */
+    .card-tray .card-container:hover,
+    .enemy-cards .card-container:hover {
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-5px) !important; /* Clean localized pop animation */
+    }
+
+    /* Neutralizes structural offsets causing cards to slide off-screen */
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-5px) translateX(2px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-5px) translateX(-2px) !important;
+    }
+
+    /* Safeguards any rotation animations triggered during gameplay phases */
+    .rotate-player-D, .rotate-enemy-D { transform: rotate(-90deg) scale(0.9) !important; }
+    .rotate-player-A, .rotate-enemy-A { transform: rotate(90deg) scale(0.9) !important; }
+    .enemy-card-visual.rotate-A { transform: rotate(0deg) !important; }
+    .enemy-card-visual.rotate-D { transform: rotate(180deg) !important; }
+
+
+    .enemy-card-visual,
+    .player-card-slide,
+    .player-card-slide .card-container,
+    .enemy-card-wrapper .card-container,
+    .table-card {
+        width: 117px !important;    /* 1.5x of 78px */
+        height: 198px !important;   /* 1.5x of 132px */
+        min-width: 117px !important;
+        min-height: 198px !important;
+        max-width: 117px !important;
+        max-height: 198px !important;
+        flex-shrink: 0 !important;
+    }
+
+    /* Ensure inner art inside these scaled cards fills the new 117x198 space */
+    .enemy-card-visual img,
+    .player-card-slide img,
+    .table-card img {
+        width: 100% !important;
+        height: 100% !important;
+        object-fit: cover !important;
+    }
+    
+    /* Ensures the enemy layout wrapper expands to accommodate the 2x larger graphic */
+    .enemy-sprite-container,
+    .enemy-display-zone {
+        display: flex !important;
+        justify-content: center !important;
+        align-items: center !important;
+        padding: 5px !important;
+        min-height: 190px !important; /* Allocates enough vertical breathing room */
+    }
+
+    /* --- OPTIMALIZÁCIA PRE OVERLAY VÝBERU HRDINU A ZBRANE --- */
+    #hero-card-display, 
+    #weapon-card-display {
+        width: 95% !important;          /* Zruší fixných 705px, aby sa karty zmestili na displej */
+        max-width: 660px !important;
+        height: 85vh !important;        /* Prispôsobí sa nízkym landscape obrazovkám mobilov */
+    }
+
+    #hero-display-skills {
+        padding: 5px !important;
+        font-size: 0.7rem !important;
+    }
+
+    #hero-display {
+        padding: 5px !important;
+    }
+
+    #hero-display-name {
+        font-size: 1rem !important;
+    }
+
+    /* Úprava mriežky schopností a štatistík, aby nebola príliš stlačená */
+    #hero-skills-grid, 
+    #weapon-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 4px 15px !important;
+    }
+
+    /* Reset mohutného globálneho pravidla pre tlačidlá v týchto overlayoch */
+    #hero-selection-overlay button.adrenaline-select,
+    #weapon-selection-overlay button.adrenaline-select {
+        height: 32px !important;        /* Príjemnejšia výška na klikanie prstom oproti 24px */
+        font-size: 0.8rem !important;   /* Čitateľnejšie písmo */
+        padding: 4px 8px !important;
+        margin: 0 !important;
+    }
+
+    /* Vynútenie správnych šírok pre navigačné a akčné tlačidlá vedľa seba */
+    #new-hero-btn { 
+        width: 100% !important; 
+        max-width: 110px !important; 
+        font-size: 0.75rem !important; 
+    }
+    #delete-hero-btn { 
+        width: 100% !important; 
+        max-width: 85px !important; 
+        font-size: 0.75rem !important; 
+    }
+    
+    #hero-prev-btn, #weapon-prev-btn { width: 45px !important; }
+    #hero-next-btn, #weapon-next-btn { width: 45px !important; }
+    
+    #hero-confirm-btn { width: 85px !important; }
+    #weapon-confirm-btn { width: 110px !important; }
+
+    #close-builder{
+        max-width: 70px !important;
+    }
+
+    /* --- SAFE TRACK NODES THAT DON'T STRETCH WIDER THAN THE SCREEN WIDTH --- */
+    .track-table {
+        width: 100%;
+        table-layout: auto; 
+    }
+
+    .track-header {
+        width: 28px !important;
+        padding: 0 !important;
+    }
+
+    .track-header img {
+        height: 1.2em !important; 
+        width: auto;
+    }
+
+    .track-cell {
+        font-size: 0.75rem;               
+        height: 20px !important; 
+        padding: 0 4px !important;      
+        min-width: 20px;                 /* Fluid floor that scales back without bloating column scrollWidths */
+        white-space: nowrap;
+    }
+
+    #sp-label, #sp {
+        font-size: 0.8rem !important; 
+    }
+
+    #enemy-panel {
+        width: 100%;              
+        max-width: 220px;
+    }
+
+    .panel h3 {
+        font-size: 0.8rem !important;
+        margin-bottom: 2px !important;
+    }
+
+    /* --- FIX: PROCEED PROMPT HIGHER LAYER PRIORITY OVER ENEMY CARD --- */
+    .next-prompt {
+        z-index: 99999 !important; /* Pushes it above relatively-positioned stat cards and backgrounds */
+        bottom: 12px !important;
+        right: 12px !important;
+    }
+
+    /* --- INCREASED CARD TRAY COMPONENT (FLUID INNER SCROLLING) --- */
+    .card-tray-wrapper {
+        overflow: hidden !important; 
+        height: 155px !important;   
+        flex-grow: 1 !important;     
+        display: flex !important;
+        flex-direction: column !important;
+        width: 100% !important;
     }
 
     .card-scroll-row {
-        overflow-x: auto;
-        overflow-y: hidden;
-        -webkit-overflow-scrolling: touch; /* smooth momentum scroll on iOS */
-        touch-action: pan-x; /* explicitly re-allow horizontal swipe here, overriding html's touch-action:none */
-        padding-top: 90px;   /* invisible "ceiling" — gives hovered cards room to scale up into */
-        margin-top: -90px;   /* cancels the padding so layout position doesn't shift */
-        pointer-events: none; /* the empty ceiling zone shouldn't block clicks on what's above it */
+        overflow-x: auto !important; 
+        overflow-y: hidden !important;
+        -webkit-overflow-scrolling: touch !important; 
+        touch-action: pan-x !important; 
+        padding-top: 0 !important;    
+        margin-top: 0 !important;     
+        pointer-events: auto !important; 
+        width: 100% !important;
+        height: 100% !important;      
+        display: flex !important;
+        align-items: center !important;
     }
 
     .card-tray {
-        flex-wrap: nowrap;
-        justify-content: flex-start;
-        overflow: visible;
-        min-width: max-content; /* tray grows to fit all cards instead of squeezing them */
-        padding-left: 40px;
-        padding-right: 40px;    /* room so first/last card hover-scale doesn't clip at the edges */
-        pointer-events: auto;   /* re-enable clicks on the actual cards */
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important; 
+        justify-content: flex-start !important;
+        overflow: visible !important;
+        min-width: max-content !important; 
+        padding-left: 10px !important;
+        padding-right: 10px !important;    
+        pointer-events: auto !important;   
+        gap: 6px !important; 
+        height: 100% !important;
     }
 
+    /* Position flip button inside the tray to the right of the last card */
+    #flip-cards-btn {
+        display: block !important;
+        flex-shrink: 0 !important;
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 1rem !important;
+        padding: 0 !important;
+        margin: 0 0 0 2px !important;
+        border-radius: 4px;
+    }
+
+    #escape-btn {
+        width: auto !important;
+        padding: 4px 8px !important;
+    }
+
+    /* Card container size optimization */
     .card-container {
-        flex-shrink: 0; /* don't let cards shrink to force a second row */
+        flex-shrink: 0 !important; 
+        width: 78px !important;   
+        height: 132px !important; 
+        margin: 0 !important;
     }
 
+    /* Clean mobile scales */
     .card-tray .card-container:hover {
         position: relative;
         z-index: 9999 !important;
+        transform: scale(1.08) translateY(-2px) !important; 
     }
 
     .card-tray .card-container:first-child:hover {
-        transform: scale(1.4) translateY(-25px) translateX(35px) !important;
+        transform: scale(1.08) translateY(-2px) translateX(4px) !important;
     }
 
     .card-tray .card-container:last-child:hover {
-        transform: scale(1.4) translateY(-25px) translateX(-35px) !important;
+        transform: scale(1.08) translateY(-2px) translateX(-4px) !important;
     }
 
-    .status-badge{display: none;}
+}
 
-    /* --- Force horizontal (landscape) viewing --- */
-    /* Rotates the whole viewport when the phone is held in portrait mode */
-    @media (orientation: portrait) {
-        html {
-            transform: rotate(-90deg) translate(-100%, 0); /* the translate is what actually pulls the rotated page back into view */
-            transform-origin: top left;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: var(--real-vh, 100vh);  /* JS-measured px, not the CSS vh unit — see note below */
-            height: var(--real-vw, 100vw);
-            overflow: hidden; /* clip on the UNSCALED ancestor, after body's scale is applied */
-        }
-
-        body {
-            width: var(--real-vh, 100vh);
-            height: var(--real-vw, 100vw);
-            overflow: visible; /* IMPORTANT: must stay visible so transform:scale shrinks
-                                   the *entire* content instead of clipping it to 100vw
-                                   first and only then scaling the leftover slice down */
-            transform: scale(var(--mobile-fit-scale, 1)); /* set by JS to shrink page to screen height */
-            transform-origin: top center; /* shrink symmetrically, anchored to the top */
-        }
+/* --- Keep your JS-backed Orientation Logic cleanly segregated below --- */
+@media (max-width: 968px) and (orientation: portrait) {
+    html {
+        transform: rotate(-90deg) translate(-100%, 0); 
+        transform-origin: top left;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--real-vh, 100vh);  
+        height: var(--real-vw, 100vw);
+        overflow: hidden; 
     }
 
+    body {
+        width: var(--real-vh, 100vh);
+        height: var(--real-vw, 100vw);
+        overflow: hidden; 
+        transform: scale(var(--mobile-fit-scale, 1)); 
+        transform-origin: top center; 
+    }
 }

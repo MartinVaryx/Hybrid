@@ -579,7 +579,7 @@
                 };
     
                 addSkillDiv.innerHTML = `
-                    <div style="font-size: 2.4rem; font-weight: bold; color: #464646;">+</div>
+                    <div id="new-skill" style="font-size: 2.4rem; font-weight: bold; color: #464646;">+</div>
                 `;
                 container.appendChild(addSkillDiv);
             }

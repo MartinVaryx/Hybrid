@@ -2331,53 +2331,31 @@
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 narrative_phase = true; 
-                document.getElementById("player-turn-indicator").innerText = "VYBER SI MOŽNOSŤ";
                 
                 let choicePrompt = document.getElementById("choice-prompt");
                 
+
                 if (!choicePrompt) {
                     choicePrompt = document.createElement("div");
                     choicePrompt.id = "choice-prompt";
-                    choicePrompt.style.cssText = `
-                        position: absolute; bottom: 2%; left: 0; right: 0; margin: 0 auto;
-                        padding: 20px 20px 20px 90px; display: flex; flex-wrap: wrap;
-                        justify-content: center; gap: 10px; z-index: 200; max-width: 100%;
-                    `;
+                    // Removed style.cssText — styling handled completely in CSS!
                     document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
                 }
 
                 choicePrompt.innerHTML = "";
-                activeChoiceIndex = 0; // Reset index to the first choice automatically
-
-                // Store a structural reference directly on the container element so our key listener can access it safely
+                activeChoiceIndex = 0; 
                 choicePrompt.userData = { validChoices: validChoices };
 
                 validChoices.forEach((choice, index) => {
                     const btn = document.createElement("button");
-                    btn.className = "adrenaline-select";
+                    btn.className = "adrenaline-select choice-btn"; // Use both class profiles
                     
-                    // Set base styling matching your custom specs
                     if (choice.isBack) {
-
-                        btn.style.cssText = `
-                            position: absolute; bottom: 0; left: 0; width: 60px; height: 46px;
-                            margin-left:10px;
-                            border-radius: 9px;
-                            background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
-                            color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
-                        `;
-                    } else {
-                        btn.style.cssText = `
-                            height: 46px; white-space: nowrap; padding: 0 16px; border-radius: 9px;
-                            background: rgb(231, 231, 231); backdrop-filter: blur(6px);
-                            -webkit-backdrop-filter: blur(6px); border: 3px solid rgba(25, 25, 25, 0.96);
-                            color: rgb(0, 0, 0); font-size: 1.1em; cursor: pointer;
-                        `;
+                        btn.classList.add("back-btn");
                     }
 
                     btn.innerText = choice.text;
                     
-                    // Mouse Hover switches active keyboard focus seamlessly
                     btn.onmouseenter = () => {
                         activeChoiceIndex = index;
                         updateVisualChoiceHighlights();
@@ -2385,7 +2363,7 @@
 
                     btn.onclick = () => {
                         if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
-                            return; // Early return to completely freeze challenge transitions
+                            return; 
                         }
                         choicePrompt.style.display = "none";
                         narrative_phase = false;
@@ -3197,17 +3175,6 @@
                 if (enemyHeading) enemyHeading.innerText = enemy;
             }
 
-            if (inputs_frozen ) {
-                document.getElementById("player-turn-indicator").innerText = "ČAKAJ...";
-            } else if (!is_conflict) {
-                document.getElementById("player-turn-indicator").innerText = "VYBER SI KARTU";
-            } else {
-                if (turn === "p") {
-                    document.getElementById("player-turn-indicator").innerText = "IDEŠ";
-                } else {
-                    document.getElementById("player-turn-indicator").innerText = "Waiting";
-                }
-            }
         }
 
         function resolveActionPhase(card) {
@@ -5162,7 +5129,7 @@
                     max-height: 90vh;
                 ">
                     <!-- Scrollable content area -->
-                    <div style="padding: 15px 15px 10px; text-align: center; overflow-y: auto; flex: 1;">
+                    <div id="hero-display" style="padding: 15px 15px 10px; text-align: center; overflow-y: auto; flex: 1;">
                         <h3 id="hero-display-name" style="font-family: 'Archivo Black', sans-serif; margin: 0 0 5px 0; text-transform: uppercase; color: #fff;">-</h3>
                         <div id="hero-display-skills" style="text-align: left; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; background: #111; padding: 12px; border-radius: 4px; border: 1px solid #333;">
                             <div id="hero-skills-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 30px;"></div>
@@ -6815,60 +6782,6 @@
                 }, 250); 
             }
         });
-
-    function setRealViewportVars() {
-        const root = document.documentElement;
-        root.style.setProperty('--real-vw', window.innerWidth + 'px');
-        root.style.setProperty('--real-vh', window.innerHeight + 'px');
-    }
- 
-    function fitMobilePage() {
-        const isMobilePortrait = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
-        const root = document.documentElement;
- 
-        if (!isMobilePortrait) {
-            root.style.setProperty('--mobile-fit-scale', 1);
-            return;
-        }
- 
-        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real size
- 
-        // "Height" constraint: content's natural height (local y-axis) must
-        // fit in the rotated frame's available height (= window.innerWidth).
-        const naturalHeight = document.body.scrollHeight;
-        const availableHeight = window.innerWidth;
-        const heightScale = availableHeight / naturalHeight;
- 
-        // "Width" constraint: content's natural width (local x-axis — this is
-        // where left-column + right-column sit side by side) must fit in the
-        // rotated frame's available width (= window.innerHeight). Without this
-        // check, a layout that's too wide just overflows sideways, and since
-        // it's horizontally centered, clips on one end while leaving a gap on
-        // the other — exactly the bug being fixed here.
-        const naturalWidth = document.body.scrollWidth;
-        const availableWidth = window.innerHeight;
-        const widthScale = availableWidth / naturalWidth;
- 
-        const scale = Math.min(1, heightScale, widthScale);
-        root.style.setProperty('--mobile-fit-scale', scale);
-    }
- 
-    function updateMobileLayout() {
-        setRealViewportVars(); // size the rotated box correctly FIRST
-        fitMobilePage();       // THEN measure/scale content against that box
-    }
- 
-    window.addEventListener('load', updateMobileLayout);
-    window.addEventListener('resize', updateMobileLayout);
-    window.addEventListener('orientationchange', updateMobileLayout);
- 
-    // Re-measure once custom web fonts actually finish loading.
-    // window 'load' does NOT wait for @font-face downloads, so the first
-    // measurement above can happen against fallback-font sizing and be
-    // slightly wrong — this corrects it once the real fonts swap in.
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updateMobileLayout);
-    }
 
 
 
