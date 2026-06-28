@@ -1,0 +1,652 @@
+        :root {
+            --bg-paper: #949494; 
+            --hybrid-black: #000000;
+            --hybrid-red: #c62828;
+            --hybrid-green: #2e7d32;
+            --text-dark: #222222;
+            --border-heavy: 3px solid #000;
+        }
+        html, body {
+            max-width: 100%;
+            overflow-x: hidden; /* Zabráni horizontálnemu scrollu */
+        }
+
+            .header-row {
+                display: flex;
+                flex-direction: row; /* Put logo and menu side-by-side */
+                flex-wrap: wrap;    /* Automatically drop to 2nd row if they touch */
+                justify-content: space-between; /* Logo left, Button right */
+                align-items: center;
+                width: 100%;
+                padding: 10px 15px;
+                box-sizing: border-box;
+            }
+
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: var(--bg-paper);
+            color: var(--text-dark);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            position: relative;
+            overflow-x: visible;
+        }
+
+        .stain {
+            position: fixed;
+            background-image: url("assets/machula.png"); 
+            background-size: contain;
+            background-repeat: no-repeat;
+            z-index: -1;
+            pointer-events: none;
+            opacity: 0.2;
+            mix-blend-mode: multiply;
+            width: 1050px; 
+            height: 1050px;
+        }
+
+        .stain-tl { top: -250px; left: -350px; transform: rotate(15deg); }
+        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
+        .stain-br { bottom: -300px; right: -250px; transform: rotate(-40deg); }
+
+        .logo-container { text-align: center; margin-bottom: 25px; position: relative; }
+        .logo-img { max-width: 140px; height: auto; display: block; margin: 0 auto; }
+
+        /* Hlavné Menu - Top Right */
+        .main-menu {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+            font-family: 'Archivo Black', sans-serif;
+        }
+        .responsive-img {
+            max-width: 100%;  /* Obrázok nikdy nebude širší ako text */
+            height: auto;     /* Zachová pomer strán */
+            display: block;   /* Odstráni medzeru pod obrázkom */
+            margin: 10px auto; /* Vycentruje obrázok a pridá odstup od textu */
+        }
+        .menu-dropdown {
+            position: relative;
+            display: inline-block;
+        }
+
+        .menu-trigger {
+            background: var(--hybrid-black);
+            color: white;
+            padding: 10px 20px;
+            border: 2px solid white;
+            cursor: pointer;
+            text-transform: uppercase;
+        }
+
+        .menu-items {
+            display: none;
+            position: absolute;
+            right: 0;
+            background-color: var(--hybrid-black);
+            min-width: 200px;
+            box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
+            border: 1px solid #333;
+            z-index: 2000;
+        }
+
+        .menu-items a {
+            color: #bbb;
+            padding: 12px 16px;
+            text-decoration: none;
+            display: block;
+            font-size: 0.9rem;
+            transition: 0.2s;
+            white-space: nowrap;
+        }
+
+        .menu-items a:hover {
+            background-color: var(--hybrid-red);
+            color: white;
+        }
+
+        .menu-dropdown:hover .menu-items {
+            display: block;
+        }
+
+        /* Globálny štýl pre tooltip rámček */
+        .skill-tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;  /* ← Use visibility instead of display: none */
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            line-height: 1.4;
+        }
+
+        .skill-tooltip.visible {
+            opacity: 1;
+            visibility: visible; /* ← Pair with visible class */
+        }
+
+        /* Skrytie sekcií */
+        .view-section { display: none; }
+        .view-section.active-view { display: block; }
+
+        .char-header {
+            width: 1100px;
+            background: var(--hybrid-black);
+            padding: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-sizing: border-box;
+            border-radius: 8px 8px 0 0;
+            z-index: 1;
+            border: var(--border-heavy);
+            border-bottom: none;    
+        }
+
+        .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
+        .control-box { width: 300px;background: #000; color: white; padding: 20px; border-radius: 10px; }
+        #builder-list{height: 260px; border-radius: 8px;}
+        #filter-container-container{
+            gap: 10px;
+        }
+        #filter-container{
+            margin-bottom: 10px;
+        }
+
+        /* Information Panel Overlay Container Backdrop */
+        #info-panel-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.75); /* Darkens everything behind the pop-up */
+            z-index: 2000; /* Stacks safely on top of your sticky header and carousel arrows */
+            
+            /* Flexbox layout to center the modal window box perfectly on screen */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            
+            /* Smooth opacity transitions */
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+        }
+
+        /* Class added via JavaScript to animate it visible */
+        #info-panel-container.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        /* The visual modal box inside the overlay backdrop */
+        .info-panel-box {
+            background-color: #ffffff;
+            border: 3px solid #000000;
+            border-radius: 12px;
+            padding: 30px;
+            max-width: 750px;
+            max-height: 450px;
+            width: 90%;
+            box-sizing: border-box;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            position: relative;
+            
+            /* Starting animation position (slight pop-up bounce) */
+            transform: scale(0.9);
+            transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Animates the box content scale outwards when parent opens */
+        #info-panel-container.active .info-panel-box {
+            transform: scale(1);
+        }
+
+        /* Close action button in the corner of the overlay panel */
+        .info-panel-close-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            font-weight: bold;
+            cursor: pointer;
+            color: #333333;
+            transition: color 0.2s;
+        }
+        .info-panel-close-btn:hover {
+            color: var(--hybrid-red);
+        }
+
+
+        .container {
+            width: 1100px;
+            background-color: #fff;
+            color: #000;
+            border: var(--border-heavy);
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.1);
+            overflow: visible !important;
+            margin-top: -3px;
+            z-index: 1;
+            box-sizing: border-box;
+        }
+
+        .tabs { 
+            display: flex; 
+            background-color: var(--hybrid-black); 
+            padding: 10px 30px; 
+            gap: 5px;
+        }
+        
+        .add-btn,.down-btn, .back-btn {
+            padding: 12px 12px;
+            font-size: 1.6rem;
+            border: none;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: 0.3s;
+            border-radius: 8px;
+            
+        }
+
+        .tab-btn {
+            padding: 12px 20px;
+            border: none;
+            border-radius: 8px;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: 0.3s;
+        }
+
+        .basic-btn {
+            padding: 12px 20px;
+            background: #222;
+            color: #777;
+            cursor: pointer;
+            font-family: 'Archivo Black', sans-serif;
+            text-transform: uppercase;
+            transition: transform 0.15s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-sizing: border-box;
+            border: 3px solid #fff !important;
+        }
+
+        .basic-btn:active {
+            transform: scale(0.93);
+            transition: transform 0.08s ease;
+        }
+        
+        .tab-btn:hover {
+            background: #333;
+            color: #bbb;
+        }
+
+        .basic-btn:hover {
+            background: #333;
+            color: #bbb !important;
+        }
+
+        .tab-btn.active { 
+            color: #fff; 
+            background-color: var(--hybrid-red); 
+        }
+
+        .tab-content {
+            display: none !important;
+            padding-top: 0 !important; 
+            visibility: hidden;
+            opacity: 0;
+
+        }
+
+        .tab-content.active {
+            display: flex !important; /* Väčšina tvojich tabov používa flex */
+            visibility: visible;
+            opacity: 1;
+            height: auto;
+            overflow: visible !important;
+        }
+        /* Upravený stats-panel pre presné zarovnanie s SVG */
+        .stats-panel {
+            flex: 3;
+            position: relative;
+            background-image: url("assets/dennik.png");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: top-left;
+            max-width: 80%;
+            aspect-ratio: 16/9;
+            border: none !important;
+            margin-bottom: 10px !important;
+            background-color: transparent !important;
+            overflow: hidden !important;
+            align-items: stretch !important; /* Dôležité pre šírku riadkov */
+            align-self: center;
+        }
+
+        /* Štýl pre dynamické textové polia */
+        .sheet-field {
+            position: absolute;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-weight: bold;
+            color: #000;
+            pointer-events: none;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            width: auto !important; /* ZMENA: z 100% na auto */
+        }
+
+        .share-btn-top {
+            background: #444; 
+            color: white; 
+            margin-left: auto; 
+            height: 38px; 
+            padding: 0 15px; 
+            clip-path: none;
+        }
+
+        .share-btn-top:hover {
+            background: #5865F2; /* Pekná modrá pri hoveri (Discord farba) */
+        }
+
+        .skill-slot {
+            position: absolute;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+            font-size: 1.2rem; /* Mierne väčšie písmo */
+        }
+        .item-slot {
+            position: absolute;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+            font-size: 1.2rem;
+        }
+        .skill-slot:hover {
+            background: rgba(0, 0, 0, 0.05);
+        }
+
+        .skill-slot.selected {
+            background: transparent !important;
+            outline: none !important;
+        }
+
+        .skill-slot.selected .skill-name-text {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .skill-node {
+            width: 160px; 
+            height: 48px;
+            background: white;
+            padding: 8px;
+            border: 2px solid #000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 1rem;
+            text-transform: uppercase;
+            box-sizing: border-box;
+            box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
+        }
+        .skill-node.selected { background-color: var(--hybrid-black); color: white; }
+        .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
+
+        .info-panel { flex: 2.2; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 300px; z-index: 100000;}
+        
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
+        .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
+        .skill-list-item:hover { background: #f4f4f4; }
+        .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
+
+        .tag {
+            background: #222;
+            color: #fff;
+            padding: 4px 8px;
+            border-radius: 3px;
+            font-size: 11px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin: 2px;
+            text-transform: uppercase;
+        }
+        .tag-remove { color: whitesmoke; cursor: pointer; font-weight: bold; }
+
+        input, select { border: 2px solid #000; padding: 8px; font-family: 'Roboto Condensed', sans-serif; font-weight: bold; text-transform: uppercase; }
+
+        .old-price-wrapper { position: relative; display: inline-block; margin-right: 20px; }
+        .old-price { 
+            font-size: 1.6rem; 
+            color: #444; 
+            font-family: 'Archivo Black', sans-serif;
+        }
+        .old-price::after { 
+            content: ""; position: absolute; left: -5%; top: 50%; width: 110%; height: 3px; 
+            background: var(--hybrid-red); transform: rotate(-15deg); 
+        }
+
+        .owned-rel { color: var(--hybrid-red); font-weight: bold; }
+
+        #sel-skill-rels span {
+            white-space: nowrap;
+            display: inline-block;
+        }
+
+        #edit-rels-container, #edit-desc-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            min-height: 105px; /* Pôvodná výška pre PC */
+            width: 100%;       /* Zabezpečí, aby využil priestor v paneli */
+            border: 2px solid #000;
+            padding: 8px;
+            background: #fff;
+            align-content: flex-start;
+            box-sizing: border-box;
+        }
+
+        #status-message {
+            position: fixed;
+            bottom: 80px; /* Aby nezavadzal nad control-boxom */
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--hybrid-black);
+            color: white;
+            padding: 10px 20px;
+            border: 2px solid var(--hybrid-red);
+            z-index: 2000;
+            display: none;
+            font-weight: bold;
+        }
+
+        #rel-add-list {
+            height: 150px !important;      /* Pevná výška pre PC */
+            overflow-y: auto !important;   /* Povolenie scrollbaru */
+            background-color: #fff;
+            border: 1px solid #000;
+            display: block;                /* Zabezpečí správne správanie výšky */
+        }
+
+        #editor .info-panel {
+            position: relative;
+            padding-bottom: 70px; /* Vytvoríme miesto pre sticky tlačidlá */
+        }
+
+        .editor-actions {
+            position: sticky;
+            bottom: 0;
+            background: #fff;
+            padding: 15px 0;
+            border-top: 1px solid #ddd;
+            z-index: 10;
+            width: 100%;
+        }
+
+        .modal-overlay {
+            display: none; /* JS zmení na flex pri showCustomAlert */
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85); 
+            z-index: 10000; /* Musí byť vyššie ako .stain (1) a .main-menu (1000) */
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal-box {
+            background: white;
+            padding: 30px;
+            border: 4px solid var(--hybrid-red);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            box-shadow: 15px 15px 0px rgba(0,0,0,0.5);
+            color: black;
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .news-card {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            background: rgba(255,255,255,0.05);
+            margin-bottom: 20px;
+            padding: 15px;
+            cursor: pointer;
+            border: 1px solid transparent;
+            transition: 0.3s;
+        }
+
+        .news-card:hover {
+            border-color: var(--hybrid-red);
+            background: rgba(255,255,255,0.1);
+        }
+
+        .news-card img {
+            width: 150px;
+            height: 100px;
+            object-fit: cover;
+        }
+
+        .news-date {
+            font-size: 0.8rem;
+            color: var(--hybrid-red);
+            font-weight: bold;
+        }
+
+
+
+
+        /* ZOBRAZENIE TLAČIDLA + (teraz aj na PC) */
+        #mobile-rel-toggle {
+            display: inline-block !important; /* Pôvodne ste tam mali none */
+            cursor: pointer;
+            /* Pridajte si štýl podľa potreby, aby ladil s PC editorom */
+        }
+
+        /* SPOLOČNÝ OVERLAY PRE PC AJ MOBIL */
+        #rel-add-container {
+            display: none; /* Predvolene skrytý pre všetkých */
+            position: fixed; /* Fixná pozícia na stred obrazovky */
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 600px; /* Šírka pre PC */
+            max-width: 95vw; /* Aby nepretiekol na mobile */
+            height: 200px;
+            background-color: #333;
+            padding: 25px;
+            border: 3px solid #000;
+            box-sizing: border-box;
+            z-index: 999999;
+            flex-direction: row; /* Na PC vedľa seba */
+            gap: 15px;
+            box-shadow: 0 0 50px rgba(0,0,0,0.8); /* Tieň pre efekt hĺbky */
+        }
+
+        /* AKTÍVNY STAV */
+        #rel-add-container.active {
+            display: flex !important;
+        }
+
+        /* ZATVÁRACIE TLAČIDLO (viditeľné všade) */
+        .mobile-only-close {
+            display: block !important;
+            position: absolute;
+            top: -15px;
+            right: -15px;
+            background: var(--hybrid-red, red);
+            color: white;
+            border: 2px solid black;
+            width: 35px;
+            height: 35px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 0; /* Zachovanie hranatého štýlu */
+        }
+
+        /* TEXTY */
+        #rel-add-container label {
+            color: #ffffff !important;
+            font-weight: bold;
+            display: block;
+        }
+
+        #rel-add-container .rel-field label {
+            color: #bbb !important;
+            font-size: 0.8rem;
+            margin-bottom: 3px;
+        }
+
+        .rel-add-controls {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        #rel-add-list {
+            flex: 1;
+            overflow-y: auto;
+            background: #ffffff;
+            border: 1px solid #000;
+        }
+

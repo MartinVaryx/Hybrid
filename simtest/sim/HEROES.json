@@ -1,0 +1,53 @@
+[{
+        "name": "ANJELIK",
+        "stress": 0,
+        "items": {},
+        "weapons": [],
+        "ammo": {},
+        "sp": 0,
+        "skills": {
+            "OBRATNOSŤ": 3,
+            "SILA": 1,
+            "ZMYSLY": 2,
+            "ŤAŽKÉ ZBRANE": 4,
+            "PLÝŽENIE": 4
+        },
+        "isInitialPhase": false,
+        "initialSkillsSnapshot": {},
+        "humanity": 50,
+        "defaultWeapons": ["mačeta"],
+        "defaultAmmo": {},
+        "defaultItems": {"SLIVOVICA":1},
+        "stress_thresh": 8,
+        "weapon": 0
+    },
+    {
+        "name": "NATAŠA",
+        "sp": 0,
+        "stress": 0,
+        "skills": {
+            "OBRATNOSŤ": 2,
+            "ZRUČNOSŤ": 2,
+            "IQ": 1,
+            "ZMYSLY": 2,
+            "STREĽBA": 3,
+            "PLÝŽENIE": 2,
+            "OSTNE": 1,
+            "PRESVIEDČANIE": 2,
+            "ZASTRAŠOVANIE": 1,
+            "KRADNUTIE": 1,
+            "LEZENIE": 2,
+            "ŠPRINT": 1
+        },
+        "isInitialPhase": false,
+        "humanity": 44,
+        "initialSkillsSnapshot": {
+            "OBRATNOSŤ": 2,
+            "ZRUČNOSŤ": 2,
+            "IQ": 1,
+            "ZMYSLY": 2
+        },
+        "defaultWeapons":["pištoľ"],
+        "defaultAmmo":{"pištoľ":10}
+    }
+]

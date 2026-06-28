@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HYBRID - Card Combat Simulator</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Protest+Riot&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">    
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="game-container">
+
+        
+        <div class="left-column">
+
+                <div style="display: flex; flex-direction: row; align-items: center; gap: 15px; width: 100%;">
+                    <button onclick="showMenu()" class="adrenaline-select" style="background-color: var(--hybrid-red); color: white; width: auto; padding: 8px 16px; margin: 10px 0; cursor: pointer;">
+                        MENU
+                    </button>
+                    <button onclick="toggleBuilder(true)" class="adrenaline-select" style="background-color: #444; color: white; width: auto; padding: 8px 16px; margin: 10px 0; cursor: pointer;">
+                        DENNÍK
+                    </button>
+                    <h3 style="margin: 0; flex-grow: 1; display: flex; border: 2px solid; border-radius: 4px;"> 
+                        <div class="info-img">
+                        <img  src="assets/INFO.png" alt="STRESS" style="height: 1.8em; width: auto; object-fit: contain; padding-left: 5px;"> 
+                        </div>
+                        <span class="status-badge" id="player-turn-indicator" style="width: 100%; text-align: center;">IDEŠ</span>
+                    </h3>
+                </div>
+                <div class="controls-panel">
+                <input type="hidden" id="adrenaline-select" value="0">
+                
+                <table class="track-table">
+                    <tr id="stress-track-row">
+                        <td class="track-header" style="display: flex; align-items: center; justify-content: center; height: 100%;">
+                            <img src="assets/STRESS.png" alt="STRESS" style="height: 2.2em; width: auto; object-fit: contain;" data-tooltip="STRES">
+                        </td>
+                        <td class="track-cell stress-node" data-val="1">1</td>
+                        <td class="track-cell stress-node" data-val="2">2</td>
+                        <td class="track-cell stress-node" data-val="3">3</td>
+                        <td class="track-cell stress-node" data-val="4">4</td>
+                        <td class="track-cell stress-node" data-val="5">5</td>
+                        <td class="track-cell stress-node" data-val="6">6</td>
+                        <td class="track-cell stress-node" data-val="7">7</td>
+                        <td class="track-cell stress-node" data-val="8">8</td>
+                        <td class="track-cell stress-node" data-val="9">9</td>
+                        <td class="track-cell stress-node" data-val="10">10</td>
+                    </tr>
+                        <tr id="adrenaline-track-row">
+                        <td class="track-header" style="display: flex; align-items: center; justify-content: center; height: 100%; gap: 5px;">
+                            <img src="assets/ADRENALINE.png" alt="STRESS" style="height: 2.2em; width: auto; object-fit: contain;" data-tooltip="ADRENALÍN">
+                        </td>
+                        <td class="track-cell ad-node" data-idx="1" data-val="1">1</td>
+                        <td class="track-cell ad-node" data-idx="2" data-val="2">2</td>
+                        <td class="track-cell ad-node" data-idx="3" data-val="3">3</td>
+                        <td class="track-cell ad-node" data-idx="4" data-val="4">4</td>
+                        <td class="track-cell ad-node" data-idx="5" data-val="3">3</td>
+                        <td class="track-cell ad-node" data-idx="6" data-val="2">2</td>
+                        <td class="track-cell ad-node" data-idx="7" data-val="1">1</td>
+                        <td></td>
+                        <td ><span id="sp-label">BR:</span><span id="sp">0</span></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="panel">
+                <div class="stat-row" style="display: flex; justify-content: space-between; align-items: center;">
+                    <select id="player-skill-dropdown" style="background: #e0e0e0; color: black; border: 2px solid #333; font-family: 'Roboto Condensed', sans-serif; font-size: 0.9rem; padding: 2px 15px; margin-right: 15px; cursor: pointer; border-radius: 4px; outline: none; text-transform: uppercase; width: 200px;"></select>
+                </div>
+                <div class="stat-row"><span>VÝHODA:</span><span id="player-advantage">0</span></div>
+                <div class="stat-row" style="display: flex; justify-content: space-between; align-items: center;">
+                    <select id="player-weapon-dropdown" style="background: #e0e0e0; color: black; border: 2px solid #333; font-family: 'Roboto Condensed', sans-serif; font-size: 0.9rem; padding: 2px 15px; margin-right: 15px; cursor: pointer; border-radius: 4px; outline: none; text-transform: uppercase; width: 200px;"></select>
+                </div>
+                <div class="stat-row">
+                    <span>
+                        <div onclick="runHealCheck()" class="adrenaline-select" id="heal" style="width: 165px; border-radius: 12px; height: 37px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">                            
+                            <img src="assets/CROSS.png" alt="STRESS" style="height: 1em; width: auto; object-fit: contain; margin-right: 8px;">
+                            PRVÁ POMOC
+                        </div>
+                    </span>
+                </div>
+
+            </div>
+            <div class="card-tray-wrapper">
+                <div class="card-scroll-row">
+                    <div class="card-tray-overflow-escape">
+                        <div class="card-tray" id="card-tray-container">
+                            <div class="card-container" data-card="O">
+                                <div class="split-zone top" data-action="D">ČIN</div>
+                                <div class="split-zone bottom" data-action="A">ÚTOK</div>
+                                <img src="assets/O.png" alt="Card O" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#c62828'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>O CARD</div>'">
+                            </div>
+                            <div class="card-container" data-card="R">
+                                <div class="split-zone top" data-action="D">ČIN</div>
+                                <div class="split-zone bottom" data-action="A">ÚTOK</div>
+                                <img src="assets/R.png" alt="Card R" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#2e7d32'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>R CARD</div>'">
+                            </div>
+                            <div class="card-container" data-card="S">
+                                <div class="split-zone top" data-action="D">ČIN</div>
+                                <div class="split-zone bottom" data-action="A">ÚTOK</div>
+                                <img src="assets/S.png" alt="Card S" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#e65100'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>S CARD</div>'">
+                            </div>
+                            <div class="card-container" data-card="B">
+                                <div class="split-zone top" data-action="D">ČIN</div>
+                                <div class="split-zone bottom" data-action="A">ÚTOK</div>
+                                <img src="assets/B.png" alt="Card B" class="card-img" onerror="this.style.display='none'; this.parentElement.style.background='#1565c0'; this.parentElement.innerHTML+='<div style=\'position:absolute;top:40%;width:100%;text-align:center;color:white;font-family:sans-serif;font-weight:bold;\'>B CARD</div>'">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div style="width:100%; display:flex; justify-content:center;">
+                    <button id="flip-cards-btn" class="adrenaline-select" style="background: #000; color: #fff; width: 50px;">
+                        ↻
+                    </button>
+                    <button id="escape-btn" class="adrenaline-select" style="background: #000; color: #fff;">
+                        UJSŤ
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="right-column">
+            <div class="right-top-row">
+                <div class="terminal-border-box">
+                    <div class="terminal-scroll-container">
+                        <div id="terminal-screen" class="terminal-content"></div>
+                    </div>
+                </div>     
+            </div>
+            
+            
+            <div class="gaming-table-floor">
+                <div id="enemy-sprite-container" style="display: none;">
+                    <img id="enemy-sprite" src="" alt="Enemy Encounter" />
+                </div>
+                <div id="challenge-stats-display" class="challenge-display" style="display: none;">
+                    <div class="stat-item" data-tooltip="NÁROČNOSŤ" onmouseenter="showTooltip(event)" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"><img src="assets/DIFFICULTY.png" class="stat-icon"> <span>7</span></div>
+                    <div class="stat-item" data-tooltip="HROZBA" onmouseenter="showTooltip(event)" onmousemove="moveTooltip(event)" onmouseleave="hideTooltip()"><img src="assets/THREAT.png" class="stat-icon"> <span>2</span></div>
+                </div>
+                <div id="player-card-display" class="player-card-slide"></div>
+                    <div id="ready-prompt">
+                        <div style="font-family:'Archivo Black';margin-top: 10px;">Priprav sa!</div>
+                        <button id="ready-btn" class="adrenaline-select" style="width: 150px;margin: 10px; background: var(--hybrid-green);">SOM READY!</button>
+                    </div>
+
+                         <div id="proceed-prompt"  class="next-prompt">
+                            <button id="proceed-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
+                                POKRAČOVAŤ</button>
+                        </div>
+                        <div id="back-to-game-prompt" class="next-prompt">
+                            <button id="back-to-game-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
+                                SPÄŤ DO HRY</button>
+                        </div>
+                <div class="panel" id="enemy-panel">
+                    <h3><span id="enemy-heading-type">ENEMY</span> </h3>
+                    <div class="enemy-stats-row">
+                        <div class="stat-row"><span>Stres:</span><span id="enemy-stress">0 / 5</span></div>
+                        <div class="stat-row"><span>Výhoda:</span><span id="enemy-advantage">0</span></div>
+                    </div>
+                    <div class="enemy-stats-row">
+                        <div class="stat-row"><span>Schopnosť:</span><span id="enemy-skill">0</span></div>
+                        <div class="stat-row"><span>Zbraň:</span><span id="enemy-weapon">0</span></div>
+                    </div> 
+                    <div class="enemy-card-wrapper" id="enemy-card-container"></div>
+                </div>
+            </div>
+        </div>        
+    </div>
+    <div id="main-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
+
+        <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
+            
+            <button onclick="hideMenu()" class="adrenaline-select" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">
+                X
+            </button>
+            
+            <div style="font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: #fff; margin-bottom: 25px; text-transform: uppercase;">
+                MENU
+            </div>
+            
+            <div  style="display: flex; flex-direction: column; gap: 15px; justify-content: center; width: 100%; align-items: center;">
+                <button onclick="showSettings()" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    NASTAVENIA</button>
+                <button id="launch-tutorial-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    POMOC</button>
+                <button onclick="about()" id="about-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    O HYBRIDE</button>
+                <button id="restart-btn" onclick="restartGame(true)" class="adrenaline-select" style="width: 140px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-red); cursor: pointer;">REŠTARTOVAŤ</button>
+            </div>
+        </div>
+        </div>                 
+    </div>
+    <div id="settings" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
+
+        <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
+            
+            <button onclick="hideSettings()" class="adrenaline-select" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">
+                X
+            </button>
+            
+            <div style="font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: #fff; margin-bottom: 25px; text-transform: uppercase;">
+                NASTAVENIA
+            </div>
+            
+            <div style="display: flex; flex-direction: column; gap: 15px; justify-content: center; width: 100%; align-items: center;">
+                
+                <label style="display: flex; align-items: center; gap: 12px; color: #ffffff; font-weight: bold; height: 40px; cursor: pointer; user-select: none; font-size: 1.1rem;">
+                    <span>TUTORIÁL</span>
+                    <input type="checkbox" id="tutorial-checkbox" onchange="toggleTutorial()" style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--hybrid-green);">
+                </label>
+                    
+                <button onclick="hideSettings()" id="about-btn" class="adrenaline-select" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    SPÄŤ</button>
+            </div>
+        </div>
+    </div>
+    <div id="builder-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999;">
+    
+        <button class="adrenaline-select" onclick="toggleBuilder(false)" style="position: absolute; top: 20px; right: 50px; z-index: 10000; background: var(--hybrid-red); color: white; border: none; padding: 10px 20px; font-weight: bold; cursor: pointer;">
+            ZAVRIEŤ
+        </button>
+        
+        <iframe id="builder-iframe" style="width: 100%; height: 100%; border: none;"></iframe>
+    </div>
+    <div id="general-prompt" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 10100; flex-direction: column; align-items: center; justify-content: center;">  
+        <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
+            <div id="general-prompt-text" style="font-family: 'Archivo Black', sans-serif; font-size: 1.2rem; color: #fff; margin-bottom: 25px;">Otázka</div>
+            <input id="general-prompt-input" type="text" placeholder="" style="display: none; width: 80%; margin-bottom: 20px; padding: 8px 12px; font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; background: #2a2a2a; color: #fff; border: 2px solid #555; border-radius: 4px; outline: none;">
+            <div style="display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%;">
+                <button id="gp-confirm-btn" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-green);">Áno.</button>
+                <button id="gp-cancel-btn" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-red);">Nie.</button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="script.js"></script>
+    
+</body>
+</html>
