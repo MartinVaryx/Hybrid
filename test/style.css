@@ -445,7 +445,7 @@
         .tab-title {
             font-family: 'Rubik Dirt', cursive !important;
             font-feature-settings: "PUNC" 1;
-            font-size: 1.8rem;
+            font-size: 3rem;
             font-weight: normal;
             margin-top: 15px;
             border-bottom: 2px solid var(--hybrid-red);
