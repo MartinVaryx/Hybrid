@@ -1,0 +1,693 @@
+{
+    "ŠOFÉROVANIE": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "IQ"
+        ],
+        "Týka sa osobných vozidiel. Neplatí pre nákladné autá či stavebné stroje."
+    ],
+    "IQ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "EQ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "ZRUČNOSŤ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "SILA": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "OBRATNOSŤ": [
+        4,
+        "DANOSTI",
+        [],
+        "Schopnosť šplhať sa, liezť, skákať, uhýbať… (v boji je možné využiť ju len na obranu)"
+    ],
+    "ZMYSLY": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "ODOLNOSŤ": [
+        4,
+        "DANOSTI",
+        []
+    ],
+    "PLÁVANIE": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ"
+        ]
+    ],
+    "PRESVIEDČANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "ZMYSLY"
+        ],
+        "Ovplyvnenie názorov/postojov inej postavy. Zámery hrdinu musia byť postave jasné a cieľ presviedčania pravdepodobný (nie je možné presvedčiť inú postavu, že čierna je biela)."
+    ],
+    "EMPATIA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ"
+        ]
+    ],
+    "MANIPULÁCIA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "ZMYSLY",
+            "PREDSTIERANIE"
+        ],
+        "Schopnosť presvedčiť inú postavu o niečom, čomu predtým neverila bez toho, aby bol manipulátorov zámer odhalený."
+    ],
+    "ZASTRAŠOVANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ",
+            "MANIPULÁCIA"
+        ],
+        "Vyhrážanie, vydieranie. Ovplyvňovanie správania iných postáv."
+    ],
+    "PREDSTIERANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ"
+        ]
+    ],
+    "ZVÁDZANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ",
+            "ZMYSLY",
+            "FEROMÓNY",
+            "TANEC"
+        ]
+    ],
+    "VODCOVSTVO": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ"
+        ]
+    ],
+    "RÉTORIKA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "IQ",
+            "EQ"
+        ]
+    ],
+    "VRHANIE": [
+        1,
+        "BOJ Z DIAĽKY",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "Vrhanie do diaľky aj na terč (do 1kg)"
+    ],
+    "ŤAŽKÉ PREDMETY": [
+        2,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "SILA"
+        ],
+        "Vrhanie ťažkými predmetmi (do 10kg)"
+    ],
+    "STREĽBA": [
+        2,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "Používanie ľahkých strelných zbraní, od luku po samopal."
+    ],
+    "ŤAŽKÉ STRELNÉ ZBRANE": [
+        3,
+        "BOJ Z DIAĽKY",
+        [
+            "VRHANIE",
+            "STREĽBA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "Používanie zbraní ako sú guľomety, raketomety či granátomety."
+    ],
+    "ŠPECIÁLNE STRELNÉ ZBRANE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "STREĽBA",
+            "IQ",
+            "ZMYSLY"
+        ]
+    ],
+    "BOJOVÉ STROJE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "STREĽBA",
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "ZRUČNOSŤ",
+            "IQ"
+        ],
+        "Ovládanie bojovej techniky ako tanky, pojazdné raketomety, stíhačky a podobne."
+    ],
+    "HROMADNÉ NIČENIE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
+            "BOJOVÉ STROJE",
+            "IQ"
+        ],
+        "Používanie zbraní hromadného ničenia. / Výroba zbraní hromadného ničenia."
+    ],
+    "ĽAHKÉ ZBRANE": [
+        1,
+        "BOJ ZBLÍZKA",
+        [
+            "OBRATNOSŤ",
+            "ZRUČNOSŤ",
+            "SILA",
+            "ŤAŽKÉ ZBRANE",
+            "ZMYSLY"
+        ],
+        "Používanie ľahkých zbraní v boji (nôž, kladivo, palica, ostne a pod.)"
+    ],
+    "ŤAŽKÉ ZBRANE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "OBRATNOSŤ",
+            "SILA",
+            "ZRUČNOSŤ"
+        ],
+        "Používanie ťažkých zbraní v boji (sekera, ťažké kladivo, baseballová pálka, hryzadlá…)"
+    ],
+    "ŠPECIÁLNE ZBRANE": [
+        3,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "ŤAŽKÉ ZBRANE",
+            "IQ",
+            "ZRUČNOSŤ",
+            "MECHANIKA"
+        ],
+        "Napr. (elektro)motorová píla, elektromechanické zbrane, ktoré dokáže používateľ ovládať svojou mysľou (protézy a pod.), žihadlo, …"
+    ],
+    "OMRÁČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZRUČNOSŤ",
+            "SILA",
+            "ĽAHKÉ ZBRANE",
+            "ŤAŽKÉ ZBRANE"
+        ],
+        "Počas aj mimo boja."
+    ],
+    "MUČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZASTRAŠOVANIE",
+            "EQ",
+            "ZRUČNOSŤ"
+        ],
+        "Ovplyvňovanie správania iných postáv fyzickým nátlakom."
+    ],
+    "TICHÁ ELIMINÁCIA": [
+        4,
+        "BOJ ZBLÍZKA",
+        [
+            "ĽAHKÉ ZBRANE",
+            "PLÝŽENIE",
+            "OBRATNOSŤ",
+            "ZRUČNOSŤ",
+            "SILA"
+        ],
+        "Zabitie protivníka jediným útokom, ak sa k nemu hrdina priblíži nespozorovaný."
+    ],
+    "ŠPEHOVANIE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ZMYSLY"
+        ],
+        "Prieskum neznámej oblasti, odhalenie slabosti nepriateľa, objavenie hniezda. Hľadanie skrýší, maskovanie seba aj iných, ukrývanie predmetov, vozidiel či stavieb."
+    ],
+    "PLÝŽENIE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "OBRATNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "PASCE": [
+        2,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "VÝROBA",
+            "OPRAVA",
+            "ZRUČNOSŤ"
+        ],
+        "Nastraženie jednoduchých pascí."
+    ],
+    "INVESTIGATÍVA": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "MANIPULÁCIA",
+            "ZMYSLY",
+            "PRESVIEDČANIE",
+            "IQ",
+            "EQ"
+        ],
+        "Zisťovanie informácií, najmä takých, ktoré sa niekto snaží ukryť."
+    ],
+    "ŠÍRENIE KLEBIET": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "MANIPULÁCIA",
+            "EQ",
+            "IQ"
+        ],
+        "Ovplyvňovanie názorov veľkých skupín ľudí and s tým súvisiace zmeny v spoločenskom vývoji."
+    ],
+    "POUŽÍVANIE VÝBUŠNÍN": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "VÝROBA VÝBUŠNÍN",
+            "ŠPECIÁLNE ZBRANE",
+            "VRHANIE"
+        ],
+        "Výroba malých bômb, improvizovaných granátov a podobne."
+    ],
+    "VÝROBA VÝBUŠNÍN": [
+        3,
+        "KUTILSTVO",
+        [
+            "VÝROBA",
+            "ELEKTRONIKA",
+            "POUŽÍVANIE VÝBUŠNÍN"
+        ]
+    ],
+    "MAPOVANIE POPULÁCIE": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "INVESTIGATÍVA",
+            "IQ"
+        ],
+        "Zhromažďovanie informácií o populácií Somôr v danom regióne a odhad ďalšieho vývoja populácie."
+    ],
+    "PRVÁ POMOC": [
+        1,
+        "LIEČENIE",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "EQ"
+        ],
+        "Zníženie krátkodobého stresu o hodnotu regenerácie."
+    ],
+    "MEDICÍNA": [
+        3,
+        "LIEČENIE",
+        [
+            "PRVÁ POMOC",
+            "IQ",
+            "ZMYSLY",
+            "EQ"
+        ],
+        "Diagnóza a liečenie chorôb a zranení. Zníženie dlhodobého telesného stresu o hodnotu regenerácie."
+    ],
+    "TERAPIA": [
+        2,
+        "LIEČENIE",
+        [
+            "EMPATIA",
+            "EQ",
+            "PRESVIEDČANIE"
+        ],
+        "Zníženie dlhodobého psychického stresu o hodnotu regenerácie."
+    ],
+    "CHIRURGIA": [
+        4,
+        "LIEČENIE",
+        [
+            "ZRUČNOSŤ",
+            "IQ",
+            "ZMYSLY",
+            "MEDICÍNA",
+            "PRVÁ POMOC"
+        ],
+        "Liečenie vážnych vnútorných zranení (zlomenín a podobne)."
+    ],
+    "BIOCHÉMIA": [
+        3,
+        "LIEČENIE",
+        [
+            "MEDICÍNA",
+            "IQ"
+        ],
+        "Miešanie účinných látok pri dostatku surovín s potrebným vybavením."
+    ],
+    "SYNTÉZA FEROMÓNOV": [
+        4,
+        "LIEČENIE",
+        [
+            "BIOCHÉMIA",
+            "MEDICÍNA",
+            "IQ"
+        ],
+        "Tvorba umelých feromónov, ktoré majú podobné účinky ako Somorie. Zmena účinku feromónov pomocou experimentovania."
+    ],
+    "BIOLOGICKÉ ZBRANE": [
+        4,
+        "LIEČENIE",
+        [
+            "BIOCHÉMIA",
+            "MEDICÍNA"
+        ],
+        "Vývoj vírusov, baktérií či plesní zameraných na konkrétny živočíšny druh. Predvídanie a ovplyvnenie ich účinku."
+    ],
+    "OPRAVA": [
+        1,
+        "KUTILSTVO",
+        [
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "…jednoduchých nástrojov a zariadení."
+    ],
+    "STAVBA": [
+        1,
+        "KUTILSTVO",
+        [
+            "SILA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "…provizórnych príbytkov, úkrytov a opevnení pri dostatku času, nástrojov a materiálov."
+    ],
+    "BUDOVANIE": [
+        2,
+        "KUTILSTVO",
+        [
+            "STAVBA",
+            "IQ",
+            "ZMYSLY"
+        ],
+        "…pevností pri dostatku času, pracovníkov, techniky a materiálov."
+    ],
+    "VÝROBA": [
+        2,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ],
+        "…a vylepšovanie jednoduchých nástrojov a zariadení."
+    ],
+    "MECHANIKA": [
+        4,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "VÝROBA",
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "IQ"
+        ],
+        "Oprava a výroba mechanických strojov a vozidiel. Schopnosť opraviť či upraviť bez návodu aj neznáme zariadenie."
+    ],
+    "ELEKTRONIKA": [
+        3,
+        "KUTILSTVO",
+        [
+            "OPRAVA",
+            "VÝROBA",
+            "ZRUČNOSŤ",
+            "IQ"
+        ],
+        "Oprava, úprava a výroba elektronických zariadení."
+    ],
+    "ŤAŽKÁ TECHNIKA": [
+        4,
+        "KUTILSTVO",
+        [
+            "MECHANIKA",
+            "ŠOFÉROVANIE",
+            "ZRUČNOSŤ"
+        ],
+        "Výroba a oprava ťažkej techniky pri dostatku času, materiálov a nástrojov."
+    ],
+    "HRA NA GITARU": [
+        1,
+        "VŠEOBECNÉ",
+        [
+            "EQ",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "KRÍDLA": [
+        1,
+        "SOMORA",
+        [],
+        "Hrdina si môže nechať narásť krídla. Človeku pri jeho váhe neumožnia letieť, ale skôr vyskočiť (do výšky 10m) and doplachtiť bez zranenia z ľubovoľnej výšky."
+    ],
+    "OPATROVANIE": [
+        1,
+        "SOMORA",
+        []
+    ],
+    "MIMIKRY": [
+        1,
+        "SOMORA",
+        [],
+        "Hrdina dokáže splynúť s prostredím. Pre človeka sa stane mimoriadne ťažko objaviteľným, najmä v neprehľadnom teréne, na veľkú vzdialenosť, v hmle či v šere."
+    ],
+    "FEROMÓNY": [
+        1,
+        "SOMORA",
+        [],
+        "Žľazy, ktoré produkujú základné Somorie feromóny, ktoré dokážu vyjadriť priateľský, nepriateľský alebo neutrálny vzťah. Hrdina dokáže vycítiť Somory v okolí. Vie identifikovať približnú vzdialenosť aj smer. Dokáže sledovať pachové stopy."
+    ],
+    "ŠPRINT": [
+        1,
+        "SOMORA",
+        [],
+        "Hrdina dokáže bežať nadľudskou rýchlosťou."
+    ],
+    "STRIDULÁCIA": [
+        2,
+        "SOMORA",
+        [
+            "KRÍDLA"
+        ],
+        "Hrdina dokáže bzučaním tvoreným krídlami Somory vábiť, zastrašovať, varovať či provokovať. Počas boja dokáže vydávať rušivý zvuk, ktorý zmätie Somory v blízkosti hrdinu."
+    ],
+    "RÝCHLA REGENERÁCIA": [
+        3,
+        "SOMORA",
+        [
+            "ODOLNOSŤ",
+            "LIEČENIE"
+        ],
+        "Hrdina je schopný regenerovať časti tela. Počas spánku mu za noc zrastú zlomeniny a zahoja sa aj vážne rany."
+    ],
+    "BIOKAMUFLÁŽ": [
+        2,
+        "SOMORA",
+        [
+            "FEROMÓNY"
+        ],
+        "Hrdina dokáže produkovať feromóny, vďaka ktorým sa stane pre Somory “neviditeľným”. Somory ho ignorujú, ak na ne neútočí alebo ak ho iná Somora neoznačí feromónmi za nepriateľa."
+    ],
+    "OSTNE": [
+        2,
+        "SOMORA",
+        [],
+        "Za 1 bod rastu si môže hrdina nechať narásť chitínové ostne na ľubovoľnej časti tela. Poznačí si ich do vybavenia and ak sa mu ulomia, musí si ich nechať narásť opäť (za vyššiu cenu). Dokážu preraziť chitínový pancier Somôr."
+    ],
+    "PANCIER": [
+        2,
+        "SOMORA",
+        [
+            "ODOLNOSŤ"
+        ],
+        "Za 1 bod rastu si môže hrdina nechať narásť chitínové pláty na ľubovoľnej časti tela - za každé zvýšenie získava obranu +1. Ak sa mu zničia, musí si ich nechať narásť opäť (za vyššiu cenu)."
+    ],
+    "LEZENIE": [
+        2,
+        "SOMORA",
+        [
+            "OBRATNOSŤ"
+        ],
+        "Schopnosť liezť po stenách aj stropoch. Náročnosť môže byť zvýšená, ak je povrch príliš hladký."
+    ],
+    "LIEČENIE": [
+        2,
+        "SOMORA",
+        [
+            "OPATROVANIE"
+        ]
+    ],
+    "OVLÁDANIE SOMÔR": [
+        3,
+        "SOMORA",
+        [
+            "FEROMÓNY",
+            "OPATROVANIE"
+        ],
+        "Hrdina dokáže feromónmi upokojiť, rozzúriť alebo odlákať Somory."
+    ],
+    "KYSELINA": [
+        2,
+        "SOMORA",
+        [],
+        "Žľazy, ktoré produkujú silnú kyselinu schopnú rozleptať ľudské tkanivo and reagovať s kovmi."
+    ],
+    "HRYZADLÁ": [
+        3,
+        "SOMORA",
+        [],
+        "Hrdinovi sa rozštiepi sánka a narastú mu silné hryzadlá schopné amputovať končatinu. Dokážu prehrýzť chitínový pancier. Bude sa mu však horšie rozprávať."
+    ],
+    "KLEPETÁ": [
+        3,
+        "SOMORA",
+        []
+    ],
+    "METAMORFÓZA": [
+        4,
+        "SOMORA",
+        [
+            "RÝCHLA REGENERÁCIA",
+            "LIEČENIE",
+            "MIMIKRY"
+        ],
+        "Chitínové časti (ostne, pancier, žihadlo,...) hrdinovi podľa potreby dorastajú a odpadávajú bez potreby kupovať si ich. Hrdina dokáže zakryť to, že je Hybrid."
+    ],
+    "OVLÁDANIE ĽUDÍ": [
+        4,
+        "SOMORA",
+        [
+            "OVLÁDANIE SOMÔR",
+            "FEROMÓNY"
+        ],
+        "Hrdina dokáže feromónmi upokojiť, rozzúriť alebo odlákať ľudí."
+    ],
+    "ZALOŽENIE HNIEZDA": [
+        4,
+        "SOMORA",
+        [
+            "OVLÁDANIE SOMÔR",
+            "LIEČENIE",
+            "FEROMÓNY",
+            "OPATROVANIE"
+        ],
+        "Hrdina dokáže klásť vajíčka a založiť si vlastnú armádu Somôr. Musí však jesť takmer výhradne ľudské mäso."
+    ],
+    "ŽIHADLO": [
+        4,
+        "SOMORA",
+        [
+            "OSTNE",
+            "KYSELINA"
+        ],
+        "Osteň, ktorým je možné aplikovať toxíny."
+    ],
+    "ŠPLHANIE": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ",
+            "SILA",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
+    ],
+    "KRADNUTIE": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "PLÝŽENIE",
+            "ZRUČNOSŤ",
+            "ZMYSLY",
+            "PREDSTIERANIE",
+            "MANIPULÁCIA"
+        ]
+    ],
+    "INFORMATIKA": [
+        3,
+        "VŠEOBECNÉ",
+        [
+            "IQ"
+        ]
+    ],
+    "TANEC": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ",
+            "EQ",
+            "ZMYSLY",
+            "PREDSTIERANIE",
+            "ZVÁDZANIE"
+        ]
+    ],
+    "ELIMINÁCIA Z DIAĽKY": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ZMYSLY",
+            "ZRUČNOSŤ",
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
+            "STREĽBA",
+            "ŤAŽKÉ STRELNÉ ZBRANE"
+        ]
+    ]
+}
