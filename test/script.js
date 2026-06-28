@@ -1074,94 +1074,94 @@
         }
     }
 
-function openTab(id, shouldUpdateHash = true) {
-    // Ak už tab je aktívny, nič nerob (bráni preblikávaniu)
-    const target = document.getElementById(id);
-    if (!target) {
-        showCustomAlert("Tab data not found.");
-        return;
-    }
-
-    // Check if tab has any content
-    if (target.innerHTML.trim() === '') {
-        target.innerHTML = '<p style="margin-top: 15px; margin-left: 30px; margin-right: 30px; font-size: 1.4rem; line-height: 1.6;">PRÍKLAD TEXTU: Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky. Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa rozhodujú, ako ich hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Hráč sa potrebuje rozhodnúť, čo je pre jeho hrdinu v danej chvíli podstatnejšie.</p>';
-    }
-
-    // Aktualizácia URL len ak je to žiadané (pri kliku, nie pri routingu)
-    if (shouldUpdateHash && window.location.hash !== '#' + id) {
-        window.location.hash = id;
-        window.scrollTo(0, 0);
-    }
-
-    // --- FEATURED WIDGET VISIBILITY LOGIC ---
-    // Finds your widget and displays it ONLY on the 'uvod' tab
-    const featuredWidget = document.querySelector('.carousel-container'); // Change to '#featured-widget' if using an ID
-    if (featuredWidget) {
-        if (id === 'uvod') {
-            featuredWidget.style.display = 'block'; // Show on home tab
-        } else {
-            featuredWidget.style.display = 'none';  // Hide on all other tabs
+    function openTab(id, shouldUpdateHash = true) {
+        // Ak už tab je aktívny, nič nerob (bráni preblikávaniu)
+        const target = document.getElementById(id);
+        if (!target) {
+            showCustomAlert("Tab data not found.");
+            return;
         }
-    }
-    // ----------------------------------------
 
-    // Klasické prepínanie tried
-    document.querySelectorAll('.tab-content').forEach(c => {
-        c.classList.remove('active');
-    });
-    document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-    document.querySelectorAll('.builder-btn').forEach(b => b.classList.remove('active'));
-
-    target.classList.add('active');
-    
-    // Keep builder tab active when clicking inner builder tabs
-    const isInnerBuilderTab = ['builder-journal', 'editor', 'navod'].includes(id);
-    if (isInnerBuilderTab) {
-        const builderTab = document.getElementById('builder');
-        if (builderTab) {
-            builderTab.classList.add('active');
+        // Check if tab has any content
+        if (target.innerHTML.trim() === '') {
+            target.innerHTML = '<p style="margin-top: 15px; margin-left: 30px; margin-right: 30px; font-size: 1.4rem; line-height: 1.6;">PRÍKLAD TEXTU: Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky. Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa rozhodujú, ako ich hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Hráč sa potrebuje rozhodnúť, čo je pre jeho hrdinu v danej chvíli podstatnejšie.</p>';
         }
-        // Highlight the clicked builder button
-        const clickedBtn = Array.from(document.querySelectorAll('.builder-btn')).find(b => 
-            b.getAttribute('onclick')?.includes(`'${id}'`)
-        );
-        if (clickedBtn) clickedBtn.classList.add('active');
-    }
-    
-    if (id === 'builder') {
-        const firstInnerTab = document.getElementById('builder-journal');
-        if (firstInnerTab) {
-            firstInnerTab.classList.add('active');
-            // Also highlight the first tab button in the .builder-container tabs section
-            const tabsContainer = document.querySelector('.builder-container .tabs');
-            if (tabsContainer) {
-                const firstBtn = tabsContainer.querySelector('.builder-btn:first-of-type');
-                if (firstBtn) firstBtn.classList.add('active');
+
+        // Aktualizácia URL len ak je to žiadané (pri kliku, nie pri routingu)
+        if (shouldUpdateHash && window.location.hash !== '#' + id) {
+            window.location.hash = id;
+            window.scrollTo(0, 0);
+        }
+
+        // --- FEATURED WIDGET VISIBILITY LOGIC ---
+        // Finds your widget and displays it ONLY on the 'uvod' tab
+        const featuredWidget = document.querySelector('.carousel-container'); // Change to '#featured-widget' if using an ID
+        if (featuredWidget) {
+            if (id === 'uvod') {
+                featuredWidget.style.display = 'block'; // Show on home tab
+            } else {
+                featuredWidget.style.display = 'none';  // Hide on all other tabs
             }
         }
-    }
+        // ----------------------------------------
 
-    // Zvýraznenie tlačidla
-    const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
-        b.getAttribute('onclick')?.includes(`'${id}'`)
-    );
-    if (btn) btn.classList.add('active');
+        // Klasické prepínanie tried
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.builder-btn').forEach(b => b.classList.remove('active'));
 
-    // Špecifická logika pre taby
-    
-    if (id === 'novinky') {
-        ensureNewsStructure(); // Vždy priprav štruktúru
-        if (!window.location.hash.includes('novinky-')) {
-            renderNewsList(); // Zoznam vykresli len ak nie sme v článku
+        target.classList.add('active');
+        
+        // Keep builder tab active when clicking inner builder tabs
+        const isInnerBuilderTab = ['builder-journal', 'editor', 'navod'].includes(id);
+        if (isInnerBuilderTab) {
+            const builderTab = document.getElementById('builder');
+            if (builderTab) {
+                builderTab.classList.add('active');
+            }
+            // Highlight the clicked builder button
+            const clickedBtn = Array.from(document.querySelectorAll('.builder-btn')).find(b => 
+                b.getAttribute('onclick')?.includes(`'${id}'`)
+            );
+            if (clickedBtn) clickedBtn.classList.add('active');
+        }
+        
+        if (id === 'builder') {
+            const firstInnerTab = document.getElementById('builder-journal');
+            if (firstInnerTab) {
+                firstInnerTab.classList.add('active');
+                // Also highlight the first tab button in the .builder-container tabs section
+                const tabsContainer = document.querySelector('.builder-container .tabs');
+                if (tabsContainer) {
+                    const firstBtn = tabsContainer.querySelector('.builder-btn:first-of-type');
+                    if (firstBtn) firstBtn.classList.add('active');
+                }
+            }
+        }
+
+        // Zvýraznenie tlačidla
+        const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
+            b.getAttribute('onclick')?.includes(`'${id}'`)
+        );
+        if (btn) btn.classList.add('active');
+
+        // Špecifická logika pre taby
+        
+        if (id === 'novinky') {
+            ensureNewsStructure(); // Vždy priprav štruktúru
+            if (!window.location.hash.includes('novinky-')) {
+                renderNewsList(); // Zoznam vykresli len ak nie sme v článku
+            }
+        }
+        
+        if (id === 'editor') renderEditorList();
+        if (id === 'builder') {
+            renderStats();
+            setTimeout(() => filterBuilder(), 50);
         }
     }
-    
-    if (id === 'editor') renderEditorList();
-    if (id === 'builder') {
-        renderStats();
-        setTimeout(() => filterBuilder(), 50);
-    }
-}
     
     function showStatus(text) {
         const msg = document.getElementById('status-message');
