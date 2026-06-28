@@ -1030,6 +1030,7 @@
         overflow-x: auto;
         overflow-y: hidden;
         -webkit-overflow-scrolling: touch; /* smooth momentum scroll on iOS */
+        touch-action: pan-x; /* explicitly re-allow horizontal swipe here, overriding html's touch-action:none */
         padding-top: 90px;   /* invisible "ceiling" — gives hovered cards room to scale up into */
         margin-top: -90px;   /* cancels the padding so layout position doesn't shift */
         pointer-events: none; /* the empty ceiling zone shouldn't block clicks on what's above it */
@@ -1062,37 +1063,31 @@
         transform: scale(1.4) translateY(-25px) translateX(-35px) !important;
     }
 
+    .status-badge{display: none;}
+
     /* --- Force horizontal (landscape) viewing --- */
     /* Rotates the whole viewport when the phone is held in portrait mode */
     @media (orientation: portrait) {
         html {
             transform: rotate(-90deg) translate(-100%, 0); /* the translate is what actually pulls the rotated page back into view */
             transform-origin: top left;
-            position: absolute;
+            position: fixed;
             top: 0;
             left: 0;
-            width: 100vh;
-            height: 100vw;
-            overflow-x: hidden;
+            width: var(--real-vh, 100vh);  /* JS-measured px, not the CSS vh unit — see note below */
+            height: var(--real-vw, 100vw);
+            overflow: hidden; /* clip on the UNSCALED ancestor, after body's scale is applied */
         }
+
         body {
-            width: 100vh;
-            height: 100vw;
-            overflow-x: hidden;
-            overflow-y: hidden; /* no scroll — content must fit via scale below */
+            width: var(--real-vh, 100vh);
+            height: var(--real-vw, 100vw);
+            overflow: visible; /* IMPORTANT: must stay visible so transform:scale shrinks
+                                   the *entire* content instead of clipping it to 100vw
+                                   first and only then scaling the leftover slice down */
             transform: scale(var(--mobile-fit-scale, 1)); /* set by JS to shrink page to screen height */
             transform-origin: top center; /* shrink symmetrically, anchored to the top */
         }
     }
 
 }
-
-
-
-        
-
-
-
-
-
-        

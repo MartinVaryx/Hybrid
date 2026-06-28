@@ -6816,26 +6816,60 @@
             }
         });
 
-
+    function setRealViewportVars() {
+        const root = document.documentElement;
+        root.style.setProperty('--real-vw', window.innerWidth + 'px');
+        root.style.setProperty('--real-vh', window.innerHeight + 'px');
+    }
+ 
     function fitMobilePage() {
         const isMobilePortrait = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
         const root = document.documentElement;
-
+ 
         if (!isMobilePortrait) {
             root.style.setProperty('--mobile-fit-scale', 1);
             return;
         }
-
-        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real height
+ 
+        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real size
+ 
+        // "Height" constraint: content's natural height (local y-axis) must
+        // fit in the rotated frame's available height (= window.innerWidth).
         const naturalHeight = document.body.scrollHeight;
-        const availableHeight = window.innerWidth; // device's narrow physical dimension = visual height after rotation
-        const scale = Math.min(1, availableHeight / naturalHeight);
+        const availableHeight = window.innerWidth;
+        const heightScale = availableHeight / naturalHeight;
+ 
+        // "Width" constraint: content's natural width (local x-axis — this is
+        // where left-column + right-column sit side by side) must fit in the
+        // rotated frame's available width (= window.innerHeight). Without this
+        // check, a layout that's too wide just overflows sideways, and since
+        // it's horizontally centered, clips on one end while leaving a gap on
+        // the other — exactly the bug being fixed here.
+        const naturalWidth = document.body.scrollWidth;
+        const availableWidth = window.innerHeight;
+        const widthScale = availableWidth / naturalWidth;
+ 
+        const scale = Math.min(1, heightScale, widthScale);
         root.style.setProperty('--mobile-fit-scale', scale);
     }
+ 
+    function updateMobileLayout() {
+        setRealViewportVars(); // size the rotated box correctly FIRST
+        fitMobilePage();       // THEN measure/scale content against that box
+    }
+ 
+    window.addEventListener('load', updateMobileLayout);
+    window.addEventListener('resize', updateMobileLayout);
+    window.addEventListener('orientationchange', updateMobileLayout);
+ 
+    // Re-measure once custom web fonts actually finish loading.
+    // window 'load' does NOT wait for @font-face downloads, so the first
+    // measurement above can happen against fallback-font sizing and be
+    // slightly wrong — this corrects it once the real fonts swap in.
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateMobileLayout);
+    }
 
-    window.addEventListener('load', fitMobilePage);
-    window.addEventListener('resize', fitMobilePage);
-    window.addEventListener('orientationchange', fitMobilePage);
 
 
 
