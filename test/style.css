@@ -32,21 +32,18 @@
         }
 
         .stain {
-            position: fixed;
-            background-image: url("assets/machula.png"); 
-            background-size: contain;
-            background-repeat: no-repeat;
-            z-index: -1;
+            position: absolute;
+            z-index: 0;
             pointer-events: none;
-            opacity: 0.2;
             mix-blend-mode: multiply;
-            width: 1050px; 
-            height: 1050px;
+            width: 20%; 
+            height: auto;
+            object-fit: contain;
         }
 
-        .stain-tl { top: -250px; left: -350px; transform: rotate(15deg); }
-        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
-        .stain-br { bottom: -300px; right: -250px; transform: rotate(-40deg); }
+        .stain-bl { bottom: 11%; left: 0px; }
+        .stain-br { bottom: 11%; right: 0px; }
+
 
         .logo-container {
             display: flex; 
@@ -68,6 +65,23 @@
             flex-direction: column;
             align-items: center;
             background-color: seashell;
+        }
+
+        .footer {
+            display: flex;
+            height: 300px;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            gap:5px;
+            padding: 10px 50px;
+            background-color: rgba(0, 0, 0, 0.75);
         }
 
         .responsive-img {
@@ -108,7 +122,7 @@
         .view-section.active-view { display: block; }
 
         .char-header {
-            width: 100%;
+            width: 900px;
             background: var(--hybrid-black);
             padding: 15px;
             display: flex;
@@ -119,19 +133,120 @@
             z-index: 1;
             border: var(--border-heavy);
             border-bottom: none;    
+            margin-top: 20px;
         }
 
-        .container {
-            width: 1008px;
-            color: #000;
-            overflow: visible !important;
-            margin-top: 20;
-            z-index: 1;
+        .footer {
+            width: 100%;
+            background-color: var(--hybrid-black);
+            border-top: var(--border-heavy);
+            margin-top: 60px;
+            padding: 40px 20px;
             box-sizing: border-box;
         }
 
+        .footer-content {
+            width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .footer-columns {
+            display: flex;
+            gap: 60px;
+            justify-content: flex-start;
+        }
+
+        .footer-column {
+            flex: 1;
+        }
+
+        .footer-copyright {
+            border-top: 1px solid #444;
+            padding-top: 20px;
+            text-align: center;
+            margin-top: 6px;
+        }
+
+        .footer-copyright p {
+            color: #888;
+            font-size: 0.85rem;
+            margin: 0;
+            font-family: 'Roboto Condensed', sans-serif;
+        }
+
+        .footer-icon {
+            width: 24px;
+            height: 24px;
+            object-fit: contain;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .footer-icon:hover {
+            transform: scale(1.2);
+        }
+
+        .footer-p1 {
+            margin: 2px 0px;
+            font-size: 14px;
+        }
+
+        .footer-p2 {
+            margin-top: 18px;
+            margin-bottom: 6px;
+            font-size: 14px
+        }
+
+        /* MOBILE FOOTER STYLES */
+        @media (max-width: 900px) {
+            .footer {
+                padding: 30px 15px;
+            }
+
+            .footer-content {
+                width: 100%;
+            }
+
+            .footer-columns {
+                gap: 40px;
+            }
+
+        }
+
+        @media (max-width: 600px) {
+            .footer {
+                padding: 20px 10px;
+            }
+
+            .footer-columns {
+                flex-direction: column;
+                gap: 30px;
+            }
+
+
+            .footer-copyright p {
+                font-size: 0.75rem;
+            }
+        }
+
+        .container {
+            width: 800px;
+            color: #000;
+            overflow: visible !important;
+            z-index: 1;
+            box-sizing: border-box;
+            padding-bottom: 350px;
+        }
+
+        #builder.active .tab-content.active {
+            width: 900px;  /* Match the builder-container width */
+        }
+
         .builder-container {
-            width: 1148px;
+            width: 900px;
             background-color: #fff;
             color: #000;
             border: var(--border-heavy);
@@ -148,12 +263,10 @@
             text-align: center;
         }
 
-
-        
         .carousel-container {
             position: relative;
             width: 100%; 
-            min-height: 420px;
+            min-height: 505px;
             margin: 0px ; 
             overflow: hidden;
             font-family: sans-serif;
@@ -166,51 +279,40 @@
             scroll-snap-type: x mandatory;
             scrollbar-width: none;
             width: 100%;
-            background: transparent; /* Make sure track is transparent */
+            height: 100%; /* Keeps this */
+            min-height: 505px; /* ADD THIS to ensure it doesn't collapse to 0px */
+            background: transparent; 
         }
 
         /* Individual Slides */
         .carousel-slide {
             flex: 0 0 100%;
             max-width: 100%; 
+            height: 100%;
             scroll-snap-align: start;
             box-sizing: border-box;
             position: relative;
-            
-            /* CHANGE HERE: Strips the default gray background bleed color */
             background: transparent; 
-            
-            overflow: hidden; 
-            
-            /* ADD THIS: Forces full vertical alignment for structural elements */
+            overflow: hidden;             
             display: flex;
             flex-direction: column;
         }
 
 
-        /* Content overlay (Text & Buttons) */
-        .carousel-content {
-            padding: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            border-top: none; 
-            flex-grow: 1; 
-        }
-        
         .carousel-track::-webkit-scrollbar {
             display: none; /* Hides scrollbar on Chrome/Safari/Edge */
         }
 
-
         /* Ensure the image wrapper serves as an anchor boundary for absolute positions */
         .featured-image-wrapper {
-            position: relative; /* CRITICAL: Anchors absolutely positioned children inside this box */
+            position: relative;
             display: flex;
             flex-direction: column;
             justify-content: center; 
             align-items: center;     
-            width: 100%;
-            height: 380px; 
-            background-color: transparent;  /* Changed from #000 to transparent */
+            width: 100% !important;
+            height: 505px; 
+            background-color: transparent;
             border-radius: 8px 8px 0 0; 
             overflow: hidden;  
         }
@@ -228,6 +330,7 @@
         .carousel-overlay-controls {
             display: flex;
             z-index: 5;
+            margin-bottom: 15px;
         }
         /* Base custom styles for your new overlay buttons */
         .overlay-action-btn {
@@ -424,12 +527,36 @@
 
         }
 
+        .social-icon{
+            height: 50px;
+            width: auto;
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .social-icon:hover {
+            transform: scale(1.1);
+        }
+
+
         .tab-content.active {
             display: flex !important; /* Väčšina tvojich tabov používa flex */
             visibility: visible;
             opacity: 1;
             height: auto;
             overflow: visible !important;
+            width: 800px;
+            padding: none !important;
+            color: black;
+            min-height: 900px;
+            flex-direction: column;
+        }
+
+        .tab-paragraph {
+            margin-top: 20px; 
+            font-size: 16px; 
+            line-height: 1.6;
+            font-family: 'Roboto', sans-serif;;
         }
 
         #builder.active {
@@ -818,8 +945,18 @@
             box-sizing: border-box;
             background-color: rgba(0, 0, 0, 0.85);
             position: sticky;
-            top: 0;                    /* Tells it exactly WHERE to stick */
-            z-index: 1000;             /* Ensures it scrolls ABOVE elements underneath */
+            top: 0;
+            z-index: 1000;
+            transition: transform 0.3s ease;
+            transform: translateY(0);
+        }
+
+        .header-row.hide {
+            transform: translateY(-100%);
+        }
+
+        .header-row.show {
+            transform: translateY(0);
         }
 
         /* ZATVÁRACIE TLAČIDLO (viditeľné všade) */
@@ -837,6 +974,8 @@
             cursor: pointer;
             border-radius: 0; /* Zachovanie hranatého štýlu */
         }
+
+        
 
         /* TEXTY */
         #rel-add-container label {

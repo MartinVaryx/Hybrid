@@ -18,11 +18,15 @@
     <meta property="og:description" content="Stolná hra na hrdinov (RPG) zasadená do post apokalyptického sveta po invázii Somôr, obrovského ľudožravého hmyzu. Staňte sa Hybridom, človekom so schopnosťami Somôr, a vyberte si svoju cestu. Zachránite zvyšky ľudstva alebo prispejete k jeho záhube?">
     <meta property="og:image" content="https://hybridrpg.sk/assets/og_image.jpg">
 </head>
+
+
 <body>
 
     <div class="logo-container" style="display: none;" onclick="openTab('uvod')">
         <img src="assets/logo.png" alt="HYBRID" class="mobile-logo" style="display: none;">
     </div>
+
+
 
     <div class="header-row">
         <div id="pc-logo-container" class="logo-container" onclick="openTab('uvod')">
@@ -74,17 +78,16 @@
 
 <div class="main-section">
 
-
-
-    
+    <img src="assets/stain left.svg" alt="" class="stain-bl stain">
+    <img src="assets/stain right.svg" alt="" class="stain-br stain">
 
 
     <div class="container">
-        <div id="novinky" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="uvod" class="tab-content active" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="o-projekte" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="demo" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="kontakt" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
+        <div id="novinky" class="tab-content" ></div>
+        <div id="uvod" class="tab-content active" ></div>
+        <div id="o-projekte" class="tab-content" ></div>
+        <div id="demo" class="tab-content" ></div>
+        <div id="kontakt" class="tab-content" ></div>
         <div id="builder" class="tab-content">
 
 
@@ -227,9 +230,64 @@
             </div>
         </div>
     </div>
+    
+</div>
+
+<div class="footer">
+    <div class="footer-content">
+        <img src="assets/logo.png" alt="down" style="height: 35px; align-self: flex-start;">
+        <div class="footer-columns">
+            <div class="footer-column">                
+                <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start;">
+                    <p style="color: #FFB800;" class="footer-p2">Kontakt</p>
+                </div>
+                
+                <div style="display: flex; flex-direction: row; gap: 6px; align-items: center; justify-content: flex-start;">
+                    <img src="assets/at.svg" alt="">
+                    <p style="color: white;" class="footer-p1">martin.krc44@gmail.com</p>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: flex-start;">
+                    <div style="display: flex; flex-direction: row; gap: 30px; justify-content: flex-start;">
+                        <div style="display: flex; flex-direction: column;justify-content: flex-start;">
+                            <div>
+                                <p style="color: #FFB800;" class="footer-p2">Sociálne siete</p>
+                            </div>
+                            <div style="display: flex; flex-direction: row; gap: 16px; align-items: center; justify-content: flex-start; height: 30px;">
+                                <img src="assets/fb.svg" alt="" class="footer-icon" onclick="window.open('https://www.facebook.com/people/Hybrid-RPG/61575788678686/', '_blank')">
+                                <img src="assets/insta.svg" alt="" class="footer-icon" onclick="window.open('https://www.instagram.com/hybrid_rpg/', '_blank')">
+                                <img src="assets/yt.svg" alt="" class="footer-icon" onclick="window.open('https://www.youtube.com/@HybridRPG', '_blank')">
+                            </div>
+                        </div>                    
+                        <div style="display: flex; flex-direction: column; justify-content: flex-start; margin-left: 16px;">
+                            <p style="color: #FFB800;" class="footer-p2">Záznam z hry</p>
+                            <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; height: 30px;">
+                                <img src="assets/yt.svg" alt="" class="footer-icon" onclick="window.open('https://youtu.be/kcrJPERUp0U?si=04B_clX-w4ReoLQ-', '_blank')">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-column">
+                <p style="color: #FFB800;" class="footer-p2">Tvorcovia</p>
+                <p style="color: white;" class="footer-p1">Martin Krč – Autor hry</p>
+                <p style="color: white;" class="footer-p1">Andrej Purkant – Ilustrátor</p>
+                <p style="color: white;" class="footer-p1">Rebeka Mehlyová – Grafický design</p>
+                <p style="color: white;" class="footer-p1">Sofia Tothová - PR a sociálne siete</p>
+                <p style="color: white;" class="footer-p1">Ema Suckrová – Ilustrácie pre Hybrid: Zákon schválnosti</p>
+            </div>
+        </div>
+        
+        <div class="footer-copyright">
+            <p>&copy; 2026 HYBRID RPG. Všetky práva vyhradené.</p>
         </div>
     </div>
+    
+</div>
 
+</div>
+
+</div>
 
 <div id="custom-modal" class="modal-overlay">
     <div class="modal-box">
@@ -316,6 +374,7 @@
         <button class="builder-btn" style="background: var(--hybrid-green); color: white; clip-path: none; margin: 0; padding: 8px 15px; font-size: 0.8rem; flex: 1;" onclick="confirmNewCharacter()">ULOŽIŤ</button>
         <button class="builder-btn" style="background: var(--hybrid-red); color: white; clip-path: none; margin: 0; padding: 8px 15px; font-size: 0.8rem; flex: 1;" onclick="cancelNewCharacter()">ZRUŠIŤ</button>
     </div>
+    
 </div>
 
 <div id="overlay-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 999;" onclick="cancelNewCharacter()"></div>

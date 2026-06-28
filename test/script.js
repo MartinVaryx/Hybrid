@@ -16,7 +16,33 @@
         }
     ];
     
-    
+    let lastScrollTop = 0;
+    let isScrolling = false;
+    const headerRow = document.querySelector('.header-row');
+
+    window.addEventListener('scroll', () => {
+        let currentScroll = window.pageYOffset;
+        
+        if (currentScroll > lastScrollTop && currentScroll > 50) {
+            // Scrolling DOWN
+            headerRow.classList.add('hide');
+            headerRow.classList.remove('show');
+            isScrolling = true;
+        } else {
+            // Scrolling UP
+            headerRow.classList.remove('hide');
+            headerRow.classList.add('show');
+            isScrolling = false;
+        }
+        
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+    });
+
+    // Show header on hover
+    headerRow.addEventListener('mouseenter', () => {
+        headerRow.classList.remove('hide');
+        headerRow.classList.add('show');
+    });
     
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
@@ -1259,12 +1285,13 @@ function openTab(id, shouldUpdateHash = true) {
                         <h2 class="section-title">NAJNOVŠIE SPRÁVY</h2>
                         <div id="news-feed"></div>
                     </div>
-                    <div id="news-article-view" style="display: none;">
-                        <button class="back-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                    <div id="news-article-view" style="display: none; margin: 20px">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+                            <button class="builder-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                        </div>
                         <div id="article-content"></div>
                     </div>
-                </div>`;
-        }
+                </div>`;        }
     }
 
     function renderNewsList() {
