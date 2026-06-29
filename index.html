@@ -7,6 +7,7 @@
     <link rel="icon" type="image/png" href="assets/logo_icon.png">
     <meta name="description" content="Staňte sa Hybridom, človekom so schopnosťami Somôr, a vyberte si svoju cestu. Zachránite zvyšky ľudstva alebo prispejete k jeho záhube?">  
     <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik+Dirt&display=swap" rel="stylesheet">
 
     <link rel="stylesheet" href="style.css">    
     
@@ -17,150 +18,90 @@
     <meta property="og:description" content="Stolná hra na hrdinov (RPG) zasadená do post apokalyptického sveta po invázii Somôr, obrovského ľudožravého hmyzu. Staňte sa Hybridom, človekom so schopnosťami Somôr, a vyberte si svoju cestu. Zachránite zvyšky ľudstva alebo prispejete k jeho záhube?">
     <meta property="og:image" content="https://hybridrpg.sk/assets/og_image.jpg">
 </head>
+
+
 <body>
 
-<div class="stain stain-tl"></div>
-<div class="stain stain-tr"></div>
-<div class="stain stain-br"></div>
+    <div class="logo-container" style="display: none;" onclick="openTab('uvod')">
+        <img src="assets/logo.png" alt="HYBRID" class="mobile-logo" style="display: none;">
+    </div>
 
 
 
-
-<div id="view-intro" class="view-section active-view">
     <div class="header-row">
-        <div class="logo-container">
+        <div id="pc-logo-container" class="logo-container" onclick="openTab('uvod')">
             <img src="assets/logo.png" alt="HYBRID" class="logo-img">
         </div>
-        <div class="main-menu">
-            <button id="view-toggle" class="menu-trigger" onclick="toggleView()">VYTVOR SI HRDINU</button>
+        <div class="tabs">
+                <button class="tab-btn active" onclick="openTab('uvod')">DOMOV</button>
+                <button class="tab-btn" onclick="openTab('novinky')">NOVINKY</button>
+                <button class="tab-btn" onclick="openTab('demo')">DEMO</button>
+                <button class="tab-btn" onclick="openTab('o-projekte')">TVORCOVIA</button>
+                <button class="tab-btn" onclick="openTab('kontakt')">KONTAKT</button>
         </div>
     </div>
+
+    <div class="carousel-container">
+        <button class="carousel-btn prev-btn" aria-label="Previous Slide">&#10094;</button>
+        <button class="carousel-btn next-btn" aria-label="Next Slide">&#10095;</button>
+
+        <div class="carousel-track">
+            
+            <div class="carousel-slide">
+                <div class="carousel-overlay">
+                    <div>
+                        <p class="carousel-overlay-text" style="color: #fff">Vytvor si postavu vďaka interaktívnemu denníku.</p>
+                    </div>                    
+                    <div class="carousel-overlay-controls">
+                        <button class="overlay-action-btn" onclick="openTab('builder')">VYTVORIŤ POSTAVU</button>
+                    </div>
+                </div>
+            </div>
+
+
+        </div>
+    </div>
+
+<div class="main-section">
+
+    <img src="assets/stain left.svg" alt="" class="stain-bl stain">
+    <img src="assets/stain right.svg" alt="" class="stain-br stain">
+
 
     <div class="container">
-        <div class="tabs">
-            <button class="tab-btn" onclick="openTab('novinky')">NOVINKY</button>
-            <button class="tab-btn active" onclick="openTab('uvod')">O HYBRIDE</button>
-            <button class="tab-btn" onclick="openTab('demo')">DEMO</button>
-            <button class="tab-btn" onclick="openTab('o-projekte')">TVORCOVIA</button>
-            <button class="tab-btn" onclick="openTab('kontakt')">KONTAKT</button>
-        </div>
-        <div id="novinky" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="uvod" class="tab-content active" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="o-projekte" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="demo" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-        <div id="kontakt" class="tab-content" style="padding: 40px; color: black; min-height: 400px; flex-direction: column;"></div>
-    </div> </div> <div id="view-builder" class="view-section">
-    <div class="header-row">
-        <div class="logo-container">
-            <img src="assets/logo.png" alt="HYBRID" class="logo-img">
-        </div>
-        <div class="main-menu">
-            <button id="view-toggle" class="menu-trigger" onclick="toggleView()">HLAVNÁ STRÁNKA</button>
-        </div>
-    </div>
+        <div id="novinky" class="tab-content" ></div>
+        <div id="uvod" class="tab-content active" ></div>
+        <div id="o-projekte" class="tab-content" ></div>
+        <div id="demo" class="tab-content" ></div>
+        <div id="kontakt" class="tab-content" ></div>
+        <div id="builder" class="tab-content">
+
+
+
 
     <div class="char-header">
-        <div style="display: flex; gap: 10px; align-items: center;">
-            <select id="char-selector" onchange="switchCharacter()"></select>
-            <button class="tab-btn" style="background: var(--hybrid-red); color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
-            <button class="add-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="createNewCharacter()"> + </button>
-            <button class="tab-btn" style="background: #444; color: white; height: 38px; padding: 0 15px; clip-path: none;" onclick="exportpng()">EXPORTOVAŤ</button>
+        <div id="char-table">
+            <div>
+            </div>
+            <button class="builder-btn" id="share-btn" style="padding: 8px 15px;" onclick="zdielatVsetkoDiscord()" data-tooltip="POSLAŤ SVOJE VÝTVORY TVORCOM, VEĽMI SA POTEŠIA!">PODELIŤ SA!</button>
+            <div class="char-buttons" >
+                <select id="char-selector" onchange="switchCharacter()"></select>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="deleteCharacter()" data-tooltip="ODSTRÁNIŤ VYBRANÚ POSTAVU">ODSTRÁNIŤ</button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="createNewCharacter()" data-tooltip="PRIDAŤ NOVÚ POSTAVU"> PRIDAŤ </button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()" data-tooltip="STIAHNUŤ PDF BEZ LEVELOV SCHOPNOSTÍ, BR A ĽUDSKOSTI">EXPORTOVAŤ</button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="toggleEditorOverlay(true)" data-tooltip="VYTVORIŤ, ODSTRÁNIŤ, ZMENIŤ HODNOTY A VZŤAHY...">UPRAVIŤ SCHOPNOSTI</button>
+            </div>
         </div>
-
-        <div id="new-char-input-container" style="display:none; flex-grow: 1; margin: 0 15px; background: #222; padding: 5px 10px; gap: 8px; border: 1px solid var(--hybrid-red); align-items: center;">
-            <input type="text" id="new-char-name" placeholder="MENO NOVÉHO HRDINU" style="flex: 1; padding: 8px; font-size: 14px; background: #000; color: white; border: 1px solid #444;">
-            <button class="tab-btn" style="background: var(--hybrid-green); color: white; clip-path: none; margin:0; padding: 5px 10px; font-size: 0.8rem;" onclick="confirmNewCharacter()">ULOŽIŤ</button>
-            <button class="tab-btn" style="background: var(--hybrid-red); color: white; clip-path: none; margin:0; padding: 5px 10px; font-size: 0.8rem;" onclick="cancelNewCharacter()">ZRUŠIŤ</button>
-        </div>
-        <button class="tab-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
 
-    <div class="container">
-        <div class="tabs">
-            <button class="tab-btn active" onclick="openTab('builder')">DENNÍK HRDINU</button>
-            <button class="tab-btn" onclick="openTab('editor')">UPRAVIŤ SCHOPNOSTI</button>
-            <button class="tab-btn" onclick="openTab('navod')">NÁVOD</button>
+    <div class="builder-container">
 
-</div>
-
-        <div id="builder" class="tab-content active">
+        <div id="builder-journal" class="tab-content active">
             <div class="stats-panel" id="character-stats"></div>
-            <div class="info-panel">
-                <div class="control-box">
-                    <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
-                    <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
-                    <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
-                    <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
-                        <span id="cost-container" style="display:none;" class="old-price-wrapper">
-                            <span id="cost-orig" class="old-price"></span>
-                        </span>
-                        <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
-                    </div>
-                    <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
-                        <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
-                        <button class="down-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
-                        <button class="back-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
 
-                    </div>
-                </div>
-                <div id="filter-container" style="display: flex; gap: 5px;">
-                    <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
-                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5; margin-right: 5px;" onkeyup="filterBuilder()">
-                </div>
-                <div class="selection-list" id="builder-list"></div>
-            </div>
         </div>
 
-        <div id="editor" class="tab-content">
-            <div class="info-panel" style="flex: 2.5;">
-                <div id="editor-main-layout" style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
-                    <div style="flex: 0.8;">
-                        <label style="font-size:1rem; font-weight:bold;">NÁZOV SCHOPNOSTI</label>
-                        <input type="text" id="edit-name" style="width:100%; margin-bottom:15px; box-sizing: border-box;" onkeyup="filterEditorList()">
-                        
-                        <div id="editor-cat-group-row" style="display: flex; gap: 15px; margin-bottom: 15px;">
-                            <div style="width: 100px;">
-                                <label style="font-size:1rem; font-weight:bold; white-space: nowrap;">KATEGÓRIA</label>
-                                <input type="number" id="edit-cat" min="1" max="4" style="width:100%; box-sizing: border-box;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size:1rem; font-weight:bold;">SKUPINA</label>
-                                <select id="edit-group" style="width:100%; box-sizing: border-box; padding: 5px;"></select>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div style="flex: 1.1; width: 100%;">
-                        <div style="display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; margin-bottom: 5px; width: 100%;">
-                            <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">PRÍBUZNÉ SCHOPNOSTI</label>
-                            
-                        <button id="mobile-rel-toggle" 
-                                style="background: #444; color: white; border: none; width: 24px; height: 24px; cursor: pointer; border-radius: 4px; clip-path: none !important; font-weight: bold;" 
-                                onclick="toggleRelOverlay(true)">
-                            +
-                        </button>
-                        </div>
-
-                        <div id="edit-rels-container" style="width: 100%; box-sizing: border-box;"></div>
-                        
-                        <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">POPIS</label>
-
-                        <div id="edit-desc-container" style="width: 100%; box-sizing: border-box;">
-                            <textarea id="edit-desc" style="width: 100%; height: 100px; box-sizing: border-box; resize: vertical; margin-top: 5px; padding: 8px; font-family: inherit; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px;"></textarea>
-                        </div>
-                    </div>
-                </div> 
-
-                <div class="editor-actions" style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-start; margin-left:15px;">
-                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; width: 180px; height: 45px; clip-path:none !important; border-radius:0; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
-                    <button class="tab-btn" style="background:var(--hybrid-red); color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 25px;" onclick="deleteSkill()">ZMAZAŤ</button>
-                    <button class="tab-btn" style="background:#555; color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 20px; margin-left: auto;" onclick="exportSkills()">EXPORTOVAŤ</button>
-                </div>
-            </div> <div class="info-panel" style="flex: 1.1; margin-left:25px; margin-right:15px;">
-                <h3 style="font-family:'Archivo Black'; margin-top: 10px; margin-bottom:10px;">ZOZNAM SCHOPNOSTÍ</h3>
-                <div class="selection-list" id="editor-list" style="height: calc(100% - 60px); overflow-y: auto;"></div>
-            </div>
-        </div>
         <div id="navod" class="tab-content">
             <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
                 <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
@@ -221,8 +162,63 @@
             </div>
         </div>
     </div>
+    
+</div>
+
+<div class="footer">
+    <div class="footer-content">
+        <img src="assets/logo.png" id="footer-logo" alt="down" style="height: 35px; align-self: flex-start;">
+        <div class="footer-columns">
+            <div class="footer-column">                
+                <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start;">
+                    <p style="color: #FFB800;" class="footer-p2">Kontakt</p>
+                </div>
+                
+                <div style="display: flex; flex-direction: row; gap: 6px; align-items: center; justify-content: flex-start;">
+                    <img src="assets/at.svg" alt="">
+                    <p style="color: white;" class="footer-p1">martin.krc44@gmail.com</p>
+                </div>
+                <div style="display: flex; flex-direction: column; justify-content: flex-start;">
+                    <div style="display: flex; flex-direction: row; gap: 30px; justify-content: flex-start;">
+                        <div style="display: flex; flex-direction: column;justify-content: flex-start;">
+                            <div>
+                                <p style="color: #FFB800;" class="footer-p2">Sociálne siete</p>
+                            </div>
+                            <div style="display: flex; flex-direction: row; gap: 16px; align-items: center; justify-content: flex-start; height: 30px;">
+                                <img src="assets/fb.svg" alt="" class="footer-icon" onclick="window.open('https://www.facebook.com/people/Hybrid-RPG/61575788678686/', '_blank')">
+                                <img src="assets/insta.svg" alt="" class="footer-icon" onclick="window.open('https://www.instagram.com/hybrid_rpg/', '_blank')">
+                                <img src="assets/yt.svg" alt="" class="footer-icon" onclick="window.open('https://www.youtube.com/@HybridRPG', '_blank')">
+                            </div>
+                        </div>                    
+                        <div style="display: flex; flex-direction: column; justify-content: flex-start; margin-left: 16px;">
+                            <p style="color: #FFB800;" class="footer-p2">Záznam z hry</p>
+                            <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start; height: 30px;">
+                                <img src="assets/yt.svg" alt="" class="footer-icon" onclick="window.open('https://youtu.be/kcrJPERUp0U?si=04B_clX-w4ReoLQ-', '_blank')">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="footer-column">
+                <p style="color: #FFB800;" class="footer-p2">Tvorcovia</p>
+                <p style="color: white;" class="footer-p1">Martin Krč – Autor hry</p>
+                <p style="color: white;" class="footer-p1">Andrej Purkant – Ilustrátor</p>
+                <p style="color: white;" class="footer-p1">Rebeka Mehlyová – Grafický design</p>
+                <p style="color: white;" class="footer-p1">Sofia Tothová - PR a sociálne siete</p>
+                <p style="color: white;" class="footer-p1">Ema Suckrová – Ilustrácie pre Hybrid: Zákon schválnosti</p>
+            </div>
+        </div>
+        
+        <div class="footer-copyright">
+            <p>&copy; 2026 HYBRID RPG. Všetky práva vyhradené.</p>
+        </div>
     </div>
-    </div>
+    
+</div>
+
+</div>
+
 </div>
 
 <div id="custom-modal" class="modal-overlay">
@@ -268,5 +264,116 @@
             init(); 
         });
     </script> 
+
+<div id="info-panel-container">
+    <div class="info-panel-box">
+        <button class="info-panel-close-btn" onclick="toggleInfoOverlay(false)">×</button>
+        <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSŤ</h3>
+        <p style="font-family: 'Roboto Condensed', sans-serif;">Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.</p>
+        <div class="info-panel">
+            <div class="control-box">
+                <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBRAŤ SCHOPNOSŤ</h3>
+                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;" data-tooltip="URČUJE ZÁKLADNÚ CENU SCHOPNOSTI">KATEGÓRIA: -</p>
+                <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
+                <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
+                    <span id="cost-container" style="display:none;" class="old-price-wrapper">
+                        <span id="cost-orig" class="old-price" data-tooltip="PÔVODNÁ CENA (KATEGÓRIA x POŽADOVANÁ ÚROVEŇ)"></span>
+                    </span>
+                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';" data-tooltip="PÔVODNÁ CENA ZNÍŽENÁ O SÚČET ÚROVNÍ PRÍBUZNÝCH SCHOPNOSTÍ (MAXIMÁLNE TROCH). NESMIE BYŤ NIŽŠIA AKO CIEĽOVÁ ÚROVEŇ.">0 BR</span>
+                </div>
+                <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
+                    <button class="builder-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 0.9rem; clip-path:none; margin: 0;" onclick="upgradeSelected()" data-tooltip="VYBRANEJ SCHOPNOSTI">ZVÝŠIŤ ÚROVEŇ</button>
+                    <button class="builder-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()" data-tooltip="ZNÍŽIŤ ÚROVEŇ (VRÁTIA SA TI BR)" >↓</button>
+                    <button class="builder-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()" data-tooltip="VRÁTIŤ POSLEDNÚ ZMENU">⤺</button>
+                </div>
+            </div>
+            <div id="filter-container-container">
+                <div id="filter-container" style="display: flex; gap: 5px;">
+                    <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
+                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5; margin-right: 5px;" onkeyup="filterBuilder()">
+                </div>
+                <div class="selection-list" id="builder-list">
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="editor-container">
+    <div class="info-panel-box">
+        <div style="display: flex; flex-direction: row; justify-content: space-between;">
+            <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSTI</h3>
+            <button class="editor-close-btn" onclick="toggleEditorOverlay(false)">×</button>
+        </div>
+        <p style="font-family: 'Roboto Condensed', sans-serif;">Upravte vlastnosti vybranej schopnosti alebo spravujte databázu.</p>
+        
+        <div id="editor" class="editor-panel">
+            
+            <div>
+                <div id="editor-main-layout">
+                    
+                    <div class="edit-fields-left">
+                        <label>NÁZOV SCHOPNOSTI</label>
+                        <input type="text" id="edit-name" onkeyup="filterEditorList()">
+                        
+                        <div id="editor-cat-group-row">
+                            <div>
+                                <label style="white-space: nowrap;">KATEGÓRIA</label>
+                                <input type="number" id="edit-cat" min="1" max="4">
+                            </div>
+                            <div>
+                                <label>SKUPINA</label>
+                                <select id="edit-group"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="edit-fields-right">
+                        <div class="rel-skills-header">
+                            <label><strong>PRÍBUZNÉ SCHOPNOSTI</strong></label>
+                            <button id="mobile-rel-toggle" 
+                                    style="background: #444; color: white; border: none; width: 24px; height: 24px; cursor: pointer; border-radius: 4px; clip-path: none !important; font-weight: bold;" 
+                                    onclick="toggleRelOverlay(true)">+</button>
+                        </div>
+
+                        <div id="edit-rels-container"></div>
+                    </div>
+
+                </div> 
+                    <div>
+                        <label style="white-space: nowrap;">POPIS</label>
+                        <div id="edit-desc-container">
+                            <textarea id="edit-desc"></textarea>
+                        </div>
+                    </div>
+                <div class="editor-actions">
+                    <button class="builder-btn" style="background: var(--hybrid-green); color: white; width: 160px; height: 45px; clip-path: none; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
+                    <button class="builder-btn" style="background: var(--hybrid-red); color: white; height: 45px; clip-path: none; margin: 0; padding: 0 25px;" onclick="deleteSkill()">ZMAZAŤ</button>
+                    <button class="builder-btn" style="background: #555; color: white; height: 45px; clip-path: none; margin: 0; padding: 0 20px;" onclick="exportSkills()">EXPORTOVAŤ</button>
+                </div>
+            </div> 
+
+            <div id="editor-list-container">
+                <h3>ZOZNAM SCHOPNOSTÍ</h3>
+                <div class="selection-list" id="editor-list">
+                    </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<div id="new-char-input-container" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 1000; background: #222; padding: 20px; gap: 10px; border: 2px solid var(--hybrid-red); align-items: center; flex-direction: column; width: 90%; max-width: 400px; border-radius: 8px;">
+    <input type="text" id="new-char-name" placeholder="MENO NOVÉHO HRDINU" style="width: 100%; padding: 10px; font-size: 14px; background: #000; color: white; border: 1px solid #444; box-sizing: border-box;">
+    <div style="display: flex; gap: 10px; width: 100%;">
+        <button class="builder-btn" style="background: var(--hybrid-green); color: white; clip-path: none; margin: 0; padding: 8px 15px; font-size: 0.8rem; flex: 1;" onclick="confirmNewCharacter()">ULOŽIŤ</button>
+        <button class="builder-btn" style="background: var(--hybrid-red); color: white; clip-path: none; margin: 0; padding: 8px 15px; font-size: 0.8rem; flex: 1;" onclick="cancelNewCharacter()">ZRUŠIŤ</button>
+    </div>
+    
+</div>
+
+<div id="overlay-backdrop" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.7); z-index: 999;" onclick="cancelNewCharacter()"></div>
+
+
 </body>
 </html>

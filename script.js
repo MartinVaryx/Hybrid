@@ -16,7 +16,35 @@
         }
     ];
     
-    
+    let lastScrollTop = 0;
+    let isScrolling = false;
+    const headerRow = document.querySelector('.header-row');
+    let tooltipsInitialized = false;
+
+
+    window.addEventListener('scroll', () => {
+        let currentScroll = window.pageYOffset;
+        
+        if (currentScroll > lastScrollTop && currentScroll > 50) {
+            // Scrolling DOWN
+            headerRow.classList.add('hide');
+            headerRow.classList.remove('show');
+            isScrolling = true;
+        } else {
+            // Scrolling UP
+            headerRow.classList.remove('hide');
+            headerRow.classList.add('show');
+            isScrolling = false;
+        }
+        
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+    });
+
+    // Show header on hover
+    headerRow.addEventListener('mouseenter', () => {
+        headerRow.classList.remove('hide');
+        headerRow.classList.add('show');
+    });
     
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
@@ -619,7 +647,7 @@
         filterBuilder();
         if (selectedSkill) selectSkill(selectedSkill);
     }
-        
+
     function renderStats() {
         const container = document.getElementById('character-stats');
         const char = characters[activeCharIdx];
@@ -670,49 +698,94 @@
             .filter(([_, lvl]) => lvl > 0)
             .sort();
 
-        const slots = [];
-        const maxRows = 8; 
-        
-        // Generovanie pozícií pre PC papier
-        for (let col = 0; col < 2; col++) {
-            for (let row = 0; row < maxRows; row++) {
-                slots.push({
-                    x: col === 0 ? 6.5 : 54,
-                    y: 40.5 + (row * 4.73) 
-                });
-            }
-        }
+        // Calculate available width and determine columns
+        const availableWidth = isMobile ? container.clientWidth : window.innerWidth;
+        const minWidthPerSkill = 200; // Minimum width needed to display skill name + level without wrapping
+        const columns = availableWidth >= minWidthPerSkill * 2 ? 2 : 1;
+        const maxRows = Math.ceil(learnedSkills.length / columns);
 
-        learnedSkills.forEach(([name, lvl], index) => {
-            if (index < slots.length) {
-                const slot = slots[index];
+        const slots = [];
+        
+        if (isMobile) {
+            // Mobile layout: flexbox-based, dynamically split into columns
+            const skillsContainer = document.createElement('div');
+            skillsContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(${columns}, 1fr);
+                gap: 10px;
+                padding: 10px;
+            `;
+
+            learnedSkills.forEach(([name, lvl]) => {
                 const data = skillsDB_new[name] || [0, ""];
-                
-                // Limit 18 znakov (pre PC verziu, aby text nepretiekol)
                 const displayName = truncateString(name, 18);
 
                 const div = document.createElement('div');
-                // Pridávame triedu vybraného slotu
                 div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
-                
-                // Štýlovanie pre PC (tieto hodnoty CSS media query na mobile prepíše)
-                div.style.left = slot.x + "%";
-                div.style.top = slot.y + "%";
-                div.style.width = "42.5%"; 
-                div.style.height = "4.4%"; 
-                
-                div.onclick = () => selectSkill(name);
-
-                // Vnútro slotu: Kategória | Názov | Úroveň
-                // Dôležité: Kategória je v prvom div, ktorý na mobile skrývame cez display:none
-                div.innerHTML = `
-                    <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
-                    <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
-                    <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                div.style.cssText = `
+                    padding: 8px;
+                    background: #f5f5f5;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                    min-width: 0;
                 `;
-                container.appendChild(div);
+                
+                div.onclick = () => {
+                    selectSkill(name);
+                    toggleInfoOverlay(true);
+                };
+
+                div.innerHTML = `
+                    <div class="skill-name-text" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${displayName}</div>
+                    <div class="skill-lvl-box" style="font-weight: bold; flex-shrink: 0;">${lvl}</div>
+                `;
+                skillsContainer.appendChild(div);
+            });
+
+            container.appendChild(skillsContainer);
+        } else {
+            // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
+            for (let col = 0; col < 2; col++) {
+                for (let row = 0; row < 8; row++) {
+                    slots.push({
+                        x: col === 0 ? 6.5 : 54,
+                        y: 40.5 + (row * 4.73) 
+                    });
+                }
             }
-        });
+
+            learnedSkills.forEach(([name, lvl], index) => {
+                if (index < slots.length) {
+                    const slot = slots[index];
+                    const data = skillsDB_new[name] || [0, ""];
+                    const displayName = truncateString(name, 18);
+
+                    const div = document.createElement('div');
+                    div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
+                    
+                    div.style.left = slot.x + "%";
+                    div.style.top = slot.y + "%";
+                    div.style.width = "42.5%"; 
+                    div.style.height = "4.4%"; 
+                    
+                    div.onclick = () => {
+                        selectSkill(name);
+                        toggleInfoOverlay(true);
+                    };
+
+                    div.innerHTML = `
+                        <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
+                        <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                        <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                    `;
+                    container.appendChild(div);
+                }
+            });
+        }
     }
 
     function addSheetText(container, text, top, left, size, width, align, extraClass = "") {
@@ -828,8 +901,14 @@
 
     
     function createNewCharacter() {
-        // Namiesto promptu len zobrazíme skrytý riadok
         document.getElementById('new-char-input-container').style.display = 'flex';
+        document.getElementById('overlay-backdrop').style.display = 'block';
+        document.getElementById('new-char-name').focus();
+    }
+
+    function cancelNewCharacter() {
+        document.getElementById('new-char-input-container').style.display = 'none';
+        document.getElementById('overlay-backdrop').style.display = 'none';
     }
 
     function confirmNewCharacter() {
@@ -849,13 +928,11 @@
             switchCharacter();
             input.value = '';
             document.getElementById('new-char-input-container').style.display = 'none';
+            document.getElementById('overlay-backdrop').style.display = 'none';
         }
     }
 
-    function cancelNewCharacter() {
-        document.getElementById('new-char-name').value = '';
-        document.getElementById('new-char-input-container').style.display = 'none';
-    }
+
 
     // Pomocná funkcia na porovnanie dvoch objektov (či sú databázy identické)
     function suSchopnostiIdenticke(obj1, obj2) {
@@ -929,44 +1006,20 @@
     }
 
     function toggleView() {
-        // Zistíme, ktorá sekcia je momentálne aktívna
-        const isIntro = document.getElementById('view-intro').classList.contains('active-view');
-        if (isIntro) {
-            switchView('builder');
+        // Zistíme, ktorá tab je momentálne aktívna
+        const builderTab = document.getElementById('builder');
+        if (!builderTab.classList.contains('active')) {
+            openTab('builder');
         } else {
-            switchView('intro');
+            openTab('uvod');
         }
     }
 
     let currentView = 'intro'; 
 
-    // --- OPRAVENÁ FUNKCIA SWITCHVIEW ---
     function switchView(viewId) {
         currentView = viewId;
-        const toggleBtn = document.getElementById('view-toggle');
-
-        // 1. Skryť všetky sekcie
-        document.querySelectorAll('.view-section').forEach(view => {
-            view.classList.remove('active-view');
-        });
-        
-        // 2. Zobraziť vybranú sekciu
-        const targetView = document.getElementById('view-' + viewId);
-        if (targetView) {
-            targetView.classList.add('active-view');
-        }
-        
-        // 3. Logika pre tlačidlá a taby
-        if (viewId === 'builder') {
-            // Ak máme viacero tlačidiel s týmto ID (jedno v Intro, jedno v Builderi)
-            document.querySelectorAll('#view-toggle').forEach(btn => btn.innerText = 'HLAVNÁ STRÁNKA');
-            openTab('builder');
-            renderStats();
-            filterBuilder();
-        } else {
-            document.querySelectorAll('#view-toggle').forEach(btn => btn.innerText = 'VYTVOR SI HRDINU');
-            openTab('uvod');
-        }
+        openTab(viewId);
     }
 
 
@@ -999,36 +1052,107 @@
     // Pomocná funkcia, ktorá neskáče hore-dole
     function forceView(viewType) {
         const introView = document.getElementById('view-intro');
-        const builderView = document.getElementById('view-builder');
-        const toggleBtn = document.getElementById('view-toggle');
+        const builderView = document.getElementById('builder');
 
         if (viewType === 'builder') {
-            introView.classList.remove('active-view');
-            builderView.classList.add('active-view');
-            if (toggleBtn) toggleBtn.innerText = 'HLAVNÁ STRÁNKA';
+            introView.classList.remove('active');
+            builderView.classList.add('active');
+            renderStats();
+            filterBuilder();
         } else {
-            builderView.classList.remove('active-view');
-            introView.classList.add('active-view');
-            if (toggleBtn) toggleBtn.innerText = 'VYTVOR SI HRDINU';
+            builderView.classList.remove('active');
+            introView.classList.add('active');
         }
     }
 
+    function toggleInfoOverlay(show) {
+        const overlay = document.getElementById('info-panel-container');
+        if (!overlay) return;
+
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+
+    function toggleEditorOverlay(show) {
+        const overlay = document.getElementById('editor-container');
+        if (!overlay) return;
+
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
 
     function openTab(id, shouldUpdateHash = true) {
         // Ak už tab je aktívny, nič nerob (bráni preblikávaniu)
         const target = document.getElementById(id);
-        if (!target) return;
+        if (!target) {
+            showCustomAlert("Tab data not found.");
+            return;
+        }
+
+        // Check if tab has any content
+        if (target.innerHTML.trim() === '') {
+            target.innerHTML = '<p style="margin-top: 15px; margin-left: 30px; margin-right: 30px; font-size: 1.4rem; line-height: 1.6;">PRÍKLAD TEXTU: Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky. Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa rozhodujú, ako ich hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Hráč sa potrebuje rozhodnúť, čo je pre jeho hrdinu v danej chvíli podstatnejšie.</p>';
+        }
 
         // Aktualizácia URL len ak je to žiadané (pri kliku, nie pri routingu)
         if (shouldUpdateHash && window.location.hash !== '#' + id) {
             window.location.hash = id;
+            window.scrollTo(0, 0);
         }
 
+        // --- FEATURED WIDGET VISIBILITY LOGIC ---
+        // Finds your widget and displays it ONLY on the 'uvod' tab
+        const featuredWidget = document.querySelector('.carousel-container'); // Change to '#featured-widget' if using an ID
+        if (featuredWidget) {
+            if (id === 'uvod') {
+                featuredWidget.style.display = 'block'; // Show on home tab
+            } else {
+                featuredWidget.style.display = 'none';  // Hide on all other tabs
+            }
+        }
+        // ----------------------------------------
+
         // Klasické prepínanie tried
-        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.remove('active');
+        });
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.builder-btn').forEach(b => b.classList.remove('active'));
 
         target.classList.add('active');
+        
+        // Keep builder tab active when clicking inner builder tabs
+        const isInnerBuilderTab = ['builder-journal', 'editor', 'navod'].includes(id);
+        if (isInnerBuilderTab) {
+            const builderTab = document.getElementById('builder');
+            if (builderTab) {
+                builderTab.classList.add('active');
+            }
+            // Highlight the clicked builder button
+            const clickedBtn = Array.from(document.querySelectorAll('.builder-btn')).find(b => 
+                b.getAttribute('onclick')?.includes(`'${id}'`)
+            );
+            if (clickedBtn) clickedBtn.classList.add('active');
+        }
+        
+        if (id === 'builder') {
+            const firstInnerTab = document.getElementById('builder-journal');
+            if (firstInnerTab) {
+                firstInnerTab.classList.add('active');
+                // Also highlight the first tab button in the .builder-container tabs section
+                const tabsContainer = document.querySelector('.builder-container .tabs');
+                if (tabsContainer) {
+                    const firstBtn = tabsContainer.querySelector('.builder-btn:first-of-type');
+                    if (firstBtn) firstBtn.classList.add('active');
+                }
+            }
+        }
 
         // Zvýraznenie tlačidla
         const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
@@ -1037,6 +1161,7 @@
         if (btn) btn.classList.add('active');
 
         // Špecifická logika pre taby
+        
         if (id === 'novinky') {
             ensureNewsStructure(); // Vždy priprav štruktúru
             if (!window.location.hash.includes('novinky-')) {
@@ -1050,7 +1175,6 @@
             setTimeout(() => filterBuilder(), 50);
         }
     }
-
     
     function showStatus(text) {
         const msg = document.getElementById('status-message');
@@ -1131,13 +1255,6 @@
         filterRelSearch();
 
         initSkillTooltips(); 
-
-        // 4. JEDINÉ spustenie routingu pri štarte
-        // Toto sa pozrie na URL (napr. #novinky-zaciatok) a otvorí čo treba
-        handleRouting(); 
-
-        // 5. Počúvanie na zmeny URL (keď používateľ kliká na "Späť" v prehliadači)
-        window.addEventListener('hashchange', handleRouting);
     }
 
     async function loadSkills() {
@@ -1181,12 +1298,13 @@
                         <h2 class="section-title">NAJNOVŠIE SPRÁVY</h2>
                         <div id="news-feed"></div>
                     </div>
-                    <div id="news-article-view" style="display: none;">
-                        <button class="back-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                    <div id="news-article-view" style="display: none; margin: 20px">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+                            <button class="builder-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                        </div>
                         <div id="article-content"></div>
                     </div>
-                </div>`;
-        }
+                </div>`;        }
     }
 
     function renderNewsList() {
@@ -1211,6 +1329,35 @@
             </div>
         `).join('');
     }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const track = document.querySelector(".carousel-track");
+        const prevBtn = document.querySelector(".prev-btn");
+        const nextBtn = document.querySelector(".next-btn");
+
+        if (!track || !prevBtn || !nextBtn) return;
+
+        // Get the exact width of one slide
+        const getSlideWidth = () => track.clientWidth;
+
+        nextBtn.addEventListener("click", () => {
+            // If we are at the end, loop back to the start
+            if (track.scrollLeft + getSlideWidth() >= track.scrollWidth - 5) {
+                track.scrollTo({ left: 0, behavior: "smooth" });
+            } else {
+                track.scrollBy({ left: getSlideWidth(), behavior: "smooth" });
+            }
+        });
+
+        prevBtn.addEventListener("click", () => {
+            // If we are at the beginning, loop to the end
+            if (track.scrollLeft <= 5) {
+                track.scrollTo({ left: track.scrollWidth, behavior: "smooth" });
+            } else {
+                track.scrollBy({ left: -getSlideWidth(), behavior: "smooth" });
+            }
+        });
+    });
 
 async function openArticle(articleId) {
     ensureNewsStructure();
@@ -1497,3 +1644,97 @@ function initSkillTooltips() {
         
     });
 }
+
+function showTooltip(event) {
+    console.log('showTooltip called', event.currentTarget);
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        console.log('Creating tooltip');
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+    const desc = event.currentTarget.getAttribute('data-tooltip');
+    console.log('Tooltip description:', desc);
+    if (desc && tooltip) {
+        tooltip.textContent = desc;
+        tooltip.classList.add('visible');
+        console.log('Tooltip visible, text:', desc);
+    }
+}
+
+function moveTooltip(event) {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        let posX = event.clientX + 15;
+        let posY = event.clientY - 15;
+        
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - 15;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - 15;
+        }
+        
+        tooltip.style.left = posX + 'px';
+        tooltip.style.top = posY + 'px';
+    }
+}
+
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function initTooltips() {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    document.body.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        const description = target.getAttribute('data-tooltip');
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+    }, true); // true = capture phase
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+});
