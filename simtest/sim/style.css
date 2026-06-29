@@ -1526,6 +1526,14 @@
         transform: scale(1.08) translateY(-2px) translateX(-4px) !important;
     }
 
+    .logo-container, .logo-img{
+        display: flex !important;
+        max-height: 30px;
+        width: auto;
+        position: relative;
+        align-self: flex-start;
+    }
+
 }
 
 /* --- Keep your JS-backed Orientation Logic cleanly segregated below --- */
@@ -1548,4 +1556,6 @@
         transform: scale(var(--mobile-fit-scale, 1)); 
         transform-origin: top center; 
     }
+
+
 }
