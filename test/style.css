@@ -110,7 +110,7 @@
         .view-section.active-view { display: block; }
 
         .char-header {
-            width: 900px;
+            width: 800px;
             background: var(--hybrid-black);
             padding: 15px;
             display: flex;
@@ -217,11 +217,11 @@
         }
 
         #builder.active .tab-content.active {
-            width: 900px;  /* Match the builder-container width */
+            width: 800px;  /* Match the builder-container width */
         }
 
         .builder-container {
-            width: 900px;
+            width: 800px;
             background-color: #fff;
             color: #000;
             border: var(--border-heavy);
@@ -498,6 +498,29 @@
             transform: scale(1.1);
         }
 
+        .tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            line-height: 1.4;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
 
         .tab-content.active {
             display: flex !important; /* Väčšina tvojich tabov používa flex */
@@ -574,17 +597,30 @@
             width: auto !important; /* ZMENA: z 100% na auto */
         }
 
-        .share-btn-top {
-            background: #444; 
-            color: white; 
-            margin-left: auto; 
-            height: 38px; 
+        #share-btn {
+            display: flex;
+            margin-left: auto;
             padding: 0 15px; 
-            clip-path: none;
+            align-self: flex-end;
+            margin-bottom: 20px;
         }
 
-        .share-btn-top:hover {
+        .char-buttons{
+            display: flex;
+            width: 100%;
+            flex-wrap: wrap;
+            gap: 2vh;
+            margin-top: 1vh;
+        }
+
+        #share-btn:hover {
             background: #5865F2; /* Pekná modrá pri hoveri (Discord farba) */
+        }
+
+        #char-selector{
+            border-radius: 8px;
+            min-width: 140px;
+            flex: auto;
         }
 
         .skill-slot {
@@ -635,7 +671,7 @@
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
 
         .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
-        .control-box { background: #000; color: white; padding: 20px; border-radius: 10px; }
+        .control-box { flex:1; background: #000; color: white; padding: 20px; border-radius: 10px; }
         #builder-list{height: 300px;}
         #filter-container-container{
             gap: 10px;
@@ -665,8 +701,33 @@
             transition: opacity 0.25s ease;
         }
 
+
+        .editor-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
+
+        #editor-container{
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            background-color: rgba(0, 0, 0, 0.75); /* Darkens everything behind the pop-up */
+            z-index: 2000; /* Stacks safely on top of your sticky header and carousel arrows */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.25s ease;
+
+        }
+
         /* Class added via JavaScript to animate it visible */
         #info-panel-container.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #editor-container.active {
             opacity: 1;
             pointer-events: auto;
         }
@@ -694,6 +755,10 @@
             transform: scale(1);
         }
 
+        #editor-container.active .info-panel-box {
+            transform: scale(1);
+        }
+
         /* Close action button in the corner of the overlay panel */
         .info-panel-close-btn {
             position: absolute;
@@ -707,6 +772,7 @@
             color: #333333;
             transition: color 0.2s;
         }
+
         .info-panel-close-btn:hover {
             color: var(--hybrid-red);
         }
@@ -793,6 +859,149 @@
             border-top: 1px solid #ddd;
             z-index: 10;
             width: 100%;
+        }
+
+        /* Editor Main Flex Container */
+        #editor-container .info-panel {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+        }
+
+        /* Left Column: Input Forms Box */
+        #editor-container .control-box {
+            flex: 2.5;
+            text-align: left;
+        }
+
+        /* Left Column Internal Layout Sub-columns */
+        #editor-main-layout {
+            display: flex;
+            gap: 30px;
+            align-items: flex-start;
+            margin-top: 10px;
+        }
+
+        #editor-main-layout .edit-fields-left {
+            flex: 1;
+        }
+
+        #editor-main-layout .edit-fields-right {
+            flex: 1.2;
+            width: 100%;
+        }
+
+        /* Form Elements Consistency */
+        #edit-name, 
+        #edit-cat, 
+        #edit-group, 
+        #edit-desc {
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        #edit-name {
+            margin-bottom: 15px;
+        }
+
+        #editor-cat-group-row {
+            display: flex;
+            gap: 15px;
+        }
+
+        #editor-cat-group-row div:first-child {
+            width: 100px;
+        }
+
+        #editor-cat-group-row div:last-child {
+            flex: 1;
+        }
+
+        #edit-group {
+            padding: 5px;
+            height: 32px;
+        }
+
+        /* Related Skills Header and Textarea Elements */
+        .rel-skills-header {
+            display: flex !important;
+            flex-direction: row !important;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 5px;
+            width: 100%;
+        }
+
+        .rel-skills-header label {
+            font-size: 1rem;
+            font-weight: bold;
+            margin-bottom: 0;
+            white-space: nowrap;
+        }
+
+        #edit-rels-container {
+            width: 100%;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        #edit-desc-container {
+            width: 100%;
+            box-sizing: border-box;
+            height: 10px !important;
+        }
+
+        #edit-desc {
+            height: 100%;
+            resize: vertical;
+            padding: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+
+        /* Standard Field Labels */
+        #editor-container label {
+            font-size: 1rem;
+            font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        /* Bottom Action Buttons Placement */
+        .editor-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 25px;
+            justify-content: flex-start;
+            width: 100%;
+        }
+
+        .editor-actions button:last-child {
+            margin-left: auto;
+        }
+
+        /* RIGHT COLUMN: Database Sidebar List (Fixes the 100% height bug) */
+        #editor-list-container {
+            flex: 1.1;
+            display: flex;
+            flex-direction: column;
+            max-height: 100vh;
+        }
+
+        #editor-list-container h3 {
+            font-family: 'Archivo Black';
+            margin-top: 0;
+            margin-bottom: 10px;
+            text-align: left;
+        }
+
+        #editor-list {
+            flex: 1;
+            min-height: 50vh;
+            max-height: 100px;
+            overflow-y: auto;
         }
 
         .modal-overlay {

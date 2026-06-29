@@ -92,80 +92,26 @@
     <div class="char-header">
         <div id="char-table">
             <div>
-                <select id="char-selector" onchange="switchCharacter()"></select>
             </div>
+            <button class="builder-btn" id="share-btn" style="padding: 8px 15px;" onclick="zdielatVsetkoDiscord()" data-tooltip="POSLAŤ SVOJE VÝTVORY TVORCOM, VEĽMI SA POTEŠIA!">PODELIŤ SA!</button>
             <div class="char-buttons" >
-                <button class="builder-btn" style="padding: 8px 15px;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
-                <button class="builder-btn" style="padding: 8px 15px;" onclick="createNewCharacter()"> PRIDAŤ </button>
-                <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()">EXPORTOVAŤ</button>
-                <button class="builder-btn" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
+                <select id="char-selector" onchange="switchCharacter()"></select>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="deleteCharacter()" data-tooltip="ODSTRÁNIŤ VYBRANÚ POSTAVU">ODSTRÁNIŤ</button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="createNewCharacter()" data-tooltip="PRIDAŤ NOVÚ POSTAVU"> PRIDAŤ </button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()" data-tooltip="STIAHNUŤ PDF BEZ LEVELOV SCHOPNOSTÍ, BR A ĽUDSKOSTI">EXPORTOVAŤ</button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="toggleEditorOverlay(true)" data-tooltip="VYTVORIŤ, ODSTRÁNIŤ, ZMENIŤ HODNOTY A VZŤAHY...">UPRAVIŤ SCHOPNOSTI</button>
             </div>
         </div>
     </div>
 
     <div class="builder-container">
-        <div class="tabs">
-            <button class="builder-btn active" onclick="openTab('builder-journal')">DENNÍK HRDINU</button>
-            <button class="builder-btn" onclick="openTab('editor')">UPRAVIŤ SCHOPNOSTI</button>
-            <button class="builder-btn" onclick="openTab('navod')">NÁVOD</button>
-
-</div>
 
         <div id="builder-journal" class="tab-content active">
             <div class="stats-panel" id="character-stats"></div>
 
         </div>
 
-        <div id="editor" class="tab-content">
-            <div class="info-panel" style="flex: 2.5;">
-                <div id="editor-main-layout" style="display: flex; gap: 30px; align-items: flex-start; margin-top:20px; margin-left:15px;">
-                    <div style="flex: 0.8;">
-                        <label style="font-size:1rem; font-weight:bold;">NÁZOV SCHOPNOSTI</label>
-                        <input type="text" id="edit-name" style="width:100%; margin-bottom:15px; box-sizing: border-box;" onkeyup="filterEditorList()">
-                        
-                        <div id="editor-cat-group-row" style="display: flex; gap: 15px; margin-bottom: 15px;">
-                            <div style="width: 100px;">
-                                <label style="font-size:1rem; font-weight:bold; white-space: nowrap;">KATEGÓRIA</label>
-                                <input type="number" id="edit-cat" min="1" max="4" style="width:100%; box-sizing: border-box;">
-                            </div>
-                            <div style="flex: 1;">
-                                <label style="font-size:1rem; font-weight:bold;">SKUPINA</label>
-                                <select id="edit-group" style="width:100%; box-sizing: border-box; padding: 5px;"></select>
-                            </div>
-                        </div>
-                    </div>
 
-                    <div style="flex: 1.1; width: 100%;">
-                        <div style="display: flex !important; flex-direction: row !important; align-items: center; gap: 10px; margin-bottom: 5px; width: 100%;">
-                            <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">PRÍBUZNÉ SCHOPNOSTI</label>
-                            
-                        <button id="mobile-rel-toggle" 
-                                style="background: #444; color: white; border: none; width: 24px; height: 24px; cursor: pointer; border-radius: 4px; clip-path: none !important; font-weight: bold;" 
-                                onclick="toggleRelOverlay(true)">
-                            +
-                        </button>
-                        </div>
-
-                        <div id="edit-rels-container" style="width: 100%; box-sizing: border-box;"></div>
-                        
-                        <label style="font-size:1rem; font-weight:bold; margin-bottom: 0; white-space: nowrap;">POPIS</label>
-
-                        <div id="edit-desc-container" style="width: 100%; box-sizing: border-box;">
-                            <textarea id="edit-desc" style="width: 100%; height: 100px; box-sizing: border-box; resize: vertical; margin-top: 5px; padding: 8px; font-family: inherit; font-size: 0.9rem; border: 1px solid #ccc; border-radius: 4px;"></textarea>
-                        </div>
-                    </div>
-                </div> 
-
-                <div class="editor-actions" style="display: flex; gap: 10px; margin-top: 15px; justify-content: flex-start; margin-left:15px;">
-                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; width: 180px; height: 45px; clip-path:none !important; border-radius:0; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
-                    <button class="tab-btn" style="background:var(--hybrid-red); color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 25px;" onclick="deleteSkill()">ZMAZAŤ</button>
-                    <button class="tab-btn" style="background:#555; color:white; height: 45px; clip-path:none !important; border-radius:0; margin: 0; padding: 0 20px; margin-left: auto;" onclick="exportSkills()">EXPORTOVAŤ</button>
-                </div>
-            </div> <div class="info-panel" style="flex: 1.1; margin-left:25px; margin-right:15px;">
-                <h3 style="font-family:'Archivo Black'; margin-top: 10px; margin-bottom:10px;">ZOZNAM SCHOPNOSTÍ</h3>
-                <div class="selection-list" id="editor-list" style="height: calc(100% - 60px); overflow-y: auto;"></div>
-            </div>
-        </div>
         <div id="navod" class="tab-content">
             <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
                 <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
@@ -336,20 +282,19 @@
         <p style="font-family: 'Roboto Condensed', sans-serif;">Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.</p>
         <div class="info-panel">
             <div class="control-box">
-                <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
-                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
+                <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBRAŤ SCHOPNOSŤ</h3>
+                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;" data-tooltip="URČUJE ZÁKLADNÚ CENU SCHOPNOSTI">KATEGÓRIA: -</p>
                 <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
                 <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
                     <span id="cost-container" style="display:none;" class="old-price-wrapper">
-                        <span id="cost-orig" class="old-price"></span>
+                        <span id="cost-orig" class="old-price" data-tooltip="PÔVODNÁ CENA (KATEGÓRIA x POŽADOVANÁ ÚROVEŇ)"></span>
                     </span>
-                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
+                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';" data-tooltip="PÔVODNÁ CENA ZNÍŽENÁ O SÚČET ÚROVNÍ PRÍBUZNÝCH SCHOPNOSTÍ (MAXIMÁLNE TROCH). NESMIE BYŤ NIŽŠIA AKO CIEĽOVÁ ÚROVEŇ.">0 BR</span>
                 </div>
                 <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
-                    <button class="builder-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
-                    <button class="builder-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
-                    <button class="builder-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
-
+                    <button class="builder-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 0.9rem; clip-path:none; margin: 0;" onclick="upgradeSelected()" data-tooltip="VYBRANEJ SCHOPNOSTI">ZVÝŠIŤ ÚROVEŇ</button>
+                    <button class="builder-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()" data-tooltip="ZNÍŽIŤ ÚROVEŇ (VRÁTIA SA TI BR)" >↓</button>
+                    <button class="builder-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()" data-tooltip="VRÁTIŤ POSLEDNÚ ZMENU">⤺</button>
                 </div>
             </div>
             <div id="filter-container-container">
@@ -360,6 +305,70 @@
                 <div class="selection-list" id="builder-list">
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="editor-container">
+    <div class="info-panel-box">
+        <div style="display: flex; flex-direction: row; justify-content: space-between;">
+            <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSTI</h3>
+            <button class="editor-close-btn" onclick="toggleEditorOverlay(false)">×</button>
+        </div>
+        <p style="font-family: 'Roboto Condensed', sans-serif;">Upravte vlastnosti vybranej schopnosti alebo spravujte databázu.</p>
+        
+        <div id="editor" class="editor-panel">
+            
+            <div>
+                <div id="editor-main-layout">
+                    
+                    <div class="edit-fields-left">
+                        <label>NÁZOV SCHOPNOSTI</label>
+                        <input type="text" id="edit-name" onkeyup="filterEditorList()">
+                        
+                        <div id="editor-cat-group-row">
+                            <div>
+                                <label style="white-space: nowrap;">KATEGÓRIA</label>
+                                <input type="number" id="edit-cat" min="1" max="4">
+                            </div>
+                            <div>
+                                <label>SKUPINA</label>
+                                <select id="edit-group"></select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="edit-fields-right">
+                        <div class="rel-skills-header">
+                            <label><strong>PRÍBUZNÉ SCHOPNOSTI</strong></label>
+                            <button id="mobile-rel-toggle" 
+                                    style="background: #444; color: white; border: none; width: 24px; height: 24px; cursor: pointer; border-radius: 4px; clip-path: none !important; font-weight: bold;" 
+                                    onclick="toggleRelOverlay(true)">+</button>
+                        </div>
+
+                        <div id="edit-rels-container"></div>
+                    </div>
+
+                </div> 
+                    <div>
+                        <label style="white-space: nowrap;">POPIS</label>
+                        <div id="edit-desc-container">
+                            <textarea id="edit-desc"></textarea>
+                        </div>
+                    </div>
+                <div class="editor-actions">
+                    <button class="builder-btn" style="background: var(--hybrid-green); color: white; width: 160px; height: 45px; clip-path: none; margin: 0;" onclick="saveSkill()">AKTUALIZOVAŤ</button>
+                    <button class="builder-btn" style="background: var(--hybrid-red); color: white; height: 45px; clip-path: none; margin: 0; padding: 0 25px;" onclick="deleteSkill()">ZMAZAŤ</button>
+                    <button class="builder-btn" style="background: #555; color: white; height: 45px; clip-path: none; margin: 0; padding: 0 20px;" onclick="exportSkills()">EXPORTOVAŤ</button>
+                </div>
+            </div> 
+
+            <div id="editor-list-container">
+                <h3>ZOZNAM SCHOPNOSTÍ</h3>
+                <div class="selection-list" id="editor-list">
+                    </div>
+            </div>
+
         </div>
     </div>
 </div>
