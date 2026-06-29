@@ -48,27 +48,23 @@
         <div class="carousel-track">
             
             <div class="carousel-slide">
-                <div class="featured-image-wrapper">
-                    <div class="carousel-overlay">
-                        <div>
-                            <p class="carousel-overlay-text" style="color: #fff">Vytvor si postavu vďaka interaktívnemu denníku.</p>
-                        </div>                    
-                        <div class="carousel-overlay-controls">
-                            <button class="overlay-action-btn" onclick="openTab('builder')">VYTVORIŤ POSTAVU</button>
-                        </div>
+                <div class="carousel-overlay">
+                    <div>
+                        <p class="carousel-overlay-text" style="color: #fff">Vytvor si postavu vďaka interaktívnemu denníku.</p>
+                    </div>                    
+                    <div class="carousel-overlay-controls">
+                        <button class="overlay-action-btn" onclick="openTab('builder')">VYTVORIŤ POSTAVU</button>
                     </div>
                 </div>
             </div>
 
             <div class="carousel-slide">
-                <div class="featured-image-wrapper">
-                    <div class="carousel-overlay">
-                        <div >
-                            <p class="carousel-overlay-text" style="color: #fff">Nová browser hra! Vyskúšaj si Hybrid už teraz!</p>
-                        </div>                    
-                        <div class="carousel-overlay-controls">
-                            <button class="overlay-action-btn" onclick="window.open('https://hybridrpg.sk/sim', '_blank')">OTVORIŤ</button>
-                        </div>
+                <div class="carousel-overlay">
+                    <div >
+                        <p class="carousel-overlay-text" style="color: #fff">Nová browser hra! Vyskúšaj si Hybrid už teraz!</p>
+                    </div>                    
+                    <div class="carousel-overlay-controls">
+                        <button class="overlay-action-btn" onclick="window.open('https://hybridrpg.sk/sim', '_blank')">OTVORIŤ</button>
                     </div>
                 </div>
             </div>
@@ -102,9 +98,9 @@
                 <button class="builder-btn" style="padding: 8px 15px;" onclick="deleteCharacter()">ODSTRÁNIŤ</button>
                 <button class="builder-btn" style="padding: 8px 15px;" onclick="createNewCharacter()"> PRIDAŤ </button>
                 <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()">EXPORTOVAŤ</button>
+                <button class="builder-btn" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
             </div>
         </div>
-        <button class="builder-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
 
     <div class="builder-container">
@@ -235,7 +231,7 @@
 
 <div class="footer">
     <div class="footer-content">
-        <img src="assets/logo.png" alt="down" style="height: 35px; align-self: flex-start;">
+        <img src="assets/logo.png" id="footer-logo" alt="down" style="height: 35px; align-self: flex-start;">
         <div class="footer-columns">
             <div class="footer-column">                
                 <div style="display: flex; flex-direction: row; align-items: center; justify-content: flex-start;">
