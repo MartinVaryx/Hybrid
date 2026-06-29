@@ -17,6 +17,7 @@
         body {
             font-family: 'Roboto Condensed', sans-serif;
             background-color: var(--bg-paper);
+            background-image: url('assets/bg.png');
             color: var(--hybrid-black);
             display: flex;
             flex-direction: column;
@@ -625,6 +626,7 @@
         .enemy-stats-row {
             display: flex;
             gap: 20px; /* Puts comfortable breathing room between the two stat blocks */
+            z-index: 50;
         }
 
         .enemy-stats-row .stat-row {
@@ -1024,6 +1026,11 @@
     border: 3px solid rgba(201, 201, 201, 0.96);
     color: rgb(224, 224, 224);
     font-size: 1.2em;
+}
+
+#hero-selection-overlay{
+    height: 97% !important;
+    margin-top: 2px;
 }
 
 
@@ -1463,7 +1470,7 @@
         }
 
         #enemy-sprite {
-            max-width: 300px !important; /* ceiling, not a forced size — lets the
+            max-width: 220px !important; /* ceiling, not a forced size — lets the
                 script's own per-mode inline width (bigger default, smaller
                 distance/elimination) keep working under a smaller mobile cap */
             height: auto !important;
