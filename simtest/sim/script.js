@@ -5107,6 +5107,8 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
+                overflow: hidden;
+                box-sizing: border-box;
                 background: rgba(10, 10, 10, 0.95);
                 display: flex;
                 flex-direction: column;
@@ -5121,12 +5123,14 @@
                     background: #1a1a1a; 
                     border: 2px solid var(--hybrid-green); 
                     border-radius: 8px; 
-                    width: 705px; 
-                    height: 380px;
+                    width: min(705px, 94%); 
+                    height: min(380px, 90%);
+                    max-width: 94%;
+                    max-height: 90%;
+                    box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0, 215, 0, 0.3);
                     display: flex;
                     flex-direction: column;
-                    max-height: 90vh;
                 ">
                     <!-- Scrollable content area -->
                     <div id="hero-display" style="padding: 15px 15px 10px; text-align: center; overflow-y: auto; flex: 1;">

@@ -24,7 +24,7 @@
 
         body {
             font-family: 'Roboto Condensed', sans-serif;
-            background-color: var(--bg-paper);
+            background-color: rgba(20, 20, 20, 0.119);
             color: var(--text-dark);
             margin: 0;
             padding: 20px;
@@ -36,27 +36,7 @@
             overflow-x: visible;
         }
 
-        .stain {
-            position: fixed;
-            background-image: url("assets/machula.png"); 
-            background-size: contain;
-            background-repeat: no-repeat;
-            z-index: -1;
-            pointer-events: none;
-            opacity: 0.2;
-            mix-blend-mode: multiply;
-            width: 1050px; 
-            height: 1050px;
-        }
 
-        .stain-tl { top: -250px; left: -350px; transform: rotate(15deg); }
-        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
-        .stain-br { bottom: -300px; right: -250px; transform: rotate(-40deg); }
-
-        .logo-container { text-align: center; margin-bottom: 25px; position: relative; }
-        .logo-img { max-width: 140px; height: auto; display: block; margin: 0 auto; }
-
-        /* Hlavné Menu - Top Right */
         .main-menu {
             position: absolute;
             top: 20px;
@@ -76,7 +56,6 @@
         }
 
         .menu-trigger {
-            background: var(--hybrid-black);
             color: white;
             padding: 10px 20px;
             border: 2px solid white;
@@ -88,7 +67,6 @@
             display: none;
             position: absolute;
             right: 0;
-            background-color: var(--hybrid-black);
             min-width: 200px;
             box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
             border: 1px solid #333;
@@ -106,7 +84,6 @@
         }
 
         .menu-items a:hover {
-            background-color: var(--hybrid-red);
             color: white;
         }
 
@@ -144,7 +121,6 @@
 
         .char-header {
             width: 1100px;
-            background: var(--hybrid-black);
             padding: 20px;
             display: flex;
             justify-content: space-between;
@@ -248,7 +224,6 @@
 
         .tabs { 
             display: flex; 
-            background-color: var(--hybrid-black); 
             padding: 10px 30px; 
             gap: 5px;
         }
