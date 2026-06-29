@@ -1,4 +1,4 @@
-        :root {
+:root {
             --bg-paper: #949494; 
             --hybrid-black: #000000;
             --hybrid-red: #c62828;
@@ -1073,9 +1073,10 @@
     }
 
     html, body {
-        overflow-x: hidden !important; /* Hard lockdown against layout leaking */
-        overflow-y: hidden !important;
-        height: 100% !important;
+        overflow-x: hidden !important; /* Still block sideways leaking */
+        overflow-y: auto !important;   /* Allow vertical scroll so the address bar can't trap content */
+        min-height: 100%;
+        min-height: 100dvh !important; /* Real visible viewport height where supported, ignores the address bar */
         width: 100% !important;
         padding: 0 !important;        /* Clears out desktop body bloating margins */
         margin: 0 !important;
@@ -1087,10 +1088,11 @@
         flex-direction: row;  
         flex-wrap: nowrap;     
         width: 100%;
-        height: 100%;
+        min-height: 100%;
+        min-height: 100dvh;
         gap: 10px;            
         align-items: stretch; 
-        overflow: hidden !important; 
+        overflow: visible;
         padding: 6px !important;       
     }
 
@@ -1099,11 +1101,11 @@
         flex: 0 1 33.333%;   
         min-width: 0 !important; 
         max-width: 35% !important;  
-        height: 100%;            
+        height: auto;            
         display: flex;
         flex-direction: column;
         gap: 6px;
-        overflow: hidden !important; 
+        overflow: visible; 
     }
 
     /* Right Column: FLUIDLY scales up/down to take up all remaining available width */
@@ -1113,7 +1115,7 @@
         display: flex;
         flex-direction: column;
         gap: 10px;
-        overflow: hidden !important;
+        overflow: visible;
     }
 
     /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
