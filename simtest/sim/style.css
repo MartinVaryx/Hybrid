@@ -88,7 +88,7 @@
 
         /* --- Background Overlay Update --- */
         .gaming-table-floor {
-            aspect-ratio: 11 / 6;    /* ← add this */
+            aspect-ratio: 16/9;    /* ← add this */
             position: relative;
             overflow: hidden;
             background-color: rgb(0, 0, 0); /* Keeps your native dark table floor color */
@@ -811,9 +811,9 @@
         /* Base Die Frame Structure */
         .die-container {
             position: relative;
-            width: 60px;
-            height: 60px;
-            opacity: 0;
+            aspect-ratio: 1 / 1; /* Ensures the die stays a perfect square */
+            width: 100%;         /* Scales to fit the parent container */
+            max-width: 60px;     /* Prevents it from getting too large on desktop */            opacity: 0;
             animation: slideUpRoll 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
@@ -1026,39 +1026,27 @@
 }
 
 
+@keyframes slideUpRoll {
+    0% {
+        transform: translateY(50%) rotate(-45deg); /* Use percentage */
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(-50%) rotate(360deg); /* Relative to parent */
+        opacity: 1;
+    }
+}
 
-        
-
-        /* Animation Keyframe translating up to roughly 1/3 of the field height and staying */
-        @keyframes slideUpRoll {
-            0% {
-                transform: translateY(100px) rotate(-45deg);
-                opacity: 0;
-            }
-            30% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(-180px) rotate(360deg); /* Halts at ~1/3 height up */
-                opacity: 1; /* Keeps the dice fully visible on the board permanently */
-            }
-        }
-
-        @keyframes slideDownRoll {
-            0% {
-                transform: translateY(-100px) rotate(45deg);
-                opacity: 0;
-            }
-            30% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(250px) rotate(-360deg); /* Settles hovering overlay style */
-                opacity: 1;
-            }
-
-
-        }
+@keyframes slideDownRoll {
+    0% {
+        transform: translateY(-50%) rotate(45deg);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(50%) rotate(-360deg); /* Relative to parent */
+        opacity: 1;
+    }
+}
 
 /* =============================================================
    CLEANED MOBILE VIEW: FLUID FLEX OVERRIDES (NO HORIZONTAL SCROLL)
@@ -1070,6 +1058,11 @@
     /* --- Global Elements Hard Clamp --- */
     *, *::before, *::after {
         box-sizing: border-box !important; /* Forces paddings/borders to stay INSIDE widths */
+    }
+
+    h1 {
+        /* Scales between 1.5rem and 2.5rem based on viewport width */
+        font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
     }
 
     html, body {
@@ -1093,12 +1086,15 @@
         gap: 10px;            
         align-items: stretch; 
         overflow: visible;
-        padding: 6px !important;       
+        padding-top: max(6px, env(safe-area-inset-top)) !important;
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
     }
 
-    /* Left Column: Orients at ~33% space, but allowed to shrink smaller to fit */
+    /* Left Column: fixed 33.333% share, immune to content size */
     .left-column {
-        flex: 0 1 33.333%;   
+        flex: 0 0 33.333%;   
         min-width: 0 !important; 
         max-width: 35% !important;  
         height: auto;            
@@ -1108,9 +1104,9 @@
         overflow: visible; 
     }
 
-    /* Right Column: FLUIDLY scales up/down to take up all remaining available width */
+    /* Right Column: takes exactly the remaining space, immune to content size */
     .right-column {
-        flex: 1 1 auto !important; /* Dynamic adjustment: grows and shrinks dynamically */
+        flex: 1 1 0% !important; /* explicit 0% basis instead of "auto" — stops long terminal lines from inflating this column's preferred width */
         min-width: 0 !important;   /* Disables default flex layout min-content boundaries */
         display: flex;
         flex-direction: column;
@@ -1157,6 +1153,7 @@
 
     .panel {
         padding: 4px 6px !important;
+        gap: 5px !important
     }
 
     .stat-row {
@@ -1197,7 +1194,50 @@
         justify-content: center;
     }
 
+    /* Shrink the base die container */
+    .die-container {
+        width: 40px !important;  /* Reduced from 60px */
+        height: 40px !important;
+    }
+
+    /* Override individual dice classes to prevent them from breaking the grid */
+    .die-d4, .die-d6, .die-d8, .die-d10, .die-d12, .die-dh, .die-dt {
+        width: 38px !important;
+        height: 38px !important;
+    }
     
+    /* Ensure the pool doesn't force a width that overflows the column */
+    .dice-animation-pool {
+        grid-template-columns: repeat(3, 42px) !important; /* Shrink grid columns */
+        gap: 2px !important;
+    }
+
+    /* Retain original layout coordinates but drop the font size uniformly */
+    .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    /* Target specific dice to override desktop's fixed font rules (like 1rem) */
+    .die-d4 .die-label,
+    .die-d6 .die-label,
+    .die-d8 .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    .die-d10 .die-label,
+    .die-d12 .die-label {
+        font-size: 0.65rem !important; /* Slightly smaller for multi-digit numbers if needed */
+    }
+
+    .die-dt .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    .gaming-table-floor {
+        position: relative;
+        overflow: hidden !important; /* CRITICAL: Clips dice that animate too far */
+    }
+
     #choice-prompt {
         padding: 12px 12px 65px 12px; /* Uniform spacing with bottom room for Back button */
         bottom: 1%;
@@ -1292,55 +1332,97 @@
     .enemy-cards .card-container:hover {
         z-index: 9999 !important;
         position: relative !important;
-        transform: scale(1.15) translateY(-5px) !important; /* Clean localized pop animation */
+        transform: scale(1.3) translateY(-5px) !important; /* Clean localized pop animation */
     }
 
     /* Neutralizes structural offsets causing cards to slide off-screen */
     .card-tray .card-container:first-child:hover {
-        transform: scale(1.15) translateY(-5px) translateX(2px) !important;
+        transform: scale(1.3) translateY(-5px) translateX(2px) !important;
     }
     .card-tray .card-container:last-child:hover {
-        transform: scale(1.15) translateY(-5px) translateX(-2px) !important;
+        transform: scale(1.3) translateY(-5px) translateX(-2px) !important;
     }
 
     /* Safeguards any rotation animations triggered during gameplay phases */
-    .rotate-player-D, .rotate-enemy-D { transform: rotate(-90deg) scale(0.9) !important; }
-    .rotate-player-A, .rotate-enemy-A { transform: rotate(90deg) scale(0.9) !important; }
-    .enemy-card-visual.rotate-A { transform: rotate(0deg) !important; }
-    .enemy-card-visual.rotate-D { transform: rotate(180deg) !important; }
+        .rotate-player-D { transform: rotate(90deg) scale(0.9) !important; }
+        .rotate-player-A { transform: rotate(-90deg) scale(0.9) !important; }
+        .rotate-enemy-D { transform: rotate(-90deg) scale(0.9) !important; }
+        .rotate-enemy-A { transform: rotate(90deg) scale(0.9) !important; }
+
+        .enemy-card-visual.rotate-A { transform: rotate(0deg) !important; }
+        .enemy-card-visual.rotate-D { transform: rotate(180deg) !important; }
 
 
-    .enemy-card-visual,
-    .player-card-slide,
-    .player-card-slide .card-container,
-    .enemy-card-wrapper .card-container,
-    .table-card {
-        width: 117px !important;    /* 1.5x of 78px */
-        height: 198px !important;   /* 1.5x of 132px */
-        min-width: 117px !important;
-        min-height: 198px !important;
-        max-width: 117px !important;
-        max-height: 198px !important;
-        flex-shrink: 0 !important;
+        .enemy-card-visual,
+        .player-card-slide,
+        .player-card-slide .card-container,
+        .enemy-card-wrapper .card-container,
+        .table-card {
+            width: 117px !important;
+            height: 198px !important;
+            min-width: 117px !important;
+            min-height: 198px !important;
+            max-width: 117px !important;
+            max-height: 198px !important;
+            flex-shrink: 0 !important;
+        }
+
+        .enemy-card-visual img,
+        .player-card-slide img,
+        .table-card img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
+
+        #enemy-sprite-container
+        {
+            /* no !important: inline style.display set by the script must still win */
+            display: flex;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 5px !important;
+            height: fit-content !important; /* was a fixed 190px tuned for the old
+                max-width — wraps whatever size the sprite actually renders at now */
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            width: fit-content !important;
+            bottom: 10% !important;
+        }
+
+        #enemy-sprite {
+            max-width: 300px !important; /* ceiling, not a forced size — lets the
+                script's own per-mode inline width (bigger default, smaller
+                distance/elimination) keep working under a smaller mobile cap */
+            height: auto !important;
+        }
+
+    .challenge-display {
+        left: 50% !important;
+        top: -24px !important;
+        height: 60px !important;
+        gap: 18px !important;
+        padding: 6px 14px !important;
+        border-radius: 30px !important;
+        border-width: 3px !important;
+        transform: translateX(-50%) translateY(-20px) !important; /* keeps the "raised, hidden" start state, just re-centered */
     }
 
-    /* Ensure inner art inside these scaled cards fills the new 117x198 space */
-    .enemy-card-visual img,
-    .player-card-slide img,
-    .table-card img {
-        width: 100% !important;
-        height: 100% !important;
-        object-fit: cover !important;
+    .challenge-display.show {
+        transform: translateX(-50%) translateY(0) !important;
     }
-    
-    /* Ensures the enemy layout wrapper expands to accommodate the 2x larger graphic */
-    .enemy-sprite-container,
-    .enemy-display-zone {
-        display: flex !important;
-        justify-content: center !important;
-        align-items: center !important;
-        padding: 5px !important;
-        min-height: 190px !important; /* Allocates enough vertical breathing room */
+
+    .challenge-display .stat-item {
+        font-size: 1.1rem !important;
+        gap: 4px !important;
+    }
+
+    .challenge-display .stat-icon {
+        width: 24px !important;
+        height: 24px !important;
     }
 
     /* --- OPTIMALIZÁCIA PRE OVERLAY VÝBERU HRDINU A ZBRANE --- */
@@ -1526,12 +1608,25 @@
         transform: scale(1.08) translateY(-2px) translateX(-4px) !important;
     }
 
-    .logo-container, .logo-img{
-        display: flex !important;
-        max-height: 30px;
-        width: auto;
-        position: relative;
-        align-self: flex-start;
+    .terminal-content .terminal-line, 
+    .terminal-content .terminal-inline-segment {
+        font-size: 0.85rem !important; /* Change this value to whatever you want */
+    }
+
+    .terminal-content{
+        padding: 5px;
+    }
+
+    .terminal-line.spacing-top {
+        margin-top: 1.5em !important; /* Scaled down from 5.5em */
+    }
+
+    .terminal-line.spacing-bottom {
+        margin-bottom: 0.2em !important; /* Scaled down from 2.5em */
+    }
+
+    .terminal-line.spacing-bottom-medium {
+        margin-bottom: 0 !important;
     }
 
 }
