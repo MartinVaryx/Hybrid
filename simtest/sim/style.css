@@ -168,6 +168,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr; /* 2 stĺpce s rovnakou šírkou */
             grid-template-rows: auto auto;   /* 2 riadky s výškou podľa obsahu */
+            z-index: 1;
         }
 
         .panel h3 {
@@ -1075,6 +1076,15 @@
         margin: 0 !important;
     }
 
+    body {
+        /* Use standard 10px padding as a baseline, but add the phone's safe boundary if it exists */
+        padding-top: calc(15px + env(safe-area-inset-top, 0px)) !important;
+        padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        overflow-x: hidden !important;
+    }
+
     /* --- Fluid Non-Strict Layout Columns Grid --- */
     .game-container {
         display: flex;
@@ -1188,11 +1198,12 @@
         font-size: 0.7rem !important;
         padding: 2px 4px !important;
         margin: 0 !important;
-        height: 22px !important;
+        height: 30px !important;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
     }
+
 
     /* Shrink the base die container */
     .die-container {
@@ -1277,7 +1288,7 @@
 
     
     #heal img {
-        height: 0.85em !important;
+        height: 0.9em !important;
         margin-right: 2px !important;
     }
 
@@ -1287,13 +1298,12 @@
     }
 
 
-    .card-container,
+
     .enemy-card-visual,
     .table-card,
     .combat-card,
     .enemy-cards .card-container,
-    .enemy-hand .card-container,
-    .card-tray .card-container {
+    .enemy-hand .card-container {
         width: 117px !important;    /* 1.5x of 78px */
         height: 198px !important;   /* 1.5x of 132px */
         min-width: 117px !important;
@@ -1307,9 +1317,26 @@
         margin: 0 2px !important;
     }
 
-    /* 2. RE-SCALE INNER IMAGES & ART ASSETS BOUNDARIES */
-    /* Destroys desktop aspect ratio rules so images adapt to the 78x132 bounds */
-    .card-container img,
+    
+
+    .card-tray-wrapper {
+        position: relative; 
+        /* Keep it above the panel on mobile too */
+        z-index: 10; 
+        overflow: visible !important; 
+        width: 100% !important;
+        height: auto !important;
+    }
+
+    .card-scroll-row {
+        overflow-x: auto !important;
+        /* Let the scaled/hovered cards pop upward into the panel area */
+        overflow-y: visible !important; 
+        width: 100% !important;
+        display: flex !important;
+        -webkit-overflow-scrolling: touch;
+    }    
+
     .card-img,
     .enemy-card-visual img,
     .table-card img {
@@ -1326,22 +1353,64 @@
         object-fit: cover !important; /* Fills the portrait rectangle without squeezing distortion */
     }
 
-    /* 3. MOBILE ROTATIONS AND FAN-LAYOUT CORRECTIONS */
-    /* Clears aggressive desktop translate coordinates that displace small cards */
-    .card-tray .card-container:hover,
-    .enemy-cards .card-container:hover {
-        z-index: 9999 !important;
-        position: relative !important;
-        transform: scale(1.3) translateY(-5px) !important; /* Clean localized pop animation */
+
+    /* 1. The Scroll Row controls the clipping boundary. 
+        We give it extra vertical room so the scaled cards can breathe inside it. */
+    .card-scroll-row {
+        width: 100%;
+        overflow-x: auto;   /* Allows horizontal scroll if cards overflow widthwise */
+        overflow-y: hidden; /* Prevents vertical scrollbars, but clips if container is too short */
+        
+        /* THE REAL FIX: Create safe vertical zones within the scroll boundary */
+        padding-top: 70px;    /* Ample room for scale(1.7) + translateY(-20px) */
+        padding-bottom: 30px; /* Room for the bottom edge expansion */
+        margin-top: -70px;    /* Pull the tray layout back up so it doesn't leave an ugly blank gap */
+        margin-bottom: -30px;
     }
 
-    /* Neutralizes structural offsets causing cards to slide off-screen */
+    /* 2. Keep the escape container and tray purely structural with visible overflow */
+    .card-tray-overflow-escape,
+    .card-tray {
+        display: flex;
+        flex-wrap: nowrap; /* Ensures cards stay in a single row for scrolling */
+        gap: 12px;         /* Adds breathing room between individual cards */
+        width: max-content;
+        overflow: visible !important;
+    }
+
+    .card-tray .card-container {
+        width: 100px !important;   /* Shrunk down from 80px */
+        height: 150px !important;  /* Shrunk down from 120px to keep aspect ratio */
+        margin-top: 8px !important;
+        border: 5px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
+        border-radius: 6px !important;        /* Matches your PC look */
+        overflow: hidden !important;          /* Clips the absolute-positioned image inside the border */
+    }
+
+    /* Force the card face graphics to adapt perfectly */
+    .card-tray .card-container .card {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Tighten up the row height so it doesn't take over the screen */
+    .card-tray-wrapper {
+        height: 170px !important; 
+    }
+
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.3) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
     .card-tray .card-container:first-child:hover {
-        transform: scale(1.3) translateY(-5px) translateX(2px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(18px) !important;
     }
     .card-tray .card-container:last-child:hover {
-        transform: scale(1.3) translateY(-5px) translateX(-2px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(-6px) !important;
     }
+
 
     /* Safeguards any rotation animations triggered during gameplay phases */
         .rotate-player-D { transform: rotate(90deg) scale(0.9) !important; }
@@ -1456,7 +1525,7 @@
     /* Reset mohutného globálneho pravidla pre tlačidlá v týchto overlayoch */
     #hero-selection-overlay button.adrenaline-select,
     #weapon-selection-overlay button.adrenaline-select {
-        height: 32px !important;        /* Príjemnejšia výška na klikanie prstom oproti 24px */
+        height: 40px !important;        /* Príjemnejšia výška na klikanie prstom oproti 24px */
         font-size: 0.8rem !important;   /* Čitateľnejšie písmo */
         padding: 4px 8px !important;
         margin: 0 !important;
@@ -1496,15 +1565,15 @@
     }
 
     .track-header img {
-        height: 1.2em !important; 
+        height: 1.7em !important; 
         width: auto;
     }
 
     .track-cell {
         font-size: 0.75rem;               
-        height: 20px !important; 
-        padding: 0 4px !important;      
-        min-width: 20px;                 /* Fluid floor that scales back without bloating column scrollWidths */
+        height: 30px !important; 
+        padding: 0 2px !important;      
+        min-width: 30px;                 /* Fluid floor that scales back without bloating column scrollWidths */
         white-space: nowrap;
     }
 
@@ -1529,29 +1598,6 @@
         right: 12px !important;
     }
 
-    /* --- INCREASED CARD TRAY COMPONENT (FLUID INNER SCROLLING) --- */
-    .card-tray-wrapper {
-        overflow: hidden !important; 
-        height: 155px !important;   
-        flex-grow: 1 !important;     
-        display: flex !important;
-        flex-direction: column !important;
-        width: 100% !important;
-    }
-
-    .card-scroll-row {
-        overflow-x: auto !important; 
-        overflow-y: hidden !important;
-        -webkit-overflow-scrolling: touch !important; 
-        touch-action: pan-x !important; 
-        padding-top: 0 !important;    
-        margin-top: 0 !important;     
-        pointer-events: auto !important; 
-        width: 100% !important;
-        height: 100% !important;      
-        display: flex !important;
-        align-items: center !important;
-    }
 
     .card-tray {
         display: flex !important;
@@ -1585,28 +1631,10 @@
         padding: 4px 8px !important;
     }
 
-    /* Card container size optimization */
-    .card-container {
-        flex-shrink: 0 !important; 
-        width: 78px !important;   
-        height: 132px !important; 
-        margin: 0 !important;
-    }
 
-    /* Clean mobile scales */
-    .card-tray .card-container:hover {
-        position: relative;
-        z-index: 9999 !important;
-        transform: scale(1.08) translateY(-2px) !important; 
-    }
 
-    .card-tray .card-container:first-child:hover {
-        transform: scale(1.08) translateY(-2px) translateX(4px) !important;
-    }
 
-    .card-tray .card-container:last-child:hover {
-        transform: scale(1.08) translateY(-2px) translateX(-4px) !important;
-    }
+
 
     .terminal-content .terminal-line, 
     .terminal-content .terminal-inline-segment {
