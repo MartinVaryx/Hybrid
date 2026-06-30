@@ -2680,6 +2680,7 @@
                     tempImg.onload = () => {
                         tableFloor.style.setProperty('--bg-image', `url('${newUrl}')`);
                         tableFloor.classList.add('fade-in');
+                        tableFloor.classList.toggle('safari-repaint-trigger');
                         proceedWithPhase(); // Now proceed with narrative UI layout or action checks
                     };
                     tempImg.onerror = () => {

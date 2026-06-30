@@ -1073,27 +1073,22 @@
     }
 
     html, body {
-        margin: 0;
-        padding: 0;
-        width: 100%;
-        /* 1. REMOVE position: fixed and overflow: hidden */
-        position: static !important; 
-        overflow-x: hidden !important; 
-        overflow-y: auto !important; /* Allows vertical scrolling */
-        
-        /* 2. Set height to auto so the document can expand past 100% just slightly */
-        height: auto !important; 
+        overflow-x: hidden !important; /* Still block sideways leaking */
+        overflow-y: auto !important;   /* Allow vertical scroll so the address bar can't trap content */
         min-height: 100%;
+        min-height: 100dvh !important; /* Real visible viewport height where supported, ignores the address bar */
+        width: 100% !important;
+        padding: 0 !important;        /* Clears out desktop body bloating margins */
+        margin: 0 !important;
     }
 
     body {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: flex-start; /* Aligns content from the top down */
-        
-        /* 3. Add your requested top margin buffer to trigger the browser scroll */
-        padding-top: 60px !important; 
+        /* Use standard 10px padding as a baseline, but add the phone's safe boundary if it exists */
+        padding-top: calc(15px + env(safe-area-inset-top, 0px)) !important;
+        padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        overflow-x: hidden !important;
     }
 
     /* --- Fluid Non-Strict Layout Columns Grid --- */
@@ -1102,18 +1097,12 @@
         flex-direction: row;  
         flex-wrap: nowrap;     
         width: 100%;
+        min-height: 100%;
+        min-height: 100dvh;
         gap: 10px;            
         align-items: stretch; 
-        
-        /* FORCE container to perfectly match the remaining visible viewport height */
-        height: 100dvh !important;
-        min-height: 100dvh !important;
-        max-height: 100dvh !important;
-        
-        /* Keep internal content clipped tightly inside this container height */
-        overflow: hidden !important; 
-
-        /* Retain your safe area padding rules */
+        overflow: visible;
+        padding-top: max(6px, env(safe-area-inset-top)) !important;
         padding-right: max(6px, env(safe-area-inset-right)) !important;
         padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
         padding-left: max(6px, env(safe-area-inset-left)) !important;
@@ -1163,45 +1152,19 @@
         height: 108px !important; 
     }
 
-/* Control Panel horizontal swipe optimizations */
+    /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
     .controls-panel {
         padding: 4px 6px !important;       
         display: flex !important;
         flex-direction: row !important;    
-        flex-wrap: nowrap !important;      
+        flex-wrap: nowrap !important;      /* Enforces tracks to sit on a single line */
         justify-content: flex-start !important; 
         align-items: center !important;
-        overflow-x: auto !important;       
+        overflow-x: auto !important;       /* Re-activates horizontal scrollbar inside the component */
         overflow-y: hidden !important;
-        white-space: nowrap !important;    
+        white-space: nowrap !important;    /* Keeps tracking rows perfectly linear */
         gap: 4px !important;               
-        -webkit-overflow-scrolling: touch; 
-
-        /* ==========================================
-           THE FIX FOR REAL IPHONE DEVICES:
-           ========================================== */
-        grid-template-columns: none !important; /* 1. Completely remove desktop grid traits */
-        width: 100% !important;                  /* 2. Forces panel to baseline layout width */
-        min-width: max-content !important;      /* 3. CRITICAL: Tells Safari the panel is allowed to be wider than the column */
-        flex-shrink: 0 !important;              /* 4. Blocks parent from crushing the panel */
-    } 
-
-    /* Force EVERYTHING inside the panel to maintain its natural, uncompressed size */
-    .controls-panel > *,
-    .controls-panel .track-table,
-    .controls-panel .track-cell,
-    .controls-panel select,
-    .controls-panel span,
-    .controls-panel label {
-        flex-shrink: 0 !important;       /* Tells iOS Safari: "Do not compress under any circumstance" */
-        width: auto !important;          /* Lets items fill their natural space */
-        display: inline-block !important; /* Prevents text elements from collapsing into multi-line blocks */
-    }
-
-    /* Keep the track table nested cells perfectly squared instead of squeezed */
-    .controls-panel .track-cell {
-        min-width: 30px !important;
-        width: 30px !important;
+        -webkit-overflow-scrolling: touch; /* Liquid swiping support on mobile devices */
     }
 
     .panel {
@@ -1425,7 +1388,7 @@
         width: 100px !important;   /* Shrunk down from 80px */
         height: 150px !important;  /* Shrunk down from 120px to keep aspect ratio */
         margin-top: 8px !important;
-        border: 4px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
+        border: 5px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
         border-radius: 6px !important;        /* Matches your PC look */
         overflow: hidden !important;          /* Clips the absolute-positioned image inside the border */
     }
@@ -1444,46 +1407,15 @@
     .card-tray .card-container:hover{
         z-index: 9999 !important;
         position: relative !important;
-        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+        transform: scale(1.3) translateY(-20px) !important; /* Clean localized pop animation */
     }
 
     .card-tray .card-container:first-child:hover {
-        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(18px) !important;
     }
     .card-tray .card-container:last-child:hover {
-        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(-6px) !important;
     }
-
-    .card-tray .card-container:hover{
-        z-index: 9999 !important;
-        position: relative !important;
-        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
-    }
-
-    .card-tray .card-container:first-child:hover {
-        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
-    }
-    .card-tray .card-container:last-child:hover {
-        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
-    }
-
-    .card-tray .card-container.flipped:hover {
-        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
-    }
-
-    .card-tray .card-container.flipped:first-child:hover {
-        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(-18px) !important;
-    }
-
-    .card-tray .card-container.flipped:last-child:hover {
-        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(6px) !important;
-    }
-
-    /* Also safeguard your JS touch tracking engine layout clones */
-    #card-tray-container:not(.mouse-active) .card-container.flipped.keyboard-hover {
-        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
-    }
-
 
 
     /* Safeguards any rotation animations triggered during gameplay phases */
@@ -1697,6 +1629,49 @@
         border-radius: 4px;
     }
 
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+    }
+
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+    }
+
+    .card-tray .card-container.flipped:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
+    }
+
+    .card-tray .card-container.flipped:first-child:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(-18px) !important;
+    }
+
+    .card-tray .card-container.flipped:last-child:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(6px) !important;
+    }
+
+    /* Also safeguard your JS touch tracking engine layout clones */
+    #card-tray-container:not(.mouse-active) .card-container.flipped.keyboard-hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
+    }
+
     #escape-btn {
         width: auto !important;
         padding: 4px 8px !important;
@@ -1750,6 +1725,5 @@
         transform: scale(var(--mobile-fit-scale, 1)); 
         transform-origin: top center; 
     }
-
 
 }
