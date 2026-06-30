@@ -1,7 +1,7 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = true;
-        let debug_start = "START"
+        let debug_start = "SHACK_0"
 
         let tooltipsInitialized = false;
 
@@ -6815,41 +6815,7 @@
         const root = document.documentElement;
         root.style.setProperty('--real-vw', window.innerWidth + 'px');
         root.style.setProperty('--real-vh', window.innerHeight + 'px');
-    }
- 
-    function fitMobilePage() {
-        const isMobilePortrait = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
-        const root = document.documentElement;
- 
-        if (!isMobilePortrait) {
-            root.style.setProperty('--mobile-fit-scale', 1);
-            return;
-        }
- 
-        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real size
-        const naturalHeight = document.body.scrollHeight;
-        const availableHeight = window.innerWidth;
-        const heightScale = availableHeight / naturalHeight;
-        const naturalWidth = document.body.scrollWidth;
-        const availableWidth = window.innerHeight;
-        const widthScale = availableWidth / naturalWidth;
- 
-        const scale = Math.min(1, heightScale, widthScale);
-        root.style.setProperty('--mobile-fit-scale', scale);
-    }
- 
-    function updateMobileLayout() {
-        setRealViewportVars(); // size the rotated box correctly FIRST
-        fitMobilePage();       // THEN measure/scale content against that box
-    }
- 
-    window.addEventListener('load', updateMobileLayout);
-    window.addEventListener('resize', updateMobileLayout);
-    window.addEventListener('orientationchange', updateMobileLayout);
- 
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updateMobileLayout);
-    }
+    } 
 
         Promise.all([
             fetch('./CHALLENGES.json').then(response => {
