@@ -1072,39 +1072,48 @@
         font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
     }
 
-        /* --- Base Viewport Lockdown --- */
-        html, body {
-            margin: 0;
-            padding: 0;
-            width: 100%;
-            height: 100dvh; /* Dynamic Viewport Height - matches actual visible space */
-            overflow: hidden; /* Hard block on any browser-level scrolling */
-            position: fixed; /* Prevents mobile rubber-banding/bouncing */
-        }
-
-        body {
-            font-family: 'Roboto Condensed', sans-serif;
-            background-color: var(--bg-paper);
-            background-image: url('assets/bg.png');
-            color: var(--hybrid-black);
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-        }
+    html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        /* 1. REMOVE position: fixed and overflow: hidden */
+        position: static !important; 
+        overflow-x: hidden !important; 
+        overflow-y: auto !important; /* Allows vertical scrolling */
         
+        /* 2. Set height to auto so the document can expand past 100% just slightly */
+        height: auto !important; 
+        min-height: 100%;
+    }
+
+    body {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start; /* Aligns content from the top down */
+        
+        /* 3. Add your requested top margin buffer to trigger the browser scroll */
+        padding-top: 60px !important; 
+    }
+
     /* --- Fluid Non-Strict Layout Columns Grid --- */
     .game-container {
         display: flex;
         flex-direction: row;  
         flex-wrap: nowrap;     
         width: 100%;
-        min-height: 100%;
-        min-height: 100dvh;
         gap: 10px;            
         align-items: stretch; 
-        overflow: visible;
-        padding-top: max(6px, env(safe-area-inset-top)) !important;
+        
+        /* FORCE container to perfectly match the remaining visible viewport height */
+        height: 100dvh !important;
+        min-height: 100dvh !important;
+        max-height: 100dvh !important;
+        
+        /* Keep internal content clipped tightly inside this container height */
+        overflow: hidden !important; 
+
+        /* Retain your safe area padding rules */
         padding-right: max(6px, env(safe-area-inset-right)) !important;
         padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
         padding-left: max(6px, env(safe-area-inset-left)) !important;
@@ -1390,7 +1399,7 @@
         width: 100px !important;   /* Shrunk down from 80px */
         height: 150px !important;  /* Shrunk down from 120px to keep aspect ratio */
         margin-top: 8px !important;
-        border: 5px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
+        border: 4px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
         border-radius: 6px !important;        /* Matches your PC look */
         overflow: hidden !important;          /* Clips the absolute-positioned image inside the border */
     }
