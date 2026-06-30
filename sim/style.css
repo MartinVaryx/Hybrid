@@ -1163,23 +1163,45 @@
         height: 108px !important; 
     }
 
-    /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
+/* Control Panel horizontal swipe optimizations */
     .controls-panel {
         padding: 4px 6px !important;       
         display: flex !important;
         flex-direction: row !important;    
-        flex-wrap: nowrap !important;      /* Enforces tracks to sit on a single line */
+        flex-wrap: nowrap !important;      
         justify-content: flex-start !important; 
         align-items: center !important;
-        overflow-x: auto !important;       /* Re-activates horizontal scrollbar inside the component */
+        overflow-x: auto !important;       
         overflow-y: hidden !important;
-        white-space: nowrap !important;    /* Keeps tracking rows perfectly linear */
+        white-space: nowrap !important;    
         gap: 4px !important;               
-        -webkit-overflow-scrolling: touch; /* Liquid swiping support on mobile devices */
+        -webkit-overflow-scrolling: touch; 
+
+        /* ==========================================
+           THE FIX FOR REAL IPHONE DEVICES:
+           ========================================== */
+        grid-template-columns: none !important; /* 1. Completely remove desktop grid traits */
+        width: 100% !important;                  /* 2. Forces panel to baseline layout width */
+        min-width: max-content !important;      /* 3. CRITICAL: Tells Safari the panel is allowed to be wider than the column */
+        flex-shrink: 0 !important;              /* 4. Blocks parent from crushing the panel */
+    } 
+
+    /* Force EVERYTHING inside the panel to maintain its natural, uncompressed size */
+    .controls-panel > *,
+    .controls-panel .track-table,
+    .controls-panel .track-cell,
+    .controls-panel select,
+    .controls-panel span,
+    .controls-panel label {
+        flex-shrink: 0 !important;       /* Tells iOS Safari: "Do not compress under any circumstance" */
+        width: auto !important;          /* Lets items fill their natural space */
+        display: inline-block !important; /* Prevents text elements from collapsing into multi-line blocks */
     }
 
-    .controls-panel > * {
-        flex-shrink: 0 !important; /* Tells iOS Safari: "Do not compress my layout under any circumstance" */
+    /* Keep the track table nested cells perfectly squared instead of squeezed */
+    .controls-panel .track-cell {
+        min-width: 30px !important;
+        width: 30px !important;
     }
 
     .panel {
