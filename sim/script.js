@@ -1,7 +1,7 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = true;
-        let debug_start = "SHACK_0"
+        let debug_start = "START"
 
         let tooltipsInitialized = false;
 
