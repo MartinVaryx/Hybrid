@@ -1,8 +1,9 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
-        let debug_start = "START"
+        const DEBUG = true;
+        let debug_start = "SHACK_0"
 
+        let tooltipsInitialized = false;
 
         let current_challenge_key = "WELCOME";
         let back_to_game = "START";
@@ -362,7 +363,7 @@
                     if (CHALLENGES[targetEnemyKey].saved_stress > maxStress) {
                         log(`Nepriateľ bol ticho zneškodnený!`, "success-msg");
                         HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                        executeMods("item_ŽĽAZA SOMORY+1");
+                        if(enemyType === "Predátorka" || enemyType === "Skautka") executeMods("item_ŽĽAZA SOMORY+1");
                         
                         if (CHALLENGES[targetEnemyKey]) CHALLENGES[targetEnemyKey].alerted = true;
                         updateUI();
@@ -377,8 +378,18 @@
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                             player_action = null; enemy_action = null; is_conflict = false;
 
-                            proceed(pending_challenge_key ? pending_challenge_key : activeChallenge.case_success);
-                            pending_challenge_key = null;
+                            let nextChallenge = [];
+
+                            pushFlat(nextChallenge, activeChallenge?.on_death);
+
+                            if (pending_challenge_key) {
+                                pushFlat(nextChallenge, pending_challenge_key);
+                                pending_challenge_key = null;
+                            } else {
+                                pushFlat(nextChallenge, activeChallenge?.case_success);
+                            }
+
+                            proceed(nextChallenge);
                         };
                         return;
                     } else {
@@ -580,7 +591,7 @@
                 } else {
                     let finalDelay;
                     if (test_mode) {
-                        finalDelay = 0;
+                        finalDelay = 100;
                     }  else {
                         const characterDelay = currentLog.message.length * 35;
                         finalDelay = Math.max(800, 400 + characterDelay);
@@ -1538,6 +1549,7 @@
                         ? CHALLENGES[instanceKey].distance
                         : 0;
                     distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
+                    if (DEBUG) log(`Distance: ${conflict_distance} distance combat: Distance: ${distance_combat_active}`, "system-msg");
                     if (elimMode) {
                         const enemyContainer = document.getElementById("enemy-sprite-container");
                         const enemyImg = document.getElementById("enemy-sprite");
@@ -2330,53 +2342,31 @@
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 narrative_phase = true; 
-                document.getElementById("player-turn-indicator").innerText = "VYBER SI MOŽNOSŤ";
                 
                 let choicePrompt = document.getElementById("choice-prompt");
                 
+
                 if (!choicePrompt) {
                     choicePrompt = document.createElement("div");
                     choicePrompt.id = "choice-prompt";
-                    choicePrompt.style.cssText = `
-                        position: absolute; bottom: 2%; left: 0; right: 0; margin: 0 auto;
-                        padding: 20px 20px 20px 90px; display: flex; flex-wrap: wrap;
-                        justify-content: center; gap: 10px; z-index: 200; max-width: 100%;
-                    `;
+                    // Removed style.cssText — styling handled completely in CSS!
                     document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
                 }
 
                 choicePrompt.innerHTML = "";
-                activeChoiceIndex = 0; // Reset index to the first choice automatically
-
-                // Store a structural reference directly on the container element so our key listener can access it safely
+                activeChoiceIndex = 0; 
                 choicePrompt.userData = { validChoices: validChoices };
 
                 validChoices.forEach((choice, index) => {
                     const btn = document.createElement("button");
-                    btn.className = "adrenaline-select";
+                    btn.className = "adrenaline-select choice-btn"; // Use both class profiles
                     
-                    // Set base styling matching your custom specs
                     if (choice.isBack) {
-
-                        btn.style.cssText = `
-                            position: absolute; bottom: 0; left: 0; width: 60px; height: 46px;
-                            margin-left:10px;
-                            border-radius: 9px;
-                            background: rgb(0, 0, 0); border: 3px solid rgba(201, 201, 201, 0.96);
-                            color: rgb(224, 224, 224); font-size: 1.2em; cursor: pointer;
-                        `;
-                    } else {
-                        btn.style.cssText = `
-                            height: 46px; white-space: nowrap; padding: 0 16px; border-radius: 9px;
-                            background: rgb(231, 231, 231); backdrop-filter: blur(6px);
-                            -webkit-backdrop-filter: blur(6px); border: 3px solid rgba(25, 25, 25, 0.96);
-                            color: rgb(0, 0, 0); font-size: 1.1em; cursor: pointer;
-                        `;
+                        btn.classList.add("back-btn");
                     }
 
                     btn.innerText = choice.text;
                     
-                    // Mouse Hover switches active keyboard focus seamlessly
                     btn.onmouseenter = () => {
                         activeChoiceIndex = index;
                         updateVisualChoiceHighlights();
@@ -2384,7 +2374,7 @@
 
                     btn.onclick = () => {
                         if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
-                            return; // Early return to completely freeze challenge transitions
+                            return; 
                         }
                         choicePrompt.style.display = "none";
                         narrative_phase = false;
@@ -2477,21 +2467,21 @@
             if (!challengeDisplay) return;
             if (show) {
                 if (data) {
-                    challengeDisplay.innerHTML = `
-                        <div class="stat-item"><img src="assets/DIFFICULTY.png" class="stat-icon"> <span>${data.difficulty}</span></div>
-                        <div class="stat-item"><img src="assets/THREAT.png" class="stat-icon"> <span>${data.threat}</span></div>
-                    `;
+                    // Update the span values instead of replacing innerHTML
+                    const spans = challengeDisplay.querySelectorAll('.stat-item span');
+                    if (spans[0]) spans[0].textContent = data.difficulty;
+                    if (spans[1]) spans[1].textContent = data.threat;
                 }
                 
                 // 1. Reveal the element structure
                 challengeDisplay.style.display = "flex"; 
                 
-                // 2. Force a quick browser reflow so it registers display: flex BEFORE animating
+                // 2. Force a quick browser reflow
                 void challengeDisplay.offsetWidth; 
-                
                 
                 // 3. Slide it down
                 challengeDisplay.classList.add("show");
+                initTooltips()
 
             } else {
                 // Only attempt to hide it if it's actually visible right now
@@ -2500,17 +2490,14 @@
                     // 4. Start sliding up
                     challengeDisplay.classList.remove("show");
                     
-                    // 5. Wait for the exact moment the CSS transition finishes, then kill the display
+                    // 5. Wait for the CSS transition to finish
                     challengeDisplay.addEventListener('transitionend', function handleHide() {
-                        // Double check it hasn't been re-opened while sliding up
                         if (!challengeDisplay.classList.contains("show")) {
                             challengeDisplay.style.display = "none";
                         }
-                        // Clean up the listener so it doesn't stack up
                         challengeDisplay.removeEventListener('transitionend', handleHide);
                     });
                 } else {
-                    // Backup case: if it wasn't fully open, just hide it immediately
                     challengeDisplay.style.display = "none";
                 }
             }
@@ -3048,7 +3035,7 @@
                 // Vytvorenie placeholderu
                 const placeholder = document.createElement("option");
                 placeholder.value = "placeholder";
-                placeholder.textContent = "- ŽIADNA SCHOPNOSŤ -";
+                placeholder.textContent = "- SCHOPNOSŤ -";
                 skillDropdown.appendChild(placeholder);
 
                 const BIOLOGICAL_WEAPONS = ["OSTNE", "HRYZADLÁ", "KLEPETÁ", "KYSELINA", "ŽIHADLO"];
@@ -3199,17 +3186,6 @@
                 if (enemyHeading) enemyHeading.innerText = enemy;
             }
 
-            if (inputs_frozen ) {
-                document.getElementById("player-turn-indicator").innerText = "ČAKAJ...";
-            } else if (!is_conflict) {
-                document.getElementById("player-turn-indicator").innerText = "VYBER SI KARTU";
-            } else {
-                if (turn === "p") {
-                    document.getElementById("player-turn-indicator").innerText = "IDEŠ";
-                } else {
-                    document.getElementById("player-turn-indicator").innerText = "Waiting";
-                }
-            }
         }
 
         function resolveActionPhase(card) {
@@ -3368,17 +3344,6 @@
                     setTimeout(() => {
                     runActionPhase();
                     },Math.max(100,delay - 500))
-                } else {
-                    // Fail-safe fallback if state engine defaults
-                    enemy = "Skautka";
-                    enemy_stress = 0;
-                    enemy_escaping = false;
-                    is_conflict = true;
-                    move = 0;
-                    combat_starter = null;
-                    setTimeout(() => {
-                    runConflictTurn();
-                    },delay)
                 }
             } else {
                 setTimeout(() => {
@@ -3387,6 +3352,11 @@
             }
         }
 
+        function pushFlat(arr, value) {
+            if (!value) return;
+            if (Array.isArray(value)) arr.push(...value);
+            else arr.push(value);
+        }
 
         function resolveConflict() {
             if (!is_conflict || !enemy || !player_action || !enemy_action) {
@@ -3403,7 +3373,7 @@
             }
 
             inputs_frozen = true;
-            if (test_mode) {skill = 10; weapon = 3};
+            if (test_mode) {skill = 10; weapon = 2};
             let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
 
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
@@ -3420,6 +3390,8 @@
 
             let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
             let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
+            const enemyType = CHALLENGES[current_challenge_key]?.type || current_challenge_key;
+
 
             log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
 
@@ -3429,7 +3401,7 @@
             resetAdrenalineSelection();
 
             // === DISTANCE / RANGED COMBAT: closing the gap ===
-            if (distance_combat_active) {
+            if (conflict_distance>0) {
                 if (enemy_action[0] === "D" && enemy_roll > player_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
                     log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "error-msg");
@@ -3477,7 +3449,7 @@
                     if (enemyContainer) enemyContainer.style.display = "none";
                     if (enemyImg) enemyImg.src = "";
                     
-                    let activeChallenge = CHALLENGES[current_challenge_key];
+                    let activeChallenge = CHALLENGES[enemy_id];                    
                     
                     if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                         if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
@@ -3496,15 +3468,18 @@
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
-                    if (activeChallenge && activeChallenge.enemy_escape) {
-                        proceed(activeChallenge.enemy_escape);
-                    } else if (pending_challenge_key) {
-                        let nextChallenge = pending_challenge_key; 
-                        pending_challenge_key = null; 
-                        proceed(nextChallenge);
+                    let nextChallenge = [];
+
+                    pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
+                    if (pending_challenge_key) {
+                        pushFlat(nextChallenge, pending_challenge_key);
+                        pending_challenge_key = null;
                     } else {
-                        proceed(activeChallenge.case_success);
+                        pushFlat(nextChallenge, activeChallenge?.case_success);
                     }
+
+                    proceed(nextChallenge);
                 };
 
                 if (!isProcessingQueue) {
@@ -3581,13 +3556,18 @@
 
                             if (bothEscaping) {
                                 pre_encounter_challenge_key = null;
+                                let nextChallenge = [];
+
+                                pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
                                 if (pending_challenge_key) {
-                                    let nextChallenge = pending_challenge_key; 
-                                    pending_challenge_key = null; 
-                                    proceed(nextChallenge);
-                                } else if (activeChallenge && activeChallenge.case_success) {
-                                    proceed(activeChallenge.case_success);
+                                    pushFlat(nextChallenge, pending_challenge_key);
+                                    pending_challenge_key = null;
+                                } else {
+                                    pushFlat(nextChallenge, activeChallenge?.case_success);
                                 }
+
+                                proceed(nextChallenge);
                             } 
                             else if (pre_encounter_challenge_key) {
                                 let stepsToRetreat = 0; 
@@ -3660,24 +3640,27 @@
                 else if (enemy_escaping) {
                     if (enemy_roll > player_roll) {
                         enemy_escape_counter++;
-                        log(`🏃 ${enemy.toUpperCase()} sa ti vzďaľuje! (Únik: ${enemy_escape_counter}/2)`, "danger-msg", false,false,true);
+                        log(`${enemy.toUpperCase()} sa ti vzďaľuje! (Únik: ${enemy_escape_counter}/2)`, "danger-msg", false,false,true);
                     } 
                     else if (player_roll > enemy_roll) {
                         if (player_action[0] === "A") {
-                            log(`🎯 Triafaš unikajúceho nepriateľa!`, "success-msg", false,false,true);
+                            log(`Triafaš unikajúceho nepriateľa!`, "success-msg", false,false,true);
                         } else {
                             enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                            log(`🛑 Dobiehaš nepriateľa! (Únik: ${enemy_escape_counter}/2)`, "success-msg", false,false,true);
+                            log(`Dobiehaš nepriateľa! (Únik: ${enemy_escape_counter}/2)`, "success-msg", false,false,true);
                         }
                     }
                     else {
-                        log(`🏃 Držíte si rovnaké tempo. (Únik: ${enemy_escape_counter}/2)`, "info-msg", false,false,true);
+                        log(`Držíte si rovnaké tempo. (Únik: ${enemy_escape_counter}/2)`, "info-msg", false,false,true);
                     }
 
                     if (enemy_escape_counter >= 2) {
-                        log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg", false,false,true);
+                        log(` ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg", false,false,true);
                         HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                         log(`(+1 BR)`, "success-msg", false,false,true);
+                        enemy_escape_counter = 0;
+                        enemy_escaping = false;
+                        
                         inputs_frozen = true;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3707,15 +3690,18 @@
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                             player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
-                            if (activeChallenge && activeChallenge.enemy_escape) {
-                                proceed(activeChallenge.enemy_escape);
-                            } else if (pending_challenge_key) {
-                                let nextChallenge = pending_challenge_key; 
-                                pending_challenge_key = null; 
-                                proceed(nextChallenge);
+                            let nextChallenge = [];
+
+                            pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
+                            if (pending_challenge_key) {
+                                pushFlat(nextChallenge, pending_challenge_key);
+                                pending_challenge_key = null;
                             } else {
-                                proceed(activeChallenge.case_success);
+                                pushFlat(nextChallenge, activeChallenge?.case_success);
                             }
+
+                            proceed(nextChallenge);
                         };
 
                         if (!isProcessingQueue) {
@@ -3771,6 +3757,7 @@
 
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                     log(`${enemy.toUpperCase()} padá a ty prežívaš! (+1 BR).`, "success-msg");
+                    if(enemyType === "Predátorka" || enemyType === "Skautka") executeMods("item_ŽĽAZA SOMORY+1");
                     inputs_frozen = true; 
                     const scrollRow = document.querySelector('.card-scroll-row');
                     if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -3785,26 +3772,23 @@
                         if (enemyContainer) enemyContainer.style.display = "none";
 
                         let activeChallenge = CHALLENGES[enemy_id];
-                        if (enemy_id) { 
-                            CHALLENGES["ACTIVE"][enemy_id] = false; 
-                            if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
-                                handleChallengeTransition(activeChallenge.on_death);
-                            }
-                        }
 
                         enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                         enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                         player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
+                        let nextChallenge = [];
+
+                        pushFlat(nextChallenge, activeChallenge?.on_death);
+
                         if (pending_challenge_key) {
-                            let nextChallenge = pending_challenge_key; 
-                            pending_challenge_key = null; 
-                            is_collapse_check = false;
-                            proceed(nextChallenge); 
+                            pushFlat(nextChallenge, pending_challenge_key);
+                            pending_challenge_key = null;
                         } else {
-                            is_collapse_check = false;
-                            proceed(activeChallenge.case_success); 
+                            pushFlat(nextChallenge, activeChallenge?.case_success);
                         }
+
+                        proceed(nextChallenge);
                     };
 
                     if (!isProcessingQueue) { 
@@ -3882,7 +3866,7 @@
                 clearTimeout(combatLoopTimeout);
                 clearTimeout(readyPromptTimeout);
                 HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
-                executeMods("item_ŽĽAZA SOMORY+1");
+                if(enemyType === "Predátorka" || enemyType === "Skautka") executeMods("item_ŽĽAZA SOMORY+1");
                 log(`${enemy} JE DOLE! (+1 BR).`, "success-msg", false,false,true);
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
@@ -3897,24 +3881,23 @@
                     if (enemyImg) enemyImg.src = "";
 
                     let activeChallenge = CHALLENGES[enemy_id];
-                    if (enemy_id) {
-                        CHALLENGES["ACTIVE"][enemy_id] = false; 
-                        if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
-                            handleChallengeTransition(activeChallenge.on_death);
-                        }
-                    }
                     
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
+                    let nextChallenge = [];
+
+                    pushFlat(nextChallenge, activeChallenge?.on_death);
+
                     if (pending_challenge_key) {
-                        let nextChallenge = pending_challenge_key;
-                        pending_challenge_key = null; 
-                        proceed(nextChallenge); 
+                        pushFlat(nextChallenge, pending_challenge_key);
+                        pending_challenge_key = null;
                     } else {
-                        proceed(activeChallenge.case_success); 
+                        pushFlat(nextChallenge, activeChallenge?.case_success);
                     }
+
+                    proceed(nextChallenge);
                 };
 
                 if (!isProcessingQueue) {
@@ -4888,7 +4871,7 @@
                 }
             }
 
-            if (distance_combat_active && enemy_action && enemy_action[0] === "A") {
+            if (conflict_distance > 0 && !enemyHasRangedWeapon() && enemy_action && enemy_action[0] === "A") {
                 enemy_action = ["D", enemy_action[1]];
             }
 
@@ -5147,6 +5130,8 @@
                 left: 0;
                 width: 100%;
                 height: 100%;
+                overflow: hidden;
+                box-sizing: border-box;
                 background: rgba(10, 10, 10, 0.95);
                 display: flex;
                 flex-direction: column;
@@ -5161,15 +5146,17 @@
                     background: #1a1a1a; 
                     border: 2px solid var(--hybrid-green); 
                     border-radius: 8px; 
-                    width: 705px; 
-                    height: 380px;
+                    width: min(705px, 94%); 
+                    height: min(380px, 90%);
+                    max-width: 94%;
+                    max-height: 90%;
+                    box-sizing: border-box;
                     box-shadow: 0 0 15px rgba(0, 215, 0, 0.3);
                     display: flex;
                     flex-direction: column;
-                    max-height: 90vh;
                 ">
                     <!-- Scrollable content area -->
-                    <div style="padding: 15px 15px 10px; text-align: center; overflow-y: auto; flex: 1;">
+                    <div id="hero-display" style="padding: 15px 15px 10px; text-align: center; overflow-y: auto; flex: 1;">
                         <h3 id="hero-display-name" style="font-family: 'Archivo Black', sans-serif; margin: 0 0 5px 0; text-transform: uppercase; color: #fff;">-</h3>
                         <div id="hero-display-skills" style="text-align: left; font-family: 'Roboto Condensed', sans-serif; font-size: 0.95rem; background: #111; padding: 12px; border-radius: 4px; border: 1px solid #333;">
                             <div id="hero-skills-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 6px 30px;"></div>
@@ -5438,6 +5425,7 @@
                     localStorage.setItem('characters', JSON.stringify(saved));
                 }
                 toggleBuilder(true);
+                showGeneralPrompt("POČIATOČNÁ FÁZA \n \n Máš k dispozícii 40 bodov rastu (BR) určených na DANOSTI (Sila, IQ, Obratnosť...). Môžeš si pridať 1 až 6 daností. \n \n Keď minieš všetkých 40 bodov, odomknú sa schopnosti.")
             };
             // ── after the existing onclick assignments for prev/next/confirm ──
 
@@ -5470,7 +5458,7 @@
             const weaponDropdown = document.getElementById("player-weapon-dropdown");
             if (!weaponDropdown) return;
             const currentSelectedWeapon = weaponDropdown.value; 
-            weaponDropdown.innerHTML = '<option value="placeholder">👊PRÁZDNE RUKY👊</option>';
+            weaponDropdown.innerHTML = '<option value="placeholder">- ZBRAŇ - </option>';
 
             // Ak hrdina existuje a má pole zbraní (weapons), pridáme ich do dropdownu
             if (HERO && Array.isArray(HERO.weapons)) {
@@ -6163,7 +6151,7 @@
 
             // --- D. SKUTOČNÁ KONTROLA A SPOTREBA MUNÍCIE ---
             
-            if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof distance_combat_active !== 'undefined' && distance_combat_active) {
+            if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof conflict_distance !== 'undefined' && conflict_distance > 0) {                
                 if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
                     log(`⚠️ Na útok holými rukami je nepriateľ príliš ďaleko.`, "error-msg");
                     return;
@@ -6522,14 +6510,11 @@
         // Score = 10 minus how many times this id appears in the last 10 history entries.
         // Never-seen (or rarely-seen) choices score highest, so the bot is pushed to explore.
         function getExploratoryScore(choiceId) {
-            const recentWindow = test_choice_history.slice(-50);
+            const recentWindow = test_choice_history.slice(-10);
             const occurrences = recentWindow.filter(id => id === choiceId).length;
-            return 50 - occurrences;
+            return 10 - occurrences;
         }
 
-        // Given a list of stable choice ids, returns the index of the one to pick.
-        // Ties are broken with a per-candidate random draw (NOT by index/order/alphabetical),
-        // so a recurring tie between the same options can't lock into a stable cycle.
         function pickExploratoryIndex(choiceIds) {
             const scores = choiceIds.map(id => getExploratoryScore(id));
             const maxScore = Math.max(...scores);
@@ -6573,6 +6558,12 @@
                 return;
             }
 
+            if (typeof is_conflict !== 'undefined' && is_conflict && !enemy) {
+                console.log("TEST: combat state unstable (is_conflict=true but enemy=null), waiting for stabilization");
+                setTimeout(test, 400); 
+                return;
+            }
+
             if (current_challenge_key.includes("GAME")) {
                 setTimeout(() => exportNreload("GAME OVER"), 200);
                 return;
@@ -6584,6 +6575,7 @@
             if (stuck_counter > 20) {
                 setTimeout(() => exportNreload("STUCK"), 700);
             }
+
 
             if (prev_challenge !== current_challenge_key) {
                 prev_challenge = current_challenge_key;
@@ -6819,6 +6811,46 @@
         });
 
 
+    function setRealViewportVars() {
+        const root = document.documentElement;
+        root.style.setProperty('--real-vw', window.innerWidth + 'px');
+        root.style.setProperty('--real-vh', window.innerHeight + 'px');
+    }
+ 
+    function fitMobilePage() {
+        const isMobilePortrait = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
+        const root = document.documentElement;
+ 
+        if (!isMobilePortrait) {
+            root.style.setProperty('--mobile-fit-scale', 1);
+            return;
+        }
+ 
+        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real size
+        const naturalHeight = document.body.scrollHeight;
+        const availableHeight = window.innerWidth;
+        const heightScale = availableHeight / naturalHeight;
+        const naturalWidth = document.body.scrollWidth;
+        const availableWidth = window.innerHeight;
+        const widthScale = availableWidth / naturalWidth;
+ 
+        const scale = Math.min(1, heightScale, widthScale);
+        root.style.setProperty('--mobile-fit-scale', scale);
+    }
+ 
+    function updateMobileLayout() {
+        setRealViewportVars(); // size the rotated box correctly FIRST
+        fitMobilePage();       // THEN measure/scale content against that box
+    }
+ 
+    window.addEventListener('load', updateMobileLayout);
+    window.addEventListener('resize', updateMobileLayout);
+    window.addEventListener('orientationchange', updateMobileLayout);
+ 
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(updateMobileLayout);
+    }
+
         Promise.all([
             fetch('./CHALLENGES.json').then(response => {
                 if (!response.ok) throw new Error('Nepodarilo sa načítať súbor CHALLENGES.json');
@@ -6939,3 +6971,97 @@
         .catch(error => {
             console.error("Chyba pri inicializácii hry:", error);
         });
+
+function showTooltip(event) {
+    console.log('showTooltip called', event.currentTarget);
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        console.log('Creating tooltip');
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+    const desc = event.currentTarget.getAttribute('data-tooltip');
+    console.log('Tooltip description:', desc);
+    if (desc && tooltip) {
+        tooltip.textContent = desc;
+        tooltip.classList.add('visible');
+        console.log('Tooltip visible, text:', desc);
+    }
+}
+
+function moveTooltip(event) {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        let posX = event.clientX + 15;
+        let posY = event.clientY - 15;
+        
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - 15;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - 15;
+        }
+        
+        tooltip.style.left = posX + 'px';
+        tooltip.style.top = posY + 'px';
+    }
+}
+
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function initTooltips() {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    document.body.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        const description = target.getAttribute('data-tooltip');
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+    }, true); // true = capture phase
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+});

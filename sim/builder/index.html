@@ -19,54 +19,17 @@
 </head>
 <body>
 
-<div class="stain stain-tl"></div>
-<div class="stain stain-tr"></div>
-<div class="stain stain-br"></div>
-
-
-
 
 <div id="view-builder" class="view-section" style="display: block;">
-    <div class="header-row">
-        <div class="logo-container">
-            <img src="assets/logo.png" alt="HYBRID" class="logo-img">
-        </div>
-    </div>
+
 
     <div class="container">
         <div class="tabs">
-            <button class="tab-btn active" onclick="openTab('builder')">DENNÍK HRDINU</button>
-            <button class="tab-btn" onclick="openTab('inventar')">INVENTÁR</button>
-            <button class="tab-btn" onclick="openTab('navod')">NÁVOD</button>
-            <button class="tab-btn share-btn-top" onclick="zdielatVsetkoDiscord()">PODELIŤ SA!</button>
     </div>
 
         <div id="builder" class="tab-content active">
             <div class="stats-panel" id="character-stats"></div>
-            <div class="info-panel">
-                <div class="control-box">
-                    <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
-                    <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
-                    <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
-                    <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
-                        <span id="cost-container" style="display:none;" class="old-price-wrapper">
-                            <span id="cost-orig" class="old-price"></span>
-                        </span>
-                        <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
-                    </div>
-                    <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
-                        <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
-                        <button class="down-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
-                        <button class="back-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
 
-                    </div>
-                </div>
-                <div id="filter-container" style="display: flex; gap: 5px;">
-                    <select id="builder-group-filter" style="flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
-                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="flex: 1.5; margin-right: 5px;" onkeyup="filterBuilder()">
-                </div>
-                <div class="selection-list" id="builder-list"></div>
-            </div>
         </div>
 
         <div id="navod" class="tab-content">
@@ -135,20 +98,40 @@
 
 
 </div>
-<div id="rel-add-container">
-    <button class="mobile-only-close" onclick="toggleRelOverlay(false)">X</button>
-    <div class="rel-add-controls">
-        <label>PRIDAŤ PRÍBUZNÚ SCHOPNOSŤ</label>
-        <div>
-            <label>HĽADAŤ NÁZOV</label>
-            <input type="text" id="rel-search" placeholder="ZADAJTE NÁZOV..." onkeyup="filterRelSearch()">
-        </div>
-        <div>
-            <label>FILTER SKUPINY</label>
-            <select id="rel-group-filter" onchange="filterRelSearch()"></select>
+
+<div id="info-panel-container">
+    <div class="info-panel-box">
+        <button class="info-panel-close-btn" onclick="toggleInfoOverlay(false)">×</button>
+        <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSŤ</h3>
+        <p style="font-family: 'Roboto Condensed', sans-serif;">Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.</p>
+
+        <div class="info-panel">
+            <div class="control-box">
+                <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
+                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
+                <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
+                <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
+                    <span id="cost-container" style="display:none;" class="old-price-wrapper">
+                        <span id="cost-orig" class="old-price"></span>
+                    </span>
+                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
+                </div>
+                <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
+                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
+                    <button class="down-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
+                    <button class="back-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
+
+                </div>
+            </div>
+            <div>
+                <div id="filter-container" style="display: flex; gap: 5px;">
+                    <select id="builder-group-filter" style="border-radius: 8px;flex: 1; font-size: 0.8rem;" onchange="filterBuilder()"><option value="">VŠETKY SKUPINY</option></select>
+                    <input type="text" id="builder-search" placeholder="ZADAJTE SCHOPNOSŤ" style="border-radius:8px;flex: 1.5; margin-right: 5px;" onkeyup="filterBuilder()">
+                </div>
+                <div class="selection-list" id="builder-list"></div>
+            </div>
         </div>
     </div>
-    <div class="selection-list" id="rel-add-list"></div>
 </div>
 
 <script src="script_builder.js"></script>

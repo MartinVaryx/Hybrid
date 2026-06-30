@@ -1,6 +1,24 @@
     
     let isSyncing = false;
+    let selectedItem = null;
     
+    function selectItem(name) {
+        selectedItem = (selectedItem === name) ? null : name;
+        renderStats();
+    }
+    
+    function toggleInfoOverlay(show) {
+        const overlay = document.getElementById('info-panel-container');
+        if (!overlay) return;
+
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+
+
     function updateGroupDropdown() {
         const builderSelect = document.getElementById('builder-group-filter');
         
@@ -438,96 +456,266 @@
         const container = document.getElementById('character-stats');
         const char = characters[activeCharIdx];
         container.innerHTML = '';
+    
+    
+        // --- PC VERZIA: MENO ---
 
-        //MENO - pozícia na hárku
-        addSheetText(container, char.name, "13%", "17.5%", "1.2rem", "380px", "left", "name-field");
-
-        // Zistíme, či sme v mobilnom zobrazení (napr. šírka pod 768px)
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-            // --- MOBILNÁ VERZIA ---
-            const headerRow = document.createElement('div');
-            headerRow.className = "mobile-header-row";
-            headerRow.style.cssText = "display: flex; flex-direction: column; gap: 10px; padding: 10px; background: #eee; border-bottom: 2px solid #000; margin-bottom: 10px;";
-
-            // Meno
-            const nameDiv = document.createElement('div');
-            nameDiv.className = "name-field";
-            nameDiv.style.fontSize = "1.4rem";
-            nameDiv.style.fontWeight = "bold";
-            headerRow.appendChild(nameDiv);
-
-            // Kontajner pre BR a Ľudskosť vedľa seba
-            const statsRow = document.createElement('div');
-            statsRow.style.cssText = "display: flex; justify-content: space-between; align-items: center;";
-
-            const humanityVal = char.humanity !== undefined ? char.humanity : 50;
-
-            statsRow.innerHTML = `
-                <div class="humanity-field" style="font-weight: bold;"> ${humanityVal}</div>
-                <div class="br-field" style="font-weight: bold;">${char.sp}</div>
-            `;
-            
-            headerRow.appendChild(statsRow);
-            container.appendChild(headerRow); // Pridáme hlavičku ako prvú
-
-        } else {
-            // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
-            addSheetText(container, char.sp.toString(), "25%", "90%", "1.8rem", "60px", "center", "br-field");
+            addSheetText(container, char.name, "6.29%", "10%", "1.4rem", "380px", "left", "name-field");
+            addSheetText(container, char.sp.toString(), "5.53%", "94%", "1.8rem", "60px", "center", "br-field");
             
             const humanityVal = char.humanity !== undefined ? char.humanity : 10;
-            addSheetText(container, humanityVal.toString(), "25%", "76.5%", "1.8rem", "60px", "center", "humanity-field");
-        }
+            addSheetText(container, humanityVal.toString(), "5.53%", "84.5%", "1.8rem", "60px", "center", "humanity-field");
 
-        //SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
+    
+        // --- SCHOPNOSTI DATA PREPARATION ---
         const learnedSkills = Object.entries(char.skills)
             .filter(([_, lvl]) => lvl > 0)
             .sort();
+    
 
-        const slots = [];
-        const maxRows = 8; 
-        
-        // Generovanie pozícií pre PC papier
-        for (let col = 0; col < 2; col++) {
-            for (let row = 0; row < maxRows; row++) {
-                slots.push({
-                    x: col === 0 ? 6.5 : 54,
-                    y: 40.5 + (row * 4.73) 
-                });
+            // --- PC VERZIA: SCHOPNOSTI ---
+            const slots = [];
+            const maxRows = 8; 
+            
+            for (let col = 0; col < 2; col++) {
+                for (let row = 0; row < maxRows; row++) {
+                    slots.push({
+                        x: col === 0 ? 4 : 37,
+                        y: 33.17 + (row * 8.22)
+                    });
+                }
             }
-        }
+    
+            learnedSkills.forEach(([name, lvl], index) => {
+                if (index < slots.length) {
+                    const slot = slots[index];
+                    const data = skillsDB_new[name] || [0, ""];
+                    const displayName = truncateString(name, 18);
+    
+                    // Background with category and level labels
+                    const div = document.createElement('div');
+                    div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
+                    div.style.left = slot.x + "%";
+                    div.style.top = slot.y + "%";
+                    div.style.width = "29%"; 
+                    div.style.height = "4.4%"; 
+                    div.onclick = () => {
+                        selectSkill(name);
+                        toggleInfoOverlay(true);
+                    };
+                    div.setAttribute('data-description', data[3] || '');
+    
+                    div.innerHTML = `
+                        <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
+                        <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                        <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                    `;
+                    container.appendChild(div);
 
-        learnedSkills.forEach(([name, lvl], index) => {
-            if (index < slots.length) {
-                const slot = slots[index];
-                const data = skillsDB_new[name] || [0, ""];
-                
-                // Limit 18 znakov (pre PC verziu, aby text nepretiekol)
-                const displayName = truncateString(name, 18);
-
-                const div = document.createElement('div');
-                // Pridávame triedu vybraného slotu
-                div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
-                
-                // Štýlovanie pre PC (tieto hodnoty CSS media query na mobile prepíše)
-                div.style.left = slot.x + "%";
-                div.style.top = slot.y + "%";
-                div.style.width = "42.5%"; 
-                div.style.height = "4.4%"; 
-                
-                div.onclick = () => selectSkill(name);
-
-                // Vnútro slotu: Kategória | Názov | Úroveň
-                // Dôležité: Kategória je v prvom div, ktorý na mobile skrývame cez display:none
-                div.innerHTML = `
-                    <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
-                    <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
-                    <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                    // Name button overlay
+                    const nameButton = document.createElement('div');
+                    nameButton.style.position = 'absolute';
+                    nameButton.style.left = (slot.x + 3.6) + "%";
+                    nameButton.style.top = (slot.y - 1.8) + "%";
+                    nameButton.style.width = "19.5%"; 
+                    nameButton.style.height = "7.4%";
+                    nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                    nameButton.style.cursor = 'pointer';
+                    nameButton.style.border = '2px solid #999';
+                    nameButton.style.borderRadius = '6px';
+                    nameButton.style.transition = 'all 0.2s ease';
+                    nameButton.style.zIndex = '1';
+                    nameButton.setAttribute('data-description', data[3] || '');
+                    nameButton.onclick = (e) => {
+                        e.stopPropagation();
+                        selectSkill(name);
+                        toggleInfoOverlay(true);
+                    };
+                    
+                    nameButton.onmouseover = () => {
+                        nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.5)';
+                        nameButton.style.borderColor = '#666';
+                    };
+                    nameButton.onmouseout = () => {
+                        nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                        nameButton.style.borderColor = '#999';
+                    };
+                    
+                    container.appendChild(nameButton);
+                }
+            });
+    
+            // --- ADD "+" TO FIRST EMPTY SKILL SLOT ---
+            if (learnedSkills.length < slots.length) {
+                const emptySlotIndex = learnedSkills.length;
+                const emptySlot = slots[emptySlotIndex];
+    
+                const addSkillDiv = document.createElement('div');
+                addSkillDiv.className = 'skill-slot add-skill-slot';
+                addSkillDiv.style.left = (emptySlot.x + 3.6) + "%";
+                addSkillDiv.style.top = (emptySlot.y - 1.8) + "%";
+                addSkillDiv.style.width = "19.5%"; 
+                addSkillDiv.style.height = "7.4%";
+                addSkillDiv.style.display = 'flex';
+                addSkillDiv.style.alignItems = 'center';
+                addSkillDiv.style.justifyContent = 'center';
+                addSkillDiv.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                addSkillDiv.style.cursor = 'pointer';
+                addSkillDiv.style.border = '2px solid #999';
+                addSkillDiv.style.borderRadius = '6px';
+                addSkillDiv.style.transition = 'all 0.2s ease';
+                addSkillDiv.onclick = () => {
+                    toggleInfoOverlay(true);
+                };
+    
+                // Hover effects
+                addSkillDiv.onmouseover = () => {
+                    addSkillDiv.style.backgroundColor = 'rgba(151, 151, 151, 0.5)';
+                    addSkillDiv.style.borderColor = '#666';
+                };
+                addSkillDiv.onmouseout = () => {
+                    addSkillDiv.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                    addSkillDiv.style.borderColor = '#999';
+                };
+    
+                addSkillDiv.innerHTML = `
+                    <div id="new-skill" style="font-size: 2.4rem; font-weight: bold; color: #464646;">+</div>
                 `;
-                container.appendChild(div);
+                container.appendChild(addSkillDiv);
             }
-        });
+        
+    
+        // --- ITEMS DATA PREPARATION ---
+        const saved = JSON.parse(localStorage.getItem('characters')) || [];
+        const savedChar = saved.find(c => c.name.toUpperCase() === char.name.toUpperCase());
+        const items = savedChar ? (savedChar.items || {}) : {};
+        const weapons = savedChar ? (savedChar.weapons || []) : {};
+    
+        let allItems = Object.entries(items)
+            .filter(([_, qty]) => qty > 0)
+            .concat(weapons.map(w => [w, 1]))
+            .sort((a, b) => a[0].localeCompare(b[0]));
+    
+        const ITEM_LIST = window.parent && window.parent.ITEM_LIST;
+
+            // --- PC VERZIA: VYBAVENIE ---
+            const itemSlots = [];
+            const itemMaxRows = 6; 
+            const itemStartY = 33.17;
+            const itemSpacing = 8.25;
+            const itemHeight = 4.4;
+    
+            for (let col = 0; col < 2; col++) {
+                for (let row = 0; row < itemMaxRows; row++) {
+                    itemSlots.push({
+                        x: col === 0 ? 64.5 : 8,
+                        y: itemStartY + (row * itemSpacing)
+                    });
+                }
+            }
+    
+            const selectedItemData = (ITEM_LIST && selectedItem) ? ITEM_LIST[selectedItem.toUpperCase()] : null;
+            const selectedItemHasEffect = !!(selectedItemData && selectedItemData.effect);
+    
+            if (selectedItem && selectedItemHasEffect) {
+                // Calculate button position based on selected item's position
+                let buttonY = itemStartY; // Default fallback
+                
+                // Find which slot the selected item is in
+                const selectedItemIndex = allItems.findIndex(([name]) => name === selectedItem);
+                if (selectedItemIndex !== -1 && selectedItemIndex < itemSlots.length) {
+                    const selectedSlot = itemSlots[selectedItemIndex];
+                    // Position button just below the selected item (top + height + small gap)
+                    buttonY = selectedSlot.y; // 1% gap
+                }
+    
+                const useBtn = document.createElement('button');
+                useBtn.className = 'basic-btn';
+                useBtn.innerText = 'POUŽIŤ';
+                useBtn.style.cssText = `
+                    position: absolute;
+                    right: 5%;
+                    top: ${buttonY}%;
+                    width: 9%;
+                    height: 5.5%;
+                    background: var(--hybrid-green);
+                    color: white;
+                    border: 1px solid #fff;
+                    border-radius: 12px;
+                    font-weight: bold;
+                    font-size: 0.9rem;
+                    cursor: pointer;
+                    z-index:10000;
+                `;
+                useBtn.onclick = () => {
+                    useItemBuilder(selectedItem);
+                    selectedItem = null;     // Clear selection
+                    renderStats();           // Re-render to hide button
+                };
+                container.appendChild(useBtn);
+            }
+    
+            allItems.forEach(([name, qty], index) => {
+                if (index < itemSlots.length) {
+                    const itemSlot = itemSlots[index];
+                    const displayName = truncateString(name.toUpperCase(), 18);
+    
+                    const itemData = ITEM_LIST ? ITEM_LIST[name.toUpperCase()] : null;
+                    const itemHasEffect = !!(itemData && itemData.effect);
+    
+                    // Background with quantity label
+                    const div = document.createElement('div');
+                    div.className = `skill-slot ${selectedItem === name ? 'selected' : ''}`;
+                    div.style.left = itemSlot.x + "%";
+                    div.style.top = itemSlot.y + "%";
+                    div.style.width = "28.5%"; 
+                    div.style.height = "4.4%"; 
+                    div.onclick = () => selectItem(name);
+                    div.setAttribute('data-description', itemData && itemData.description ? itemData.description : '');
+                    
+                    div.innerHTML = `
+                        <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                        <div class="skill-lvl-box" style="position:absolute; right:-10%; width:9%; text-align:center; font-weight:bold;">${qty}</div>
+                    `;
+                    container.appendChild(div);
+
+                    // Item name button overlay (only if has effect)
+                    if (itemHasEffect) {
+                        const nameButton = document.createElement('div');
+                        nameButton.style.position = 'absolute';
+                        nameButton.style.left = (itemSlot.x + 3.1) + "%";
+                        nameButton.style.top = (itemSlot.y - 1.4) + "%";
+                        nameButton.style.width = "24.4%"; 
+                        nameButton.style.height = "6.6%";
+                        nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                        nameButton.style.cursor = 'pointer';
+                        nameButton.style.border = '2px solid #999';
+                        nameButton.style.borderRadius = '6px';
+                        nameButton.style.transition = 'all 0.2s ease';
+                        nameButton.style.zIndex = '1';
+                        nameButton.setAttribute('data-description', itemData && itemData.description ? itemData.description : '');  
+                        nameButton.onclick = (e) => {
+                            e.stopPropagation();
+                            selectItem(name);
+                        };
+                        
+                        nameButton.onmouseover = () => {
+                            nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.5)';
+                            nameButton.style.borderColor = '#666';
+                        };
+                        nameButton.onmouseout = () => {
+                            nameButton.style.backgroundColor = 'rgba(151, 151, 151, 0.3)';
+                            nameButton.style.borderColor = '#999';
+                        };
+                        
+                        container.appendChild(nameButton);
+                    }
+                }
+            });
+        
     }
+
+
 
     function addSheetText(container, text, top, left, size, width, align, extraClass = "") {
         const div = document.createElement('div');
@@ -619,7 +807,7 @@
     function useItemBuilder(name){
         window.parent.useItem(name);
         setTimeout(() => {
-            renderInventar()
+            renderStats()
         }, 500);
     }
 
@@ -1160,7 +1348,6 @@ function cleanUpExport(originalStyles) {
 }
 
 function initSkillTooltips() {
-    // Vytvoríme jeden globálny div pre tooltip v dokumente, ak ešte neexistuje
     let tooltip = document.querySelector('.skill-tooltip');
     if (!tooltip) {
         tooltip = document.createElement('div');
@@ -1168,13 +1355,12 @@ function initSkillTooltips() {
         document.body.appendChild(tooltip);
     }
 
-    // Delegovanie udalosti na celý dokument (bude fungovať aj po premazaní a znovuvykreslení zoznamov)
+    // Updated selector to catch both builder items AND renderStats items
     document.addEventListener('mouseover', (event) => {
-        const target = event.target.closest('.skill-list-item');
+        const target = event.target.closest('[data-description]');  // ← Changed this line
         if (!target) return;
 
         const description = target.getAttribute('data-description');
-        // Ak schopnosť nemá popis (index 3 je prázdny), tooltip nezobrazujeme
         if (!description || description.trim() === "") return;
 
         tooltip.textContent = description;
@@ -1190,7 +1376,6 @@ function initSkillTooltips() {
         let posX = event.clientX + offsetX;
         let posY = event.clientY + offsetY;
 
-        // Ošetrenie, aby rámček nevyliezol mimo obrazovku vpravo alebo dole
         if (posX + tooltip.offsetWidth > window.innerWidth) {
             posX = event.clientX - tooltip.offsetWidth - offsetX;
         }
@@ -1203,12 +1388,10 @@ function initSkillTooltips() {
     });
 
     document.addEventListener('mouseout', (event) => {
-        const target = event.target.closest('.skill-list-item');
+        const target = event.target.closest('[data-description]');
         if (!target) return;
 
         tooltip.classList.remove('visible');
-
-        
     });
 }
 
@@ -1216,4 +1399,6 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.parent && typeof window.parent.onIframeReady === 'function') {
         window.parent.onIframeReady();
     }
+    initSkillTooltips();
+
 });

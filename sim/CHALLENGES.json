@@ -26,9 +26,9 @@
         "case_threat": "enemy_advantage+1",
         "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
         "case_failure": [
-            "alerted_Predátorka_2:true",
-            "Predátorka_2",
-            "if_distractBasment:true_CITY_2_else_WRECKS_0"
+            "if_distractBasment:true_alerted:Predátorka_1:true_else_alerted_Predátorka_2:true",
+            "if_distractBasment:true_Predátorka_1_else_Predátorka_2",
+            "Predátorka_2"
         ],
         "enemy_escape_delayed": "WRECKS_PREDATOR_2"
     },
@@ -47,9 +47,10 @@
     "Predátorka_2": {
         "image": "assets/CITY.png",
         "type": "Predátorka",
-        "on_death": [
+        "case_success": [
             "set_WRECKS_PREDATOR_2_false",
-            "set_WRECKS_PREDATOR_false"
+            "set_WRECKS_PREDATOR_false",
+            "WRECKS"
         ]
     },
     "WRECKS_PREDATOR": {
@@ -79,7 +80,7 @@
         "failure_msg": "Nepodarilo sa ti to. Buď tam nič nie je, alebo to jednoducho nevieš.",
         "case_success": "WRECKS_1",
         "case_threat": "stress+2",
-        "case_failure": "WRECKS_PREDATOR_2",
+        "case_failure": "WRECKS_PREDATOR",
         "back": true
     },
     "BASEMENT_PREDATOR_2": {
@@ -92,18 +93,16 @@
             "flag_distractBasment:true",
             "DISTRACT_PREDATOR"
         ],
-        "case_B": [
-            "Predátorka_1",
-            "CITY_2"
-        ],
+        "case_B": "Predátorka_1",
         "enemy_escape_delayed": "BASEMENT_PREDATOR_2"
     },
     "Predátorka_1": {
         "image": "assets/CITY.png",
         "type": "Predátorka",
-        "on_death": [
+        "case_success": [
             "set_BASEMENT_PREDATOR_2_false",
-            "set_BASEMENT_PREDATOR_false"
+            "set_BASEMENT_PREDATOR_false",
+            "CITY_2"
         ]
     },
     "BASEMENT_PREDATOR": {
@@ -116,10 +115,7 @@
             "flag_distractBasment:true",
             "DISTRACT_PREDATOR"
         ],
-        "case_B": [
-            "Predátorka_1",
-            "CITY_2"
-        ],
+        "case_B": "Predátorka_1",
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "CAR_3": {
@@ -228,7 +224,10 @@
         ],
         "case_success_delayed": "BASEMENT_PREDATOR",
         "case_threat": "stress+1",
-        "case_failure": ["alerted_SKAUTKA_2:true","SKAUTKA_2"],
+        "case_failure": [
+            "alerted_SKAUTKA_2:true",
+            "SKAUTKA_2"
+        ],
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENCOUNTER": {
@@ -520,10 +519,7 @@
         "case_B": "PURITAN_D_0",
         "choice_C": "Napadnem ho.",
         "case_C": [
-            "PURITÁN_1",
-            "set_TOWER_1_true",
-            "set_FOREST_PATH_0_false",
-            "TOWER_1"
+            "PURITÁN_1"
         ],
         "choice_D": "Nenápadne ho obídem.",
         "case_D": "FOREST_PATH_SNEAK",
@@ -536,10 +532,15 @@
         "case_success": "",
         "case_failure": "",
         "choice_A": "Skúsim dvere.",
-        "case_A": "SHACK_DOOR_BREAK",
+        "case_A": [
+            "flag_fromCellar:false",
+            "SHACK_DOOR_BREAK"
+        ],
         "choice_B": "Skúsim to oknom.",
         "case_B": "SHACK_WINDOW",
         "choice_C": "Prehľadám okolie.",
+        "choice_D": "Idem do pivnice.",
+        "case_D": "SHACK_CELLAR",
         "case_C": "SHACK_LOOK_AROUND",
         "back": true,
         "choice_E": "Idem dnu.",
@@ -587,7 +588,11 @@
     },
     "PURITÁN_1": {
         "image": "assets/FOREST.png",
-        "case_success": "",
+        "case_success": [
+            "set_TOWER_1_true",
+            "set_FOREST_PATH_0_false",
+            "TOWER_1"
+        ],
         "case_failure": "",
         "type": "Puritán"
     },
@@ -620,10 +625,7 @@
             "TOWER_1"
         ],
         "case_failure": [
-            "PURITÁN_1",
-            "set_TOWER_1_true",
-            "set_FOREST_PATH_0_false",
-            "TOWER_1"
+            "PURITÁN_1"
         ],
         "skills": [
             "ZASTRAŠOVANIE",
@@ -647,10 +649,7 @@
         "case_A": "FOREST_PATH_2",
         "choice_B": "Vieš čo, už ťa mám dosť.",
         "case_B": [
-            "PURITÁN_1",
-            "set_TOWER_1_true",
-            "set_FOREST_PATH_0_false",
-            "TOWER_1"
+            "PURITÁN_1"
         ],
         "choice_C": "Niečo som si zabudol v aute, maj sa.",
         "case_C": "FOREST_PATH_1"
@@ -662,10 +661,7 @@
         "case_failure": "",
         "choice_A": "Ideme sa biť.",
         "case_A": [
-            "PURITÁN_1",
-            "set_FOREST_PATH_0_false",
-            "set_TOWER_1_true",
-            "TOWER_1"
+            "PURITÁN_1"
         ],
         "choice_B": "Vrátim sa.",
         "case_B": "FOREST_PATH_1",
@@ -689,7 +685,9 @@
         "choice_E": "Idem do pivnice.",
         "case_E": "SHACK_CELLAR",
         "choice_A": "Pokračujem po lesnej ceste.",
-        "case_A": "FOREST_PATH_0"
+        "case_A": "FOREST_PATH_0",
+        "choice_F": "Idem k vysielaču.",
+        "case_F": "TOWER_1"
     },
     "PURITÁN_2": {
         "image": "assets/FOREST.png",
@@ -706,10 +704,7 @@
             "TOWER_1"
         ],
         "case_failure": [
-            "PURITÁN_1",
-            "set_TOWER_1_true",
-            "set_FOREST_PATH_0_false",
-            "TOWER_1"
+            "PURITÁN_1"
         ],
         "trigger_delayed": "difficulty+1",
         "skills": [
@@ -821,8 +816,6 @@
     "SHACK_LOOK_AROUND": {
         "initial_msg": "Kvôli porastu je ťažké pohybovať sa v blízkosti chaty.",
         "case_success": [
-            "set_SHACK_WINDOW_false",
-            "set_SHACK_DOOR_false",
             "set_SHACK_LOOK_AROUND_false",
             "set_SHACK_CELLAR_true",
             "SHACK_CELLAR"
@@ -902,10 +895,11 @@
         "case_A": [
             "SHACK_2",
             "SHACK_1",
+            "flag_fromCellar:true",
             "SHACK_DOOR_BREAK"
         ],
         "choice_B": "Ísť von.",
-        "case_B": "FOREST_PATH_1",
+        "case_B": "if_SHACK_0:true_SHACK_0_else_FOREST_PATH_1",
         "choice_C": "Prehľadať to tu.",
         "case_C": "SHACK_CELLAR_0"
     },
@@ -974,11 +968,9 @@
         "case_failure": "",
         "next": [
             "flag_doorOpen:true",
-            "set_SHACK_DOOR_0_false",
             "set_SHACK_CELLAR_true",
             "set_UNLOCK_CELLAR_false",
-            "SHACK_1",
-            "SHACK_2"
+            "SHACK_CELLAR"
         ]
     },
     "SHACK_ATTIC": {
@@ -1317,9 +1309,9 @@
         "initial_msg": "Najskôr ideš opatrne, potom pridáš do kroku.",
         "case_success": "BACK_ACTION_2",
         "case_failure": [
-            "PURITÁN_1",
             "set_PURITAN_CONVINCE_false",
-            "set_PURITAN_LIE_false"
+            "set_PURITAN_LIE_false",
+            "PURITÁN_1"
         ],
         "image": "assets/FOREST.png",
         "skills": [
@@ -1661,8 +1653,7 @@
         "success_msg": "PURITÁN: Nie, nepoznám človeka menom René. Ale viem o hybridovi, ktorý sa tak volal. Prečo ťa to zaujíma?",
         "threat_msg": "PURITÁN: Ty si určite tiež jeden z nich, čo? Neboj sa, očistím tvoju dušu od hriechu!",
         "case_threat": [
-            "PURITÁN_1",
-            "if_PURITÁN_1:false_TOWER_else_PURITAN_DONT_CONVINCE"
+            "PURITÁN_1"
         ],
         "threat_avoided_msg": "Nachvíľu sa na teba podozrievavo zahľadí, ale potom akoby si povedal: \"Nie, to sa mi len zdá.\"",
         "failure_msg": "Nikoho takého nepoznám.",
@@ -2648,32 +2639,32 @@
             "y": 1893
         },
         "WRECKS_PREDATOR_2": {
-            "x": 8742,
-            "y": 1667
+            "x": 8962,
+            "y": 1439
         },
         "Predátorka_2": {
-            "x": 8445,
-            "y": 1744
+            "x": 8603,
+            "y": 1652
         },
         "WRECKS_PREDATOR": {
-            "x": 8340,
-            "y": 1988
+            "x": 8224,
+            "y": 1700
         },
         "WRECKS": {
-            "x": 9084,
-            "y": 1877
+            "x": 9192,
+            "y": 1896
         },
         "BASEMENT_PREDATOR_2": {
-            "x": 8032,
-            "y": 2270
+            "x": 7999,
+            "y": 2176
         },
         "Predátorka_1": {
-            "x": 8429,
-            "y": 2356
+            "x": 8354,
+            "y": 2288
         },
         "BASEMENT_PREDATOR": {
-            "x": 8609,
-            "y": 2209
+            "x": 8548,
+            "y": 2129
         },
         "CAR_3": {
             "x": 12192,
@@ -2796,8 +2787,8 @@
             "y": 4742
         },
         "PURITAN_LIE": {
-            "x": 10582,
-            "y": 4991
+            "x": 10692,
+            "y": 5014
         },
         "PURITAN_THREATEN": {
             "x": 10893,
@@ -2808,8 +2799,8 @@
             "y": 5299
         },
         "PURITAN_DONT_CONVINCE": {
-            "x": 10389,
-            "y": 4732
+            "x": 10344,
+            "y": 4856
         },
         "FOREST_PATH_1": {
             "x": 9891,
@@ -3096,8 +3087,8 @@
             "y": 5554
         },
         "INTERROGATE_1": {
-            "x": 12518,
-            "y": 4704
+            "x": 11958,
+            "y": 5665
         },
         "INTERROGATE_2": {
             "x": 12540,

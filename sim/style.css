@@ -1,4 +1,4 @@
-        :root {
+:root {
             --bg-paper: #949494; 
             --hybrid-black: #000000;
             --hybrid-red: #c62828;
@@ -13,26 +13,11 @@
             padding: 0;
         }
 
-        .stain {
-            position: fixed;
-            background-image: url("assets/machula.png"); 
-            background-size: contain;
-            background-repeat: no-repeat;
-            z-index: -1;
-            pointer-events: none;
-            opacity: 0.2;
-            mix-blend-mode: multiply;
-            width: 800px; 
-            height: 800px;
-        }
-
-        .stain-tl { top: -500px; left: -350px; transform: rotate(15deg); }
-        .stain-tr { top: -400px; right: -350px; transform: rotate(115deg); }
-        .stain-br { bottom: -500px; right: 250px; transform: rotate(-40deg); }
 
         body {
             font-family: 'Roboto Condensed', sans-serif;
             background-color: var(--bg-paper);
+            background-image: url('assets/bg.png');
             color: var(--hybrid-black);
             display: flex;
             flex-direction: column;
@@ -104,7 +89,7 @@
 
         /* --- Background Overlay Update --- */
         .gaming-table-floor {
-            aspect-ratio: 11 / 6;    /* ← add this */
+            aspect-ratio: 16/9;    /* ← add this */
             position: relative;
             overflow: hidden;
             background-color: rgb(0, 0, 0); /* Keeps your native dark table floor color */
@@ -176,6 +161,7 @@
         .panel {
             background: #e0e0e0;
             border: var(--border-heavy);
+            border-radius: 6px;
             padding: 15px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
             width: 100%;
@@ -183,6 +169,7 @@
             display: grid;
             grid-template-columns: 1fr 1fr; /* 2 stĺpce s rovnakou šírkou */
             grid-template-rows: auto auto;   /* 2 riadky s výškou podľa obsahu */
+            z-index: 1;
         }
 
         .panel h3 {
@@ -230,6 +217,7 @@
             display: none; /* Controlled cleanly by system runtime toggles */
             position: relative;
             padding-bottom: 5px;
+            z-index: 50;
         }
 
 
@@ -237,6 +225,7 @@
             max-width: 250px;     /* Adjust size to fit your table proportions */
             height: auto;
             border-radius: 8px;   /* Matches your clean rounded corners look */
+            z-index: 10;
         }
 
         /* Enemy Card: Slide from Right to Left */
@@ -350,6 +339,7 @@
             gap: 5px;
             z-index: 200;
         }
+
         /* LAYER 1: The Outer Frame */
         .terminal-border-box {
             flex: 1;
@@ -381,7 +371,7 @@
         /* LAYER 3: The Text Engine */
         .terminal-content {
             color: #000000;
-            font-family: 'Protest Riot', sans-serif;
+            font-family: 'Rubik', sans-serif;
             font-size: 1.29rem;
             padding: 5px 10px 10px 10px; 
         }
@@ -412,6 +402,29 @@
             margin-bottom: 0px !important;
             white-space: pre-wrap;
             line-height: 1.4; /* Controls the tight spacing between lines */
+        }
+
+        .tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            line-height: 1.4;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+            visibility: visible;
         }
 
         /* TARGETS ONLY THE VERY FIRST LINE */
@@ -458,6 +471,7 @@
             justify-content: space-between;
             background: #d4d4d4;
             border: var(--border-heavy);
+            border-radius: 6px;
             padding: 12px 20px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
         }
@@ -473,6 +487,7 @@
             font-weight: bold;
             padding: 6px 12px;
             border: var(--border-heavy);
+            border-radius: 8px;
             background: #fff;
             cursor: pointer;
             outline: none;
@@ -491,6 +506,7 @@
         .card-tray-wrapper {
             background: rgba(0, 0, 0, 0.85);
             border: 4px solid var(--hybrid-black);
+            border-radius: 6px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
             width: 100%;
         }
@@ -612,6 +628,7 @@
         .enemy-stats-row {
             display: flex;
             gap: 20px; /* Puts comfortable breathing room between the two stat blocks */
+            z-index: 50;
         }
 
         .enemy-stats-row .stat-row {
@@ -680,10 +697,15 @@
             table-layout: fixed;
         }
 
+        .basic-frame{
+            border: 2px solid var(--hybrid-black);
+            border-radius: 4px;
+        }
 
         .track-cell {
             background: #ffffff;
             border: 2px solid var(--hybrid-black);
+            border-radius: 4px;
             text-align: center;
             font-weight: bold;
             font-size: 1rem;
@@ -794,9 +816,9 @@
         /* Base Die Frame Structure */
         .die-container {
             position: relative;
-            width: 60px;
-            height: 60px;
-            opacity: 0;
+            aspect-ratio: 1 / 1; /* Ensures the die stays a perfect square */
+            width: 100%;         /* Scales to fit the parent container */
+            max-width: 60px;     /* Prevents it from getting too large on desktop */            opacity: 0;
             animation: slideUpRoll 1.2s cubic-bezier(0.25, 1, 0.5, 1) forwards;
         }
 
@@ -943,6 +965,9 @@
             font-family: 'Archivo Black', sans-serif;
             font-size: 2.2rem;
             color: var(--hybrid-black);
+            pointer-events: auto;  /* ← Allow events only on stat-items */
+
+            
         }
 
         .stat-icon {
@@ -960,357 +985,703 @@
             font-size: 1.1rem;
         }
 
-        
+/* Base styles (Place outside media queries) */
+#choice-prompt {
+    position: absolute;
+    bottom: 2%;
+    left: 0;
+    right: 0;
+    margin: 0 auto;
+    padding: 20px 20px 20px 90px;
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 10px;
+    z-index: 200;
+    max-width: 100%;
+}
 
-        /* Animation Keyframe translating up to roughly 1/3 of the field height and staying */
-        @keyframes slideUpRoll {
-            0% {
-                transform: translateY(100px) rotate(-45deg);
-                opacity: 0;
-            }
-            30% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(-180px) rotate(360deg); /* Halts at ~1/3 height up */
-                opacity: 1; /* Keeps the dice fully visible on the board permanently */
-            }
-        }
+.choice-btn {
+    height: 46px;
+    white-space: nowrap;
+    padding: 0 16px;
+    border-radius: 9px;
+    background: rgb(231, 231, 231);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+    border: 3px solid rgba(25, 25, 25, 0.96);
+    color: rgb(0, 0, 0);
+    font-size: 1.1em;
+    cursor: pointer;
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
 
-        @keyframes slideDownRoll {
-            0% {
-                transform: translateY(-100px) rotate(45deg);
-                opacity: 0;
-            }
-            30% {
-                opacity: 1;
-            }
-            100% {
-                transform: translateY(250px) rotate(-360deg); /* Settles hovering overlay style */
-                opacity: 1;
-            }
-
-
-        }
+.choice-btn.back-btn {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 60px;
+    height: 46px;
+    margin-left: 10px;
+    border-radius: 9px;
+    background: rgb(0, 0, 0);
+    border: 3px solid rgba(201, 201, 201, 0.96);
+    color: rgb(224, 224, 224);
+    font-size: 1.2em;
+}
 
 
 
-/* =============================================
-   MOBILE LAYOUT — single column, reordered
-   Final order:
-     1. Menu / Denník / status badge
-     2. Stress & Adrenaline tracks
-     3. Terminal log
-     4. Gaming table
-     5. Cards
-     6. Skill & Weapon dropdowns
-   ============================================= */
-@media (max-width: 740px) {
 
-    body {
-        padding-left: 8px;
-        padding-right: 8px;
-        padding-top: 6px;
+@keyframes slideUpRoll {
+    0% {
+        transform: translateY(50%) rotate(-45deg); /* Use percentage */
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(-50%) rotate(360deg); /* Relative to parent */
+        opacity: 1;
+    }
+}
+
+@keyframes slideDownRoll {
+    0% {
+        transform: translateY(-50%) rotate(45deg);
+        opacity: 0;
+    }
+    100% {
+        transform: translateY(50%) rotate(-360deg); /* Relative to parent */
+        opacity: 1;
+    }
+}
+
+/* =============================================================
+   CLEANED MOBILE VIEW: FLUID FLEX OVERRIDES (NO HORIZONTAL SCROLL)
+   ============================================================= */
+@media (max-width: 968px) {
+
+
+
+    /* --- Global Elements Hard Clamp --- */
+    *, *::before, *::after {
+        box-sizing: border-box !important; /* Forces paddings/borders to stay INSIDE widths */
     }
 
-    /* Flatten game-container into a single flex column
-       so we can order ALL descendants freely */
+    h1 {
+        /* Scales between 1.5rem and 2.5rem based on viewport width */
+        font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
+    }
+
+    html, body {
+        overflow-x: hidden !important; /* Still block sideways leaking */
+        overflow-y: auto !important;   /* Allow vertical scroll so the address bar can't trap content */
+        min-height: 100%;
+        min-height: 100dvh !important; /* Real visible viewport height where supported, ignores the address bar */
+        width: 100% !important;
+        padding: 0 !important;        /* Clears out desktop body bloating margins */
+        margin: 0 !important;
+    }
+
+    body {
+        /* Use standard 10px padding as a baseline, but add the phone's safe boundary if it exists */
+        padding-top: calc(15px + env(safe-area-inset-top, 0px)) !important;
+        padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
+        padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
+        padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)) !important;
+        overflow-x: hidden !important;
+    }
+
+    /* --- Fluid Non-Strict Layout Columns Grid --- */
     .game-container {
+        display: flex;
+        flex-direction: row;  
+        flex-wrap: nowrap;     
+        width: 100%;
+        min-height: 100%;
+        min-height: 100dvh;
+        gap: 10px;            
+        align-items: stretch; 
+        overflow: visible;
+        padding-top: max(6px, env(safe-area-inset-top)) !important;
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
+    }
+
+    /* Left Column: fixed 33.333% share, immune to content size */
+    .left-column {
+        flex: 0 0 33.333%;   
+        min-width: 0 !important; 
+        max-width: 35% !important;  
+        height: auto;            
+        display: flex;
         flex-direction: column;
+        gap: 6px;
+        overflow: visible; 
+    }
+
+    /* Right Column: takes exactly the remaining space, immune to content size */
+    .right-column {
+        flex: 1 1 0% !important; /* explicit 0% basis instead of "auto" — stops long terminal lines from inflating this column's preferred width */
+        min-width: 0 !important;   /* Disables default flex layout min-content boundaries */
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow: visible;
+    }
+
+    /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
+    .right-top-row,
+    .terminal-border-box {
+        width: 100% !important;
+        min-width: 0 !important;       
+    }
+
+    /* --- FIX: FLUID FLOORS (PREVENTS PROMPT FROM CUTTING OFF) --- */
+    .gaming-table-floor {
+        width: 100% !important;
+        min-width: 0 !important;       
+        min-height: 0 !important;
+        aspect-ratio: auto !important; /* Removes desktop aspect ratio blowout so bottom won't chop */
+        flex-grow: 1 !important;       /* Instructs floor to stretch perfectly to the screen height floor bounds */
+        height: auto !important;
+    }
+
+    /* --- DECREASED TERMINAL HEIGHT BY ~15% --- */
+    .terminal-border-box {
+        height: 108px !important; 
+    }
+
+    /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
+    .controls-panel {
+        padding: 4px 6px !important;       
+        display: flex !important;
+        flex-direction: row !important;    
+        flex-wrap: nowrap !important;      /* Enforces tracks to sit on a single line */
+        justify-content: flex-start !important; 
+        align-items: center !important;
+        overflow-x: auto !important;       /* Re-activates horizontal scrollbar inside the component */
+        overflow-y: hidden !important;
+        white-space: nowrap !important;    /* Keeps tracking rows perfectly linear */
+        gap: 4px !important;               
+        -webkit-overflow-scrolling: touch; /* Liquid swiping support on mobile devices */
+    }
+
+    .panel {
+        padding: 4px 6px !important;
+        gap: 5px !important
+    }
+
+    .stat-row {
+        margin-bottom: 2px !important;
+        font-size: 0.72rem !important;  
+        display: flex !important;
+        gap: 4px !important;
+    }
+
+    .stat-row span {
+        font-size: 0.72rem !important;
+    }
+
+    /* --- COMPACT BUTTONS THAT FIT INSIDE THE MODIFIED FLEX COLUMN --- */
+    .adrenaline-select, 
+    select, 
+    button,
+    #player-skill-dropdown,
+    #player-weapon-dropdown {
+        width: 100% !important;          /* Sets width boundaries back inside columns */
+        max-width: 100% !important;
+        font-size: 0.72rem !important; 
+        padding: 3px 4px !important;     
+        margin: 0 !important;            
+        height: 24px !important;
+    }
+
+    /* Heal button dimensions reduced */
+    #heal {
+        width: 100% !important;
+        max-width: 100% !important;    
+        font-size: 0.7rem !important;
+        padding: 2px 4px !important;
+        margin: 0 !important;
+        height: 30px !important;
+        display: inline-flex !important;
+        align-items: center;
+        justify-content: center;
+    }
+
+
+    /* Shrink the base die container */
+    .die-container {
+        width: 40px !important;  /* Reduced from 60px */
+        height: 40px !important;
+    }
+
+    /* Override individual dice classes to prevent them from breaking the grid */
+    .die-d4, .die-d6, .die-d8, .die-d10, .die-d12, .die-dh, .die-dt {
+        width: 38px !important;
+        height: 38px !important;
+    }
+    
+    /* Ensure the pool doesn't force a width that overflows the column */
+    .dice-animation-pool {
+        grid-template-columns: repeat(3, 42px) !important; /* Shrink grid columns */
+        gap: 2px !important;
+    }
+
+    /* Retain original layout coordinates but drop the font size uniformly */
+    .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    /* Target specific dice to override desktop's fixed font rules (like 1rem) */
+    .die-d4 .die-label,
+    .die-d6 .die-label,
+    .die-d8 .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    .die-d10 .die-label,
+    .die-d12 .die-label {
+        font-size: 0.65rem !important; /* Slightly smaller for multi-digit numbers if needed */
+    }
+
+    .die-dt .die-label {
+        font-size: 0.72rem !important;
+    }
+
+    .gaming-table-floor {
+        position: relative;
+        overflow: hidden !important; /* CRITICAL: Clips dice that animate too far */
+    }
+
+    #choice-prompt {
+        padding: 12px 12px 65px 12px; /* Uniform spacing with bottom room for Back button */
+        bottom: 1%;
         gap: 8px;
     }
 
-    /* Both columns become full-width flex containers
-       so their children can be individually ordered */
-    .left-column,
-    .right-column {
-        flex: none;
-        min-width: 0;
+    .choice-btn {
+        width: auto !important;       /* FORCE override against the generic button rule */
+        flex: 1 1 auto !important;    /* Allows buttons to size naturally or expand to fill row rows nicely side-by-side */
+        height: auto;
+        min-height: 42px;
+        white-space: normal;          /* Allows long choices to wrap text beautifully */
+        padding: 8px 14px;
+        font-size: 1rem;
         max-width: 100%;
-        width: 100%;
-        display: contents; /* dissolves the column wrappers —
-                              children participate directly in
-                              game-container's flex flow */
+        text-align: center;
     }
 
-    /* ── FINAL ORDER (game-container flex children) ── */
-
-    /* 1 — Menu / Denník / status bar (first div in left-column) */
-    .left-column > div:first-child  { order: 1; }
-
-    /* 2 — Stress & Adrenaline tracks */
-    .controls-panel                 { order: 2; }
-
-    /* 3 — Terminal log */
-    .right-top-row                  { order: 3; }
-
-    /* 4 — Gaming table */
-    .gaming-table-floor             { order: 4; }
-
-    /* 5 — Cards */
-    .card-tray-wrapper              { order: 5; }
-
-    /* 6 — Skill & Weapon dropdowns panel */
-    .panel:not(#enemy-panel)        { order: 6; }
-
-    /* Full width for right-column sections */
-    .right-top-row,
-    .gaming-table-floor {
-        width: 100%;
+    .choice-btn.back-btn {
+        left: 50%;
+        bottom: 10px;
+        transform: translateX(-50%);
+        margin-left: 0;
+        width: 40px !important;
+        height: 40px;
     }
 
-    /* ── TERMINAL: fluid height + font-size via clamp() ── */
-    .terminal-border-box {
-        height: clamp(150px, 10vw + 78px, 220px);
+    .choice-btn:hover,
+    .choice-btn.choice-hover-highlight {
+        transform: scale(1.03);
     }
-    .terminal-content {
-        font-size: clamp(1rem, 1.4vw + 0.7rem, 1.99rem);
-        line-height: 1.35;
-    }
-
-    /* ── GAMING TABLE: fixed 11:6 aspect ratio ── */
-    .gaming-table-floor {
-        aspect-ratio: 11 / 6;
-        min-height: unset;
+    
+    .choice-btn.back-btn:hover,
+    .choice-btn.back-btn.choice-hover-highlight {
+        transform: translateX(-50%) scale(1.03);
     }
 
-    /* Enemy panel inside gaming table — full width on mobile */
-    #enemy-panel {
-        width: 100%;
-        position: relative;
+    
+    #heal img {
+        height: 0.9em !important;
+        margin-right: 2px !important;
     }
 
-    /* Stress / adrenaline track: tighter cells on small screens */
-    .track-cell {
-        font-size: 0.8rem;
-        height: 26px;
+    .left-column button {
+        width: 100% !important; 
+        margin: 0 !important;
     }
 
-    /* ==========================================================================
-    MOBILE CARD TRAY CLEANUP (Inside @media (max-width: 700px))
-    ========================================================================== */
 
-    /* 1. Reset the wrapper to sit flush right below the table */
+
+    .enemy-card-visual,
+    .table-card,
+    .combat-card,
+    .enemy-cards .card-container,
+    .enemy-hand .card-container {
+        width: 117px !important;    /* 1.5x of 78px */
+        height: 198px !important;   /* 1.5x of 132px */
+        min-width: 117px !important;
+        min-height: 198px !important;
+        max-width: 117px !important;
+        max-height: 198px !important;
+        flex-shrink: 0 !important;
+        position: relative !important;
+        overflow: hidden !important; /* Clips anything trying to bulge outward */
+        border-radius: 4px !important;
+        margin: 0 2px !important;
+    }
+
+    
+
     .card-tray-wrapper {
         position: relative; 
-        z-index: 1000; /* Keeps the card layer safely above the gaming table floor */
+        /* Keep it above the panel on mobile too */
+        z-index: 10; 
         overflow: visible !important; 
-        padding-top: 0 !important; /* Clears old layout hacks */
-        margin-top: 0 !important;  /* Snaps container right up against the table */
-        background: transparent !important; /* Make transparent so padding doesn't block the table */
-        box-shadow: none !important; /* Clear frame shadow here so it can live on the tray instead */
-        border: none !important;
-
+        width: 100% !important;
+        height: auto !important;
     }
 
-    /* 2. Create the invisible overflow ceiling using padding & negative margin */
     .card-scroll-row {
-        overflow-x: auto;
-        overflow-y: hidden;
-        padding-top: 90px !important;  
-        margin-top: -100px !important; 
+        overflow-x: auto !important;
+        /* Let the scaled/hovered cards pop upward into the panel area */
+        overflow-y: visible !important; 
+        width: 100% !important;
+        display: flex !important;
         -webkit-overflow-scrolling: touch;
-        pointer-events: none; /* Blocked by default */
+    }    
+
+    .card-img,
+    .enemy-card-visual img,
+    .table-card img {
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        display: block !important;
+        position: absolute !important;
+        top: 0 !important;
+        left: 0 !important;
+        object-fit: cover !important; /* Fills the portrait rectangle without squeezing distortion */
     }
 
-    /* New utility class to restore interaction */
-    .enable-interaction {
-        pointer-events: auto !important;
+
+    /* 1. The Scroll Row controls the clipping boundary. 
+        We give it extra vertical room so the scaled cards can breathe inside it. */
+    .card-scroll-row {
+        width: 100%;
+        overflow-x: auto;   /* Allows horizontal scroll if cards overflow widthwise */
+        overflow-y: hidden; /* Prevents vertical scrollbars, but clips if container is too short */
+        
+        /* THE REAL FIX: Create safe vertical zones within the scroll boundary */
+        padding-top: 70px;    /* Ample room for scale(1.7) + translateY(-20px) */
+        padding-bottom: 30px; /* Room for the bottom edge expansion */
+        margin-top: -70px;    /* Pull the tray layout back up so it doesn't leave an ugly blank gap */
+        margin-bottom: -30px;
     }
 
-    /* 3. Strip old padding hacks from the escape container */
-    .card-tray-overflow-escape {
-        overflow: visible !important;
-        padding-top: 0 !important;
-        margin-top: 0 !important;
-        background: transparent !important;
-    }
-
-    /* 4. House the actual dark tray background and borders strictly around the cards */
+    /* 2. Keep the escape container and tray purely structural with visible overflow */
+    .card-tray-overflow-escape,
     .card-tray {
         display: flex;
-        flex-wrap: nowrap;
+        flex-wrap: nowrap; /* Ensures cards stay in a single row for scrolling */
+        gap: 12px;         /* Adds breathing room between individual cards */
+        width: max-content;
         overflow: visible !important;
-        gap: 15px;
-        min-width: max-content;
-        padding: 12px 10px !important;
-        padding-left: 40px !important;
-        padding-right: 40px !important;
-        border: none !important;
-        padding-top: 12px;
-        padding-bottom: 12px;
     }
 
-    /* 5. Ensure the hovered mobile card breaks ranks and scales up nicely */
-    .card-tray .card-container:hover {
-        position: relative;
+    .card-tray .card-container {
+        width: 100px !important;   /* Shrunk down from 80px */
+        height: 150px !important;  /* Shrunk down from 120px to keep aspect ratio */
+        margin-top: 8px !important;
+        border: 5px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
+        border-radius: 6px !important;        /* Matches your PC look */
+        overflow: hidden !important;          /* Clips the absolute-positioned image inside the border */
+    }
+
+    /* Force the card face graphics to adapt perfectly */
+    .card-tray .card-container .card {
+        width: 100% !important;
+        height: 100% !important;
+    }
+
+    /* Tighten up the row height so it doesn't take over the screen */
+    .card-tray-wrapper {
+        height: 170px !important; 
+    }
+
+    .card-tray .card-container:hover{
         z-index: 9999 !important;
-        transform: scale(1.4) translateY(-25px) !important; /* Scales cleanly up into the transparent zone */
+        position: relative !important;
+        transform: scale(1.3) translateY(-20px) !important; /* Clean localized pop animation */
     }
 
     .card-tray .card-container:first-child:hover {
-        transform: scale(1.4) translateY(-25px) translateX(35px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(18px) !important;
     }
-
     .card-tray .card-container:last-child:hover {
-        transform: scale(1.4) translateY(-25px) translateX(-35px) !important;
+        transform: scale(1.3) translateY(-20px) translateX(-6px) !important;
     }
 
-    .gaming-table-floor {
-        position: relative;
-        /* Ensures nested elements tracking percentages absolute to the floor stay clamped */
-    }
 
-    /* --- CHALLENGE DISPLAY SCALING --- */
+    /* Safeguards any rotation animations triggered during gameplay phases */
+        .rotate-player-D { transform: rotate(90deg) scale(0.9) !important; }
+        .rotate-player-A { transform: rotate(-90deg) scale(0.9) !important; }
+        .rotate-enemy-D { transform: rotate(-90deg) scale(0.9) !important; }
+        .rotate-enemy-A { transform: rotate(90deg) scale(0.9) !important; }
+
+        .enemy-card-visual.rotate-A { transform: rotate(0deg) !important; }
+        .enemy-card-visual.rotate-D { transform: rotate(180deg) !important; }
+
+
+        .enemy-card-visual,
+        .player-card-slide,
+        .player-card-slide .card-container,
+        .enemy-card-wrapper .card-container,
+        .table-card {
+            width: 117px !important;
+            height: 198px !important;
+            min-width: 117px !important;
+            min-height: 198px !important;
+            max-width: 117px !important;
+            max-height: 198px !important;
+            flex-shrink: 0 !important;
+        }
+
+        .enemy-card-visual img,
+        .player-card-slide img,
+        .table-card img {
+            width: 100% !important;
+            height: 100% !important;
+            object-fit: cover !important;
+        }
+
+        #enemy-sprite-container
+        {
+            display: flex;
+            justify-content: center !important;
+            align-items: center !important;
+            padding: 5px !important;
+            height: fit-content !important; 
+            position: absolute !important;
+            left: 0 !important;
+            right: 0 !important;
+            margin-left: auto !important;
+            margin-right: auto !important;
+            width: fit-content !important;
+            bottom: 10% !important;
+            z-index: 40;
+        }
+
+        #enemy-sprite {
+            max-width: 180px !important; 
+            height: auto !important;
+        }
+
     .challenge-display {
-        transform: scale(0.6) translateY(0); /* Shrinks the entire layout container */
-        top: -85px !important;    /* Shifts higher up to maximize center table real estate */
-        left: 30% !important;     /* Centers it broadly across the narrower width */
-        gap: 20px !important;    /* Tightens gap between icons and text values */
-        height: 50 !important;
-        padding: 8px 16px !important;
-        border-radius: 36px !important;
+        left: 50% !important;
+        top: -24px !important;
+        height: 60px !important;
+        gap: 18px !important;
+        padding: 6px 14px !important;
+        border-radius: 30px !important;
+        border-width: 3px !important;
+        transform: translateX(-50%) translateY(-20px) !important; /* keeps the "raised, hidden" start state, just re-centered */
+    }
+
+    .challenge-display.show {
+        transform: translateX(-50%) translateY(0) !important;
+    }
+
+    .challenge-display .stat-item {
+        font-size: 1.1rem !important;
+        gap: 4px !important;
+    }
+
+    .challenge-display .stat-icon {
+        width: 24px !important;
+        height: 24px !important;
+    }
+
+    /* --- OPTIMALIZÁCIA PRE OVERLAY VÝBERU HRDINU A ZBRANE --- */
+    #hero-card-display, 
+    #weapon-card-display {
+        width: 95% !important;          /* Zruší fixných 705px, aby sa karty zmestili na displej */
+        max-width: 660px !important;
+        height: 85vh !important;        /* Prispôsobí sa nízkym landscape obrazovkám mobilov */
+    }
+
+    #hero-display-skills {
+        padding: 5px !important;
+        font-size: 0.7rem !important;
+    }
+
+    #hero-display {
+        padding: 5px !important;
+    }
+
+    #hero-display-name {
+        font-size: 1rem !important;
+    }
+
+    /* Úprava mriežky schopností a štatistík, aby nebola príliš stlačená */
+    #hero-skills-grid, 
+    #weapon-stats-grid {
+        grid-template-columns: repeat(2, 1fr) !important;
+        gap: 4px 15px !important;
+    }
+
+    /* Reset mohutného globálneho pravidla pre tlačidlá v týchto overlayoch */
+    #hero-selection-overlay button.adrenaline-select,
+    #weapon-selection-overlay button.adrenaline-select {
+        height: 40px !important;        /* Príjemnejšia výška na klikanie prstom oproti 24px */
+        font-size: 0.8rem !important;   /* Čitateľnejšie písmo */
+        padding: 4px 8px !important;
+        margin: 0 !important;
+    }
+
+    /* Vynútenie správnych šírok pre navigačné a akčné tlačidlá vedľa seba */
+    #new-hero-btn { 
+        width: 100% !important; 
+        max-width: 110px !important; 
+        font-size: 0.75rem !important; 
+    }
+    #delete-hero-btn { 
+        width: 100% !important; 
+        max-width: 85px !important; 
+        font-size: 0.75rem !important; 
     }
     
-    .challenge-display.show {
-        transform: scale(1) translateY(0) !important;
+    #hero-prev-btn, #weapon-prev-btn { width: 45px !important; }
+    #hero-next-btn, #weapon-next-btn { width: 45px !important; }
+    
+    #hero-confirm-btn { width: 85px !important; }
+    #weapon-confirm-btn { width: 110px !important; }
+
+    #close-builder{
+        max-width: 70px !important;
     }
 
-    .stat-item {
-        font-size: 1.2rem !important; /* Reduces massive numbers */
+    /* --- SAFE TRACK NODES THAT DON'T STRETCH WIDER THAN THE SCREEN WIDTH --- */
+    .track-table {
+        width: 100%;
+        table-layout: auto; 
     }
 
-    .stat-icon {
-        width: 30px !important;      /* Shrinks challenge badges */
-        height: 30px !important;
+    .track-header {
+        width: 28px !important;
+        padding: 0 !important;
     }
 
-    /* --- SPRITE & ENEMY RE-CENTERING --- */
-    #enemy-sprite-container {
-        right: 130px !important;      /* Anchors cleanly to the right boundary edge */
-        bottom: -130px;
-        transform: translateY(-50%) scale(0.65) !important; /* Scales sprite system down */
-        transform-origin: right center;
+    .track-header img {
+        height: 1.7em !important; 
+        width: auto;
+    }
+
+    .track-cell {
+        font-size: 0.75rem;               
+        height: 30px !important; 
+        padding: 0 2px !important;      
+        min-width: 30px;                 /* Fluid floor that scales back without bloating column scrollWidths */
+        white-space: nowrap;
+    }
+
+    #sp-label, #sp {
+        font-size: 0.8rem !important; 
     }
 
     #enemy-panel {
-        max-width: 240px;
-        padding-top: 0px !important;            /* Shrinks total width foot-print over the floor */
+        width: 100%;              
+        max-width: 220px;
     }
 
-    .enemy-stats-row {
-        gap: 8px !important;         /* Packs text properties neatly */
+    .panel h3 {
+        font-size: 0.8rem !important;
+        margin-bottom: 2px !important;
     }
 
-    /* --- TABLE CARDS SCALING --- */
-    .table-card {
-        width: 90px !important;      /* Shrunk from 170px */
-        height: 160px !important;    /* Shrunk from 300px */
-    }
-
-    /* Adjusts the rotation transforms so cards don't slide off-screen when flipped */
-    .rotate-player-D { transform: scale(0.8) rotate(90deg); }
-    .rotate-player-A { transform: scale(0.8) rotate(-90deg); }
-    .rotate-enemy-D { transform: scale(0.8) rotate(-90deg); }
-    .rotate-enemy-A { transform: scale(0.8) rotate(90deg); }
-
-    .enemy-card-visual {
-        width: 90px !important;      /* Mirrors base system scaling */
-        height: 160px !important;
-    }
-
-    /* --- DICE ANIMATION POOLS --- */
-    .dice-animation-pool {
-        grid-template-columns: repeat(3, 34px) !important; /* Constrains column footprint */
-        gap: 3px !important;
-    }
-
-    .dice-animation-pool.player-pool {
-        bottom: 10px !important;
-        left: 10px !important;
-    }
-
-    .dice-animation-pool.enemy-pool {
-        top: 10px !important;
-        right: 10px !important;
-        width: auto !important;      /* Resolves the rigid 270px wide desk layout overflow */
-    }
-
+    /* --- FIX: PROCEED PROMPT HIGHER LAYER PRIORITY OVER ENEMY CARD --- */
     .next-prompt {
-        position: absolute !important;
-        top: 10px !important;
-        left: 10px !important;
-        right: auto !important;
-        max-width: calc(100% - 20px) !important;
+        z-index: 99999 !important; /* Pushes it above relatively-positioned stat cards and backgrounds */
+        bottom: 12px !important;
+        right: 12px !important;
+    }
+
+
+    .card-tray {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important; 
+        justify-content: flex-start !important;
+        overflow: visible !important;
+        min-width: max-content !important; 
+        padding-left: 10px !important;
+        padding-right: 10px !important;    
+        pointer-events: auto !important;   
+        gap: 6px !important; 
+        height: 100% !important;
+    }
+
+    /* Position flip button inside the tray to the right of the last card */
+    #flip-cards-btn {
+        display: block !important;
+        flex-shrink: 0 !important;
+        width: 34px !important;
+        height: 34px !important;
+        font-size: 1rem !important;
+        padding: 0 !important;
+        margin: 0 0 0 2px !important;
+        border-radius: 4px;
+    }
+
+    #escape-btn {
         width: auto !important;
-        box-sizing: border-box !important;
-        margin: 0 !important;
-        transform: none !important;
+        padding: 4px 8px !important;
     }
 
-    /* Granular Individual Die Scaling rules */
-    .die-container {
-        width: 32px !important;      /* Half-scale matching mobile density specifications */
-        height: 32px !important;
+
+
+
+
+
+    .terminal-content .terminal-line, 
+    .terminal-content .terminal-inline-segment {
+        font-size: 0.85rem !important; /* Change this value to whatever you want */
     }
 
-    .die-img {
-        filter: drop-shadow(1px 2px 3px rgba(0,0,0,0.4)) !important;
+    .terminal-content{
+        padding: 5px;
     }
 
-    .die-label {
-        font-size: 0.75rem !important; /* Scaled down text overlays */
+    .terminal-line.spacing-top {
+        margin-top: 1.5em !important; /* Scaled down from 5.5em */
     }
 
-    /* Adjust individual die types so text alignment remains pristine */
-    .die-d4, .die-d6, .die-d8, .die-d10, .die-d12, .die-dt, .die-dh {
-        width: 32px !important;
-        height: 32px !important;
+    .terminal-line.spacing-bottom {
+        margin-bottom: 0.2em !important; /* Scaled down from 2.5em */
     }
 
-    .die-d4 .die-label, .die-d6 .die-label, .die-d8 .die-label, 
-    .die-d10 .die-label, .die-d12 .die-label, .die-dt .die-label {
-        top: 50% !important;
-        left: 50% !important;
-        transform: translate(-50%, -50%) !important; /* Center numbers completely for tiny screens */
+    .terminal-line.spacing-bottom-medium {
+        margin-bottom: 0 !important;
     }
 
-    /* --- OVERLAY KEYFRAME TRACK OVERRIDES FOR MOBILE --- */
-    @keyframes slideUpRoll {
-        0% { transform: translateY(50px) rotate(-45deg); opacity: 0; }
-        30% { opacity: 1; }
-        100% { transform: translateY(-40px) rotate(360deg); opacity: 1; } /* Stops sooner */
+}
+
+/* --- Keep your JS-backed Orientation Logic cleanly segregated below --- */
+@media (max-width: 968px) and (orientation: portrait) {
+    html {
+        transform: rotate(-90deg) translate(-100%, 0); 
+        transform-origin: top left;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: var(--real-vh, 100vh);  
+        height: var(--real-vw, 100vw);
+        overflow: hidden; 
     }
 
-    @keyframes slideDownRoll {
-        0% { transform: translateY(-50px) rotate(45deg); opacity: 0; }
-        30% { opacity: 1; }
-        100% { transform: translateY(40px) rotate(-360deg); opacity: 1; }  /* Stops sooner */
+    body {
+        width: var(--real-vh, 100vh);
+        height: var(--real-vw, 100vw);
+        overflow: hidden; 
+        transform: scale(var(--mobile-fit-scale, 1)); 
+        transform-origin: top center; 
     }
-
-    #hero-card-display {
-        width: 95% !important; /* Shrink to fit mobile screen */
-        height: auto !important; /* Allow height to adjust to content */
-        max-height: 90vh !important;
-    }
-
-    /* Tighten the grid spacing */
-    #hero-skills-grid {
-        gap: 2px 10px !important;
-    }
-
-    .next-prompt {
-            left: -360px;
-            top: 5px;
-        }
-
 
 
 }
-        
-
-
-
-
-
-        
