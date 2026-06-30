@@ -1072,85 +1072,88 @@
         font-size: clamp(1.5rem, 5vw, 2.5rem) !important;
     }
 
-    html, body {
-        overflow-x: hidden !important; 
-        overflow-y: auto !important;     /* Change from hidden to auto */
-        height: auto !important;         /* Let the viewport adapt naturally to the content */
-        max-height: none !important;
-        width: 100% !important;
-        padding: 0 !important;        
-        margin: 0 !important;
-    }
+        /* --- Base Viewport Lockdown --- */
+        html, body {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100dvh; /* Dynamic Viewport Height - matches actual visible space */
+            overflow: hidden; /* Hard block on any browser-level scrolling */
+            position: fixed; /* Prevents mobile rubber-banding/bouncing */
+        }
 
-    body {
-        padding-top: calc(15px + env(safe-area-inset-top, 0px)) !important;
-        padding-left: calc(10px + env(safe-area-inset-left, 0px)) !important;
-        padding-right: calc(10px + env(safe-area-inset-right, 0px)) !important;
-        padding-bottom: calc(40px + env(safe-area-inset-bottom, 0px)) !important; /* Extra bottom breathing room for scrolling */
-        overflow-x: hidden !important;
-    }
-
-    /* --- STEP 2: FORCE COLS TO STAY SIDE-BY-SIDE IN ONE ROW --- */
+        body {
+            font-family: 'Roboto Condensed', sans-serif;
+            background-color: var(--bg-paper);
+            background-image: url('assets/bg.png');
+            color: var(--hybrid-black);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        
+    /* --- Fluid Non-Strict Layout Columns Grid --- */
     .game-container {
         display: flex;
-        flex-direction: row !important;  /* FORCED: Keep side-by-side row layout */
-        flex-wrap: nowrap !important;    /* FORCED: Prevent columns from ever breaking into rows */
+        flex-direction: row;  
+        flex-wrap: nowrap;     
         width: 100%;
-        height: auto !important;         
-        max-height: none !important;
+        min-height: 100%;
+        min-height: 100dvh;
         gap: 10px;            
-        align-items: flex-start;        /* Align items to top so they stretch naturally downwards */
-        overflow: visible !important;   /* Let scaled cards pop out safely */
-        box-sizing: border-box;
+        align-items: stretch; 
+        overflow: visible;
+        padding-top: max(6px, env(safe-area-inset-top)) !important;
+        padding-right: max(6px, env(safe-area-inset-right)) !important;
+        padding-bottom: max(6px, env(safe-area-inset-bottom)) !important;
+        padding-left: max(6px, env(safe-area-inset-left)) !important;
     }
 
-/* --- STEP 3: PRESERVE EXACT FIXED COLUMN SHARE RATIOS --- */
+    /* Left Column: fixed 33.333% share, immune to content size */
     .left-column {
-        flex: 0 0 33.333% !important;    /* Absolute strict 1/3 layout constraint */
-        width: 33.333% !important;
+        flex: 0 0 33.333%;   
         min-width: 0 !important; 
         max-width: 35% !important;  
-        height: calc(100dvh - 45px) !important; /* Forces strict match to screen window height */
+        height: auto;            
         display: flex;
         flex-direction: column;
         gap: 6px;
-        overflow-y: hidden !important;  /* CRITICAL FIX: Stops left column from scrolling */
-        overflow-x: hidden;
+        overflow: visible; 
     }
 
+    /* Right Column: takes exactly the remaining space, immune to content size */
     .right-column {
-        flex: 1 1 0% !important;         /* Fills exactly the remaining 2/3 width space */
-        width: 66.666% !important;       
-        min-width: 0 !important;   
-        height: calc(100dvh - 45px) !important; /* HARD CEILING: Right column strictly locked to screen view */
+        flex: 1 1 0% !important; /* explicit 0% basis instead of "auto" — stops long terminal lines from inflating this column's preferred width */
+        min-width: 0 !important;   /* Disables default flex layout min-content boundaries */
         display: flex;
         flex-direction: column;
         gap: 10px;
-        overflow: hidden !important;    /* Hard ceiling clips layout blowing out */
+        overflow: visible;
     }
 
-    /* --- STEP 4: PROVIDE STABLE ELEMENT CEILINGS FOR SIDE-BY-SIDE VIEW --- */
-    /* --- FIX: RIGID HEIGHT BLOCK ALLOCATION PREVENTS CHOPPING ELEMENTS --- */
+    /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
+    .right-top-row,
+    .terminal-border-box {
+        width: 100% !important;
+        min-width: 0 !important;       
+    }
+
+    /* --- FIX: FLUID FLOORS (PREVENTS PROMPT FROM CUTTING OFF) --- */
     .gaming-table-floor {
         width: 100% !important;
         min-width: 0 !important;       
-        aspect-ratio: auto !important;  /* No aspect ratio bloat */
-        
-        /* HARD PIXEL FIX: We allocate a specific maximum height allotment 
-           so it leaves clean mechanical room for the terminal log box below it */
-        height: calc(100dvh - 170px) !important; 
         min-height: 0 !important;
-        flex-grow: 0 !important;        /* DISABLED: Stops flexbox engine from bloating layout */
-        
-        position: relative;
-        overflow: hidden !important;     
+        aspect-ratio: auto !important; /* Removes desktop aspect ratio blowout so bottom won't chop */
+        flex-grow: 1 !important;       /* Instructs floor to stretch perfectly to the screen height floor bounds */
+        height: auto !important;
     }
 
+    /* --- DECREASED TERMINAL HEIGHT BY ~15% --- */
     .terminal-border-box {
-        /* Set a precise layout height so it sits stably underneath the table floor */
-        height: 105px !important; 
-        flex-shrink: 0 !important;
+        height: 108px !important; 
     }
+
     /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
     .controls-panel {
         padding: 4px 6px !important;       
@@ -1203,7 +1206,7 @@
         font-size: 0.7rem !important;
         padding: 2px 4px !important;
         margin: 0 !important;
-        height: clamp(22px, 5dvh, 30px) !important;
+        height: 30px !important;
         display: inline-flex !important;
         align-items: center;
         justify-content: center;
@@ -1398,10 +1401,9 @@
         height: 100% !important;
     }
 
-    /* Tighten up the row height — floor matches the actual card stack (150px card + 8px margin + buffer)
-       so cards/scroll-row are never taller than their own wrapper; ceiling still gives a little breathing room */
+    /* Tighten up the row height so it doesn't take over the screen */
     .card-tray-wrapper {
-        height: clamp(164px, 24dvh, 170px) !important; 
+        height: 170px !important; 
     }
 
     .card-tray .card-container:hover{
@@ -1417,9 +1419,19 @@
         transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
     }
 
-    /* ==========================================
-    FIX: Keep rotation on mobile flipped states
-    ========================================== */
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+    }
+
     .card-tray .card-container.flipped:hover {
         transform: scale(1.15) rotate(180deg) translateY(20px) !important;
     }
@@ -1436,6 +1448,8 @@
     #card-tray-container:not(.mouse-active) .card-container.flipped.keyboard-hover {
         transform: scale(1.15) rotate(180deg) translateY(20px) !important;
     }
+
+
 
     /* Safeguards any rotation animations triggered during gameplay phases */
         .rotate-player-D { transform: rotate(90deg) scale(0.9) !important; }
@@ -1593,7 +1607,7 @@
 
     .track-cell {
         font-size: 0.75rem;               
-        height: clamp(22px, 5dvh, 30px) !important; 
+        height: 30px !important; 
         padding: 0 2px !important;      
         min-width: 30px;                 /* Fluid floor that scales back without bloating column scrollWidths */
         white-space: nowrap;
@@ -1698,5 +1712,9 @@
         width: var(--real-vh, 100vh);
         height: var(--real-vw, 100vw);
         overflow: hidden; 
+        transform: scale(var(--mobile-fit-scale, 1)); 
+        transform-origin: top center; 
     }
+
+
 }
