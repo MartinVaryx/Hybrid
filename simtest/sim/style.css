@@ -1629,6 +1629,49 @@
         border-radius: 4px;
     }
 
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+    }
+
+    .card-tray .card-container:hover{
+        z-index: 9999 !important;
+        position: relative !important;
+        transform: scale(1.15) translateY(-20px) !important; /* Clean localized pop animation */
+    }
+
+    .card-tray .card-container:first-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(18px) !important;
+    }
+    .card-tray .card-container:last-child:hover {
+        transform: scale(1.15) translateY(-20px) translateX(-6px) !important;
+    }
+
+    .card-tray .card-container.flipped:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
+    }
+
+    .card-tray .card-container.flipped:first-child:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(-18px) !important;
+    }
+
+    .card-tray .card-container.flipped:last-child:hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) translateX(6px) !important;
+    }
+
+    /* Also safeguard your JS touch tracking engine layout clones */
+    #card-tray-container:not(.mouse-active) .card-container.flipped.keyboard-hover {
+        transform: scale(1.15) rotate(180deg) translateY(20px) !important;
+    }
+
     #escape-btn {
         width: auto !important;
         padding: 4px 8px !important;
