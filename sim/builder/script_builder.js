@@ -1402,3 +1402,97 @@ document.addEventListener('DOMContentLoaded', () => {
     initSkillTooltips();
 
 });
+
+function showTooltip(event) {
+    console.log('showTooltip called', event.currentTarget);
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        console.log('Creating tooltip');
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+    const desc = event.currentTarget.getAttribute('data-tooltip');
+    console.log('Tooltip description:', desc);
+    if (desc && tooltip) {
+        tooltip.textContent = desc;
+        tooltip.classList.add('visible');
+        console.log('Tooltip visible, text:', desc);
+    }
+}
+
+function moveTooltip(event) {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        let posX = event.clientX + 15;
+        let posY = event.clientY - 15;
+        
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - 15;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - 15;
+        }
+        
+        tooltip.style.left = posX + 'px';
+        tooltip.style.top = posY + 'px';
+    }
+}
+
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function initTooltips() {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    document.body.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        const description = target.getAttribute('data-tooltip');
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+    }, true); // true = capture phase
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+});

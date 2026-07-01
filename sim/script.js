@@ -3237,16 +3237,6 @@
                 log("Vyhodnocujem hrozbu...", "error-msg",false, false, true);
             }
 
-            // 1. Log baseline success or failure text
-            if (success) {
-                log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
-            } else {
-                log(activeChallenge.failure_msg || "ZLYHANIE!", "failure-msg", false, false, true);
-            }
-
-
-
-
             // Bezpečne posielame hráča na výslednú lokáciu až po dobehnutí všetkých logov
             const doTransition = () => {
                 let followupTarget;
@@ -3333,6 +3323,13 @@
                         log(`${activeChallenge.threat_avoided_msg || "Vyhneš sa hrozbe."} - (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg", false, false, true);
                     }
 
+                    // Log baseline success or failure text (after threat resolution)
+                    if (success) {
+                        log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
+                    } else {
+                        log(activeChallenge.failure_msg || "ZLYHANIE!", "failure-msg", false, false, true);
+                    }
+
                     // Continue executing modifications and transition setups
                     runThreatPostProcessing();
                 };
@@ -3346,6 +3343,7 @@
 
             } else {
                 // If there is no threat evaluation required, proceed immediately
+                log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
                 resetAdrenalineSelection();
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
@@ -3357,6 +3355,7 @@
                 }
             }
         }
+
 
         function gameloop(success = true) {
             let delay = 0;
@@ -4453,11 +4452,11 @@
                 if (enemyCardContainer) enemyCardContainer.classList.remove("show");
                 if (playerCardDisplay) playerCardDisplay.classList.remove("show");
 
-                // Delay the DOM destruction and actual target execution by 500ms
+// Delay the DOM destruction and actual target execution by 500ms
                 setTimeout(() => {
                     if (enemyCardContainer) enemyCardContainer.innerHTML = "";
                     if (playerCardDisplay) playerCardDisplay.innerHTML = "";
-
+                    if (prompt) prompt.style.display = "none";
                     if (typeof proceed_target === 'function') {
                         if (test_mode) log("EXEC_TRANSITION: calling proceed_target function", "system-msg");
                         proceed_target();
@@ -4465,10 +4464,7 @@
                         if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + proceed_target + ")", "system-msg");
                         handleChallengeTransition(proceed_target);
                     }
-
                 }, delay); // Matches your CSS 0.5s transition
-                if (prompt) prompt.style.display = "none";
-
             } else {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target is NOT set, returning", "danger-msg");
             }

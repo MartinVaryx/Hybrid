@@ -55,7 +55,7 @@
 
         .info-panel-container{
             position: absolute;
-            z-index: 210000;
+            z-index: 2000;
         }
 
         /* Globálny štýl pre tooltip rámček */
@@ -69,7 +69,7 @@
             font-size: 0.85rem;
             max-width: 280px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            z-index: 9999;
+            z-index: 99999;
             pointer-events: none;
             opacity: 0;
             visibility: hidden;  /* ← Use visibility instead of display: none */
@@ -80,6 +80,29 @@
         .skill-tooltip.visible {
             opacity: 1;
             visibility: visible; /* ← Pair with visible class */
+        }
+
+                .tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 99999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            line-height: 1.4;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+            visibility: visible;
         }
 
         /* Skrytie sekcií */
@@ -99,9 +122,9 @@
             border-bottom: none;    
         }
 
-        .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
-        .control-box { width: 300px;background: #000; color: white; padding: 20px; border-radius: 10px; }
-        #builder-list{height: 260px; border-radius: 8px;}
+        .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 100%; z-index: 10;}
+        .control-box { flex: 2;background: #000; color: white; padding: 20px; border-radius: 10px; }
+        #builder-list{max-height: 240px; flex: 1; border-radius: 8px;}
         #filter-container-container{
             gap: 10px;
         }
@@ -141,8 +164,8 @@
             background-color: #ffffff;
             border: 3px solid #000000;
             border-radius: 12px;
-            padding: 30px;
-            max-width: 750px;
+            padding: 20px;
+            max-width: 900px;
             max-height: 450px;
             width: 90%;
             box-sizing: border-box;
@@ -221,6 +244,10 @@
             font-family: 'Archivo Black', sans-serif;
             text-transform: uppercase;
             transition: 0.3s;
+        }
+
+        .tab-btn:hover{
+            transform: scale(1.03);
         }
 
         .basic-btn {
@@ -623,9 +650,10 @@
     }
 
     .info-panel-box {
-        width: 115%;
+        width: 120% !important;
         max-width: none;
-        transform: scale(0.75) !important;
+        transform: scale(0.85) !important;
+        padding: 15px !important;
     }
 
     .tab-btn{

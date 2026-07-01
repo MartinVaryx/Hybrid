@@ -67,19 +67,18 @@
         <div class="info-panel">
             <div class="control-box">
                 <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBERTE SCHOPNOSŤ</h3>
-                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;">KATEGÓRIA: -</p>
+                <p id="sel-skill-cat" style="color:#888; font-size:0.8em; margin:5px 0;" data-tooltip="URČUJE ZÁKLADNÚ CENU SCHOPNOSTI">KATEGÓRIA: -</p>
                 <div id="sel-skill-rels" style="font-size:0.85em; color:#bbb; margin:10px 0; line-height:1.4;"></div>
                 <div style="text-align:center; background:#111; padding:15px; margin-top:10px; border: 1px solid #333;">
                     <span id="cost-container" style="display:none;" class="old-price-wrapper">
-                        <span id="cost-orig" class="old-price"></span>
+                        <span id="cost-orig" class="old-price" data-tooltip="PÔVODNÁ CENA (KATEGÓRIA x POŽADOVANÁ ÚROVEŇ)"></span>
                     </span>
-                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
+                    <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';" data-tooltip="PÔVODNÁ CENA ZNÍŽENÁ O SÚČET ÚROVNÍ PRÍBUZNÝCH SCHOPNOSTÍ (MAXIMÁLNE TROCH). NESMIE BYŤ NIŽŠIA AKO CIEĽOVÁ ÚROVEŇ.">0 BR</span>
                 </div>
                 <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
-                    <button class="tab-btn" id="upgrade-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
-                    <button class="down-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
-                    <button class="back-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
-
+                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 7; height: 50px;  font-size: 0.9rem; clip-path:none; margin: 0;" onclick="upgradeSelected()" data-tooltip="VYBRANEJ SCHOPNOSTI">ZVÝŠIŤ ÚROVEŇ</button>
+                    <button class="tab-btn"  style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()" data-tooltip="ZNÍŽIŤ ÚROVEŇ (VRÁTIA SA TI BR)" >↓</button>
+                    <button class="tab-btn" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()" data-tooltip="VRÁTIŤ POSLEDNÚ ZMENU">⤺</button>
                 </div>
             </div>
             <div>
