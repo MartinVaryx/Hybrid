@@ -1442,7 +1442,7 @@
         "initial_msg": "V tomto tutoriále sa dozvieš všetko podstatné. Ak si ho budeš chcieť zopakovať, nájdeš ho v MENU.",
         "case_success": "",
         "case_failure": "",
-        "NEXT": "TUTORIAL_2",
+        "next": "TUTORIAL_2",
         "initial_msg_1": "Toto okno je scrollovateľné, takže ak ti ujde nejaká správa alebo si ju budeš chcieť pripomenúť, všetko nájdeš vyššie.",
         "image": "assets/PLACEHOLDER.png"
     },
