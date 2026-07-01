@@ -141,15 +141,11 @@
                         <div style="font-family:'Archivo Black';margin-top: 10px;">Priprav sa!</div>
                         <button id="ready-btn" class="adrenaline-select" style="width: 150px;margin: 10px; background: var(--hybrid-green);">SOM READY!</button>
                     </div>
-
                          <div id="proceed-prompt"  class="next-prompt">
-                            <button id="proceed-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
-                                POKRAČOVAŤ
+                            <button id="close-btn" onclick="handleChallengeTransition('BACK_TO_GAME')" class="adrenaline-select" style="color: #e0e0e0; background: var(--hybrid-red); display: none;">                                UKONČIŤ
                             </button>
-                        </div>
-                        <div id="back-to-game-prompt" class="next-prompt">
-                            <button id="back-to-game-btn" class="adrenaline-select" style="width: 150px; color: #e0e0e0; background: var(--hybrid-green);">
-                                SPÄŤ DO HRY
+                            <button id="proceed-btn" class="adrenaline-select" style=" color: #e0e0e0; background: var(--hybrid-green);">
+                                POKRAČOVAŤ
                             </button>
                         </div>
                 <div class="panel" id="enemy-panel">

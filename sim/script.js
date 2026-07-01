@@ -1,6 +1,6 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = true;
+        const DEBUG = false;
         let debug_start = "START"
 
         let tooltipsInitialized = false;
@@ -1319,6 +1319,27 @@
         }
 
         function handleChallengeTransition(caseTarget) {
+            if (caseTarget == "WELCOME"){
+                const proceedBtn = document.getElementById('proceed-btn');
+                proceedBtn.innerText = "ZAČAŤ"
+            } else {
+                const proceedBtn = document.getElementById('proceed-btn');
+                proceedBtn.innerText = "ĎALEJ"
+            }
+
+            const closeBtn = document.getElementById('close-btn');
+            const proceedPrompt = document.getElementById('proceed-prompt');
+
+            if (caseTarget.includes("TUTORIAL")){
+                closeBtn.innerText = "UKONČIŤ";
+                closeBtn.style.display = "block"
+                proceedPrompt.style.justifyContent = "space-between"
+
+            } else {
+                proceedPrompt.style.justifyContent = "end"
+                closeBtn.style.display = "none"
+            }
+
             if (caseTarget == "BACK_TO_GAME"){
                 let final_target = [];
                 stress_reset = "stress-10";

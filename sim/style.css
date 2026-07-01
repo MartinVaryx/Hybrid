@@ -101,9 +101,7 @@
             justify-content: flex-end;
             align-items: flex-start;
             z-index: 1; 
-        }
-
-        
+        }        
 
         /* Base state: Clean background image display without the dark tint */
         .gaming-table-floor::before {
@@ -328,16 +326,27 @@
         }
 
         /* Ready Box - Now anchored to the top-left */
-        .next-prompt {
+        #proceed-prompt {
             position: absolute;
             bottom: 10px;
             right: 10px;
             padding: 10px;
             display: none; 
-            flex-direction: column;
             align-items: center;
+            justify-content: space-between;
             gap: 5px;
             z-index: 200;
+            width: 100%;
+        }
+
+        #close-btn {
+            max-width: 15%;
+            margin-left: 20px;
+
+        }
+
+        #proceed-btn {
+            max-width: 15%;
         }
 
         /* LAYER 1: The Outer Frame */
@@ -993,50 +1002,50 @@
             font-size: 1.1rem;
         }
 
-/* Base styles (Place outside media queries) */
-#choice-prompt {
-    position: absolute;
-    bottom: 2%;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    padding: 20px 20px 20px 90px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    z-index: 200;
-    max-width: 100%;
-}
+    /* Base styles (Place outside media queries) */
+    #choice-prompt {
+        position: absolute;
+        bottom: 2%;
+        left: 0;
+        right: 0;
+        margin: 0 auto;
+        padding: 20px 20px 20px 90px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        z-index: 200;
+        max-width: 100%;
+    }
 
-.choice-btn {
-    height: 46px;
-    white-space: nowrap;
-    padding: 0 16px;
-    border-radius: 9px;
-    background: rgb(231, 231, 231);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 3px solid rgba(25, 25, 25, 0.96);
-    color: rgb(0, 0, 0);
-    font-size: 1.1em;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
+    .choice-btn {
+        height: 46px;
+        white-space: nowrap;
+        padding: 0 16px;
+        border-radius: 9px;
+        background: rgb(231, 231, 231);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: 3px solid rgba(25, 25, 25, 0.96);
+        color: rgb(0, 0, 0);
+        font-size: 1.1em;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
 
-.choice-btn.back-btn {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 60px;
-    height: 46px;
-    margin-left: 10px;
-    border-radius: 9px;
-    background: rgb(0, 0, 0);
-    border: 3px solid rgba(201, 201, 201, 0.96);
-    color: rgb(224, 224, 224);
-    font-size: 1.2em;
-}
+    .choice-btn.back-btn {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 60px;
+        height: 46px;
+        margin-left: 10px;
+        border-radius: 9px;
+        background: rgb(0, 0, 0);
+        border: 3px solid rgba(201, 201, 201, 0.96);
+        color: rgb(224, 224, 224);
+        font-size: 1.2em;
+    }
 
 
 
@@ -1137,6 +1146,17 @@
         gap: 10px;
         overflow: visible;
     }
+
+        #close-btn {
+            max-width: 15% !important;
+            margin-left: 20px;
+
+        }
+
+        #proceed-btn {
+            max-width: 15% !important;
+        }
+
 
     /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
     .right-top-row,
@@ -1607,12 +1627,6 @@
         margin-bottom: 2px !important;
     }
 
-    /* --- FIX: PROCEED PROMPT HIGHER LAYER PRIORITY OVER ENEMY CARD --- */
-    .next-prompt {
-        z-index: 99999 !important; /* Pushes it above relatively-positioned stat cards and backgrounds */
-        bottom: 12px !important;
-        right: 12px !important;
-    }
 
 
     /* Position flip button inside the tray to the right of the last card */
