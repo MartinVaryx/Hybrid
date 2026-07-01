@@ -25,63 +25,20 @@
 
     <div class="container">
         <div class="tabs">
-    </div>
+            <div style="display: flex; align-items: flex-end; width: 100%; justify-content: flex-end;">
+                <button id="close-builder" class="adrenaline-select" onclick="window.parent.toggleBuilder(false)" >
+                    X
+                </button>
+            </div>
+        </div>
+
+
 
         <div id="builder" class="tab-content active">
+ 
             <div class="stats-panel" id="character-stats"></div>
-
         </div>
 
-        <div id="navod" class="tab-content">
-            <div style="padding: 20px; overflow-y: auto; width: 100%; font-size: 1rem; line-height: 1.6;">
-                <h1 style="font-family:'Archivo Black'; border-bottom: 4px solid var(--hybrid-red); padding-bottom: 10px;">AKO POUŽÍVAŤ MANAŽÉR HYBRID</h1>
-                
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 40px; margin-top: 30px; align-items: start;">
-                    
-                    <div>
-                        <h2 style="color: var(--hybrid-red); margin-top: 0;">TVORBA NOVÉHO HRDINU</h2>
-                        <p>Kliknutím na tlačidlo <img src="assets/add.png" alt="+" style="width: 16px; height: 16px; vertical-align: middle;"> vytvoríte novú postavu. Každý hrdina prechádza dvoma fázami:</p>
-                        <ul style="margin-bottom: 0;">
-                            <li><strong>POČIATOČNÁ FÁZA:</strong> Máte k dispozícii <strong>40 bodov rastu (BR)</strong>. V zozname schopností vidíte <strong>iba DANOSTI</strong> (Sila, IQ, Obratnosť atď.).</li>
-                            <li> Môžete si pridať <strong>1 až 6 daností</strong> (v tejto fáze nie je možné pridať si všetkých 7).</li>
-                            <li><strong>ODOMKNUTIE:</strong> V momente, keď miniete všetkých 40 bodov na Danosti, postava sa odomkne. Získate <strong>bonusových 20 BR</strong> a prístup ku všetkým ostatným skupinám schopností.</li>
-                            <li>Tlačidlom <img src="assets/back.png" alt="back" style="width: 16px; height: 16px; vertical-align: middle;"> vrátite posledný krok.</li>
-                            <li>Tlačidlom <img src="assets/down.png" alt="down" style="width: 16px; height: 16px; vertical-align: middle;"> znížite úroveň vybranej schopnosti (úrovne DANOSTÍ sa v druhej fáze zamknú a nebude ich možné znížiť pod hodnotu z prvej fázy).</li>
-                            <li><strong>Export:</strong> Kliknutím na <strong>EXPORTOVAŤ</strong> si stiahnete denník vybraného hrdinu. Číselné hodnoty v ňom uvedené nie sú, keďže sa počas hry prepisujú. Tie si po vytlačení zapíšete ceruzkou (zmazateľným perom).</li>
-
-                        </ul>
-                    </div>
-
-                    <div>
-                        <h2 style="color: var(--hybrid-red); margin-top: 0;">SYSTÉM VYLEPŠOVANIA</h2>
-                        <p>Cena za novú úroveň schopnosti sa vypočítava dynamicky:</p>
-                        <p style="background: var(--hybrid-green); color: #fff; padding: 10px; border-left: 5px solid #000; font-family: monospace;">
-                            <strong>CENA = (Cieľová úroveň × Kategória 1-4) - ZĽAVA</strong>
-                        </p>
-                        <ul>
-                            <li><strong>Zľava:</strong> Súčet úrovní 3 najlepších príbuzných schopností, ktoré už postava ovláda.</li>
-                            <li><strong>Minimálna cena:</strong> Cena za úroveň nikdy nemôže byť nižšia ako samotná cieľová úroveň.</li>
-                        </ul>
-                    <div style=" background: var(--hybrid-red); border: 5px solid #000">
-                    <h2 style="color: #ffffff; margin-top: 0; font-family:'Archivo Black'; padding: 10px;">PODEĽTE SA S NAMI!</h2>
-                    <p style="color: #ffffff; margin-bottom: 0; font-size: 1.1rem; padding: 10px">
-                        Kliknutím na tlačidlo <strong>PODELIŤ SA!</strong> nám pošlete hrdinu a schopnosti, ktoré ste vytvorili. 
-                        Veľmi nám tým pomôžete Hybrid vylepšiť.
-                    </p>
-                    </div>
-
-                    </div>
-                </div>
-
-            </div>
-        </div>
-        <div id="inventar" class="tab-content">
-            <div style="margin: 40px; margin-left: 60px; background: #000; color: #fff; padding: 25px; border-radius: 4px;">
-                <h2 style="color: var(--hybrid-red); margin-top: 0;">INVENTÁR</h2>
-                <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
-                </table>
-            </div>
-        </div>
 
     </div>
     </div>
@@ -99,7 +56,9 @@
 
 </div>
 
-<div id="info-panel-container">
+
+
+<div id="info-panel-container" style="z-index: 20000;">
     <div class="info-panel-box">
         <button class="info-panel-close-btn" onclick="toggleInfoOverlay(false)">×</button>
         <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSŤ</h3>
@@ -117,7 +76,7 @@
                     <span id="cost-disc" style="font-size: 2rem; color: var(--hybrid-green); font-family:'Archivo Black';">0 BR</span>
                 </div>
                 <div id="skill-btn-container" style="display: flex; gap: 5px; margin-top: 15px;">
-                    <button class="tab-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
+                    <button class="tab-btn" id="upgrade-btn" style="background:var(--hybrid-green); color:white; flex: 9; height: 50px; font-size: 1rem; clip-path:none; margin: 0;" onclick="upgradeSelected()">ZVÝŠIŤ ÚROVEŇ</button>
                     <button class="down-btn" title="Znížiť úroveň" style="background:var(--hybrid-red); color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="downgradeSkill()">↓</button>
                     <button class="back-btn" title="Zrušiť posledný krok" style="background:#444; color:white; flex: 0.8; height: 50px; font-size: 1.3rem; clip-path:none; margin: 0; display: flex; align-items: center; justify-content: center;" onclick="undoUpgrade()">⤺</button>
 

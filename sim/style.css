@@ -1721,13 +1721,15 @@
 
         #close-btn {
             max-width: 15% !important;
-            margin-left: 20px;
+            margin-left: 20px !important;
 
         }
 
         #proceed-btn {
             max-width: 15% !important;
         }
+
+
 
 }
 
