@@ -1072,9 +1072,6 @@
     }
 }
 
-/* =============================================================
-   CLEANED MOBILE VIEW: FLUID FLEX OVERRIDES (NO HORIZONTAL SCROLL)
-   ============================================================= */
 @media (max-width: 968px) {
 
 
@@ -1146,17 +1143,6 @@
         gap: 10px;
         overflow: visible;
     }
-
-        #close-btn {
-            max-width: 15% !important;
-            margin-left: 20px;
-
-        }
-
-        #proceed-btn {
-            max-width: 15% !important;
-        }
-
 
     /* Allow the inner gaming floors to flexibly contract inside the fluid right column */
     .right-top-row,
@@ -1364,12 +1350,14 @@
 
     .card-scroll-row {
         overflow-x: auto !important;
+        /* Let the scaled/hovered cards pop upward into the panel area */
         overflow-y: visible !important; 
         width: 100% !important;
         display: flex !important;
-        align-items: center !important;   /* ← add this */
         -webkit-overflow-scrolling: touch;
-    }
+        justify-content: flex-start !important;  /* ← add this line */
+
+    }    
 
     .card-img,
     .enemy-card-visual img,
@@ -1388,43 +1376,37 @@
     }
 
 
+    /* 1. The Scroll Row controls the clipping boundary. 
+        We give it extra vertical room so the scaled cards can breathe inside it. */
     .card-scroll-row {
-        overflow-x: auto;
-        overflow-y: hidden;
-        height: calc(100% + 100px) !important;  /* 100% content + the 70+30 padding */
-        padding-top: 70px;
-        padding-bottom: 30px;
-        margin-top: -70px;
+        width: 100%;
+        overflow-x: auto;   /* Allows horizontal scroll if cards overflow widthwise */
+        overflow-y: hidden; /* Prevents vertical scrollbars, but clips if container is too short */
+        
+        /* THE REAL FIX: Create safe vertical zones within the scroll boundary */
+        padding-top: 70px;    /* Ample room for scale(1.7) + translateY(-20px) */
+        padding-bottom: 30px; /* Room for the bottom edge expansion */
+        margin-top: -70px;    /* Pull the tray layout back up so it doesn't leave an ugly blank gap */
         margin-bottom: -30px;
-        justify-content: flex-start !important;  /* ← add this line */
-
     }
 
-
+    /* 2. Keep the escape container and tray purely structural with visible overflow */
     .card-tray-overflow-escape,
     .card-tray {
         display: flex;
-        flex-wrap: nowrap;
-        gap: 12px;
+        flex-wrap: nowrap; /* Ensures cards stay in a single row for scrolling */
+        gap: 12px;         /* Adds breathing room between individual cards */
         width: max-content;
         overflow: visible !important;
-        height: 100% !important;
-        align-items: center;
-        justify-content: flex-start;
-    }
-
-    .card-tray-overflow-escape {
-        flex-shrink: 0 !important;
     }
 
     .card-tray .card-container {
-        width: auto !important;           /* ← was 100px, now derived from height */
-        height: 100% !important;          /* ← was 150px, now fills available space */
-        aspect-ratio: 2 / 3;              /* ← NEW: preserves the 100:150 card proportions as it scales */
-        margin-top: 0 !important;         /* old fixed nudge no longer needed, centering handles it */
-        border: 5px solid #000000 !important;
-        border-radius: 6px !important;
-        overflow: hidden !important;
+        width: 100px !important;   /* Shrunk down from 80px */
+        height: 150px !important;  /* Shrunk down from 120px to keep aspect ratio */
+        margin-top: 8px !important;
+        border: 5px solid #000000 !important; /* Adjust thickness/color to match your desktop look */
+        border-radius: 6px !important;        /* Matches your PC look */
+        overflow: hidden !important;          /* Clips the absolute-positioned image inside the border */
     }
 
     /* Force the card face graphics to adapt perfectly */
@@ -1433,8 +1415,9 @@
         height: 100% !important;
     }
 
+    /* Tighten up the row height so it doesn't take over the screen */
     .card-tray-wrapper {
-        flex: 1 1 auto !important;
+        height: 170px !important; 
     }
 
     .card-tray .card-container:hover{
@@ -1627,7 +1610,28 @@
         margin-bottom: 2px !important;
     }
 
+    /* --- FIX: PROCEED PROMPT HIGHER LAYER PRIORITY OVER ENEMY CARD --- */
+    .next-prompt {
+        z-index: 99999 !important; /* Pushes it above relatively-positioned stat cards and backgrounds */
+        bottom: 12px !important;
+        right: 12px !important;
+    }
 
+
+    .card-tray {
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: center !important; 
+        justify-content: flex-start !important;
+        overflow: visible !important;
+        min-width: max-content !important; 
+        padding-left: 10px !important;
+        padding-right: 10px !important;    
+        pointer-events: auto !important;   
+        gap: 6px !important; 
+        height: 100% !important;
+    }
 
     /* Position flip button inside the tray to the right of the last card */
     #flip-cards-btn {
@@ -1715,6 +1719,15 @@
         margin-bottom: 0 !important;
     }
 
+        #close-btn {
+            max-width: 15% !important;
+            margin-left: 20px;
+
+        }
+
+        #proceed-btn {
+            max-width: 15% !important;
+        }
 
 }
 
