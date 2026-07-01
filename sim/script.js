@@ -1,6 +1,6 @@
         let test_mode = false;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START"
 
         let tooltipsInitialized = false;
@@ -2720,7 +2720,8 @@
                 if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
                     log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
                     return;
-                }
+                };
+                return
             }
             // --- REŽIM VÝZVY (CHALLENGE) ---
             const activeChallenge = CHALLENGES[current_challenge_key];
