@@ -1426,17 +1426,18 @@
         "case_success": "",
         "case_failure": "",
         "next": "TUTORIAL_0",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/WELCOME.png"
     },
     "TUTORIAL_0": {
         "initial_msg": "Táto digitálna verzia slúži ako doplnok k stolnej hre Hybrid - preto všetky tie kocky a karty.",
         "case_success": "",
         "case_failure": "",
         "next": "TUTORIAL_1",
-        "image": "assets/PLACEHOLDER.png",
+        "image": "assets/tutorial/SVET.png",
         "initial_msg_1": "Hra Hybrid zasadená do postapokalyptického sveta v blízkej budúcnosti. Na Zemi sa rozšíril neznámy druh gigantického ľudožravého hmyzu bežne nazývaného Somory.",
-        "initial_msg_2": "Názov Hybrid sa viaže k postavám, ktoré sa nachádzajú na pomedzí tohto hmyzu a človeka. Dokážu získať schopnosti Somôr, vďaka ktorým sa napríklad vedia pohybovať medzi nimi bez toho, aby na nich útočili. Aby schopnosti získali, musia sa vzdať svojej ľudskosti skonzumovaním ľudského mäsa. Ľudia nimi preto opovrhujú.",
-        "initial_msg_3": "Ty sa ujmeš práve roly Hybrida."
+        "initial_msg_2": "Názov Hybrid sa viaže k postavám, ktoré sa nachádzajú na pomedzí tohto hmyzu a človeka.",
+        "initial_msg_3": " Dokážu získať schopnosti Somôr, vďaka ktorým sa napríklad vedia pohybovať medzi nimi bez toho, aby na nich útočili. Aby schopnosti získali, musia sa vzdať svojej ľudskosti skonzumovaním ľudského mäsa. Ľudia nimi preto opovrhujú.",
+        "initial_msg_4": "Ty sa ujmeš práve roly Hybrida."
     },
     "TUTORIAL_1": {
         "initial_msg": "V tomto tutoriále sa dozvieš všetko podstatné. Ak si ho budeš chcieť zopakovať, nájdeš ho v MENU.",
@@ -1444,23 +1445,23 @@
         "case_failure": "",
         "next": "TUTORIAL_2",
         "initial_msg_1": "Toto okno je scrollovateľné, takže ak ti ujde nejaká správa alebo si ju budeš chcieť pripomenúť, všetko nájdeš vyššie.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "TUTORIAL_2": {
         "initial_msg": "Začneme tým, čo všetko tvorí tvoju postavu. Podstatné je sledovať ukazovateľ stresu. Ten vyjadruje stav tvojej postavy.",
         "case_success": "",
         "case_failure": "",
         "next": "TUTORIAL_3",
-        "initial_msg_1": "Pod ním sa nachádza ukazovateľ adrenalínu. Ten poskytne jednorazový bonus, ale okamžite ti zvýši stres na hodnotu nad ním. Môžeš ho použiť, ak veľmi potrebuješ uspieť pri niektorej skúške. Pokojne si to teraz vyskúšaj.",
+        "initial_msg_1": "Pod ním sa nachádza ukazovateľ adrenalínu. Ten poskytne jednorazový bonus, ale okamžite ti zvýši stres na hodnotu nad ním. Môžeš ho použiť, ak veľmi potrebuješ uspieť pri niektorej skúške. Pokojne si to vyskúšaj pri najbližšej výzve, stres sa ti po tutoriále obnoví.",
         "initial_msg_2": "",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/SA.png"
     },
     "TUTORIAL_3": {
         "initial_msg": "Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky.",
         "case_success": "",
         "case_failure": "",
         "next": "TUTORIAL_4",
-        "image": "assets/PLACEHOLDER.png",
+        "image": "assets/tutorial/CARDS1.png",
         "initial_msg_2": "Každá karta má svoje výhody aj nevýhody. Pri ČINE (neútočná akcia, ktorou chceš niečo dosiahnuť, väčšinou bez protivníka) sa rozhoduješ doslova medzi OPATRNOSŤOU a šancou na úspech. Pri útoku zase medzi jeho INTENZITOU a šancou na zásah.",
         "initial_msg_1": "Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa budeš rozhodovať, ako tvoj hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Je na tebe, čo je pre tvojho hrdinu v danej chvíli podstatnejšie."
     },
@@ -1468,9 +1469,15 @@
         "initial_msg": "V pravom hornom rohu je MOTIVÁCIA. Tá určuje kocky, ktorými hodíš pri výbere danej karty. Čím vyššia celková hodnota kociek, tým máš väčšiu šancu na úspech.",
         "case_success": "",
         "case_failure": "",
-        "next": "TUTORIAL_5",
+        "next": "TUTORIAL_4A",
+        "image": "assets/tutorial/CARDS2.png"
+    },
+    "TUTORIAL_4A": {
         "initial_msg_1": "Motivácia sa porovnáva s NÁROČNOSŤOU. To je jednoducho číslo, ktoré potrebuješ hodiť. Náročnosť býva v rozmedzí 6 až 12. Ak na kockách padne menej, zlyháš.",
-        "image": "assets/PLACEHOLDER.png"
+        "case_success": "",
+        "case_failure": "",
+        "next": "TUTORIAL_5",
+        "image": "assets/tutorial/DIFF.png"
     },
     "TUTORIAL_5": {
         "initial_msg": "Môžeš si to vyskúšať pri tejto \"výzve\". Náročnosť je veľmi nízka.",
@@ -1480,17 +1487,24 @@
         "threat": 0,
         "success_msg": "Super, podarilo sa.",
         "failure_msg": "Skús to ešte raz.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "TUTORIAL_6": {
         "initial_msg": "Okrem zlyhania však môžu nastať aj komplikácie. To, či nastanú, určuje HROZBA. Tá máva hodnotu 2 až 6.",
         "case_success": "",
         "case_failure": "",
-        "next": "TUTORIAL_7",
+        "next": "TUTORIAL_6A",
         "initial_msg_1": "Ak je tvoj hod nižší ako NÁROČNOSŤ, čelíš HROZBE. To znamená, že sa hodí kockami hrozby (toľko kociek, koľko je hodnota hrozby) a ak sa hrozba naplní, čelíš následkom.",
         "initial_msg_2": "Kockami hrozby sa hádže, aj keď je tvoj hod rovný  náročnosti (vtedy aj uspeješ, aj čelíš hrozbe).",
         "initial_msg_3": "Pred hrozbou ťa ale chráni OPATRNOSŤ ľavom rohu karty. Hrozba sa naplní len v prípade, že na kockách hrozby padne VIAC, ako je tvoja OPATRNOSŤ. Vyskúšaj si to.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/THREAT.png"
+    },
+        "TUTORIAL_6A": {
+        "case_success": "",
+        "case_failure": "",
+        "next": "TUTORIAL_7",
+        "initial_msg": "Pred hrozbou ťa ale chráni OPATRNOSŤ ľavom rohu karty. Hrozba sa naplní len v prípade, že na kockách hrozby padne VIAC, ako je tvoja OPATRNOSŤ. Vyskúšaj si to.",
+        "image": "assets/tutorial/CARDS aligned 1.png"
     },
     "TUTORIAL_7": {
         "initial_msg": "Vyber si kartu a všimni si, akú má OPATRNOSŤ. Náročnosť je zámerne vysoká, takže zlyháš a potom sa hodí kockami hrozby. Nemusíš sa báť, v hre na takúto náročnosť nenarazíš.",
@@ -1501,63 +1515,63 @@
         "threat_avoided_msg": "Opatrnosť ti pomohla vyhnúť sa HROZBE. V tomto prípade sa hrozbe vyhneš a nič zlé sa ti nestane.",
         "failure_msg": "Teraz sa vyhodnotí HROZBA.",
         "threat_msg": "Hrozba sa naplnila a teraz by sa ti v hre stalo niečo nepríjemné.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "TUTORIAL_8": {
         "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
         "case_success": "",
         "case_failure": "",
+        "next": "TUTORIAL_8A",
+        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
+        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
+        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
+        "image": "assets/tutorial/CARDS aligned 2.png"
+    },
+    "TUTORIAL_8A": {
+        "initial_msg": "Priprav sa...",
         "next": [
             "SCOUT_DUMMY",
             "TUTORIAL_9"
         ],
-        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
-        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
-        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "SCOUT_DUMMY": {
         "initial_msg": "Klikni na polovicu karty, na ktorej je \"ÚTOK\".",
         "case_success": "",
         "case_failure": "",
         "type": "Skautka_dummy",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "TUTORIAL_9": {
         "initial_msg": "V SPORE však môžeš aj robiť manévre výberom polovice karty s OPATRNOSŤOU, na ktorej svieti \"ČIN\".  Ak po výbere tejto karty vyhráš výmenu (hodíš viac, ako súper), zvýši sa tvoja VÝHODA. Tá ti až do konca SPORU poskytuje bonus k hodu.",
         "case_success": "",
         "case_failure": "",
+        "next": "TUTORIAL_9A",
+        "initial_msg_1": "Ak zlyháš a nepriateľ ťa zasiahne počas manévru, zvýšenie stresu, ktoré ti spôsobí, bude stlmené tvojou OPATRNOSŤOU. (Pozor na kartu BEZHLAVO! Tá má \"neopatrnosť\" a súperov útok ešte zosilní, ak ťa trafí.)",
+        "image": "assets/tutorial/CARDS3.png"
+    },
+        "TUTORIAL_9A": {
+        "initial_msg": "Priprav sa...",
         "next": [
             "SCOUT_DUMMY_0",
             "TUTORIAL_10"
         ],
-        "initial_msg_1": "Ak zlyháš a nepriateľ ťa zasiahne počas manévru, zvýšenie stresu, ktoré ti spôsobí, bude stlmené tvojou OPATRNOSŤOU. (Pozor na kartu BEZHLAVO! Tá má \"neopatrnosť\" a súperov útok ešte zosilní, ak ťa trafí.)",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "SCOUT_DUMMY_0": {
         "initial_msg": "Vyskúšaj v súboji použiť ČIN.",
         "case_success": "",
         "case_failure": "",
         "type": "Skautka_dummy",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "TUTORIAL_10": {
-        "initial_msg": "V hre môžeš čeliť nepriateľom. Vtedy nastane SPOR.",
-        "case_success": "",
-        "case_failure": "",
-        "next": "TUTORIAL_11",
-        "initial_msg_1": "Pri spore môžeš použiť aj dolnú stranu kariet. Môžeš si ich otočiť tlačidlom ↺. Otočenie je čisto vizuálne, nemá vplyv na hru.",
-        "initial_msg_2": "Na tejto strane kariet je namiesto opatrnosti INTENZITA. Ide o hodnotu, ktorá zvýši súperovi stres, ak ho trafíš. A to, či ho trafíš, určuje vzájomný hod kockami MOTIVÁCIE. Kto hodí viac, ten trafil.",
-        "initial_msg_3": "K intenzite sa priráta aj hodnota tvojej zbrane. Vyskúšaj si zaútočiť na maketu Skautky.",
-        "image": "assets/PLACEHOLDER.png"
-    },
-    "TUTORIAL_11": {
         "initial_msg": "To je všetko.",
         "case_success": "",
         "case_failure": "",
         "choice_B": "Ukončiť tutoriál.",
         "case_B": "BACK_TO_GAME",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/tutorial/GENERAL.png"
     },
     "SNEAK_0": {
         "back": true,

@@ -815,7 +815,7 @@
         /* Player-Specific Track Layout (Bottom-Left Side) */
         .dice-animation-pool.player-pool {
             bottom: 20px;
-            left: 20px;
+            left: 25%;
             align-content: end;      /* Stacks grid rows upward from bottom */
             z-index: 5;
         }
@@ -823,7 +823,7 @@
         /* Enemy-Specific Track Layout (Top-Right Side Over Panel) */
         .dice-animation-pool.enemy-pool {
             top: 20px;
-            right: 15px;             /* Perfectly maps over the 300px enemy panel */
+            right: 1%;             /* Perfectly maps over the 300px enemy panel */
             width: 270px;            /* Centers the columns within the panel column width */
             justify-content: center; 
             align-content: start;    /* Stacks grid rows downward from top */
@@ -1056,7 +1056,7 @@
         opacity: 0;
     }
     100% {
-        transform: translateY(-50%) rotate(360deg); /* Relative to parent */
+        transform: translateY(-310%) rotate(360deg); /* Relative to parent */
         opacity: 1;
     }
 }
@@ -1067,7 +1067,7 @@
         opacity: 0;
     }
     100% {
-        transform: translateY(50%) rotate(-360deg); /* Relative to parent */
+        transform: translateY(430%) rotate(-360deg); /* Relative to parent */
         opacity: 1;
     }
 }

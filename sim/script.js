@@ -5,9 +5,11 @@
 
         let tooltipsInitialized = false;
 
+
         let current_challenge_key = "WELCOME";
         let back_to_game = "START";
         let keep_testing = false;
+        let is_tutorial = false;
         let prev_challenge = null;
         let pre_encounter_challenge_key = null;
         let queued_difficulty_target = null;
@@ -569,9 +571,9 @@
                     const line = document.createElement("div");
 
                     let bottomSpaceClass = '';
-                    if (currentLog.extraSpacingB || currentLog.message.length < 90) {
+                    if (currentLog.extraSpacingB || currentLog.message.length < 150) {
                         bottomSpaceClass = 'spacing-bottom';
-                    } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
+                    } else if (currentLog.message.length >= 150 && currentLog.message.length < 220) {
                         bottomSpaceClass = 'spacing-bottom-medium';
                     }
 
@@ -675,7 +677,7 @@
 
         document.getElementById("proceed-btn").addEventListener("click", function () {
             console.log("PROCEED_HANDLER: click detected");
-            if (!gameOn && !welcome) {
+            if (!gameOn && !welcome && !is_tutorial) {
                 console.log("PROCEED_HANDLER: gameOn is false, returning");
                 return;
             }
@@ -713,7 +715,7 @@
 
         // --- UNIFIED KEYBOARD CONTROLLER ---
         window.addEventListener('keydown', (e) => {
-            if (!gameOn && !welcome) return;
+            if (!gameOn && !welcome && !is_tutorial) return;
 
             // Check visibility states for all elements
             const generalPrompt = document.getElementById('general-prompt');
@@ -1333,11 +1335,13 @@
             if (caseTarget.includes("TUTORIAL")){
                 closeBtn.innerText = "UKONČIŤ";
                 closeBtn.style.display = "block"
-                proceedPrompt.style.justifyContent = "space-between"
+                proceedPrompt.style.justifyContent = "space-between";
+                is_tutorial = true
 
             } else {
                 proceedPrompt.style.justifyContent = "end"
-                closeBtn.style.display = "none"
+                closeBtn.style.display = "none";
+                is_tutorial = false
             }
 
             if (caseTarget == "BACK_TO_GAME"){
