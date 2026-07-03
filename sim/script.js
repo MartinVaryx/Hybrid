@@ -1,6 +1,6 @@
-        let test_mode = false;
+        let test_mode = true;
         const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START"
 
         let tooltipsInitialized = false;
@@ -10,6 +10,8 @@
         let back_to_game = "START";
         let keep_testing = false;
         let is_tutorial = false;
+        let is_help = false;
+        let narrative_phase = false;
         let prev_challenge = null;
         let pre_encounter_challenge_key = null;
         let queued_difficulty_target = null;
@@ -217,7 +219,7 @@
         let heal_attempts = 0;
         let is_elimination_check = false;
         let elimination_mode = "kill"; // "kill" | "sneak" — set by runElimination()
-
+        let transition_in_progress = false;
 
         function elimination(enemyKey) {
             inputs_frozen = true;
@@ -735,7 +737,7 @@
             const cards = document.querySelectorAll("#card-tray-container .card-container");
             const trayContainer = document.getElementById("card-tray-container");
 
-            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check || is_elimination_check)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
+            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check || is_elimination_check || is_tutorial)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
                 if (cards.length === 0) return;
 
                 // =========================================================================
@@ -754,7 +756,7 @@
 
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    
+
                     // KLÁVESNICA PREBERÁ KONTROLU: Rušíme myšovú dominanciu
                     if (trayContainer) trayContainer.classList.remove("mouse-active");
                     
@@ -1320,6 +1322,34 @@
             handleChallengeTransition(target)
         }
 
+        function help(){
+            if (is_collapse_check){
+                showGeneralPrompt("Teraz to nie je možné.")
+            }
+            const choicePrompt = document.getElementById("choice-prompt");
+            const isChoicePromptVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none";
+            hideMenu();
+            if (!isChoicePromptVisible){
+                showGeneralPrompt(
+                `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
+                () => {
+                    runHelp()})
+            } else {
+                runHelp()
+            }
+        }
+        
+        function runHelp(){
+            resetStateFlags(); 
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            if (proceedPrompt) {
+                proceedPrompt.style.display = "none";
+            };
+            target = "HELP";
+            back_to_game = current_challenge_key;
+            handleChallengeTransition(target)
+        }
+
         function handleChallengeTransition(caseTarget) {
             if (caseTarget == "WELCOME"){
                 const proceedBtn = document.getElementById('proceed-btn');
@@ -1332,16 +1362,18 @@
             const closeBtn = document.getElementById('close-btn');
             const proceedPrompt = document.getElementById('proceed-prompt');
 
-            if (caseTarget.includes("TUTORIAL")){
+            if (caseTarget.includes("TUTORIAL") || caseTarget.includes("DUMMY")){
                 closeBtn.innerText = "UKONČIŤ";
                 closeBtn.style.display = "block"
                 proceedPrompt.style.justifyContent = "space-between";
                 is_tutorial = true
+            }
 
-            } else {
-                proceedPrompt.style.justifyContent = "end"
-                closeBtn.style.display = "none";
-                is_tutorial = false
+            if (caseTarget.includes("HELP")){
+                closeBtn.innerText = "UKONČIŤ";
+                closeBtn.style.display = "block"
+                proceedPrompt.style.justifyContent = "space-between";
+                is_help = true
             }
 
             if (caseTarget == "BACK_TO_GAME"){
@@ -1349,6 +1381,10 @@
                 stress_reset = "stress-10";
                 if (back_to_game.includes("START")) final_target.push(stress_reset);
                 final_target.push(back_to_game);
+                is_tutorial = false;
+                is_help = false;
+                proceedPrompt.style.justifyContent = "end";
+                closeBtn.style.display = "none";
                 updateUI;
                 handleChallengeTransition(final_target);
 
@@ -1361,7 +1397,7 @@
                 mod = Math.min(0,Math.floor(Math.random() * 14 - 1))
                 HERO.stress = Math.max(0, HERO.stress + mod);
             }
-            if (!caseTarget || (!gameOn && !welcome)) return;
+            if (!caseTarget || (!gameOn && !welcome && !is_tutorial)) return;
             if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
                 return; // Early return to completely freeze challenge transitions
             }
@@ -4424,11 +4460,16 @@
 
         // Dedicated transition executor
         function executeProceedTransition() {
+            if (transition_in_progress) {
+                if (test_mode) log("EXEC_TRANSITION: already in progress, ignoring re-entrant call", "danger-msg");
+                return;
+            }
             if(test_mode){
                 if (is_collapse_check) {
                     return;
                 }
             }
+
             const enemyCardContainer = document.getElementById("enemy-card-container");
             const playerCardDisplay = document.getElementById("player-card-display");
             const prompt = document.getElementById("proceed-prompt");
@@ -4451,27 +4492,30 @@
             if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target exists, executing after " + delay + "ms", "system-msg");
+                transition_in_progress = true;
+                const targetToRun = proceed_target;
+                proceed_target = null;
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
-                // Trigger visual slide outs
                 if (enemyCardContainer) enemyCardContainer.classList.remove("show");
                 if (playerCardDisplay) playerCardDisplay.classList.remove("show");
 
-// Delay the DOM destruction and actual target execution by 500ms
                 setTimeout(() => {
                     if (enemyCardContainer) enemyCardContainer.innerHTML = "";
                     if (playerCardDisplay) playerCardDisplay.innerHTML = "";
                     if (prompt) prompt.style.display = "none";
-                    if (typeof proceed_target === 'function') {
+                    transition_in_progress = false;
+                    if (typeof targetToRun === 'function') {
                         if (test_mode) log("EXEC_TRANSITION: calling proceed_target function", "system-msg");
-                        proceed_target();
+                        targetToRun();
                     } else {
-                        if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + proceed_target + ")", "system-msg");
-                        handleChallengeTransition(proceed_target);
+                        if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + targetToRun + ")", "system-msg");
+                        handleChallengeTransition(targetToRun);
                     }
-                }, delay); // Matches your CSS 0.5s transition
+                }, delay);
             } else {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target is NOT set, returning", "danger-msg");
             }
+
         }
 
 
@@ -4920,10 +4964,6 @@
                 updateUI();
 
                 onTerminalFinishedCallback = () => {
-                    inputs_frozen = false;
-                    const scrollRow = document.querySelector('.card-scroll-row');
-                    if (scrollRow) scrollRow.classList.add('enable-interaction');
-
                     displayEnemyCard(enemy_action[0], enemy_action[1]);
                     runGameloopCycle();
                 };
@@ -6417,7 +6457,7 @@
                 adrenalineSelectEl.value = targetAdrenalineVal;
             }
 
-            log(`⚡ Adrenalín použitý! Stres sa ti zvyšuje na ${HERO.stress} a získavaš +${targetAdrenalineVal} k ďalšiemu hodu.`, "success-msg");
+            log(`Adrenalín použitý! Stres sa ti zvyšuje na ${HERO.stress} a získavaš +${targetAdrenalineVal} k ďalšiemu hodu.`, "success-msg");
 
             // 4. Prekreslenie UI (posun červeného 'S' indikátora)
             updateUI();

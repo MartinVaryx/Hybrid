@@ -333,7 +333,7 @@
             padding: 10px;
             display: none; 
             align-items: center;
-            justify-content: space-between;
+            justify-content: end;
             gap: 5px;
             z-index: 200;
             width: 100%;
