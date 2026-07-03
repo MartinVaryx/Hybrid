@@ -1,6 +1,6 @@
         let test_mode = false;
-        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
+        const DEBUG = true;
         let debug_start = "START"
 
         let tooltipsInitialized = false;
@@ -1097,7 +1097,6 @@
                 settings.style.display = "flex";
             }
             hideMenu();
-
             syncUIWithSettings();
         }
 
@@ -1105,13 +1104,30 @@
             if (typeof SETTINGS === 'undefined') return;
 
             const tutorialCheckbox = document.getElementById('tutorial-checkbox');
+            const modeDropdown = document.getElementById('mode-dropdown');
             if (tutorialCheckbox) {
                 tutorialCheckbox.checked = !!SETTINGS.tutorial;
+            }
+            if (modeDropdown) {
+                modeDropdown.value = SETTINGS.mode || 'NORMAL';
             }
         }
 
         function hideSettings() {
+            MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
+            SETTINGS.MODE = MODE;
+            saveSettings();
+            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť: " + SETTINGS.MODE);
             document.getElementById('settings').style.display = 'none';
+        }
+
+        function backToMenu() {
+            MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
+            SETTINGS.MODE = MODE;
+            saveSettings();
+            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť: " + SETTINGS.MODE);
+            document.getElementById('settings').style.display = 'none';
+            showMenu()
         }
 
         function saveSettings() {
@@ -1305,7 +1321,8 @@
                 showGeneralPrompt(
                 `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
                 () => {
-                    runAbout()})
+                    runAbout()},() => {
+                    showMenu()})
             } else {
                 runAbout()
             }
@@ -1333,7 +1350,8 @@
                 showGeneralPrompt(
                 `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
                 () => {
-                    runHelp()})
+                    runHelp()},() => {
+                    showMenu()})
             } else {
                 runHelp()
             }
