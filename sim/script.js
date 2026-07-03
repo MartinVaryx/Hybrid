@@ -1,6 +1,6 @@
         let test_mode = false;
         let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START"
 
         let tooltipsInitialized = false;

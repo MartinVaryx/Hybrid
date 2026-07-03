@@ -511,6 +511,29 @@
             box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
         }
 
+        .menu-btn {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 6px 12px;
+            border: var(--border-heavy);
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+        }
+        .menu-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Visual highlight to make keyboard selection obvious to the player */
+        .menu-btn.choice-hover-highlight {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
+        }
+
+
+
         .card-scroll-row {
             display: flex;
             align-items: center;
@@ -1197,10 +1220,8 @@
         font-size: 0.72rem !important;
     }
 
-    /* --- COMPACT BUTTONS THAT FIT INSIDE THE MODIFIED FLEX COLUMN --- */
     .adrenaline-select, 
     select, 
-    button,
     #player-skill-dropdown,
     #player-weapon-dropdown {
         width: 100% !important;          /* Sets width boundaries back inside columns */
