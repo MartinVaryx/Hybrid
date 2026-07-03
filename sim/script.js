@@ -1109,7 +1109,7 @@
                 tutorialCheckbox.checked = !!SETTINGS.tutorial;
             }
             if (modeDropdown) {
-                modeDropdown.value = SETTINGS.mode || 'NORMAL';
+                modeDropdown.value = SETTINGS.MODE || 'NORMAL';
             }
         }
 
