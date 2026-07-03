@@ -1054,39 +1054,43 @@
 
 
     function showCustomAlert(message, title = "UPOZORNENIE", isConfirm = false, callback = null) {
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-message').innerText = message;
-        
-        const btnContainer = document.getElementById('modal-buttons');
-        if (!btnContainer) return; // Bezpečnostná poistka
-        
-        btnContainer.innerHTML = ''; 
+        const modal = document.getElementById('custom-modal');
+        if (!modal) return; // safety
+
+        // Build modal content matching the requested visual style
+        modal.innerHTML = `
+            <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215,0,0,0.4);">
+                <button id="custom-modal-close" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">X</button>
+                <div id="modal-title" style="font-family: 'Archivo Black', sans-serif; font-size: 1.2rem; color: #fff; margin-bottom: 25px;">${title}</div>
+                <div id="modal-message" style="font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; color: #fff; margin-bottom: 15px;">${message}</div>
+                <input id="modal-input" type="text" placeholder="" style="display: none; width: 80%; margin-bottom: 20px; padding: 8px 12px; font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; background: #2a2a2a; color: #fff; border: 2px solid #555; border-radius: 4px; outline: none;">
+                <div style="display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%;">
+                    <button id="modal-confirm" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-green);">Áno.</button>
+                    <button id="modal-cancel" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-red);">Nie.</button>
+                </div>
+            </div>
+        `;
+
+        // Wire up actions
+        const closeBtn = document.getElementById('custom-modal-close');
+        if (closeBtn) closeBtn.onclick = closeModal;
+
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
 
         if (isConfirm) {
-            const yesBtn = document.createElement('button');
-            yesBtn.className = 'tab-btn';
-            yesBtn.style.cssText = 'clip-path:none; background:var(--hybrid-green); color:white; margin: 5px;';
-            yesBtn.innerText = 'ÁNO';
-            yesBtn.onclick = () => { if(callback) callback(); closeModal(); };
-            
-            const noBtn = document.createElement('button');
-            noBtn.className = 'tab-btn';
-            noBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white; margin: 5px;';
-            noBtn.innerText = 'NIE';
-            noBtn.onclick = closeModal;
-
-            btnContainer.appendChild(yesBtn);
-            btnContainer.appendChild(noBtn);
+            if (confirmBtn) confirmBtn.onclick = () => { if (callback) callback(); closeModal(); };
+            if (cancelBtn) cancelBtn.onclick = closeModal;
         } else {
-            const okBtn = document.createElement('button');
-            okBtn.className = 'tab-btn';
-            okBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white;';
-            okBtn.innerText = 'OK';
-            okBtn.onclick = closeModal;
-            btnContainer.appendChild(okBtn);
+            // Non-confirm: show single OK (use confirm button as OK)
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (confirmBtn) {
+                confirmBtn.innerText = 'OK';
+                confirmBtn.onclick = closeModal;
+            }
         }
 
-        document.getElementById('custom-modal').style.display = 'flex';
+        modal.style.display = 'flex';
     }
 
     function closeModal() {
@@ -1225,7 +1229,7 @@ async function exportpng() {
                     padding: 0 !important;
                     display: block !important;
                     overflow: visible !important;
-                    z-index: 99999 !important;
+                    z-index: 999999 !important;
                     
                     background-position: top left !important;
                     background-size: 100% 100% !important;
