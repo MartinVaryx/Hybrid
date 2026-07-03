@@ -703,6 +703,7 @@
         const minWidthPerSkill = 200; // Minimum width needed to display skill name + level without wrapping
         const columns = availableWidth >= minWidthPerSkill * 2 ? 2 : 1;
         const maxRows = Math.ceil(learnedSkills.length / columns);
+        const totalSlots = 16;
 
         const slots = [];
         
@@ -746,9 +747,29 @@
                 skillsContainer.appendChild(div);
             });
 
+            if (learnedSkills.length < totalSlots) {
+                const placeholder = document.createElement('div');
+                placeholder.className = `skill-slot`;
+
+                placeholder.style.cssText = `
+                    padding: 8px;
+                    background: transparent;
+                    border: none;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 1.5rem;
+                    color: #555;
+                    font-weight: bold;
+                    cursor: pointer;
+                `;
+                placeholder.innerText = '+';
+                placeholder.onclick = () => toggleInfoOverlay(true);
+                skillsContainer.appendChild(placeholder);
+            }
+
             container.appendChild(skillsContainer);
         } else {
-            // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
             for (let col = 0; col < 2; col++) {
                 for (let row = 0; row < 8; row++) {
                     slots.push({
@@ -785,6 +806,28 @@
                     container.appendChild(div);
                 }
             });
+
+            if (learnedSkills.length < slots.length) {
+                const slot = slots[learnedSkills.length];
+                const placeholder = document.createElement('div');
+                placeholder.className = 'skill-slot empty-slot';
+                placeholder.style.left = slot.x + "%";
+                placeholder.style.top = slot.y + "%";
+                placeholder.style.width = "42.5%";
+                placeholder.style.height = "4.4%";
+                placeholder.style.display = "flex";
+                placeholder.style.alignItems = "center";
+                placeholder.style.justifyContent = "center";
+                placeholder.style.fontSize = "1.5rem";
+                placeholder.style.color = "#555";
+                placeholder.style.fontWeight = "bold";
+                placeholder.style.border = "none";
+                placeholder.style.background = "transparent";
+                placeholder.style.cursor = "pointer";
+                placeholder.innerText = "+";
+                placeholder.onclick = () => toggleInfoOverlay(true);
+                container.appendChild(placeholder);
+            }
         }
     }
 
