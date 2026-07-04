@@ -1,11 +1,9 @@
         let test_mode = false;
         let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = false;
-        let debug_start = "START"
+        let debug_start = "START";
 
         let tooltipsInitialized = false;
-
-
         let current_challenge_key = "WELCOME";
         let back_to_game = "START";
         let keep_testing = false;
@@ -88,6 +86,7 @@
             },
             "VRHACIE":{
                 "nôž":1,
+                "bomba":3
             }
         }
 
@@ -130,11 +129,11 @@
             "FEROMÓNY": {
                 "description": "Dokážu ovplyvniť správanie Somôr."
             },
-            "BOMBA":{
-                "description": "Vďaka nej zmiznú veci, ktoré ti prekážajú."
-            },
             "FILTER":{
                 "description": "Palivový filter. Aby sa do motora nedostalo nejaké svinstvo."
+            },
+            "KĽÚČ":{
+                "description": "Ktovie, od čoho je?"
             }
         }
         window.ITEM_LIST = ITEM_LIST;
@@ -148,8 +147,8 @@
 
         const WEAPON_SKILLS = {
             "1":["STREĽBA","VRHANIE","ELIMINÁCIA Z DIAĽKY","ĽAHKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
-            "2":["ŤAŽKÉ STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŤAŽKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
-            "3":["ŠPECIÁLNE STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŠPECIÁLNE ZBRANE","MUČENIE","OMRÁČENIE","TICHÁ ELIMINÁCIA"],
+            "2":["ŤAŽKÉ PREDMETY","ŤAŽKÉ STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŤAŽKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
+            "3":["ŤAŽKÉ PREDMETY","ŠPECIÁLNE STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŠPECIÁLNE ZBRANE","MUČENIE","OMRÁČENIE","TICHÁ ELIMINÁCIA"],
             "4":["BOJOVÉ STROJE","HROMADNÉ NIČENIE","ELIMINÁCIA Z DIAĽKY"]
         }
 
@@ -207,6 +206,9 @@
         let isProcessingQueue = false;
         let onTerminalFinishedCallback = null; 
         let activeLogTimeout = null; // NEW: Keeps track of the active waiting timer
+        let terminalPendingAnimationTimeout = null;
+        let terminalPendingAnimationIndex = 0;
+        const terminalPendingFrames = ["(   )", "(.  )", "(.. )", "(...)"];
         let is_collapse_check = false;
         let collapse_resume_callback = null;
         let collapse_failure_callback = null;
@@ -248,8 +250,9 @@
 
             // Rovnako ako v boji (KROK 4): zbraň s muníciou v INITIAL_AMMO ju musí mať k dispozícii
             let hasAmmo = true;
-            if (isRangedWeapon && typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                const currentAmmo = HERO["ammo"][selectedWeaponName];
+            if (isRangedWeapon) {
+                const ammoKey = getAmmoKey(selectedWeaponName);
+                const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][ammoKey] : undefined;
                 hasAmmo = currentAmmo !== undefined && currentAmmo > 0;
             }
 
@@ -506,6 +509,58 @@
         }
 
 
+        function getTerminalPendingAnimationElement() {
+            let el = document.getElementById('terminal-pending-animation');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'terminal-pending-animation';
+                el.className = 'terminal-pending-animation';
+                const container = document.querySelector('.terminal-border-box');
+                if (container) {
+                    container.appendChild(el);
+                }
+            }
+            return el;
+        }
+
+        function stopTerminalPendingAnimation() {
+            if (terminalPendingAnimationTimeout) {
+                clearTimeout(terminalPendingAnimationTimeout);
+                terminalPendingAnimationTimeout = null;
+            }
+            const el = document.getElementById('terminal-pending-animation');
+            if (el) {
+                el.style.display = 'none';
+            }
+        }
+
+        function scheduleTerminalPendingAnimationFrame() {
+            const el = getTerminalPendingAnimationElement();
+            if (!el) return;
+
+            const currentIndex = terminalPendingAnimationIndex;
+            el.textContent = terminalPendingFrames[currentIndex];
+            terminalPendingAnimationIndex = (currentIndex + 1) % terminalPendingFrames.length;
+
+            const delay = currentIndex === terminalPendingFrames.length - 1 ? 800 : 400;
+            terminalPendingAnimationTimeout = setTimeout(() => {
+                if (logs_pending.length === 0 && !isProcessingQueue) {
+                    stopTerminalPendingAnimation();
+                    return;
+                }
+                scheduleTerminalPendingAnimationFrame();
+            }, delay);
+        }
+
+        function startTerminalPendingAnimation() {
+            if (terminalPendingAnimationTimeout) return;
+            terminalPendingAnimationIndex = 0;
+            const el = getTerminalPendingAnimationElement();
+            if (!el) return;
+            el.style.display = 'block';
+            scheduleTerminalPendingAnimationFrame();
+        }
+
         function log(message, className = "", extraSpacing = true, extraSpacingB = false, isInline = false) {
             if (/(danger|failure|error|success)/i.test(className)) {
                 extraSpacing = false;
@@ -531,6 +586,7 @@
             
             if (!isProcessingQueue) {
                 isProcessingQueue = true;
+                startTerminalPendingAnimation();
                 activeLogTimeout = setTimeout(processQueue, 0); 
             }
         }
@@ -539,6 +595,7 @@
             if (logs_pending.length === 0) {
                 isProcessingQueue = false;
                 activeLogTimeout = null;
+                stopTerminalPendingAnimation();
                 if (typeof onTerminalFinishedCallback === "function") {
                     const callback = onTerminalFinishedCallback;
                     onTerminalFinishedCallback = null;
@@ -605,6 +662,7 @@
             } else {
                 isProcessingQueue = false;
                 activeLogTimeout = null;
+                stopTerminalPendingAnimation();
                 if (typeof onTerminalFinishedCallback === "function") {
                     const callback = onTerminalFinishedCallback;
                     onTerminalFinishedCallback = null;
@@ -666,6 +724,7 @@
                     activeLogTimeout = setTimeout(flushNext, delay);
                 } else {
                     activeLogTimeout = null;
+                    stopTerminalPendingAnimation();
                     if (typeof onTerminalFinishedCallback === "function") {
                         const callback = onTerminalFinishedCallback;
                         onTerminalFinishedCallback = null;
@@ -939,7 +998,7 @@
                 // flush them instead of cycling/selecting choices.
                 const hasPendingLogs = logs_pending.length > 0 || isProcessingQueue || activeLogTimeout;
 
-                if (hasPendingLogs && (e.code === 'ArrowRight' || e.code === 'Space')) {
+                if (hasPendingLogs && (e.code === 'ArrowDown' || e.code === 'Space')) {
                     e.preventDefault();
                     flushLogQueue();
                     return;
@@ -1197,6 +1256,7 @@
                 if (
                     lowerFinal.startsWith("set_") || 
                     lowerFinal.startsWith("flag_") || 
+                    lowerFinal.includes(":") ||
                     lowerFinal.includes("=") || 
                     lowerFinal.includes("+") || 
                     lowerFinal.includes("-")
@@ -1276,11 +1336,24 @@
             else if (rawValue.toLowerCase() === 'false') processedTarget = false;
             else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
         
-            if (flagKey.toLowerCase().startsWith('item')) {
-                const itemKey = flagKey.substring(5).replace(/_/g, ' ').toUpperCase();
-                processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
-                    ? HERO.items[itemKey]
-                    : 0;
+            const normalizedFlagKey = flagKey.toLowerCase();
+            const normalizeLookupKey = (rawKey) => rawKey.replace(/_/g, ' ').trim();
+            const lookupObjectKey = (obj, rawKey) => {
+                if (!obj || typeof obj !== 'object') return undefined;
+                if (rawKey in obj) return obj[rawKey];
+                const lowerKey = rawKey.toLowerCase();
+                const matchedKey = Object.keys(obj).find(k => k.toLowerCase() === lowerKey);
+                return matchedKey !== undefined ? obj[matchedKey] : undefined;
+            };
+
+            if (normalizedFlagKey.startsWith('item')) {
+                const itemKey = normalizeLookupKey(flagKey.substring(5));
+                const value = (typeof HERO !== 'undefined') ? lookupObjectKey(HERO.items, itemKey) : undefined;
+                processedCurrent = value !== undefined ? value : 0;
+            } else if (normalizedFlagKey.startsWith('ammo')) {
+                const ammoKey = normalizeLookupKey(flagKey.substring(5));
+                const value = (typeof HERO !== 'undefined') ? lookupObjectKey(HERO.ammo, ammoKey) : undefined;
+                processedCurrent = value !== undefined ? value : 0;
             } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
                 processedCurrent = Number(currentFlagValue);
             }
@@ -1378,11 +1451,14 @@
             }
 
             const closeBtn = document.getElementById('close-btn');
+            const backButton = document.getElementById('back-button');
             const proceedPrompt = document.getElementById('proceed-prompt');
 
             if (caseTarget.includes("TUTORIAL") || caseTarget.includes("DUMMY")){
                 closeBtn.innerText = "UKONČIŤ";
-                closeBtn.style.display = "block"
+                closeBtn.style.display = "block";
+                backButton.innerText = "SPÄŤ";
+                backButton.style.display = "block";
                 proceedPrompt.style.justifyContent = "space-between";
                 is_tutorial = true
             }
@@ -1872,10 +1948,10 @@
         function executeMods(caseTarget){
             let modificationExecuted = false;
 
-            // 1. KONTROLA PRE ALERTED MODS (Case Sensitive pre challengekey)
-            if (caseTarget.startsWith("alerted_") && caseTarget.includes(":")) {
-                // Odrežeme "alerted_" (8 znakov) z pôvodného reťazca
-                const alertPart = caseTarget.substring(8); 
+            // 1. KONTROLA PRE ALERTED MODS (prijímame both alerted_ and alerted: prefixes)
+            if ((caseTarget.startsWith("alerted_") || caseTarget.startsWith("alerted:")) && caseTarget.includes(":")) {
+                // Odrežeme prefix ('alerted_' alebo 'alerted:') z pôvodného reťazca
+                const alertPart = caseTarget.replace(/^alerted[_:]/, "");
                 const parts = alertPart.split(":");
                 
                 // challengeKey si zachová presný tvar (napr. "Predátorka_2")
@@ -2146,7 +2222,7 @@
 
                         if (targetChallenge && !isNaN(explicitModifier) && CHALLENGES[targetChallenge]) {
                             const baseDifficulty = CHALLENGES[targetChallenge].difficulty ?? 0;
-                            const newDifficulty = Math.max(0, baseDifficulty + explicitModifier);
+                            const newDifficulty = Math.max(5, baseDifficulty + explicitModifier);
                             CHALLENGES[targetChallenge].difficulty = newDifficulty;
 
                             if (DEBUG === true) {
@@ -2161,7 +2237,7 @@
                 else if (lowerTarget.includes("difficulty")) {
                     if (queued_difficulty_target && CHALLENGES[queued_difficulty_target]) {
                         const baseDifficulty = CHALLENGES[queued_difficulty_target].difficulty ?? 0;
-                        const newDifficulty = Math.max(0, baseDifficulty + modifier);
+                        const newDifficulty = Math.max(5, baseDifficulty + modifier);
                         CHALLENGES[queued_difficulty_target].difficulty = newDifficulty;
 
                         if (modifier > 0) {
@@ -2239,6 +2315,23 @@
                         if (DEBUG === true) {
                             log(`Predmet ${itemName} neexistuje v ITEM_LIST.`, "danger-msg");
                         }
+                    }
+                    modificationExecuted = true;
+                }
+                else if (lowerTarget.startsWith("ammo_")) {
+                    const ammoName = parts[0].split("ammo_")[1].trim().toLowerCase();
+                    if (!HERO.ammo || typeof HERO.ammo !== 'object') {
+                        HERO.ammo = {};
+                    }
+
+                    const currentAmmo = HERO.ammo[ammoName] || 0;
+                    const newAmmoValue = Math.max(0, currentAmmo + modifier);
+                    HERO.ammo[ammoName] = newAmmoValue;
+
+                    if (modifier > 0) {
+                        log(`Získavaš muníciu pre ${ammoName.toUpperCase()}: +${amount} ks. (Celkovo: ${newAmmoValue})`, "success-msg");
+                    } else {
+                        log(`Strácaš muníciu pre ${ammoName.toUpperCase()}: -${amount} ks. (Celkovo: ${newAmmoValue})`, "danger-msg");
                     }
                     modificationExecuted = true;
                 }
@@ -2918,15 +3011,14 @@
 
                 // --- 4. KROK: KONTROLA MUNÍCIE ---
                 if (actionType === "A" && !isPlaceholderWeapon) {
-                    if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[weaponVal] !== undefined) {
-                        const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
-                        const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
-                        const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                    const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
+                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
 
-                        if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                            const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][weaponVal] : undefined;
-                            if (currentAmmo === undefined || currentAmmo <= 0) return false;
-                        }
+                    if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                        const ammoKey = getAmmoKey(weaponVal);
+                        const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][ammoKey] : undefined;
+                        if (currentAmmo === undefined || currentAmmo <= 0) return false;
                     }
                 }
 
@@ -3225,6 +3317,8 @@
                 });
             }
             
+            const cardImages = tray.querySelectorAll(".card-img");
+
             if (enemy === null) {
                 is_conflict = false;
                 document.getElementById("enemy-panel").style.display = "none";
@@ -3249,11 +3343,15 @@
                         // Slide smoothly back up out of view
                         toggleChallengeDisplay(false);
                     }
+                    if (is_action_phase) {
+                        cardImages.forEach(img => img.style.filter = "saturate(100%)");
+                    }
                 }
                 
                 if (enemyHeading) enemyHeading.innerText = "ENEMY";
             } else {
                 is_conflict = true;
+                cardImages.forEach(img => img.style.filter = "saturate(100%)");
                 document.getElementById("enemy-panel").style.display = "block";
                 document.getElementById("enemy-stress").innerText = `${enemy_stress} / ${ENEMY_TYPES[enemy].stress_thresh}`;
                 document.getElementById("enemy-advantage").innerText = enemy_advantage;
@@ -3267,7 +3365,13 @@
                 if (enemyHeading) enemyHeading.innerText = enemy;
             }
 
+            cardImages.forEach(img => {
+                if (inputs_frozen) {
+                    img.style.filter = "saturate(20%)";
+                }
+            });
         }
+        
 
         function resolveActionPhase(card) {
             inputs_frozen = true;
@@ -3752,7 +3856,7 @@
                             const enemyImg = document.getElementById("enemy-sprite");
                             if (enemyImg) enemyImg.src = "";
 
-                            let activeChallenge = CHALLENGES[current_challenge_key];                            
+                            let activeChallenge = CHALLENGES[enemy_id];                            
                             if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                                 if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
                                     activeChallenge.enemy_escape_delayed.forEach(pushDelayed);
@@ -4700,6 +4804,13 @@
             const thrownWeapons = Object.keys(WEAPON_LIST["VRHACIE"] || {});
             const rangedCapable = rangedWeapons.concat(thrownWeapons);
             return !!(HERO && Array.isArray(HERO.weapons) && HERO.weapons.some(w => rangedCapable.includes(w)));
+        }
+
+        function getAmmoKey(weaponName) {
+            if (!weaponName || !HERO || !HERO.ammo || typeof HERO.ammo !== 'object') return weaponName;
+            if (HERO.ammo[weaponName] !== undefined) return weaponName;
+            const lowerName = weaponName.toLowerCase();
+            return Object.keys(HERO.ammo).find(k => k.toLowerCase() === lowerName) || weaponName;
         }
 
         function enemyHasRangedWeapon() {
@@ -6239,7 +6350,7 @@
                 } else {
                     const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
                     const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY" || upperSkill === "PLACEHOLDER");
                     const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
 
                     if (!canAttackAtDistance) {
@@ -6255,23 +6366,23 @@
 
 
             if (((is_conflict && actionType === "A") || isEliminationAttack) && selectedWeaponName !== "placeholder") {
-                if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                    const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
-                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
+                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
 
-                    if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                        const currentAmmo = HERO["ammo"][selectedWeaponName];
+                if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                    const ammoKey = getAmmoKey(selectedWeaponName);
+                    const currentAmmo = HERO["ammo"] ? HERO["ammo"][ammoKey] : undefined;
 
-                        if (currentAmmo === undefined || currentAmmo <= 0) {
-                            log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
-                            return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
-                        }
-
-                        // Bezpečné odčítanie - všetky podmienky úspešne prešli!
-                        HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
-                        log(`Munícia pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
+                    if (currentAmmo === undefined || currentAmmo <= 0) {
+                        log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
+                        return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
                     }
+
+                    // Bezpečné odčítanie - všetky podmienky úspešne prešli!
+                    HERO["ammo"][ammoKey] = Math.max(0, currentAmmo - 1);
+                    log(`Munícia pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][ammoKey]} ks.`, "info-msg");
+                    if (typeof updateUI === "function") updateUI();
                 }
             }
 
@@ -7111,4 +7222,16 @@ function initTooltips() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initTooltips();
+
+    const terminalBox = document.querySelector('.terminal-border-box');
+    if (terminalBox) {
+        terminalBox.addEventListener('pointerdown', (event) => {
+            if (event.pointerType !== 'touch') return;
+            const hasPendingLogs = logs_pending.length > 0 || isProcessingQueue || activeLogTimeout;
+            if (hasPendingLogs) {
+                event.preventDefault();
+                flushLogQueue();
+            }
+        });
+    }
 });

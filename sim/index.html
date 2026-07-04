@@ -142,11 +142,17 @@
                         <button id="ready-btn" class="adrenaline-select" style="width: 150px;margin: 10px; background: var(--hybrid-green);">SOM READY!</button>
                     </div>
                          <div id="proceed-prompt"  class="next-prompt">
-                            <button id="close-btn" onclick="handleChallengeTransition('BACK_TO_GAME')" class="adrenaline-select" style="color: #e0e0e0; background: var(--hybrid-red); display: none;">                                UKONČIŤ
+                            
+                            <button id="close-btn" onclick="handleChallengeTransition('BACK_TO_GAME')" class="adrenaline-select" style="color: #e0e0e0; background: var(--hybrid-red); display: none;">
+                                UKONČIŤ
                             </button>
-                            <button id="proceed-btn" class="adrenaline-select" style=" color: #e0e0e0; background: var(--hybrid-green);">
-                                POKRAČOVAŤ
-                            </button>
+                            <div style="display: flex; flex-direction: row; gap: 20px">
+                                <button id="back-button" onclick="handleChallengeTransition('BACK_ACTION_1')" class="adrenaline-select" style="color: #e0e0e0; background: var(--hybrid-black); display: none;  border: solid #ffffff; border-width: 2px;">                                UKONČIŤ
+                                </button>
+                                <button id="proceed-btn" class="adrenaline-select" style="min-width: 100px; color: #e0e0e0; background: var(--hybrid-green);">
+                                    ĎALEJ
+                                </button>
+                            </div>
                         </div>
                 <div class="panel" id="enemy-panel">
                     <h3><span id="enemy-heading-type">ENEMY</span> </h3>
