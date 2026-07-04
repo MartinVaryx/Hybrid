@@ -1,6 +1,6 @@
-        let test_mode = false;
+        let test_mode = true;
         let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START";
 
         let tooltipsInitialized = false;
@@ -376,6 +376,7 @@
                         updateUI();
 
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve elim. check.")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
                             let activeChallenge = CHALLENGES[targetEnemyKey];
@@ -3627,6 +3628,7 @@
                 updateUI();
                 
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback resolve conflict")
                     const enemyContainer = document.getElementById("enemy-sprite-container");
                     const enemyImg = document.getElementById("enemy-sprite");
 
@@ -3721,6 +3723,7 @@
                         updateUI();
                         
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve conflict")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             const enemyImg = document.getElementById("enemy-sprite");
                             if (enemyImg) enemyImg.src = "";
@@ -3851,6 +3854,7 @@
 
                         updateUI();
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve conflict")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
                             const enemyImg = document.getElementById("enemy-sprite");
@@ -4053,12 +4057,12 @@
                 if(enemyType === "Predátorka" || enemyType === "Skautka") executeMods("item_ŽĽAZA SOMORY+1");
                 log(`${enemy} JE DOLE! (+1 BR).`, "success-msg", false,false,true);
                 inputs_frozen = true;
+                if (enemy_id && CHALLENGES["ACTIVE"]) CHALLENGES["ACTIVE"][enemy_id] = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
                 updateUI();
-
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback resolve conflict")
                     const enemyContainer = document.getElementById("enemy-sprite-container");
                     if (enemyContainer) enemyContainer.style.display = "none";
                     const enemyImg = document.getElementById("enemy-sprite");
@@ -4505,6 +4509,7 @@
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
+                        console.log("onterminalfinishedcallback resolve collapse check")
                         restartGame();
                     };
 
@@ -4531,6 +4536,7 @@
             
             // Bind unfreezing and enemy execution directly to terminal output completion
             onTerminalFinishedCallback = () => {
+                console.log("onterminalfinishedcallback ready")
                 inputs_frozen = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
@@ -4710,6 +4716,7 @@
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
+                        console.log("onterminalfinishedcallback run conflict turn")
                         inputs_frozen = false;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.add('enable-interaction');
@@ -4833,6 +4840,7 @@
                 log("", "", false, false); 
                 
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback enemy choice")
                     proceedWithEnemyChoice();
                 };
                 
@@ -5093,6 +5101,7 @@
                 updateUI();
 
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback proceed with en. ch.")
                     displayEnemyCard(enemy_action[0], enemy_action[1]);
                     runGameloopCycle();
                 };

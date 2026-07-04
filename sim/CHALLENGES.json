@@ -1109,7 +1109,8 @@
             "brokovnica+5",
             "weapon+brokovnica",
             "weapon+nôž",
-            "set_SHACK_EXPLORE_BOMB_false"
+            "set_SHACK_EXPLORE_BOMB_false",
+            "BACK_ACTION_1"
         ],
         "case_threat": "stress+1",
         "case_failure": [
