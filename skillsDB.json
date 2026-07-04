@@ -62,6 +62,13 @@
         ],
         "Ovplyvnenie názorov/postojov inej postavy. Zámery hrdinu musia byť postave jasné a cieľ presviedčania pravdepodobný (nie je možné presvedčiť inú postavu, že čierna je biela)."
     ],
+    "EMPATIA": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ"
+        ]
+    ],
     "MANIPULÁCIA": [
         2,
         "SPOLOČENSKÉ",
@@ -88,6 +95,16 @@
         "SPOLOČENSKÉ",
         [
             "EQ"
+        ]
+    ],
+    "ZVÁDZANIE": [
+        2,
+        "SPOLOČENSKÉ",
+        [
+            "EQ",
+            "ZMYSLY",
+            "FEROMÓNY",
+            "TANEC"
         ]
     ],
     "VODCOVSTVO": [
@@ -145,6 +162,37 @@
         ],
         "Používanie zbraní ako sú guľomety, raketomety či granátomety."
     ],
+    "ŠPECIÁLNE STRELNÉ ZBRANE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "STREĽBA",
+            "IQ",
+            "ZMYSLY"
+        ]
+    ],
+    "BOJOVÉ STROJE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "STREĽBA",
+            "ŤAŽKÉ STRELNÉ ZBRANE",
+            "ZRUČNOSŤ",
+            "IQ"
+        ],
+        "Ovládanie bojovej techniky ako tanky, pojazdné raketomety, stíhačky a podobne."
+    ],
+    "HROMADNÉ NIČENIE": [
+        4,
+        "BOJ Z DIAĽKY",
+        [
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
+            "BOJOVÉ STROJE",
+            "IQ"
+        ],
+        "Používanie zbraní hromadného ničenia. / Výroba zbraní hromadného ničenia."
+    ],
     "ĽAHKÉ ZBRANE": [
         1,
         "BOJ ZBLÍZKA",
@@ -179,6 +227,27 @@
             "MECHANIKA"
         ],
         "Napr. (elektro)motorová píla, elektromechanické zbrane, ktoré dokáže používateľ ovládať svojou mysľou (protézy a pod.), žihadlo, …"
+    ],
+    "OMRÁČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZRUČNOSŤ",
+            "SILA",
+            "ĽAHKÉ ZBRANE",
+            "ŤAŽKÉ ZBRANE"
+        ],
+        "Počas aj mimo boja."
+    ],
+    "MUČENIE": [
+        2,
+        "BOJ ZBLÍZKA",
+        [
+            "ZASTRAŠOVANIE",
+            "EQ",
+            "ZRUČNOSŤ"
+        ],
+        "Ovplyvňovanie správania iných postáv fyzickým nátlakom."
     ],
     "TICHÁ ELIMINÁCIA": [
         4,
@@ -261,6 +330,16 @@
             "POUŽÍVANIE VÝBUŠNÍN"
         ]
     ],
+    "MAPOVANIE POPULÁCIE": [
+        3,
+        "INFILTRÁCIA",
+        [
+            "ŠPEHOVANIE",
+            "INVESTIGATÍVA",
+            "IQ"
+        ],
+        "Zhromažďovanie informácií o populácií Somôr v danom regióne a odhad ďalšieho vývoja populácie."
+    ],
     "PRVÁ POMOC": [
         1,
         "LIEČENIE",
@@ -282,14 +361,15 @@
         ],
         "Diagnóza a liečenie chorôb a zranení. Zníženie dlhodobého telesného stresu o hodnotu regenerácie."
     ],
-    "CHÉMIA": [
+    "TERAPIA": [
         2,
-        "VŠEOBECNÉ",
+        "LIEČENIE",
         [
-            "IQ",
-            "ZMYSLY"
+            "EMPATIA",
+            "EQ",
+            "PRESVIEDČANIE"
         ],
-        "Vedomosti v oblasti chémie, experimenty, syntéza látok..."
+        "Zníženie dlhodobého psychického stresu o hodnotu regenerácie."
     ],
     "CHIRURGIA": [
         4,
@@ -321,6 +401,15 @@
             "IQ"
         ],
         "Tvorba umelých feromónov, ktoré majú podobné účinky ako Somorie. Zmena účinku feromónov pomocou experimentovania."
+    ],
+    "BIOLOGICKÉ ZBRANE": [
+        4,
+        "LIEČENIE",
+        [
+            "BIOCHÉMIA",
+            "MEDICÍNA"
+        ],
+        "Vývoj vírusov, baktérií či plesní zameraných na konkrétny živočíšny druh. Predvídanie a ovplyvnenie ich účinku."
     ],
     "OPRAVA": [
         1,
@@ -383,6 +472,25 @@
             "IQ"
         ],
         "Oprava, úprava a výroba elektronických zariadení."
+    ],
+    "ŤAŽKÁ TECHNIKA": [
+        4,
+        "KUTILSTVO",
+        [
+            "MECHANIKA",
+            "ŠOFÉROVANIE",
+            "ZRUČNOSŤ"
+        ],
+        "Výroba a oprava ťažkej techniky pri dostatku času, materiálov a nástrojov."
+    ],
+    "HRA NA GITARU": [
+        1,
+        "VŠEOBECNÉ",
+        [
+            "EQ",
+            "ZRUČNOSŤ",
+            "ZMYSLY"
+        ]
     ],
     "KRÍDLA": [
         1,
@@ -560,12 +668,24 @@
             "IQ"
         ]
     ],
+    "TANEC": [
+        2,
+        "VŠEOBECNÉ",
+        [
+            "OBRATNOSŤ",
+            "EQ",
+            "ZMYSLY",
+            "PREDSTIERANIE",
+            "ZVÁDZANIE"
+        ]
+    ],
     "ELIMINÁCIA Z DIAĽKY": [
         4,
         "BOJ Z DIAĽKY",
         [
             "ZMYSLY",
             "ZRUČNOSŤ",
+            "ŠPECIÁLNE STRELNÉ ZBRANE",
             "STREĽBA",
             "ŤAŽKÉ STRELNÉ ZBRANE"
         ]
