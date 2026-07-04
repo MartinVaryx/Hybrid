@@ -2785,7 +2785,8 @@
         "case_success": "",
         "case_failure": "",
         "initial_msg_1": "Aj v prípade, že uspeješ, môže sa vyhodnotiť HROZBA (ak hodíš presne toľko, koľko je tvoj stres). Vtedy ti stúpne dlhodobý stres. Ten určuje minimálnu hodnotu stresu tvojej postavy.",
-        "image": "assets/PLACEHOLDER.png"
+        "image": "assets/PLACEHOLDER.png",
+        "back":true
     },
     "TUTORIAL_4B_0": {
         "initial_msg": "Na PC môžeš hru ovládať aj klávesnicou a toto rozloženie nájdeš aj v MENU.",
