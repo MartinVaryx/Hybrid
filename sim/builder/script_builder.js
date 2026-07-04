@@ -588,14 +588,17 @@
         // --- ITEMS DATA PREPARATION ---
         const saved = JSON.parse(localStorage.getItem('characters')) || [];
         const savedChar = saved.find(c => c.name.toUpperCase() === char.name.toUpperCase());
-        const items = savedChar ? (savedChar.items || {}) : {};
-        const weapons = savedChar ? (savedChar.weapons || []) : {};
-    
+        const items = char.items !== undefined ? char.items : (savedChar ? savedChar.items || {} : {});
+        const weapons = char.weapons !== undefined ? char.weapons : (savedChar ? savedChar.weapons || [] : []);
+        const ammo = char.ammo !== undefined ? char.ammo : (savedChar ? savedChar.ammo || {} : {});
+
+        const weaponsToShow = weapons.filter(w => !(w in ammo));
+        const ammoItems = Object.entries(ammo).filter(([_, qty]) => qty > 0);
+
         let allItems = Object.entries(items)
             .filter(([_, qty]) => qty > 0)
-            .concat(weapons.map(w => [w, 1]))
-            .sort((a, b) => a[0].localeCompare(b[0]));
-    
+            .concat(ammoItems)
+            .concat(weaponsToShow.map(w => [w, 1]));
         const ITEM_LIST = window.parent && window.parent.ITEM_LIST;
 
             // --- PC VERZIA: VYBAVENIE ---
