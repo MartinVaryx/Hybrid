@@ -1,6 +1,6 @@
-        let test_mode = false;
+        let test_mode = true;
         let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START";
 
         let tooltipsInitialized = false;
@@ -42,7 +42,7 @@
         const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
         const ATTACK_SKILLS = ["SILA", "OBRATNOSŤ", "ZMYSLY"]
         const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE"];
-        const SNEAK_SKILLS = ["PLÝŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
+        const SNEAK_SKILLS = ["PLÍŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
 
         const CARDS = {
             "O": [[3, [10]], [1, [10, 4]]],
@@ -56,6 +56,7 @@
             "skills": {"STREĽBA":1, "VRHANIE":1},
             "stress_thresh": 8,
             "stress": 0,
+            "perm_stress": 0,
             "items": {},
             "weapons": [],
             "ammo":{},
@@ -91,6 +92,12 @@
         }
 
         const BIOLOGICAL_WEAPONS = ["OSTNE", "HRYZADLÁ", "KLEPETÁ", "KYSELINA", "ŽIHADLO"];
+
+        const PASSIVE_SKILLS = ["PANCIER"];
+
+        function getPancierLevel() {
+            return (HERO && HERO.skills && HERO.skills["PANCIER"]) || 0;
+        }
 
 
         ITEM_LIST = {
@@ -172,9 +179,8 @@
         let move = 0;
         let weapon = 0;
         let stress = 0;
-        let perm_stress = 0;
         const stress_thresh = 8;
-        const ADVANTAGE_CAP = 3;
+        const ADVANTAGE_CAP = 5;
         let skill = 0;
         let advantage = 0;
         let enemy_advantage = 0;
@@ -1443,6 +1449,11 @@
         }
 
         function handleChallengeTransition(caseTarget) {
+            MODE = SETTINGS.MODE || 'NORMAL';
+            if(MODE != "HARD") 
+                {HERO.perm_stress = 0} 
+            else if (HERO.stress < HERO.perm_stress) 
+                {HERO.stress = HERO.perm_stress};
             if (caseTarget == "WELCOME"){
                 const proceedBtn = document.getElementById('proceed-btn');
                 proceedBtn.innerText = "ZAČAŤ"
@@ -1462,6 +1473,8 @@
                 backButton.style.display = "block";
                 proceedPrompt.style.justifyContent = "space-between";
                 is_tutorial = true
+            } else {
+                backButton.style.display = "none";
             }
 
             if (caseTarget.includes("HELP")){
@@ -1615,7 +1628,10 @@
                             target.toLowerCase().includes('item_') ||   // PRIDANÉ: Bezpečné zachytenie predmetov
                             target.toLowerCase().startsWith('set_') ||
                             target.toLowerCase().startsWith('flag_') ||
-                            target.toLowerCase().startsWith('alerted_') // PRIDANÉ: Ostražitosť nepriateľov
+                            target.toLowerCase().startsWith('alerted_') ||
+                            target.toLowerCase().startsWith('distance_') ||
+                            target.toLowerCase().startsWith('delayed_') // PRIDANÉ: Ostražitosť nepriateľov
+
                         );
 
                         // 3. Špeciálna izolovaná kontrola pre podmienky (if_)
@@ -1975,10 +1991,58 @@
                 modificationExecuted = true;
             }
 
-            // Vytvoríme lowercase verziu PRE OSTATNÉ VETVY
+            if ((caseTarget.startsWith("distance_") || caseTarget.startsWith("distance:")) && caseTarget.includes(":")) {
+                // Odrežeme prefix ('distance_' alebo 'distance:') z pôvodného reťazca
+                const distPart = caseTarget.replace(/^distance[_:]/, "");
+                const parts = distPart.split(":");
+                
+                // challengeKey si zachová presný tvar (napr. "Predátorka_2")
+                const challengeKey = parts[0].trim(); 
+                const rawVal = parts[1].trim().toLowerCase();
+                const distVal = rawVal;
+
+                // Poistka pre existenciu objektu CHALLENGES a jeho uzla
+                if (typeof CHALLENGES !== 'undefined' && CHALLENGES[challengeKey]) {
+                    CHALLENGES[challengeKey].distance = distVal;
+                    
+                    if (DEBUG === true) {
+                        log(`[distance] Vzdialenosť nepriateľa '${challengeKey}' bola nastavená na: ${distVal}`);
+                        return true
+                    }
+                } else if (DEBUG === true) {
+                    log(`[executeMods] Výzva '${challengeKey}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                    return false
+                }
+                modificationExecuted = true;
+            }
+
+            if (caseTarget.startsWith("delayed_")) {
+                const lastUnderscore = caseTarget.lastIndexOf('_');
+                
+                if (lastUnderscore !== -1) {
+                    const stateStr = caseTarget.substring(lastUnderscore + 1).toLowerCase().trim();
+                    // Vyrežeme názov výzvy (od indexu 4, čo preskočí "set_")
+                    const challengeName = caseTarget.substring(8, lastUnderscore).toUpperCase().trim();
+                   
+                    if (typeof CHALLENGES !== 'undefined' && CHALLENGES[challengeName]) {
+                        if(stateStr == "add"){
+                            DELAYED.push(challengeName);
+                            
+                            if (DEBUG === true) {
+                                log(`[delayed] Výzva '${challengeName}' bola pridaná do DELAYED. DELAYED: '${DELAYED}'`);
+                                return true
+                            }
+                        }
+                    } else if (DEBUG === true) {
+                        log(`[executeMods] Výzva '${challengeName}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                        return false
+                    }
+                    modificationExecuted = true;
+                }
+            }
+
             const lowerTarget = caseTarget.toLowerCase();
 
-            // Zmenené na ELSE IF, aby sa po úspešnom spracovaní alerted_ tieto vetvy preskočili
             if (!modificationExecuted && lowerTarget.startsWith("flag_")) {
                 const flagPart = caseTarget.substring(5); // Odstráni "flag_"
                 
@@ -2093,7 +2157,7 @@
                     
                     // --- UPRAVENÉ PRAVIDLO PRE PERM_STRESS ---
                     // Ak hrdina nemá perm_stress, dno je 0
-                    const currentPermStress = perm_stress || 0;
+                    const currentPermStress = HERO.perm_stress || 0;
 
                     if (modifier < 0 && HERO.stress < currentPermStress) {
                         // Ak stres klesal a padol pod permanentný stres, zarovnáme ho presne naň
@@ -2422,6 +2486,7 @@
             log(`Použitý predmet ${itemName}. (zostatok: ${HERO.items[itemName]}x)`, "system-msg");
             
             updateUI();
+            
             if (ITEM_LIST[itemName].message) {
                 const message = ITEM_LIST[itemName].message;
                 showGeneralPrompt(message)
@@ -2699,10 +2764,31 @@
                 const enemyPool = tableFloor.querySelector('.dice-animation-pool.enemy-pool');
                 if (enemyPool) enemyPool.remove();
             }
+            let diff_mod = 0;
+            let threat_mod = 0;
+            let d3 = Math.floor(Math.random() * 3) + 1;
+
+            if(MODE === "EASY") {
+                if(d3 === 1) {
+                    diff_mod = -1;
+                } else if(d3 === 2) {
+                    threat_mod = -1;
+                }
+            } else if(MODE === "HARD") {
+                if(d3 === 1) {
+                    diff_mod = 1;
+                } else if(d3 === 2) {
+                    threat_mod = 1;
+                }
+            }
+
+            if(DEBUG === true) {
+                log(`DEBUG: diff_mod = ${diff_mod}, threat_mod = ${threat_mod}`);
+            }
 
             const activeChallenge = CHALLENGES[current_challenge_key];
-            current_challenge.difficulty = activeChallenge.difficulty;
-            current_challenge.threat = activeChallenge.threat;
+            current_challenge.difficulty = Math.max(5, activeChallenge.difficulty + diff_mod);
+            current_challenge.threat = Math.max(1, activeChallenge.threat + threat_mod);
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
@@ -3275,8 +3361,8 @@
                 // Resetujeme všetky stavové triedy pred novým vyhodnotením
                 cell.classList.remove("active-perm", "filled-perm", "active-stress", "filled-stress");
                 
-                // Zabezpečíme načítanie globálnej premennej perm_stress (ak neexistuje, použijeme 0)
-                const currentPerm = typeof perm_stress !== 'undefined' ? perm_stress : 0;
+                // Zabezpečíme načítanie perm_stress z hernej postavy (ak neexistuje, použijeme 0)
+                const currentPerm = HERO.perm_stress !== undefined ? HERO.perm_stress : 0;
 
                 // 1. VRSTVA: Permanentný stres (čierne pozadie)
                 if (val <= currentPerm) {
@@ -3332,9 +3418,15 @@
                         tray.className = "card-tray conflict-mode";
                     }
                     const activeChallenge = CHALLENGES[current_challenge_key];
+                    const displayChallengeData = (
+                        current_challenge &&
+                        current_challenge.difficulty !== undefined &&
+                        current_challenge.threat !== undefined
+                    ) ? current_challenge : activeChallenge;
+
                     if (activeChallenge && activeChallenge.difficulty !== undefined && activeChallenge.threat !== undefined) {
                         // Slide down and update content
-                        toggleChallengeDisplay(true, activeChallenge);
+                        toggleChallengeDisplay(true, displayChallengeData);
                         is_action_phase = true;
                     } else if (is_collapse_check || is_heal_check || is_elimination_check) {
                         // Slide down without wiping out content
@@ -3344,7 +3436,7 @@
                         // Slide smoothly back up out of view
                         toggleChallengeDisplay(false);
                     }
-                    if (is_action_phase) {
+                    if (is_action_phase || is_collapse_check || is_heal_check || is_elimination_check) {
                         cardImages.forEach(img => img.style.filter = "saturate(100%)");
                     }
                 }
@@ -3575,7 +3667,7 @@
 
             let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
             let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
-            const enemyType = CHALLENGES[current_challenge_key]?.type || current_challenge_key;
+            const enemyType = CHALLENGES[enemy_id]?.type || current_challenge_key;
 
 
             log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
@@ -3904,6 +3996,7 @@
 
             let potential_player_damage = 0;
             let potential_enemy_damage = 0;
+            let pancier_absorbed = 0;
 
             if (player_roll >= enemy_roll && player_action[0] === "A") {
                 let enemy_caution = enemy_action[0] === "D" ? CARDS[enemy_action[1]][0][0] : 0;
@@ -3911,8 +4004,19 @@
             }
 
             if (player_roll <= enemy_roll && enemy_action[0] === "A") {
-                let player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
-                potential_player_damage = Math.max(0, CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"] - player_caution);
+                let base_player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
+                let pancier_level = getPancierLevel();
+                let player_caution = base_player_caution + pancier_level;
+                let incoming_hit = CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"];
+
+                potential_player_damage = Math.max(0, incoming_hit - player_caution);
+
+                // Did PANCIER actually change the outcome? Compare against what
+                // would have happened with only the card's caution, no armor.
+                if (pancier_level > 0) {
+                    let damage_without_pancier = Math.max(0, incoming_hit - base_player_caution);
+                    pancier_absorbed = damage_without_pancier - potential_player_damage;
+                }
             }
 
             if (potential_enemy_damage > 0) {
@@ -3932,6 +4036,10 @@
                 flashRed();
                 stress_increased = true;
                 log(`TVOJ STRESS: +${potential_player_damage}.`, "failure-msg", false, false, true);
+            }
+
+            if (pancier_absorbed > 0) {
+                log(`🛡️ Tvoj pancier absorboval zvýšenie stresu o ${pancier_absorbed}.`, "success-msg", false, false, true);
             }
 
             let player_collapse = HERO.stress > stress_thresh;
@@ -4057,7 +4165,6 @@
                 if(enemyType === "Predátorka" || enemyType === "Skautka") executeMods("item_ŽĽAZA SOMORY+1");
                 log(`${enemy} JE DOLE! (+1 BR).`, "success-msg", false,false,true);
                 inputs_frozen = true;
-                if (enemy_id && CHALLENGES["ACTIVE"]) CHALLENGES["ACTIVE"][enemy_id] = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
                 updateUI();
@@ -4069,7 +4176,8 @@
                     if (enemyImg) enemyImg.src = "";
 
                     let activeChallenge = CHALLENGES[enemy_id];
-                    
+                    if (enemy_id && CHALLENGES["ACTIVE"]) CHALLENGES["ACTIVE"][enemy_id] = false;
+
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
@@ -4249,8 +4357,17 @@
                 return
             }
 
+            if (heal_attempts > 2) {
+                log(`Teraz ti pomôže len čas. Nedá sa nič robiť.`, "system-msg");      
+                return         
+            }
+
             const skillDropdown = document.getElementById("player-skill-dropdown");
             const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+            if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && selectedSkillName == "RÝCHLA REGENERÁCIA") {
+                proceedHealCheck();
+            }
+
             if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && selectedSkillName !== "PRVÁ POMOC") {
                 log("Môžeš použiť len schopnosť PRVÁ POMOC.", "danger-msg");
                 return
@@ -4261,12 +4378,12 @@
                 return         
             }
 
-            if (heal_attempts > 2) {
-                log(`Teraz ti pomôže len čas. Nedá sa nič robiť.`, "system-msg");      
-                return         
-            }
+            proceedHealCheck();
 
-            heal_attempts += 1;
+        }
+
+        function proceedHealCheck(){
+                        heal_attempts += 1;
             // Flag the engine that card clicks belong to this sub-system now
             is_heal_check = true;
             inputs_frozen = true;
@@ -4328,12 +4445,20 @@
                 // Display threat visual dice pool explicitly tracked away from player pool
                 triggerDiceVisualAnimation(threatRollsData, true); 
 
-                let caution_threshold = CARDS[card][0][0]; 
-                if (threat_roll > caution_threshold) {
-                    log(`Pri ošetrovaní zničíš časť zdravotných pomôcok. \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
-                    executeMods("item_ZDRAVOTNÉ POMÔCKY-1");
+                let caution_threshold = CARDS[card][0][0];
+                if(HERO.items["ZDRAVOTNÉ POMÔCKY"] > 0){    
+                    if (threat_roll > caution_threshold) {
+                        executeMods("item_ZDRAVOTNÉ POMÔCKY-1");
+                    } else {
+                        log(`Počínaš si šetrne a pomôcky ti zostanú aj pre budúce pokusy. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                    }
                 } else {
-                    log(`Počínaš si šetrne a pomôcky ti zostanú aj pre budúce pokusy. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                    if (threat_roll > caution_threshold) {
+                        log(`Snaha zregenerovať ťa ešte viac vyčerpá. \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
+                        executeMods("stress+1")
+                    } else {
+                        log(`Je lepšie netlačiť na pílu a nevystresovať sa z toho, že máš stres. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                    }
                 }
             }
 
@@ -4409,7 +4534,17 @@
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
             updateUI();
-            let roll_result = rollDice(card, false, 0, false);
+            let skill = 0;
+            const heroSkillValue = HERO.skills?.["ODOLNOSŤ"] ?? 0;
+            if (heroSkillValue > 0) {
+                skill = heroSkillValue;
+                const skillDropdown = document.getElementById("player-skill-dropdown");
+                if (skillDropdown && Array.from(skillDropdown.options).some(opt => opt.value === "ODOLNOSŤ")) {
+                    skillDropdown.value = "ODOLNOSŤ";
+                }
+            }
+
+            let roll_result = rollDice(card, false, skill, false);
 
             let success = roll_result > current_challenge.difficulty;
             let is_tie_or_failure = roll_result <= current_challenge.difficulty;
@@ -4443,13 +4578,18 @@
             }
 
             resetAdrenalineSelection();
+            log(`MODE  ${MODE})`, "danger-msg");
 
-            // --- OPRAVA CHYBY: Zvýšenie globálneho perm_stress o 1 (predtým bolo "= + 1", čo natvrdo priradilo 1) ---
             if (threat_realized) {
-                if (typeof perm_stress === 'undefined') perm_stress = 0;
-                perm_stress += 1;
-                log(`Tvoj permanentný stres sa zvýšil o 1! (na ${perm_stress})`, "danger-msg");
+                HERO.sp = Math.max(0, Math.floor(HERO.sp / 2));
+                if(MODE === "HARD") {
+                    log(`Tvoj permanentný stres sa zvýšil o 1! (na ${HERO.perm_stress})`, "danger-msg");
+                    HERO.perm_stress = (HERO.perm_stress || 0) + 1;
+                    updateUI();
+                }
                 updateUI();
+                log("Strácaš polovicu svojich BR. (zaokrúhlené nadol)", "danger-msg");
+   
             }
 
             // Handle Resolution routing paths
@@ -5220,6 +5360,10 @@
                 for (const [skillName, val] of Object.entries(HERO.skills)) {
                     const upperSkillName = skillName.toUpperCase();
 
+                    if (PASSIVE_SKILLS.includes(upperSkillName)) {
+                        continue;
+                    }
+
                     // KONTROLA: Ak ide o bio-zbraň, nepridávame ju do dropdownu skillov!
                     if (BIOLOGICAL_WEAPONS.includes(upperSkillName)) {
                         const lowerSkillName = skillName.toLowerCase();
@@ -5269,6 +5413,7 @@
                             HEROES = savedCharacters.map(char => ({
                                 name: char.name.toUpperCase(),
                                 sp: char.sp || 0,
+                                perm_stress: char.perm_stress || 0,
                                 skills: char.skills || {},
                                 weapons: char.defaultWeapons ? [...char.defaultWeapons] : [],
                                 ammo:    char.defaultAmmo    ? {...char.defaultAmmo}    : {},
@@ -5399,6 +5544,7 @@
             function confirmHeroSelection() {
                 switchCharacterGlobally(activeCharIdx);
                 hero_selected = true;
+                MODE = SETTINGS.MODE || 'NORMAL';
                 gameOn = true;
                 overlay.remove();
                 document.removeEventListener("keydown", heroKeyHandler);
@@ -5669,6 +5815,7 @@
                     let dmgValue = 0;
                     if (typeof WEAPON_LIST === "object") {
                         for (const category in WEAPON_LIST) {
+                            
                             if (WEAPON_LIST[category] && WEAPON_LIST[category][weaponName] !== undefined) {
                                 dmgValue = WEAPON_LIST[category][weaponName];
                                 break; // Zbraň sme našli, ukončíme hľadanie v kategóriách
@@ -5807,17 +5954,18 @@
                                 HEROES = parsedCharacters.map(char => ({
                                     name: char.name.toUpperCase(),
                                     sp: char.sp || 0,
+                                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
                                     skills: char.skills || {},
-                                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),                                            
+                                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
                                     ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
                                     items: char.items !== undefined ? {...char.items} : (char.defaultItems ? {...char.defaultItems} : {}),
                                     stress_thresh: 8,
                                     stress: char.stress !== undefined ? char.stress : 0,
                                     weapon: 0,
                                     isInitialPhase: char.isInitialPhase !== undefined ? char.isInitialPhase : false,
-                                    defaultWeapons: char.defaultWeapons || [...activeWeapons],
-                                    defaultAmmo:    char.defaultAmmo    || {...activeAmmo},
-                                    defaultItems:   char.defaultItems   || {...activeItems}
+                                    defaultWeapons: char.defaultWeapons || [],
+                                    defaultAmmo: char.defaultAmmo || {},
+                                    defaultItems: char.defaultItems || {}
                                 }));
 
                                 if (typeof activeCharIdx !== 'undefined' && HEROES[activeCharIdx]) {
@@ -5842,6 +5990,52 @@
         }
         
         
+        function syncBuilderCharacterStateFromStorage() {
+            try {
+                const savedCharacters = JSON.parse(localStorage.getItem('characters')) || [];
+                if (!Array.isArray(savedCharacters) || savedCharacters.length === 0) {
+                    return;
+                }
+
+                HEROES = savedCharacters.map(char => ({
+                    name: (char.name || '').toUpperCase(),
+                    sp: char.sp || 0,
+                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
+                    skills: char.skills || {},
+                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
+                    ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
+                    items: char.items !== undefined ? {...char.items} : (char.defaultItems ? {...char.defaultItems} : {}),
+                    stress_thresh: 8,
+                    stress: char.stress !== undefined ? char.stress : 0,
+                    weapon: 0,
+                    isInitialPhase: char.isInitialPhase !== undefined ? char.isInitialPhase : false,
+                    defaultWeapons: char.defaultWeapons || [],
+                    defaultAmmo: char.defaultAmmo || {},
+                    defaultItems: char.defaultItems || {},
+                    humanity: char.humanity || 50,
+                    initialSkillsSnapshot: char.initialSkillsSnapshot || {}
+                }));
+
+                const activeHero = HEROES[activeCharIdx] || HEROES[0];
+                if (activeHero) {
+                    for (let key in HERO) delete HERO[key];
+                    Object.assign(HERO, activeHero);
+                    if (HERO.name && typeof HERO.name === 'string') {
+                        HERO.name = HERO.name.toUpperCase();
+                    }
+                }
+
+                if (typeof updateUI === 'function') {
+                    try { updateUI(); } catch (e) { console.warn('updateUI zlyhalo pri synchronizácii buildera:', e); }
+                }
+                if (typeof populatePlayerSkillsDropdown === 'function') {
+                    try { populatePlayerSkillsDropdown(); } catch (e) { console.warn('populatePlayerSkillsDropdown zlyhalo pri synchronizácii buildera:', e); }
+                }
+            } catch (e) {
+                console.error('Chyba pri synchronizácii buildera s hlavným skriptom:', e);
+            }
+        }
+
         function syncHeroToStorage() {
             const saved = JSON.parse(localStorage.getItem('characters')) || [];
             const idx = saved.findIndex(c => c.name.toUpperCase() === HERO.name.toUpperCase());
@@ -5889,6 +6083,7 @@
                 initialSkillsSnapshot: h.initialSkillsSnapshot || {},
                 humanity: h.humanity || 50,
                 stress: h.stress !== undefined ? h.stress : 0,
+                perm_stress: h.perm_stress !== undefined ? h.perm_stress : 0,
                 items: h.items !== undefined ? h.items : {},
                 weapons: h.weapons !== undefined ? h.weapons : [],
                 ammo: h.ammo !== undefined ? h.ammo : {},      
@@ -5993,6 +6188,7 @@
                 
                 if (HERO.stress_thresh === undefined) HERO.stress_thresh = 8;
                 if (HERO.weapon === undefined) HERO.weapon = 0;
+                if (HERO.perm_stress === undefined) HERO.perm_stress = 0;
             }
 
             // Aktualizujeme herné UI hlavného okna, ak existuje
@@ -6030,6 +6226,7 @@
                 ammo: {},
                 stress_thresh: 8,
                 stress: 0,
+                perm_stress: 0,
                 items: {},
                 weapon: 0,
                 // Zachováme aj builder premenné, ak by ich neskôr potreboval
@@ -6960,6 +7157,7 @@
                         const builderHeroes = savedCharacters.map(char => ({
                             name: char.name.toUpperCase(),
                             sp: char.sp || 0,
+                            perm_stress: char.perm_stress || 0,
                             skills: char.skills || {},
                             weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
                             ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
@@ -6984,6 +7182,7 @@
                             if (updatedCurrentHero) {
                                 HERO.skills = updatedCurrentHero.skills || {};
                                 HERO.sp = updatedCurrentHero.sp || 0;
+                                HERO.perm_stress = updatedCurrentHero.perm_stress || 0;
                                 HERO.isInitialPhase = updatedCurrentHero.isInitialPhase !== undefined ? updatedCurrentHero.isInitialPhase : false;
                                 
                                 // SAFE MUTATION PATCH: Ensure active equipment data syncs forward safely too!
@@ -7111,6 +7310,7 @@
                 HEROES = savedCharacters.map(char => ({
                     name: char.name.toUpperCase(),
                     sp: char.sp !== undefined ? char.sp : 40,
+                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
                     skills: char.skills || {},
                     weapons: char.defaultWeapons ? [...char.defaultWeapons] : [],
                     ammo:    char.defaultAmmo    ? {...char.defaultAmmo}    : {},

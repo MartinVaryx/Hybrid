@@ -185,7 +185,7 @@
         "BOJ ZBLÍZKA",
         [
             "ĽAHKÉ ZBRANE",
-            "PLÝŽENIE",
+            "PLÍŽENIE",
             "OBRATNOSŤ",
             "ZRUČNOSŤ",
             "SILA"
@@ -200,7 +200,7 @@
         ],
         "Prieskum neznámej oblasti, odhalenie slabosti nepriateľa, objavenie hniezda. Hľadanie skrýší, maskovanie seba aj iných, ukrývanie predmetov, vozidiel či stavieb."
     ],
-    "PLÝŽENIE": [
+    "PLÍŽENIE": [
         2,
         "INFILTRÁCIA",
         [
@@ -390,11 +390,6 @@
         [],
         "Hrdina si môže nechať narásť krídla. Človeku pri jeho váhe neumožnia letieť, ale skôr vyskočiť (do výšky 10m) and doplachtiť bez zranenia z ľubovoľnej výšky."
     ],
-    "OPATROVANIE": [
-        1,
-        "SOMORA",
-        []
-    ],
     "MIMIKRY": [
         1,
         "SOMORA",
@@ -412,14 +407,6 @@
         "SOMORA",
         [],
         "Hrdina dokáže bežať nadľudskou rýchlosťou."
-    ],
-    "STRIDULÁCIA": [
-        2,
-        "SOMORA",
-        [
-            "KRÍDLA"
-        ],
-        "Hrdina dokáže bzučaním tvoreným krídlami Somory vábiť, zastrašovať, varovať či provokovať. Počas boja dokáže vydávať rušivý zvuk, ktorý zmätie Somory v blízkosti hrdinu."
     ],
     "RÝCHLA REGENERÁCIA": [
         3,
@@ -445,7 +432,7 @@
         "Za 1 bod rastu si môže hrdina nechať narásť chitínové ostne na ľubovoľnej časti tela. Poznačí si ich do vybavenia and ak sa mu ulomia, musí si ich nechať narásť opäť (za vyššiu cenu). Dokážu preraziť chitínový pancier Somôr."
     ],
     "PANCIER": [
-        2,
+        4,
         "SOMORA",
         [
             "ODOLNOSŤ"
@@ -462,19 +449,7 @@
     ],
     "LIEČENIE": [
         2,
-        "SOMORA",
-        [
-            "OPATROVANIE"
-        ]
-    ],
-    "OVLÁDANIE SOMÔR": [
-        3,
-        "SOMORA",
-        [
-            "FEROMÓNY",
-            "OPATROVANIE"
-        ],
-        "Hrdina dokáže feromónmi upokojiť, rozzúriť alebo odlákať Somory."
+        "SOMORA"
     ],
     "KYSELINA": [
         2,
@@ -503,26 +478,7 @@
         ],
         "Chitínové časti (ostne, pancier, žihadlo,...) hrdinovi podľa potreby dorastajú a odpadávajú bez potreby kupovať si ich. Hrdina dokáže zakryť to, že je Hybrid."
     ],
-    "OVLÁDANIE ĽUDÍ": [
-        4,
-        "SOMORA",
-        [
-            "OVLÁDANIE SOMÔR",
-            "FEROMÓNY"
-        ],
-        "Hrdina dokáže feromónmi upokojiť, rozzúriť alebo odlákať ľudí."
-    ],
-    "ZALOŽENIE HNIEZDA": [
-        4,
-        "SOMORA",
-        [
-            "OVLÁDANIE SOMÔR",
-            "LIEČENIE",
-            "FEROMÓNY",
-            "OPATROVANIE"
-        ],
-        "Hrdina dokáže klásť vajíčka a založiť si vlastnú armádu Somôr. Musí však jesť takmer výhradne ľudské mäso."
-    ],
+
     "ŽIHADLO": [
         4,
         "SOMORA",
@@ -546,7 +502,7 @@
         3,
         "VŠEOBECNÉ",
         [
-            "PLÝŽENIE",
+            "PLÍŽENIE",
             "ZRUČNOSŤ",
             "ZMYSLY",
             "PREDSTIERANIE",

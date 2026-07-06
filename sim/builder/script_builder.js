@@ -226,12 +226,16 @@
     }
 
     function upgradeSelected() {
-        if (!selectedSkill) return;
+        if (!selectedSkill) {
+            console.log("No skill selected.");
+            return};
         const char = characters[activeCharIdx];
         const currentLvl = char.skills[selectedSkill] || 0;
         
         const data = skillsDB_new[selectedSkill]; 
-        if (!data) return;
+        if (!data) {
+            console.log("Skill data not found for:", selectedSkill);
+            return};
         const skillGroup = data[1]; 
         const targetLvl = currentLvl + 1;
 
@@ -378,11 +382,13 @@
                 const data = skillsDB_new[skill];
                 const isSomora = data && data[1] === "SOMORA";
                 const baseLvl = snapshot[skill] || 0;
+                const skillCost = Number(data?.[0]) || 1;
+                const relations = Array.isArray(data?.[2]) ? data[2] : [];
 
                 for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const relLevels = relations.map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
                     const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    const cost = Math.max(lvl, (lvl * data[0]) - discount);
+                    const cost = Math.max(lvl, (lvl * skillCost) - discount);
                     
                     totalCost += cost;
                     if (isSomora) somoraCost += cost;
@@ -413,12 +419,14 @@
             }
 
             let candidates = [...remainingSkills].sort((a, b) => {
-                const aHelpsB = skillsDB_new[b][2]?.includes(a);
-                const bHelpsA = skillsDB_new[a][2]?.includes(b);
+                const aData = skillsDB_new[a];
+                const bData = skillsDB_new[b];
+                const aHelpsB = Array.isArray(aData?.[2]) && aData[2].includes(b);
+                const bHelpsA = Array.isArray(bData?.[2]) && bData[2].includes(a);
                 if (aHelpsB && !bHelpsA) return -1;
                 if (bHelpsA && !aHelpsB) return 1;
-                const catA = skillsDB_new[a][0];
-                const catB = skillsDB_new[b][0];
+                const catA = Number(aData?.[0]) || 0;
+                const catB = Number(bData?.[0]) || 0;
                 if (catA !== catB) return catA - catB;
                 return a.localeCompare(b);
             });
@@ -433,10 +441,13 @@
                 const data = skillsDB_new[skill];
                 const baseLvl = snapshot[skill] || 0;
 
+                const skillCost = Number(data?.[0]) || 1;
+                const relations = Array.isArray(data?.[2]) ? data[2] : [];
+
                 for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const relLevels = relations.map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
                     const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    costAdded += Math.max(lvl, (lvl * data[0]) - discount);
+                    costAdded += Math.max(lvl, (lvl * skillCost) - discount);
                     nextSkillsState[skill] = lvl;
                 }
 
@@ -528,6 +539,7 @@
                     nameButton.setAttribute('data-description', data[3] || '');
                     nameButton.onclick = (e) => {
                         e.stopPropagation();
+                        document.querySelector('.skill-tooltip')?.classList.remove('visible');
                         selectSkill(name);
                         toggleInfoOverlay(true);
                     };
@@ -699,6 +711,7 @@
                         nameButton.setAttribute('data-description', itemData && itemData.description ? itemData.description : '');  
                         nameButton.onclick = (e) => {
                             e.stopPropagation();
+                            document.querySelector('.skill-tooltip')?.classList.remove('visible');
                             selectItem(name);
                         };
                         
@@ -805,13 +818,57 @@
         });
         localStorage.setItem('skillsDB_new', JSON.stringify(skillsDB_new));
         localStorage.setItem('characters', JSON.stringify(saved));
+
+        if (window.parent && typeof window.parent.syncBuilderCharacterStateFromStorage === 'function') {
+            window.parent.syncBuilderCharacterStateFromStorage();
+        }
+    }
+
+    function refreshCharactersFromStorage() {
+        const saved = JSON.parse(localStorage.getItem('characters')) || [];
+        const refreshed = [...characters];
+
+        saved.forEach(savedChar => {
+            const idx = refreshed.findIndex(c => c.name.toUpperCase() === savedChar.name.toUpperCase());
+            if (idx !== -1) {
+                refreshed[idx] = {
+                    ...refreshed[idx],
+                    ...savedChar,
+                    skills: savedChar.skills || refreshed[idx].skills || {},
+                    items: savedChar.items || refreshed[idx].items || {},
+                    weapons: savedChar.weapons !== undefined ? [...savedChar.weapons] : (refreshed[idx].weapons || []),
+                    ammo: savedChar.ammo !== undefined ? { ...savedChar.ammo } : (refreshed[idx].ammo || {}),
+                    defaultWeapons: savedChar.defaultWeapons || refreshed[idx].defaultWeapons || [],
+                    defaultAmmo: savedChar.defaultAmmo || refreshed[idx].defaultAmmo || {},
+                    defaultItems: savedChar.defaultItems || refreshed[idx].defaultItems || {},
+                    isInitialPhase: savedChar.isInitialPhase !== undefined ? savedChar.isInitialPhase : refreshed[idx].isInitialPhase
+                };
+            } else {
+                refreshed.push({
+                    ...savedChar,
+                    isInitialPhase: savedChar.isInitialPhase !== undefined ? savedChar.isInitialPhase : true
+                });
+            }
+        });
+
+        characters = refreshed;
+        if (activeCharIdx >= characters.length) {
+            activeCharIdx = Math.max(0, characters.length - 1);
+        }
+        return characters[activeCharIdx];
     }
 
     function useItemBuilder(name){
-        window.parent.useItem(name);
+        if (window.parent && typeof window.parent.useItem === 'function') {
+            window.parent.useItem(name);
+        }
         setTimeout(() => {
-            renderStats()
-        }, 500);
+            refreshCharactersFromStorage();
+            renderStats();
+            if (document.querySelector('#inventar table')) {
+                renderInventar();
+            }
+        }, 250);
     }
 
     function renderInventar() {
@@ -878,11 +935,9 @@
     // 2. Spoločná logika, ktorá vyčistí stav buildera a prekreslí tabuľky
     function applyCharacterChange() {
         // 🛡️ HLAVNÁ POISTKA PROTI RACE CONDITION:
-        // Ak je lokálna skillsDB_new prázdna, skúsime ju ihneď naplniť z hlavného okna (rodiča)
+        // Ak je lokálna skillsDB_new prázdna, načítame ju z lokálneho storage alebo z explicitne určeného súboru sim/skillsDB.json.
         if (!skillsDB_new || Object.keys(skillsDB_new).length === 0) {
-            if (window.parent && window.parent.SKILLS_DB && Object.keys(window.parent.SKILLS_DB).length > 0) {
-                skillsDB_new = window.parent.SKILLS_DB;
-            }
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || JSON.parse(localStorage.getItem('skillsDB')) || {};
         }
 
         selectedSkill = null; 
@@ -1117,24 +1172,16 @@
     }
 
     async function loadSkills() {
-        // ✅ Fast path: parent already has the DB loaded (avoids duplicate fetch)
-        if (window.parent && window.parent.SKILLS_DB && Object.keys(window.parent.SKILLS_DB).length > 0) {
-            skillsDB_new = window.parent.SKILLS_DB;
-            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            console.log("Dáta načítané z rodiča (parent.SKILLS_DB)");
-            return;
-        }
-
-        // Fallback: load independently if running standalone or parent not ready yet
         try {
-            const response = await fetch('skillsDB.json');
+            const response = await fetch('../skillsDB.json', { cache: 'no-store' });
             if (!response.ok) throw new Error("Súbor nenájdený");
             skillsDB_new = await response.json();
             originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            console.log("Dáta úspešne načítané zo súboru");
+            console.log("Dáta načítané z sim/skillsDB.json");
         } catch (error) {
-            console.error("Chyba pri načítaní JSON:", error);
-            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+            console.warn("Nepodarilo sa načítať sim/skillsDB.json, používam fallback z localStorage:", error);
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || JSON.parse(localStorage.getItem('skillsDB')) || {};
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
         }
     }
 
@@ -1400,6 +1447,10 @@ function initSkillTooltips() {
 
         tooltip.classList.remove('visible');
     });
+
+    document.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1498,6 +1549,10 @@ function initTooltips() {
 
         tooltip.classList.remove('visible');
     }, true); // true = capture phase
+
+    document.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
