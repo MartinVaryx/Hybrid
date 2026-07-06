@@ -17,7 +17,7 @@
         "humanity": 50,
         "defaultWeapons": ["mačeta"],
         "defaultAmmo": {},
-        "defaultItems": {"SLIVOVICA":1},
+        "defaultItems": {},
         "stress_thresh": 8,
         "weapon": 0
     },
