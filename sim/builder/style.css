@@ -144,7 +144,7 @@
         }
 
         .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 100%; z-index: 10;}
-        .control-box { flex: 2;background: #000; color: white; padding: 20px; border-radius: 10px; }
+        .control-box { border: 2px solid #444;flex: 2;background: #000; color: white; padding: 20px; border-radius: 10px; }
         #builder-list{max-height: 240px; flex: 1; border-radius: 8px;}
         #filter-container-container{
             gap: 10px;
@@ -182,7 +182,8 @@
 
         /* The visual modal box inside the overlay backdrop */
         .info-panel-box {
-            background-color: #ffffff;
+            background-color: #000000b5;
+            color: white;
             border: 3px solid #000000;
             border-radius: 12px;
             padding: 20px;
@@ -436,7 +437,7 @@
 
         .info-panel { flex: 2.2; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 300px; z-index: 100000;}
         
-        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px; color: #000;}
         .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
         .skill-list-item:hover { background: #f4f4f4; }
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
