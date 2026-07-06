@@ -2896,7 +2896,8 @@
         "initial_msg": "Nemáš bombu.",
         "case_success": "",
         "case_failure": "",
-        "next": "CALL_1"
+        "next": "CALL_1",
+        "image": "assets/PLACEHOLDER.png"
     },
     "CALL_2": {
         "initial_msg": "VYSIELAČ: Takže si pri ich vysielači... ale ty puritán nie si?",
@@ -2916,13 +2917,15 @@
         "case_failure": "",
         "next": "GAME_OVER",
         "initial_msg_1": "Po chvíli v diaľke zazrieš pevnosť a pred ňou aj nejakých ľudí. A nestrieľajú po tebe! Podarilo sa to! Konečne!",
-        "initial_msg": "Vytiahneš mapu a hľadáš podľa súradníc, ktoré ti dal človek z pevnosti Golem."
+        "initial_msg": "Vytiahneš mapu a hľadáš podľa súradníc, ktoré ti dal človek z pevnosti Golem.",
+        "image": "assets/PLACEHOLDER.png"
     },
     "WANDERING": {
         "initial_msg": "Netušíš, kam ísť. A tak ťa čakajú ďalšie dni plné blúdenia.",
         "case_success": "",
         "case_failure": "",
-        "next": "GAME_OVER"
+        "next": "GAME_OVER",
+        "image": "assets/PLACEHOLDER.png"
     },
     "TUTORIAL_4A1": {
         "initial_msg": "Vľavo si pri každej výzve môžeš vybrať schopnosť. Ku kockám na karte sa ti pridá 1 Hybrid kocka (H znamená +1) za každú úroveň schopnosti. Ak máš úroveň 6 a viac, 6 Hybrid kociek nahradí D6.",
@@ -2973,7 +2976,8 @@
         "initial_msg": "Nemáš feromóny.",
         "case_success": "",
         "case_failure": "",
-        "back": true
+        "back": true,
+        "image": "assets/PLACEHOLDER.png"
     },
     "DISTRACT_PREDATOR_0": {
         "skills": [
@@ -3006,7 +3010,8 @@
         "initial_msg": "Nemáš feromóny.",
         "case_success": "",
         "case_failure": "",
-        "back": true
+        "back": true,
+        "image": "assets/PLACEHOLDER.png"
     },
     "SHACK_DOOR": {
         "initial_msg": "Nový vytvorený príbehový uzol.",
@@ -3081,22 +3086,26 @@
         "initial_msg": "Nový vytvorený príbehový uzol.",
         "case_success": "",
         "choice_A": "If test.",
-        "case_A": "if_WORKS_WORKS_else_if_WORKS_0_WORKS_0_else_WORKS_1"
+        "case_A": "if_WORKS_WORKS_else_if_WORKS_0_WORKS_0_else_WORKS_1",
+        "image": "assets/PLACEHOLDER.png"
     },
     "WORKS": {
         "initial_msg": "WORKS",
         "case_success": "",
-        "case_failure": ""
+        "case_failure": "",
+        "image": "assets/PLACEHOLDER.png"
     },
     "WORKS_0": {
         "initial_msg": "WORKS 2",
         "case_success": "",
-        "case_failure": ""
+        "case_failure": "",
+        "image": "assets/PLACEHOLDER.png"
     },
     "WORKS_1": {
         "initial_msg": "WORKS 1",
         "case_success": "",
-        "case_failure": ""
+        "case_failure": "",
+        "image": "assets/PLACEHOLDER.png"
     },
     "CELLAR_DOOR": {
         "initial_msg": "Dvere sú zamknuté.",
@@ -3112,13 +3121,15 @@
             "flag_fromCellar:true",
             "SHACK_PICK_LOCK"
         ],
-        "back": true
+        "back": true,
+        "image": "assets/PLACEHOLDER.png"
     },
     "GO_UP": {
         "initial_msg": "Ideš po starých drevených schodoch. Vŕzgajú, ako sa na také schody patrí.",
         "case_success": "",
         "case_failure": "",
-        "next": "if_SHACK_1:true_SHACK_1_else_SHACK_2"
+        "next": "if_SHACK_1:true_SHACK_1_else_SHACK_2",
+        "image": "assets/PLACEHOLDER.png"
     },
     "LAYOUT": {
         "GAME_OVER": {
@@ -3988,7 +3999,8 @@
         "GO_UP": {
             "x": 8625,
             "y": 5495
-        }
+        },
+        "image": "assets/PLACEHOLDER.png"
     },
     "ACTIVE": {
         "BASEMENT_DISTRACT": true,
