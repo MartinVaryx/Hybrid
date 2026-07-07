@@ -1,6 +1,6 @@
-        let test_mode = false;
+        let test_mode = true;
         let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
-        const DEBUG = false;
+        const DEBUG = true;
         let debug_start = "START";
 
         let tooltipsInitialized = false;
@@ -3460,7 +3460,7 @@
 
             cardImages.forEach(img => {
                 if (inputs_frozen) {
-                    img.style.filter = "saturate(20%)";
+                    img.style.filter = "saturate(10%) brightness(140%) contrast(60%)";
                 }
             });
         }
@@ -5563,11 +5563,18 @@
                         activeCharIdx = (activeCharIdx + 1) % HEROES.length;
                         updateHeroDisplay();
                     } else if (e.key === " " || e.key === "Enter") {
+                        const gp = document.getElementById('general-prompt');
+
+                        // Let space type into the name field instead of confirming.
+                        if (e.key === " " && gp && gp.style.display !== 'none') {
+                            const gp_input = document.getElementById('general-prompt-input');
+                            if (gp_input && document.activeElement === gp_input) return;
+                        }
+
                         e.preventDefault();
                         e.stopImmediatePropagation(); // FIX: Kills the event instantly so the global listener can't intercept it
 
                         // If general prompt is visible, click its confirm button instead
-                        const gp = document.getElementById('general-prompt');
                         if (gp && gp.style.display !== 'none') {
                             document.getElementById('gp-confirm-btn')?.click();
                             return;
@@ -6889,14 +6896,32 @@
             }
             
             parsedLogs.push(newRunEntry);
-            
-            try {
-                localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
-            } catch (storageError) {
-                console.error("LocalStorage full! Clean your logs.", storageError);
+
+            // Cap stored runs so terminalOutput blobs can't silently blow past the
+            // localStorage quota. Oldest entries drop first.
+            const MAX_STORED_RUNS = 20;
+            if (parsedLogs.length > MAX_STORED_RUNS) {
+                parsedLogs = parsedLogs.slice(-MAX_STORED_RUNS);
             }
 
-            // Restart the window/session immediately without trigger-blocking delays
+            let saveOk = false;
+            try {
+                localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
+                saveOk = true;
+            } catch (storageError) {
+                console.error("LocalStorage full! Trimming oldest runs and retrying.", storageError);
+                while (parsedLogs.length > 1 && !saveOk) {
+                    parsedLogs = parsedLogs.slice(Math.ceil(parsedLogs.length / 2));
+                    try {
+                        localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
+                        saveOk = true;
+                    } catch (retryError) { /* keep shrinking */ }
+                }
+                if (!saveOk) {
+                    console.error("Could not save test run log even after trimming — quota still exceeded.");
+                }
+            }
+
             window.location.reload();
         }
 
@@ -6972,6 +6997,7 @@
             }
             if (stuck_counter > 20) {
                 setTimeout(() => exportNreload("STUCK"), 700);
+                return
             }
 
 
@@ -7263,6 +7289,27 @@
 
 
             const savedCharacters = JSON.parse(localStorage.getItem('characters')) || [];
+
+            function normalizeSkillTypo(skillsObj) {
+                if (!skillsObj || typeof skillsObj !== 'object') return false;
+                if (!Object.prototype.hasOwnProperty.call(skillsObj, "PLÝŽENIE")) return false;
+                const typoVal = skillsObj["PLÝŽENIE"];
+                const correctVal = skillsObj["PLÍŽENIE"];
+                skillsObj["PLÍŽENIE"] = (correctVal !== undefined) ? Math.max(correctVal, typoVal) : typoVal;
+                delete skillsObj["PLÝŽENIE"];
+                return true;
+            }
+
+            let typoFixApplied = false;
+            savedCharacters.forEach(char => {
+                if (normalizeSkillTypo(char.skills)) typoFixApplied = true;
+                if (normalizeSkillTypo(char.initialSkillsSnapshot)) typoFixApplied = true;
+            });
+            if (typoFixApplied) {
+                localStorage.setItem('characters', JSON.stringify(savedCharacters));
+                console.log("Opravený preklep zručnosti: PLÝŽENIE → PLÍŽENIE v localStorage.");
+            }
+            
             const savedNames = new Set(savedCharacters.map(c => c.name.toUpperCase()));
 
             // Only add stock heroes whose names aren't already in localStorage

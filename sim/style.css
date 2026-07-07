@@ -558,11 +558,12 @@
 
         /* Localized Card Tray Containment (Left-Bounded) */
         .card-tray-wrapper {
-            background: rgba(0, 0, 0, 0.85);
+            background: rgb(36, 36, 36);
             border: 4px solid var(--hybrid-black);
             border-radius: 6px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
             width: 100%;
+            padding: 5px
         }
 
         .card-tray {
@@ -583,7 +584,7 @@
             overflow: visible;        
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             cursor: pointer;
-            box-shadow: 0 0 1px 1px rgba(64, 64, 64, 0);
+            box-shadow: 0 0 2px 2px rgba(70, 70, 70, 0.655);
         }
 
         .card-tray .card-container:hover {
