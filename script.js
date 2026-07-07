@@ -1149,17 +1149,6 @@
             window.scrollTo(0, 0);
         }
 
-        // --- FEATURED WIDGET VISIBILITY LOGIC ---
-        // Finds your widget and displays it ONLY on the 'uvod' tab
-        const featuredWidget = document.querySelector('.carousel-container'); // Change to '#featured-widget' if using an ID
-        if (featuredWidget) {
-            if (id === 'uvod') {
-                featuredWidget.style.display = 'block'; // Show on home tab
-            } else {
-                featuredWidget.style.display = 'none';  // Hide on all other tabs
-            }
-        }
-        // ----------------------------------------
 
         // Klasické prepínanie tried
         document.querySelectorAll('.tab-content').forEach(c => {
@@ -1366,8 +1355,8 @@
                 <img src="${a.thumb}" alt="${a.title}" onerror="this.src='assets/logo.png'">
                 <div class="news-card-info">
                     <span class="news-date">${a.date}</span>
-                    <h3 style="margin:5px 0;">${a.title}</h3>
-                    <p style="margin:0; font-size:0.9rem; color: #555;">${a.summary}</p>
+                    <h3 class="news-h">${a.title}</h3>
+                    <p class="news-p">${a.summary}</p>
                 </div>
             </div>
         `).join('');

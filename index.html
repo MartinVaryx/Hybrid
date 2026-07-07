@@ -41,36 +41,50 @@
         </div>
     </div>
 
-    <div class="carousel-container">
-        <button class="carousel-btn prev-btn" aria-label="Previous Slide">&#10094;</button>
-        <button class="carousel-btn next-btn" aria-label="Next Slide">&#10095;</button>
 
-        <div class="carousel-track">
+    <div id="cover-img">
+        <div class="carousel-container">
+            <button class="carousel-btn prev-btn" aria-label="Previous Slide">&#10094;</button>
+            <button class="carousel-btn next-btn" aria-label="Next Slide">&#10095;</button>
 
-            <div class="carousel-slide">
-                <div class="carousel-overlay">
-                    <div >
-                        <p class="carousel-overlay-text" style="color: #fff">Nová browser hra! Vyskúšaj si Hybrid už teraz!</p>
-                    </div>                    
-                    <div class="carousel-overlay-controls">
-                        <button class="overlay-action-btn" onclick="window.open('https://hybridrpg.sk/sim', '_blank')">OTVORIŤ</button>
+            <div class="carousel-track">
+
+                <div class="carousel-slide">
+                    <div class="carousel-overlay">
+                        <div class="carousel-img">
+                            <img src="sim/assets/WELCOME.png" alt="HYBRID">
+                        </div>
+                        <div class="carousel-btn-n-text">
+                            <div >
+                                <p class="carousel-overlay-text" style="color: #fff">Nová browser hra! Vyskúšaj si Hybrid už teraz!</p>
+                            </div>                    
+                            <div class="carousel-overlay-controls">
+                                <button class="overlay-action-btn" onclick="window.open('https://hybridrpg.sk/sim', '_blank')">OTVORIŤ</button>
+                            </div>
+                        </div>
                     </div>
                 </div>
-            </div>
 
-            
-            <div class="carousel-slide">
-                <div class="carousel-overlay">
-                    <div>
-                        <p class="carousel-overlay-text" style="color: #fff">Vytvor si postavu vďaka interaktívnemu denníku.</p>
-                    </div>                    
-                    <div class="carousel-overlay-controls">
-                        <button class="overlay-action-btn" onclick="openTab('builder')">VYTVORIŤ POSTAVU</button>
+
+                <div class="carousel-slide">
+                    <div class="carousel-overlay">
+                            <div class="carousel-img">
+                                <img src="assets/dennik.png" alt="HYBRID" class="fit-top">
+                            </div>
+                            <div class="carousel-btn-n-text">
+
+                                <div>
+                                    <p class="carousel-overlay-text" style="color: #fff">Vytvor si postavu vďaka interaktívnemu denníku.</p>
+                                </div>                    
+                                <div class="carousel-overlay-controls">
+                                    <button class="overlay-action-btn" onclick="openTab('builder')">VYTVORIŤ POSTAVU</button>
+                                </div>
+                        </div>
                     </div>
                 </div>
+
+
             </div>
-
-
         </div>
     </div>
 

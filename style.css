@@ -1,4 +1,4 @@
-        :root {
+:root {
             --bg-paper: #949494; 
             --hybrid-black: #000000;
             --hybrid-red: #c62828;
@@ -238,7 +238,7 @@
             text-align: center;
         }
 
-        .carousel-container {
+        #cover-img {
             position: relative;
             width: 100%; 
             height: 40vw;       /* Scales down cleanly with the width of the screen */
@@ -249,17 +249,34 @@
             font-family: sans-serif;
             display: flex;
             flex-direction: column;
+            justify-content: flex-end;    /* Sits the track at the bottom of the container */
+
+        }
+
+        .carousel-container {
+            position: relative;
+            width: 100%; 
+            height: 20vw;
+            max-height: 220px;            /* Exactly 220px on desktop, shrinks via 20vw on smaller screens */
+            margin: 0px ; 
+            overflow: hidden;
+            font-family: sans-serif;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;    /* Sits the track at the bottom of the container */
 
         }
 
         .carousel-track {
             display: flex;
+            position: relative;           /* So prev/next buttons center on the TRACK, not the container */
             overflow-x: auto;
             scroll-behavior: smooth;
             scroll-snap-type: x mandatory;
             scrollbar-width: none;
             width: 100%;
-            height: 100%;            /* Fills 100% of the container height */
+            height: 20vw;
+            max-height: 220px;            /* Exactly 220px on desktop, shrinks via 20vw on smaller screens */
             background: transparent; 
         }
 
@@ -273,9 +290,14 @@
             overflow: hidden; 
             display: flex;
             flex-direction: column;
-            height: 100%;            /* ADD THIS: Forces the slide to fill 100% of the track height */
         }
 
+        .carousel-btn-n-text {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+        }
 
         .carousel-track::-webkit-scrollbar {
             display: none; /* Hides scrollbar on Chrome/Safari/Edge */
@@ -332,15 +354,45 @@
             left: 0;
             right: 0;
             width: 100%;
+            height: 100%;
             display: flex;
-            flex-direction: column;
-            justify-content: space-between;
+            flex-direction: row;
+            justify-content: center;
             align-items: center;
-            gap:5px;
+            gap:2%;
             padding: 10px 50px;
             background-color: rgba(0, 0, 0, 0.75);
         }
 
+        .carousel-img {
+            display: flex;
+            overflow: hidden;
+            justify-content: center;
+            align-content: center;
+            height: 70%;
+            width: 20%;
+            border: solid 2px rgb(221, 219, 219);
+            border-radius: 8px;
+        }
+
+        /* object-fit only works on the <img> itself, not the wrapper div above,
+           so the actual sizing/cropping rules live here */
+        .carousel-img img {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+            object-position: center;      /* default crop point for wide/horizontal images like welcome.png */
+        }
+
+        /* For tall/vertical images (e.g. dennik.png) show the bottom portion instead of the center */
+        .carousel-img img.fit-bottom {
+            object-position: center bottom;
+        }
+
+        .carousel-img img.fit-top {
+            object-position: center top;
+        }
 
         .carousel-content h3 {
             margin: 0 0 10px 0;
@@ -358,10 +410,9 @@
 
         .carousel-btn {
             position: absolute;
-            top: 50%;                /* CHANGED from 200px to keep buttons centered on all screens */
-            transform: translateY(-50%);
+            bottom: 40%;                /* CHANGED from 200px to keep buttons centered on all screens */
             background: rgba(0, 0, 0, 0.5);
-            color: white;
+            color: seashell;
             border: none;
             width: 40px;
             height: 40px;
@@ -432,7 +483,7 @@
             text-decoration: none;
             border-radius: 8px;
             border: 1px solid;
-            border-color: white;
+            border-color: seashell;
             
             /* Crucial for smooth animation */
             transition: transform 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
@@ -648,7 +699,7 @@
         .skill-node {
             width: 160px; 
             height: 48px;
-            background: white;
+            background: seashell;
             padding: 8px;
             border: 2px solid #000;
             display: flex;
@@ -661,8 +712,8 @@
             box-sizing: border-box;
             box-shadow: 2px 2px 0px rgba(0,0,0,0.05);
         }
-        .skill-node.selected { background-color: var(--hybrid-black); color: white; }
-        .skill-level { background: var(--hybrid-red); color: white; padding: 2px 6px; border-radius: 4px; }
+        .skill-node.selected { background-color: var(--hybrid-black); color: seashell; }
+        .skill-level { background: var(--hybrid-red); color: seashell; padding: 2px 6px; border-radius: 4px; }
 
         
         .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
@@ -671,7 +722,7 @@
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
 
         .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
-        .control-box { flex:1; background: #000; color: white; padding: 20px; border-radius: 10px; }
+        .control-box { flex:1; background: #000; color: seashell; padding: 20px; border-radius: 10px; }
         #builder-list{height: 300px;}
         #filter-container-container{
             gap: 10px;
@@ -830,7 +881,7 @@
             left: 50%;
             transform: translateX(-50%);
             background: var(--hybrid-black);
-            color: white;
+            color: seashell;
             padding: 10px 20px;
             border: 2px solid var(--hybrid-red);
             z-index: 2000;
@@ -1018,7 +1069,7 @@
         }
 
         .modal-box {
-            background: white;
+            background: seashell;
             padding: 30px;
             border: 4px solid var(--hybrid-red);
             max-width: 450px;
@@ -1037,6 +1088,7 @@
 
         .news-card {
             display: flex;
+            height: 26vh;
             align-items: center;
             gap: 20px;
             background: rgba(255,255,255,0.05);
@@ -1053,13 +1105,24 @@
         }
 
         .news-card img {
-            width: 150px;
-            height: 100px;
+            width: 30%;
+            height: 90%;
             object-fit: cover;
         }
 
+        .news-p {
+            font-size: 16px;
+            margin:0; 
+            color: #555;
+        }
+
+        .news-h {
+            font-size: 20px;
+            margin:5px 0;
+        }
+
         .news-date {
-            font-size: 0.8rem;
+            font-size: 1.2rem;
             color: var(--hybrid-red);
             font-weight: bold;
         }
@@ -1135,7 +1198,7 @@
             top: -15px;
             right: -15px;
             background: var(--hybrid-red, red);
-            color: white;
+            color: seashell;
             border: 2px solid black;
             width: 35px;
             height: 35px;
@@ -1258,16 +1321,38 @@
             }
 
                 .carousel-overlay {
-                    padding: 8px 15px !important;    /* Drastically reduces horizontal padding so text has more room to spread out sideways */
-                    gap: 2px !important;             /* Tightens up the space between text and buttons */
+                    flex-direction: row !important;      /* Image and text+button stay side by side */
+                    justify-content: center !important;
+                    align-items: center !important;
+                    padding: 5px 15px !important;       /* Leaves clear space so nothing sits under the round arrow buttons */
+                    gap: 5px !important;
                     box-sizing: border-box !important;
                 }
 
+                .carousel-img {
+                    flex: 0 0 33% !important;             /* Capped at 1/3 of the row width, never shrinks */
+                    max-width: 33% !important;
+                    width: 33% !important;
+                    height: 34vw !important;              /* Explicit size (not %) so this value reliably controls the box */
+                    max-height: 160px !important;
+                    min-height: 120px !important;
+                    min-width: 0 !important;
+                }
+
+                .carousel-btn-n-text {
+                    flex: 1 1 0% !important;              /* Takes the remaining ~2/3, and can shrink so text wraps */
+                    min-width: 0 !important;
+                    width: auto !important;
+                }
+
                 .carousel-overlay-text {
-                    font-size: 1rem !important;      /* Scales down text from 1.5rem to prevent vertical bloating */
-                    margin-bottom: 4px !important;   /* Reduces spacing under text */
+                    font-size: 0.85rem !important;       /* Scales down text from 1.5rem to prevent vertical bloating */
+                    margin-bottom: 4px !important;
                     width: 100% !important;
-                    white-space: normal !important;  /* Guarantees safe line-wrapping within visible bounds */
+                    max-width: 100% !important;
+                    white-space: normal !important;      /* Guarantees safe line-wrapping within visible bounds */
+                    overflow-wrap: break-word !important;
+                    line-height: 1.3 !important;
                 }
 
                 .carousel-overlay-controls {
@@ -1279,6 +1364,15 @@
                     padding: 6px 14px !important;    /* Scales down the button size */
                     font-size: 0.85rem !important;   /* Lowers button text size from 1rem */
                     margin-bottom: 2px !important;   /* Cuts down the massive 20px bottom margin */
+                }
+
+                /* The global "img { height: auto !important }" rule below would otherwise
+                   fight object-fit on the carousel photo, so re-assert it here with equal
+                   !important weight and higher specificity so it always wins */
+                .carousel-img img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    margin: 0 !important;
                 }
                 
                 #rel-add-container.active {
@@ -1300,8 +1394,8 @@
                         top: 20px;
                         right: 20px;
                         background: #ff4444;
-                        color: white;
-                        border: 2px solid white;
+                        color: seashell;
+                        border: 2px solid seashell;
                         padding: 10px 15px;
                         font-weight: bold;
                         cursor: pointer;
@@ -1509,7 +1603,7 @@
                     position: static !important;
                     width: 100% !important;
                     height: auto !important;
-                    background: white !important;
+                    background: seashell !important;
                     border: 1px solid #ddd;
                     padding: 10px !important;
                     display: flex !important;
@@ -1523,7 +1617,7 @@
                 }
 
                 .skill-name-text { position: static !important; width: auto !important; font-size: 1.1rem; }
-                .skill-lvl-box { position: static !important; width: auto !important; background: var(--hybrid-red); color: white; padding: 2px 8px; border-radius: 4px; }
+                .skill-lvl-box { position: static !important; width: auto !important; background: var(--hybrid-red); color: seashell; padding: 2px 8px; border-radius: 4px; }
 
                 .info-panel {margin-bottom: 90px; order: 2 !important; width: 100% !important; position: static !important; height: auto !important; padding-bottom: 10px !important;}
                 .filter-container-container{width: 100%;}
@@ -1896,23 +1990,29 @@
                     justify-content: flex-start; /* Forces content to the left */
                 }
 
-                .carousel-container {
+                #cover-img {
+                    height: 72vw !important;         /* Slightly larger than .carousel-container below so it's never clipped */
+                    max-height: 360px !important;
+                    min-height: 312px !important;
+                }
 
+                .carousel-container {
+                    height: 76.8vw !important;         /* +20% from 64vw, synced with the 968px block below */
+                    max-height: 324px !important;
+                    min-height: 276px !important;
                     box-sizing: border-box; 
                 }
 
-        
-
                 .carousel-track {
                     width: 100% !important;
+                    height: 28vw !important;          /* Matches .carousel-container so the slide/overlay grow together */
+                    max-height: 270px !important;
+                    min-height: 130px !important;
                 }
 
   
 
-                    /* Keep slide arrows perfectly centered relative to the changing 16:9 box */
-                    .carousel-btn {
-                        top: calc((92vw * 9 / 16) / 2) !important; 
-                    }
+                    /* Arrows now center automatically via .carousel-btn { top: 50% } + .carousel-track { position: relative } */
 
                 /* Shrink the padding and text sizes inside the carousel on mobile */
                 .carousel-content {
@@ -2019,17 +2119,44 @@
                 right: 10px;
             }
 
+
                 .carousel-overlay {
-                    padding: 8px 15px !important;    /* Drastically reduces horizontal padding so text has more room to spread out sideways */
-                    gap: 2px !important;             /* Tightens up the space between text and buttons */
+                    flex-direction: row !important;      /* Image and text+button stay side by side */
+                    justify-content: center !important;
+                    align-items: center !important;
+                    padding: 5px 45px !important;       /* Leaves clear space so nothing sits under the round arrow buttons */
+                    gap: 5px !important;
                     box-sizing: border-box !important;
                 }
 
+                .carousel-img {
+                    flex: 0 0 33% !important;             /* Capped at 1/3 of the row width, never shrinks */
+                    max-width: 33% !important;
+                    width: 33% !important;
+                    height: 2vw !important;              /* Explicit size (not %) so this value reliably controls the box */
+                    max-height: 160px !important;
+                    min-height: 90px !important;
+                    min-width: 0 !important;
+                }
+
+                .carousel-btn-n-text {
+                    flex: 1 1 0% !important;              /* Takes the remaining ~2/3, and can shrink so text wraps */
+                    min-width: 0 !important;
+                    width: auto !important;
+                }
+
+                .carousel-btn {
+                    bottom: 18%;
+                }
+
                 .carousel-overlay-text {
-                    font-size: 1rem !important;      /* Scales down text from 1.5rem to prevent vertical bloating */
-                    margin-bottom: 4px !important;   /* Reduces spacing under text */
+                    font-size: 0.85rem !important;       /* Scales down text from 1.5rem to prevent vertical bloating */
+                    margin-bottom: 4px !important;
                     width: 100% !important;
-                    white-space: normal !important;  /* Guarantees safe line-wrapping within visible bounds */
+                    max-width: 100% !important;
+                    white-space: normal !important;      /* Guarantees safe line-wrapping within visible bounds */
+                    overflow-wrap: break-word !important;
+                    line-height: 1.3 !important;
                 }
 
                 .carousel-overlay-controls {
@@ -2041,6 +2168,15 @@
                     padding: 6px 14px !important;    /* Scales down the button size */
                     font-size: 0.85rem !important;   /* Lowers button text size from 1rem */
                     margin-bottom: 2px !important;   /* Cuts down the massive 20px bottom margin */
+                }
+
+                /* The global "img { height: auto !important }" rule below would otherwise
+                   fight object-fit on the carousel photo, so re-assert it here with equal
+                   !important weight and higher specificity so it always wins */
+                .carousel-img img {
+                    width: 100% !important;
+                    height: 100% !important;
+                    margin: 0 !important;
                 }
 
                 #filter-container-container {
@@ -2122,8 +2258,8 @@
                         top: 20px;
                         right: 20px;
                         background: #ff4444;
-                        color: white;
-                        border: 2px solid white;
+                        color: seashell;
+                        border: 2px solid seashell;
                         padding: 10px 15px;
                         font-weight: bold;
                         cursor: pointer;
@@ -2331,7 +2467,7 @@
                         position: static !important;
                         width: 100% !important;
                         height: auto !important;
-                        background: white !important;
+                        background: seashell !important;
                         border: 1px solid #ddd;
                         padding: 10px !important;
                         display: flex !important;
@@ -2345,7 +2481,7 @@
                     }
 
                     .skill-name-text { position: static !important; width: auto !important; font-size: 1.1rem; }
-                    .skill-lvl-box { position: static !important; width: auto !important; background: var(--hybrid-red); color: white; padding: 2px 8px; border-radius: 4px; }
+                    .skill-lvl-box { position: static !important; width: auto !important; background: var(--hybrid-red); color: seashell; padding: 2px 8px; border-radius: 4px; }
 
                     .info-panel {margin-bottom: 90px; order: 2 !important; width: 100% !important; position: static !important; height: auto !important; padding-bottom: 10px !important;}
                     .filter-container-container{width: 100%;}
@@ -2718,23 +2854,26 @@
                     justify-content: flex-start; /* Forces content to the left */
                 }
 
-                .carousel-container {
+                #cover-img {
+                    height: 72vw !important;         /* Slightly larger than .carousel-container below so it's never clipped */
+                    max-height: 360px !important;
+                    min-height: 312px !important;
+                }
 
+                .carousel-container {
+                    height: 76.8vw !important;         /* +20% from 64vw */
+                    max-height: 324px !important;
+                    min-height: 276px !important;
                     box-sizing: border-box; 
                 }
 
-        
-
                 .carousel-track {
                     width: 100% !important;
+                    height: 28vw !important;          /* Matches .carousel-container so the slide/overlay grow together */
+                    max-height: 270px !important;
+                    min-height: 130px !important;
                 }
 
-  
-
-                    /* Keep slide arrows perfectly centered relative to the changing 16:9 box */
-                    .carousel-btn {
-                        top: calc((92vw * 9 / 16) / 2) !important; 
-                    }
 
                 /* Shrink the padding and text sizes inside the carousel on mobile */
                 .carousel-content {
