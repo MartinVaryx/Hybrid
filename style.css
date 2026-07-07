@@ -324,10 +324,10 @@
 
         .overlay-action-btn {
             padding: 10px 18px;
-            background-color: rgba(0, 0, 0, 0.75); /* Semi-transparent background for high contrast */
+            background-color: var(--hybrid-red); 
             color: #ffffff;
             border: 2px solid #ffffff;
-            border-radius: 20px;
+            border-radius: 8px;
             font-family: 'Roboto Condensed', sans-serif;
             font-weight: bold;
             text-transform: uppercase;
@@ -339,7 +339,7 @@
 
         /* Hover effect */
         .overlay-action-btn:hover {
-            background-color: var(--hybrid-red); /* Switches to your custom brand red on hover */
+            background-color: #a31e1e; /* Switches to your custom brand red on hover */
             transform: scale(1.05); /* Clean click preview sizing swell */
         }
 
