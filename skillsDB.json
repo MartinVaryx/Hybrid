@@ -254,7 +254,7 @@
         "BOJ ZBLÍZKA",
         [
             "ĽAHKÉ ZBRANE",
-            "PLÝŽENIE",
+            "PLÍŽENIE",
             "OBRATNOSŤ",
             "ZRUČNOSŤ",
             "SILA"
@@ -269,7 +269,7 @@
         ],
         "Prieskum neznámej oblasti, odhalenie slabosti nepriateľa, objavenie hniezda. Hľadanie skrýší, maskovanie seba aj iných, ukrývanie predmetov, vozidiel či stavieb."
     ],
-    "PLÝŽENIE": [
+    "PLÍŽENIE": [
         2,
         "INFILTRÁCIA",
         [
@@ -654,7 +654,7 @@
         3,
         "VŠEOBECNÉ",
         [
-            "PLÝŽENIE",
+            "PLÍŽENIE",
             "ZRUČNOSŤ",
             "ZMYSLY",
             "PREDSTIERANIE",
