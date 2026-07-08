@@ -11,6 +11,12 @@
         const overlay = document.getElementById('info-panel-container');
         if (!overlay) return;
 
+        const char = characters[activeCharIdx];
+        const sp = char.sp || 0;
+        
+        document.getElementById('br-label').innerText = `BR: ${sp}`;
+
+
         if (show) {
             overlay.classList.add('active');
         } else {
@@ -77,6 +83,7 @@
         const data = skillsDB_new[name];
         const targetLvl = (char.skills[name] || 0) + 1;
         const baseCost = targetLvl * data[0];
+        const sp = char.sp || 0;
         
         let discount = 0;
         let relDisplayStrings = [];
@@ -107,6 +114,7 @@
         } else { costCont.style.display = 'none'; }
         
         document.getElementById('cost-disc').innerText = `${finalCost} BR`;
+        document.getElementById('br-label').innerText = `BR: ${sp}`;
         renderStats();
     }
 
@@ -236,6 +244,12 @@
         if (!data) {
             console.log("Skill data not found for:", selectedSkill);
             return};
+
+        if (window.parent.BIOLOGICAL_WEAPONS && window.parent.BIOLOGICAL_WEAPONS.includes(selectedSkill) && currentLvl > 0) {
+            showCustomAlert("Túto zbraň už máš. Úroveň somorích zbraní sa nezvyšuje.");
+            return;
+        }
+
         const skillGroup = data[1]; 
         const targetLvl = currentLvl + 1;
 

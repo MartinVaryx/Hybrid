@@ -3,6 +3,9 @@
         const DEBUG = false;
         let debug_start = "START";
 
+
+        // Assuming you already have a reference to your audio element
+        const audio = document.getElementById('bg-audio');
         let tooltipsInitialized = false;
         let current_challenge_key = "WELCOME";
         let back_to_game = "START";
@@ -39,9 +42,9 @@
         };
 
 
-        const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
+        const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT", "KRÍDLA"];
         const ATTACK_SKILLS = ["SILA", "OBRATNOSŤ", "ZMYSLY"]
-        const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE"];
+        const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE", "KRÍDLA"];
         const SNEAK_SKILLS = ["PLÍŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
 
         const CARDS = {
@@ -92,6 +95,8 @@
         }
 
         const BIOLOGICAL_WEAPONS = ["OSTNE", "HRYZADLÁ", "KLEPETÁ", "KYSELINA", "ŽIHADLO"];
+        window.BIOLOGICAL_WEAPONS = BIOLOGICAL_WEAPONS;
+
 
         const PASSIVE_SKILLS = ["PANCIER"];
 
@@ -1170,9 +1175,13 @@
             if (typeof SETTINGS === 'undefined') return;
 
             const tutorialCheckbox = document.getElementById('tutorial-checkbox');
+            const audioCheckbox = document.getElementById('audio-checkbox');
             const modeDropdown = document.getElementById('mode-dropdown');
             if (tutorialCheckbox) {
                 tutorialCheckbox.checked = !!SETTINGS.tutorial;
+            }
+            if (audioCheckbox) {
+                audioCheckbox.checked = !!SETTINGS.audio;
             }
             if (modeDropdown) {
                 modeDropdown.value = SETTINGS.MODE || 'NORMAL';
@@ -1183,7 +1192,7 @@
             MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
             SETTINGS.MODE = MODE;
             saveSettings();
-            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť: " + SETTINGS.MODE);
+            if(DEBUG) log("Nastavenia boli uložené.");
             document.getElementById('settings').style.display = 'none';
         }
 
@@ -1191,7 +1200,7 @@
             MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
             SETTINGS.MODE = MODE;
             saveSettings();
-            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť: " + SETTINGS.MODE);
+            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť.");
             document.getElementById('settings').style.display = 'none';
             showMenu()
         }
@@ -1225,15 +1234,41 @@
             }
         }
 
-        function updateTutorialVisual() {
-            const checkbox = document.getElementById('tutorial-checkbox');
+        function toggleAudio() {
+            const checkbox = document.getElementById('audio-checkbox');
             if (!checkbox) return;
+
+            if (typeof SETTINGS === 'undefined') {
+                window.SETTINGS = {};
+            }
+
+            // Set the setting explicitly to match the checkbox state
+            SETTINGS.audio = checkbox.checked;
+            if (typeof updateUI === 'function') {
+                updateUI();
+            }
+            if (typeof saveSettings === 'function') {
+                saveSettings();
+            }
+        }
+
+        function updateSettingsVisual() {
+            const tutorial_checkbox = document.getElementById('tutorial-checkbox');
+            const audio_checkbox = document.getElementById('audio-checkbox');
+
+            if (!tutorial_checkbox || !audio_checkbox) return;
 
             // Force the checkbox UI to match the current data structure state
             if (typeof SETTINGS !== 'undefined' && SETTINGS.tutorial) {
-                checkbox.checked = true;
+                tutorial_checkbox.checked = true;
             } else {
-                checkbox.checked = false;
+                tutorial_checkbox.checked = false;
+            }
+
+            if (typeof SETTINGS !== 'undefined' && SETTINGS.audio) {
+                audio_checkbox.checked = true;
+            } else {
+                audio_checkbox.checked = false;
             }
         }
 
@@ -1300,8 +1335,9 @@
                 return caseTarget;
             }
             const parts = caseTarget.split('_else_');
-            const ifPart = parts[0].substring(3); // Odstráni "if_"
-            const falseTarget = parts[1] || null;
+            const elseIdx = caseTarget.indexOf('_else_');
+            const ifPart = elseIdx === -1 ? caseTarget.substring(3) : caseTarget.substring(3, elseIdx);
+            const falseTarget = elseIdx === -1 ? null : caseTarget.substring(elseIdx + 6);
 
             let flagKey, operator, rawValue, trueTarget;
 
@@ -1312,14 +1348,40 @@
                 operator = match[2];
                 rawValue = match[3].trim();
                 trueTarget = match[4];
-            } else {
+} else {
                 // 2. BACKUP: Skrátený zápis bez operátora (napr. door-open_TARGET) -> predvolíme == true
+                // Keďže flagKey aj target môžu obsahovať podčiarniky (napr. "WORKS_0_WORKS_0"),
+                // samotná greedy regex nevie spoľahlivo určiť hranicu medzi nimi. Preto
+                // vyskúšame kandidátov od najdlhšieho flagKey po najkratší a uprednostníme
+                // ten, ktorý reálne existuje vo FLAGS / CHALLENGES.ACTIVE.
                 const shortMatch = ifPart.match(/^([a-zA-Z0-9_-]+)_(.+)$/);
                 if (shortMatch) {
-                    flagKey = shortMatch[1];
+                    const underscorePositions = [];
+                    for (let i = 0; i < ifPart.length; i++) {
+                        if (ifPart[i] === '_') underscorePositions.push(i);
+                    }
+                    let resolved = false;
+                    for (let i = underscorePositions.length - 1; i >= 0; i--) {
+                        const pos = underscorePositions[i];
+                        const candidateKey = ifPart.substring(0, pos);
+                        const candidateTarget = ifPart.substring(pos + 1);
+                        if (!candidateKey || !candidateTarget) continue;
+                        const existsInFlags = typeof FLAGS !== 'undefined' && candidateKey in FLAGS;
+                        const existsInActive = typeof CHALLENGES !== 'undefined' && CHALLENGES["ACTIVE"] && candidateKey in CHALLENGES["ACTIVE"];
+                        if (existsInFlags || existsInActive) {
+                            flagKey = candidateKey;
+                            trueTarget = candidateTarget;
+                            resolved = true;
+                            break;
+                        }
+                    }
+                    if (!resolved) {
+                        // Fallback na pôvodné (greedy) správanie, ak žiadny kandidát nezodpovedá existujúcemu flagu
+                        flagKey = shortMatch[1];
+                        trueTarget = shortMatch[2];
+                    }
                     operator = '==';
                     rawValue = 'true';
-                    trueTarget = shortMatch[2];
                 }
             }
 
@@ -1378,7 +1440,15 @@
                 case '<=':  conditionPassed = (processedCurrent <= processedTarget); break;
             }
 
-            return conditionPassed ? trueTarget : falseTarget;
+            const resolvedResult = conditionPassed ? trueTarget : falseTarget;
+
+            // Ak je výsledná vetva sama o sebe vnorenou podmienkou (napr. "if_flagB:true_X_else_Y"),
+            // vyhodnoťme ju rekurzívne namiesto toho, aby sme ju vrátili ako nevyriešený reťazec.
+            if (typeof resolvedResult === 'string' && resolvedResult.startsWith('if_')) {
+                return evaluateIfCondition(resolvedResult);
+            }
+
+            return resolvedResult;
         }
 
         function resetStateFlags(){
@@ -1631,7 +1701,6 @@
                             target.toLowerCase().startsWith('alerted_') ||
                             target.toLowerCase().startsWith('distance_') ||
                             target.toLowerCase().startsWith('delayed_') // PRIDANÉ: Ostražitosť nepriateľov
-
                         );
 
                         // 3. Špeciálna izolovaná kontrola pre podmienky (if_)
@@ -2031,6 +2100,18 @@
                             if (DEBUG === true) {
                                 log(`[delayed] Výzva '${challengeName}' bola pridaná do DELAYED. DELAYED: '${DELAYED}'`);
                                 return true
+                            }
+                        } else if (stateStr == "remove"){
+                            const idx = DELAYED.indexOf(challengeName);
+                            if (idx !== -1) {
+                                DELAYED.splice(idx, 1);
+
+                                if (DEBUG === true) {
+                                    log(`[delayed] Výzva '${challengeName}' bola odstránená z DELAYED. DELAYED: '${DELAYED}'`);
+                                    return true
+                                }
+                            } else if (DEBUG === true) {
+                                log(`[delayed] Výzva '${challengeName}' sa v DELAYED nenachádza, netreba ju odstrániť.`);
                             }
                         }
                     } else if (DEBUG === true) {
@@ -2957,8 +3038,23 @@
 
         function pushDelayed(effect) {
             if (!effect) return;
-            if (!DELAYED.includes(effect)) {
-                DELAYED.push(effect);
+
+            // Podporíme aj pole efektov naraz (napr. case_success_delayed: [...])
+            if (Array.isArray(effect)) {
+                effect.forEach(pushDelayed);
+                return;
+            }
+
+            // KRITICKÁ OPRAVA: ak je efekt zapísaný ako podmienka (napr. "if_flag:true_TARGET_else_TARGET2"),
+            // musíme ju najprv vyhodnotiť - inak by sme do DELAYED pridali surový, nikdy sa nezhodujúci reťazec.
+            let resolvedEffect = effect;
+            if (typeof effect === 'string' && effect.startsWith('if_') && typeof evaluateIfCondition === 'function') {
+                resolvedEffect = evaluateIfCondition(effect);
+            }
+            if (!resolvedEffect) return;
+
+            if (!DELAYED.includes(resolvedEffect)) {
+                DELAYED.push(resolvedEffect);
             }
         }
 
@@ -3195,6 +3291,20 @@
 
 
         function updateUI() {
+
+            const isPlaying = !audio.paused && !audio.ended && audio.readyState > 2;
+
+            // 3. Sync the audio state with your global flag
+            if (SETTINGS.audio && !isPlaying) {
+                // The flag is TRUE, but audio is NOT playing -> Turn it on
+                audio.play().catch(error => {
+                    console.log("Playback blocked or failed:", error);
+                });
+            } else if (!SETTINGS.audio && isPlaying) {
+                // The flag is FALSE, but audio IS playing -> Turn it off
+                audio.pause();
+            }
+            
             document.getElementById("player-advantage").innerText = advantage;
             syncHeroToStorage();
             const spElement = document.getElementById("sp");
@@ -3499,30 +3609,18 @@
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                     log(" (+1 BR!)", "success-msg", false, false, true);
                     if (activeChallenge.case_success_delayed) {
-                        if (Array.isArray(activeChallenge.case_success_delayed)) {
-                            DELAYED.push(...activeChallenge.case_success_delayed);
-                        } else {
-                            DELAYED.push(activeChallenge.case_success_delayed);
-                        }
+                        pushDelayed(activeChallenge.case_success_delayed);
                     }
                     followupTarget = activeChallenge.case_success;
                 } else {
                     if (activeChallenge.case_failure_delayed) {
-                        if (Array.isArray(activeChallenge.case_failure_delayed)) {
-                            DELAYED.push(...activeChallenge.case_failure_delayed);
-                        } else {
-                            DELAYED.push(activeChallenge.case_failure_delayed);
-                        }
+                        pushDelayed(activeChallenge.case_failure_delayed);
                     }
                     followupTarget = activeChallenge.case_failure;
                 }
 
                 if (threat_realized && activeChallenge.case_threat_delayed) {
-                    if (Array.isArray(activeChallenge.case_threat_delayed)) {
-                        DELAYED.push(...activeChallenge.case_threat_delayed);
-                    } else {
-                        DELAYED.push(activeChallenge.case_threat_delayed);
-                    }
+                    pushDelayed(activeChallenge.case_threat_delayed);
                 }
 
                 if (threat_realized && activeChallenge.case_threat) {
@@ -6487,7 +6585,7 @@
             }
 
             // --- C. KONTROLY KOMBINÁCIÍ (SPOLOČNÉ PRE BOJ AJ ELIMINÁCIU) ---
-            if ((is_conflict  || isEliminationAttack) && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+            if ((is_conflict  || isEliminationAttack) && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && actionType === "A") {
                 const skillData = SKILLS_DB[selectedSkillName];
 
                 // Overenie Vrhania
@@ -6519,22 +6617,33 @@
                     }
                 }
 
-                // Dynamické overenie kategórií zbraní a skillov (Blízko vs Diaľka)
-                let weaponCategory = "";
+                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+
+                // Zbraň môže patriť do viacerých kategórií naraz (napr. NÔŽ je zároveň
+                // BOJ ZBLÍZKA aj VRHACIE). Zoznam všetkých kategórií, do ktorých zbraň patrí:
+                const weaponCategories = [];
                 for (const category in WEAPON_LIST) {
                     if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                        weaponCategory = category.toUpperCase();
-                        break;
+                        weaponCategories.push(category.toUpperCase());
                     }
+                }
+
+                // Kategóriu, podľa ktorej validujeme schopnosť, vyberáme podľa zámeru hráča
+                // (zvolenej schopnosti) namiesto poradia kľúčov v WEAPON_LIST — inak by sa
+                // vrhacia zbraň so schopnosťou VRHANIE/ŤAŽKÉ PREDMETY omylom posúdila ako
+                // útok zblízka len preto, že "BOJ ZBLÍZKA" je v objekte skôr než "VRHACIE".
+                let weaponCategory = "";
+                if (isThrownSkill && weaponCategories.includes("VRHACIE")) {
+                    weaponCategory = "VRHACIE";
+                } else if (weaponCategories.length > 0) {
+                    const skillCategoryUpper = (skillData && skillData[1]) ? skillData[1].toUpperCase() : "";
+                    weaponCategory = weaponCategories.find(cat => skillCategoryUpper.includes(cat)) || weaponCategories[0];
                 }
 
                 // Pomocné premenné pre kontrolu vzdialenosti
                 const isRanged = weaponCategory === "BOJ Z DIAĽKY";
-                const isThrownWeapon = weaponCategory === "VRHACIE";
-                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                const isThrownWeapon = weaponCategories.includes("VRHACIE");
                 const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
-
-
                 if (skillData && skillData[1]) {
                     const skillCategory = skillData[1].toUpperCase();
                     
@@ -6546,7 +6655,7 @@
                     }
                     
                     if (weaponCategory === "BOJ ZBLÍZKA") {
-                        if (!skillCategory.includes("BOJ ZBLÍZKA")) {
+                        if (!skillCategory.includes("BOJ ZBLÍZKA") && !upperSkill.includes("SILA")) {
                             log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
                             return;
                         }

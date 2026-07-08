@@ -412,8 +412,7 @@
         3,
         "SOMORA",
         [
-            "ODOLNOSŤ",
-            "LIEČENIE"
+            "ODOLNOSŤ"
         ],
         "Hrdina je schopný regenerovať časti tela. Počas spánku mu za noc zrastú zlomeniny a zahoja sa aj vážne rany."
     ],
@@ -447,10 +446,6 @@
         ],
         "Schopnosť liezť po stenách aj stropoch. Náročnosť môže byť zvýšená, ak je povrch príliš hladký."
     ],
-    "LIEČENIE": [
-        2,
-        "SOMORA"
-    ],
     "KYSELINA": [
         2,
         "SOMORA",
@@ -473,7 +468,6 @@
         "SOMORA",
         [
             "RÝCHLA REGENERÁCIA",
-            "LIEČENIE",
             "MIMIKRY"
         ],
         "Chitínové časti (ostne, pancier, žihadlo,...) hrdinovi podľa potreby dorastajú a odpadávajú bez potreby kupovať si ich. Hrdina dokáže zakryť to, že je Hybrid."

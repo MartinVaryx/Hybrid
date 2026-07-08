@@ -12,7 +12,8 @@
             "ZRUČNOSŤ",
             "FEROMÓNY",
             "MIMIKRY",
-            "BIOKAMUFLÁŽ"
+            "BIOKAMUFLÁŽ",
+            "METAMORFÓZA"
         ],
         "difficulty": 10,
         "threat": 4,
@@ -22,16 +23,15 @@
         "threat_msg": "Zrazu niekam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
         "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalíš jej zámer.",
         "failure_msg": "Odhalila ťa, už jej neujdeš.",
-        "case_success": "if_distractBasment:true_CITY_else_WRECKS_0",
+        "case_success": "if_distractBasement:true_CITY_else_WRECKS_0",
         "case_threat": "enemy_advantage+1",
-        "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
+        "case_threat_delayed": "if_distractBasement:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
         "case_failure": [
-            "if_distractBasment:true_alerted_Predátorka_1:true_else_alerted_Predátorka_2:true",
-            "if_distractBasment:true_distance_Predátorka_1:0_else_distance_Predátorka_2:1",
-            "if_distractBasment:true_Predátorka_1_else_Predátorka_2",
+            "if_distractBasement:true_alerted_Predátorka_1:true_else_alerted_Predátorka_2:true",
+            "if_distractBasement:true_distance_Predátorka_1:0_else_distance_Predátorka_2:1",
+            "if_distractBasement:true_Predátorka_1_else_Predátorka_2",
             "Predátorka_2"
-        ],
-        "enemy_escape_delayed": "WRECKS_PREDATOR_2"
+        ]
     },
     "WRECKS_PREDATOR_2": {
         "image": "assets/WRECKS.png",
@@ -39,6 +39,9 @@
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
         "case_A": [
+            "flag_distractWrecks:true",
+            "flag_distractBasement:false",
+            "flag_basementEncounter:false",
             "enemy_advantage=0",
             "DISTRACT_PREDATOR"
         ],
@@ -48,7 +51,17 @@
         "case_C": [
             "if_item_FEROMÓNY>0_FEROMÓNY-1",
             "enemy_advantage=0",
+            "flag_distractWrecks:true",
+            "flag_distractBasement:false",
+            "flag_basementEncounter:false",
             "if_item_FEROMÓNY>0_DISTRACT_PREDATOR_0_else_NO_PHEROMONES_PREDATOR"
+        ],
+        "choice_D": "Nastražím jej pascu.",
+        "case_D": [
+            "flag_distractWrecks:true",
+            "flag_distractBasement:false",
+            "flag_basementEncounter:false",
+            "SET_TRAP"
         ]
     },
     "Predátorka_2": {
@@ -66,6 +79,9 @@
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
         "case_A": [
+            "flag_distractWrecks:true",
+            "flag_distractBasement:false",
+            "flag_basementEncounter:false",
             "enemy_advantage=0",
             "DISTRACT_PREDATOR"
         ],
@@ -73,10 +89,12 @@
             "distance_Predátorka_2:1",
             "Predátorka_2"
         ],
-        "enemy_escape_delayed": "WRECKS_PREDATOR_2",
         "choice_C": "Odlákať ju feromónmi.",
         "case_C": [
             "if_item_FEROMÓNY>0_FEROMÓNY-1",
+            "flag_distractWrecks:true",
+            "flag_distractBasement:false",
+            "flag_basementEncounter:false",
             "enemy_advantage=0",
             "if_item_FEROMÓNY>0_DISTRACT_PREDATOR_0_else_NO_PHEROMONES_PREDATOR"
         ]
@@ -106,7 +124,9 @@
         "choice_B": "Pustiť sa do nej",
         "case_A": [
             "enemy_advantage=0",
-            "flag_distractBasment:true",
+            "flag_distractBasement:true",
+            "flag_distractWrecks:false",
+            "flag_basementEncounter:false",
             "DISTRACT_PREDATOR"
         ],
         "case_B": "Predátorka_1",
@@ -115,8 +135,17 @@
         "case_C": [
             "if_item_FEROMÓNY>0_FEROMÓNY-1",
             "enemy_advantage=0",
-            "flag_distractBasment:true",
+            "flag_distractBasement:true",
+            "flag_distractWrecks:false",
+            "flag_basementEncounter:false",
             "if_item_FEROMÓNY>0_DISTRACT_PREDATOR_0_else_NO_PHEROMONES_PREDATOR"
+        ],
+        "choice_D": "Nastražím jej pascu.",
+        "case_D": [
+            "flag_distractWrecks:false",
+            "flag_distractBasement:true",
+            "flag_basementEncounter:false",
+            "SET_TRAP"
         ]
     },
     "Predátorka_1": {
@@ -135,17 +164,27 @@
         "choice_B": "Pustiť sa do nej",
         "case_A": [
             "enemy_advantage=0",
-            "flag_distractBasment:true",
+            "flag_distractBasement:true",
+            "flag_distractWrecks:false",
+            "flag_basementEncounter:false",
             "DISTRACT_PREDATOR"
         ],
         "case_B": "Predátorka_1",
-        "enemy_escape_delayed": "BASEMENT_PREDATOR",
         "choice_C": "Odlákať ju feromónmi.",
         "case_C": [
             "if_item_FEROMÓNY>0_FEROMÓNY-1",
             "enemy_advantage=0",
-            "flag_distractBasment:true",
+            "flag_distractBasement:true",
+            "flag_distractWrecks:false",
+            "flag_basementEncounter:false",
             "if_item_FEROMÓNY>0_DISTRACT_PREDATOR_0_else_NO_PHEROMONES_PREDATOR"
+        ],
+        "choice_D": "Nastražím jej pascu.",
+        "case_D": [
+            "flag_distractWrecks:false",
+            "flag_distractBasement:true",
+            "flag_basementEncounter:false",
+            "SET_TRAP"
         ]
     },
     "CAR_3": {
@@ -190,7 +229,8 @@
         "initial_msg": "Mohli to tu pred odchodom upratať...",
         "skills": [
             "ZMYSLY",
-            "ŠPEHOVANIE"
+            "ŠPEHOVANIE",
+            "CHÉMIA"
         ],
         "difficulty": 7,
         "threat": 2,
@@ -227,6 +267,7 @@
             "set_IN_BASEMENT_0_true",
             "IN_BASEMENT_0"
         ],
+        "enemy_escape_delayed": "BASEMENT_PREDATOR",
         "initial_msg": "Narazíš na Skautku v garáži.",
         "distance": 1
     },
@@ -271,6 +312,13 @@
         "case_C": [
             "if_item_FEROMÓNY>0_FEROMÓNY-1",
             "if_item_FEROMÓNY>0_BASEMENT_DISTRACT_0_else_NO_PHEROMONES_BASEMENT"
+        ],
+        "choice_D": "Nastražím jej pascu.",
+        "case_D": [
+            "flag_basementEncounter:true",
+            "flag_distractWrecks:false",
+            "flag_distractBasement:false",
+            "SET_TRAP"
         ]
     },
     "EXPLORE_BASEMENT": {
@@ -279,7 +327,8 @@
             "ŠPEHOVANIE",
             "BIOKAMUFLÁŽ",
             "MIMIKRY",
-            "FEROMÓNY"
+            "FEROMÓNY",
+            "METAMORFÓZA"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -319,7 +368,10 @@
     },
     "CITY": {
         "trigger_delayed": [
-            "BASEMENT_PREDATOR"
+            "BASEMENT_PREDATOR",
+            "WRECKS_PREDATOR",
+            "BASEMENT_PREDATOR_2",
+            "WRECKS_PREDATOR_2"
         ],
         "image": "assets/CITY.png",
         "initial_msg": "Si v meste. Kam teraz?",
@@ -360,7 +412,8 @@
             "PLÍŽENIE",
             "BIOKAMUFLÁŽ",
             "MIMIKRY",
-            "FEROMÓNY"
+            "FEROMÓNY",
+            "METAMORFÓZA"
         ],
         "difficulty": 8,
         "threat": 2,
@@ -503,7 +556,8 @@
         "case_failure": "TOWER_0",
         "skills": [
             "OBRATNOSŤ",
-            "LEZENIE"
+            "LEZENIE",
+            "KRÍDLA"
         ],
         "difficulty": 9,
         "threat": 3,
@@ -599,7 +653,8 @@
         "skills": [
             "PLÍŽENIE",
             "OBRATNOSŤ",
-            "MIMIKRY"
+            "MIMIKRY",
+            "METAMORFÓZA"
         ],
         "difficulty": 7,
         "threat": 4,
@@ -645,7 +700,9 @@
             "RÉTORIKA",
             "EQ",
             "IQ",
-            "METAMORFÓZA"
+            "METAMORFÓZA",
+            "ŠÍRENIE KLEBIET",
+            "PRESVIEDČANIE"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -668,7 +725,8 @@
         ],
         "skills": [
             "ZASTRAŠOVANIE",
-            "VODCOVSTVO"
+            "VODCOVSTVO",
+            "ŠÍRENIE KLEBIET"
         ],
         "difficulty": 8,
         "threat": 4,
@@ -1094,8 +1152,7 @@
         "success_msg": "Objavíš mŕtvolu, ako sa hovorí - v pokročilom štádiu rozkladu - a pri nej nejaké papiere. Papiere rýchlo zoberieš. Nájdeš aj staré lano a kľúč, ale potom musíš ísť dole.",
         "threat_avoided_msg": "Napne ťa, ale z posledných síl zvratky zatlačíš späť.",
         "failure_msg": "Tu už nevydržíš ani sekundu. Musíš ísť späť.",
-        "case_threat": "stress+1",
-        "trigger_delayed": "item"
+        "case_threat": "stress+1"
     },
     "SHACK_2": {
         "image": "assets/SHACK.png",
@@ -1126,8 +1183,8 @@
             "weapon+brokovnica",
             "weapon+nôž",
             "set_SHACK_EXPLORE_false",
-            "if_bottleBroken:true_BACK_ACTION_1_else_SHACK_EXPLORE_2",
-            "if_bottleBroken:true_set_SHACK_EXPLORE_BOMB_true"
+            "if_bottleBroken:true_set_SHACK_EXPLORE_BOMB_true",
+            "if_bottleBroken:true_BACK_ACTION_1_else_SHACK_EXPLORE_2"
         ],
         "case_threat": [
             "flag_bottleBroken:true"
@@ -1451,7 +1508,9 @@
             "PLÍŽENIE",
             "OBRATNOSŤ",
             "ŠPRINT",
-            "MIMIKRY"
+            "MIMIKRY",
+            "KRÍDLA",
+            "METAMORFÓZA"
         ],
         "difficulty": 7,
         "threat": 3,
@@ -1513,8 +1572,6 @@
         "case_A": "DIVE",
         "choice_B": "Späť pod vodu!",
         "case_B": "DIVE_0",
-        "choice_C": "Ešte tam určite niečo bude.",
-        "case_C": "DIVE_4",
         "choice_D": "Idem späť.",
         "case_D": "BUNKER"
     },
@@ -1736,11 +1793,52 @@
         "case_threat_delayed": "",
         "case_failure_delayed": "",
         "case_threat": "stress+1",
-        "case_failure": "SKAUTKA_1",
-        "enemy_escape_delayed": [
-            "WRECKS_PREDATOR",
-            "BASEMENT_PREDATOR"
+        "case_failure": "SKAUTKA_1"
+    },
+    "SET_TRAP": {
+        "skills": [
+            "PASCE",
+            "ZRUČNOSŤ",
+            "VÝROBA"
+        ],
+        "difficulty": 7,
+        "threat": 3,
+        "image": "assets/CITY.png",
+        "initial_msg": "Nájdeš nejaké dosky, plachtu, jamu a drôt, to by mohlo stačiť.",
+        "success_msg": "Urobíš hluk, Somora si ťa všimne a vbehne rovno do pasce.",
+        "threat_msg": "Stúpiš na klinec trčiaci z dosky.",
+        "threat_avoided_msg": "Takmer stúpiš na klinec trčiaci z dosky. Ale v poslednej chvíli si ho všimneš.",
+        "failure_msg": "Všimla si ťa a rozbehla sa za tebou!",
+        "case_success": [
+            "set_BASEMENT_ENTRANCE_false",
+            "set_IN_BASEMENT_0_true",
+            "FINISH_SOMORA"
+        ],
+        "case_threat": "stress+1",
+        "case_threat_delayed": "if_distractBasement:true_BASEMENT_PREDATOR_else_WRECKS_PREDATOR",
+        "case_failure": [
+            "if_basementEncounter:true_alerted_SKAUTKA_2:true_else_if_distractBasement:true_alerted_Predátorka_1:true_else_alerted_Predátorka_2:true",
+            "if_basementEncounter:true_distance_SKAUTKA_2:0_else_if_distractBasement:true_distance_Predátorka_1:0_else_distance_Predátorka_2:1",
+            "if_basementEncounter:true_SKAUTKA_2_else_if_distractBasement:true_Predátorka_1_else_Predátorka_2"
         ]
+    },
+    "FINISH_SOMORA": {
+        "initial_msg": "Somora sa zmieta v pasci. Necháš ju tak alebo ju dorazíš?",
+        "case_success": "",
+        "case_failure": "",
+        "choice_A": "Dorazím ju.",
+        "case_A": [
+            "item_ŽĽAZA SOMORY+1",
+            "if_distractBasement:true_set_Predátorka_1_false_else_if_basementEncounter:true_set_SKAUTKA_2_false_else_set_Predátorka_2_false",
+            "if_distractBasement:true_delayed_BASEMENT_PREDATOR_remove_else_delayed_WRECKS_PREDATOR_remove",
+            "if_basementEncounter:true_IN_BASEMENT_0_else_CITY"
+        ],
+        "choice_B": "Nechám ju tak.",
+        "case_B": [
+            "delayed_BASEMENT_PREDATOR_add",
+            "if_basementEncounter:true_IN_BASEMENT_0_else_CITY"
+        ],
+        "image": "assets/CITY.png"
     },
     "FINISH_SKAUTKA": {
         "initial_msg": "Skautka sa zmieta v pasci. Necháš ju tak alebo ju dorazíš?",
@@ -1766,7 +1864,9 @@
         "initial_msg": "Snažíš sa nedať najavo, prečo sa pýtaš.",
         "skills": [
             "INVESTIGATÍVA",
-            "EQ"
+            "EQ",
+            "PREDSTIERANIE",
+            "MANIPULÁCIA"
         ],
         "difficulty": 7,
         "threat": 4,
@@ -1848,7 +1948,7 @@
         "image": "assets/FOREST.png"
     },
     "INTERROGATE_3": {
-        "initial_msg": "PURITÁN: To je dobre. Ale pre istotu si to pôjdeme overiť. Ak je to pravda, tvoje odhalenie nám ušetrí veľa práce.",
+        "initial_msg": "PURITÁN: Ak je to pravda, tvoje odhalenie nám ušetrí veľa práce.",
         "case_success": "",
         "case_failure": "",
         "choice_A": "Nemáte za čo...",
@@ -1867,21 +1967,22 @@
     "LIE_ABOUT_LETTERS": {
         "initial_msg": "Dúfaš, že ti to zožerie a pôjde hľadať listy do oblasti plnej Somôr.",
         "case_success": "INTERROGATE_3",
-        "case_failure": "INTERROGATE_5",
+        "case_failure": "INTERROGATE_4",
         "skills": [
             "ŠÍRENIE KLEBIET",
             "MANIPULÁCIA",
             "IQ",
-            "EQ"
+            "EQ",
+            "PREDSTIERANIE"
         ],
         "difficulty": 7,
         "threat": 3,
-        "success_msg": "Dobre. Je to tam zamorené, ale musíme ju nájsť!",
-        "case_threat": "INTERROGATE_4",
-        "threat_avoided_msg": "Škaredo sa na teba pozrel, ale jediný tvoj pohľad ho zbavil podozrenia.",
-        "failure_msg": "PURITÁN: Neverím ti.",
-        "threat_msg": "Ak tam naozaj je, tak mi pôjdeš ukázať, kde presne si listy našiel.",
-        "image": "assets/FOREST.png"
+        "success_msg": "PURITÁN:Dobre. Je to tam zamorené, ale musíme ju nájsť!",
+        "threat_avoided_msg": "Škaredo sa na teba pozrel a siahol po nejakom zvonci. Ale keďže ho ďalej nedráždiš, nechal ho tak.",
+        "failure_msg": "PURITÁN: Ak tam naozaj je, tak mi pôjdeš ukázať, kde presne si listy našiel. A neželaj si ma, ak tam nebudú.",
+        "image": "assets/FOREST.png",
+        "threat_msg": "Zazvonil na nejaký zvon, určite privolal ďalších.",
+        "case_threat_delayed": "PURITÁN_2"
     },
     "INTERROGATE_4": {
         "initial_msg": "PURITÁN: Tak čo? Ideme?",
@@ -1974,7 +2075,8 @@
         ],
         "skills": [
             "OPRAVA",
-            "MECHANIKA"
+            "MECHANIKA",
+            "ELEKTRONIKA"
         ],
         "difficulty": 8,
         "threat": 3,
@@ -2101,7 +2203,8 @@
             "BUDOVANIE",
             "STAVBA",
             "SILA",
-            "ZRUČNOSŤ"
+            "ZRUČNOSŤ",
+            "VÝROBA"
         ],
         "failure_msg": "Nejde to. Kanál sa stále upcháva, pôda je vlhká, len sa hrabeš v bahne.",
         "threat_msg": "Zaboríš sa do bahna a keď sa vyhrabeš, zistíš, že topánky tam zostali.",
@@ -2223,7 +2326,6 @@
         ],
         "case_failure": "WRECKS_1",
         "skills": [
-            "LIEČENIE",
             "MEDICÍNA",
             "CHIRURGIA"
         ],
@@ -2391,9 +2493,7 @@
         ],
         "case_failure": "GENERATOR",
         "skills": [
-            "INFORMATIKA",
-            "KLEPETÁ",
-            "HRYZADLÁ"
+            "INFORMATIKA"
         ],
         "difficulty": 7,
         "threat": 3,
@@ -2985,7 +3085,8 @@
             "ZRUČNOSŤ",
             "FEROMÓNY",
             "MIMIKRY",
-            "BIOKAMUFLÁŽ"
+            "BIOKAMUFLÁŽ",
+            "METAMORFÓZA"
         ],
         "difficulty": 7,
         "threat": 3,
@@ -2995,16 +3096,17 @@
         "threat_msg": "Zrazu niekam zmizla. Teraz určite sliedi po okolí a vie, že si tu. Vyskočí na teba zo zálohy.",
         "threat_avoided_msg": "Snažila sa dostať za teba, ale odhalíš jej zámer.",
         "failure_msg": "Odhalila ťa, už jej neujdeš.",
-        "case_success": "if_distractBasment:true_CITY_else_WRECKS_0",
+        "case_success": "if_distractBasement:true_CITY_else_WRECKS_0",
         "case_threat": "enemy_advantage+1",
-        "case_threat_delayed": "if_distractBasment:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
+        "case_threat_delayed": "if_distractBasement:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2",
         "case_failure": [
-            "if_distractBasment:true_alerted_Predátorka_1:true_else_alerted_Predátorka_2:true",
-            "if_distractBasment:true_distance_Predátorka_1:0_else_distance_Predátorka_2:1",
-            "if_distractBasment:true_Predátorka_1_else_Predátorka_2",
-            "Predátorka_2"
+            "if_distractBasement:true_alerted_Predátorka_1:true_else_alerted_Predátorka_2:true",
+            "if_distractBasement:true_distance_Predátorka_1:0_else_distance_Predátorka_2:1",
+            "if_distractBasement:true_Predátorka_1_else_Predátorka_2"
         ],
-        "enemy_escape_delayed": "WRECKS_PREDATOR_2"
+        "enemy_escape_delayed": [
+            "if_distractBasement:true_BASEMENT_PREDATOR_2_else_WRECKS_PREDATOR_2"
+        ]
     },
     "NO_PHEROMONES_PREDATOR": {
         "initial_msg": "Nemáš feromóny.",
@@ -3608,13 +3710,21 @@
             "x": 10248,
             "y": 2192
         },
+        "SET_TRAP": {
+            "x": 7350,
+            "y": 1877
+        },
+        "FINISH_SOMORA": {
+            "x": 7410,
+            "y": 2337
+        },
         "FINISH_SKAUTKA": {
             "x": 9816,
             "y": 2327
         },
         "INTERROGATE": {
-            "x": 11859,
-            "y": 5313
+            "x": 11943,
+            "y": 5350
         },
         "INTERROGATE_0": {
             "x": 12829,
@@ -3633,16 +3743,16 @@
             "y": 4899
         },
         "INTERROGATE_3": {
-            "x": 11828,
-            "y": 5134
+            "x": 11709,
+            "y": 5086
         },
         "LIE_ABOUT_LETTERS": {
-            "x": 12275,
-            "y": 5036
+            "x": 12218,
+            "y": 5095
         },
         "INTERROGATE_4": {
-            "x": 11984,
-            "y": 4913
+            "x": 12049,
+            "y": 4760
         },
         "CAR_6": {
             "x": 12518,
@@ -3999,8 +4109,7 @@
         "GO_UP": {
             "x": 8625,
             "y": 5495
-        },
-        "image": "assets/PLACEHOLDER.png"
+        }
     },
     "ACTIVE": {
         "BASEMENT_DISTRACT": true,
@@ -4215,10 +4324,12 @@
         "SHACK_PICK_LOCK": true,
         "SHACK_PICK_LOCK_0": true,
         "IF_TEST": true,
-        "WORKS": false,
-        "WORKS_0": false,
+        "WORKS": true,
+        "WORKS_0": true,
         "WORKS_1": true,
         "CELLAR_DOOR": true,
-        "GO_UP": true
+        "GO_UP": true,
+        "FINISH_SOMORA": true,
+        "SET_TRAP": true
     }
 }

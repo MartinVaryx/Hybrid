@@ -1,4 +1,5 @@
 {
-    "tutorial":false,
+    "tutorial":true,
+    "audio":true,
     "MODE": "NORMAL"
 }

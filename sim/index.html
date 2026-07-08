@@ -14,6 +14,7 @@
 </head>
 <body>
 
+    <audio id="bg-audio" src="assets/77_Abandoned_Fair.mp3" loop></audio>
 
     <div class="game-container">
 
@@ -59,7 +60,7 @@
                         <td class="track-cell ad-node" data-idx="6" data-val="2">2</td>
                         <td class="track-cell ad-node" data-idx="7" data-val="1">1</td>
                         <td></td>
-                        <td ><span id="sp-label">BR:</span><span id="sp">0</span></td>
+                        <td ><span id="sp-label" data-tooltip="BODY RASTU">BR:</span><span id="sp">0</span></td>
                     </tr>
                 </table>
             </div>
@@ -210,6 +211,11 @@
                 <label style="display: flex; align-items: center; gap: 12px; color: #ffffff; font-weight: bold; height: 40px; cursor: pointer; user-select: none; font-size: 1.1rem;">
                     <span>TUTORIÁL</span>
                     <input type="checkbox" id="tutorial-checkbox" onchange="toggleTutorial()" style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--hybrid-green);">
+                </label>
+
+                <label style="display: flex; align-items: center; gap: 12px; color: #ffffff; font-weight: bold; height: 40px; cursor: pointer; user-select: none; font-size: 1.1rem;">
+                    <span>AUDIO</span>
+                    <input type="checkbox" id="audio-checkbox" onchange="toggleAudio()" style="width: 22px; height: 22px; cursor: pointer; accent-color: var(--hybrid-green);">
                 </label>
 
                  <label style="display: flex; align-items: center; gap: 12px; color: #ffffff; font-weight: bold; height: 40px; cursor: pointer; user-select: none; font-size: 1.1rem;">
