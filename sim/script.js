@@ -1171,6 +1171,18 @@
             syncUIWithSettings();
         }
 
+        function showCredits() {
+            const credits = document.getElementById("credits");
+            if (credits) {
+                credits.style.display = "flex";
+            }
+            hideMenu();
+        }
+
+        function hideCredits() {
+            document.getElementById('credits').style.display = 'none';
+        }
+
         function syncUIWithSettings() {
             if (typeof SETTINGS === 'undefined') return;
 
@@ -1202,6 +1214,7 @@
             saveSettings();
             if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť.");
             document.getElementById('settings').style.display = 'none';
+            document.getElementById('credits').style.display = 'none';
             showMenu()
         }
 

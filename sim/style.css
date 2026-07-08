@@ -525,6 +525,26 @@
             box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
         }
 
+        #main-menu > div::-webkit-scrollbar,
+        #settings > div::-webkit-scrollbar {
+            width: 8px;
+        }
+        #main-menu > div::-webkit-scrollbar-track,
+        #settings > div::-webkit-scrollbar-track {
+            background: #111;
+            border-radius: 8px;
+        }
+        #main-menu > div::-webkit-scrollbar-thumb,
+        #settings > div::-webkit-scrollbar-thumb {
+            background: var(--hybrid-red);
+            border-radius: 8px;
+        }
+        #main-menu > div,
+        #settings > div {
+            scrollbar-width: thin;
+            scrollbar-color: var(--hybrid-red) #111;
+        }
+
         .menu-btn {
             font-family: 'Roboto Condensed', sans-serif;
             font-size: 1.1rem;

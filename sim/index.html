@@ -171,6 +171,7 @@
             </div>
         </div>        
     </div>
+    
     <div id="main-menu" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
 
         <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
@@ -188,12 +189,13 @@
                     NASTAVENIA</button>
                 <button onclick="help('HELP')" class="menu-btn" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
                     POMOC</button>
-                <button onclick="window.open('https://hybridrpg.sk/', '_blank')" class="menu-btn" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
-                    O HYBRIDE</button>
+                <button onclick="showCredits()" class="menu-btn" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    O HRE</button>
                 <button id="restart-btn" onclick="restartGame(true)" class="menu-btn" style="width: 140px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-red); cursor: pointer;">REŠTARTOVAŤ</button>
             </div>
         </div>                 
     </div>
+    
     <div id="settings" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
 
         <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
@@ -232,6 +234,49 @@
             </div>
         </div>
     </div>
+    
+    <div id="credits" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(10, 10, 10, 0.65); z-index: 9999; flex-direction: column; align-items: center; justify-content: center;"> 
+
+        <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215, 0, 0, 0.4);">
+            
+            <button onclick="hideCredits()" class="menu-btn" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">
+                X
+            </button>
+            
+            <div style="font-family: 'Archivo Black', sans-serif; font-size: 1.5rem; color: #fff; margin-bottom: 25px; text-transform: uppercase;">
+                TVORIVÝ TÍM
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 20px; width: 100%; align-items: center;">
+
+                <div style="display: grid; grid-template-columns: max-content 1fr; column-gap: 20px; row-gap: 12px; width: 100%; text-align: left;">
+                    <span style="color: #ffffff; font-weight: bold; font-size: 1.1rem; white-space: nowrap;">MARTIN "VARYX" KRČ</span>
+                    <span style="color: #cccccc; font-size: 1rem;">game design</span>
+
+                    <span style="color: #ffffff; font-weight: bold; font-size: 1.1rem; white-space: nowrap;">EMA SŰCKROVÁ</span>
+                    <span style="color: #cccccc; font-size: 1rem;">ilustrácie prostredia</span>
+
+                    <span style="color: #ffffff; font-weight: bold; font-size: 1.1rem; white-space: nowrap;">REBEKA MEHLYOVÁ</span>
+                    <span style="color: #cccccc; font-size: 1rem;">grafický design</span>
+
+                    <span style="color: #ffffff; font-weight: bold; font-size: 1.1rem; white-space: nowrap;">ANDREJ PURKART</span>
+                    <span style="color: #cccccc; font-size: 1rem;">character design, ilustrácie kariet</span>
+                </div>
+                <div style="display: grid; grid-template-columns: max-content 1fr; column-gap: 20px; row-gap: 12px; width: 100%; text-align: left;">
+                    <span style="color: #ffffff; font-weight: bold; font-size: 1.1rem; white-space: nowrap;">POUŽITÁ HUDBA:</span>
+                    <span style="color: #cccccc; font-size: 1rem;">Abandoned Fair (tabletopaudio.com)</span>
+                </div>
+                <div style="color: #ffffff; font-weight: bold; font-size: 1.1rem;">
+                    VIAC NA:<br>
+                    <span onclick="window.open('https://hybridrpg.sk/', '_blank')" style="cursor: pointer;"><u>HYBRIDRPG.SK</u></span>
+                </div>
+
+                <button onclick="backToMenu()" id="about-btn-back" class="menu-btn" style="width: 120px; height: 40px; font-weight: bold; color: #ffffff; background: var(--hybrid-green); cursor: pointer;">
+                    SPÄŤ</button>
+            </div>
+        </div>
+    </div>
+    
     <div id="builder-overlay" style="display: none; position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: #000; z-index: 9999;">
         <iframe id="builder-iframe" style="width: 100%; height: 100%; border: none;"></iframe>
     </div>
