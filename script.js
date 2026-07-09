@@ -1069,42 +1069,16 @@
 
     function handleRouting() {
         const hash = window.location.hash.replace('#', '') || 'uvod';
-        const builderTabs = ['builder', 'editor', 'navod'];
-        
-        // Zistíme, kde sa nachádzame (bez togglovania)
+
         const isArticle = hash.startsWith('novinky-');
         const targetTab = isArticle ? 'novinky' : hash;
 
-        // 1. Správne prepnutie hlavného zobrazenia (Intro vs Builder)
-        if (builderTabs.includes(targetTab)) {
-            forceView('builder');
-        } else {
-            forceView('intro');
-        }
-
-        // 2. Logika pre články vs taby
         if (isArticle) {
             const articleId = hash.replace('novinky-', '');
             openTab('novinky', false); // false = neprepisuj hash, už tam je
             openArticle(articleId);
         } else {
             openTab(targetTab, false); // false = neprepisuj hash
-        }
-    }
-
-    // Pomocná funkcia, ktorá neskáče hore-dole
-    function forceView(viewType) {
-        const introView = document.getElementById('view-intro');
-        const builderView = document.getElementById('builder');
-
-        if (viewType === 'builder') {
-            introView.classList.remove('active');
-            builderView.classList.add('active');
-            renderStats();
-            filterBuilder();
-        } else {
-            builderView.classList.remove('active');
-            introView.classList.add('active');
         }
     }
 
@@ -1257,54 +1231,7 @@
     }
 
     // Funkcia na načítanie obsahu konkrétneho tabu
-    async function loadTabContent(tabId) {
-        try {
-            const response = await fetch(`tabs/${tabId}.html`);
-            if (!response.ok) throw new Error(`Nepodarilo sa načítať tab: ${tabId}`);
-            const html = await response.text();
-            document.getElementById(tabId).innerHTML = html;
-        } catch (error) {
-            console.error(error);
-        }
-    }
 
-    async function init() {
-        console.log("Inicializácia systému...");
-            
-        // 1. Načítaj dáta (Kritické)
-        await loadSkills(); 
-
-        // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
-        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
-        await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
-
-        // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
-        renderCharSelector();
-        updateGroupDropdown();
-        filterBuilder();
-        renderStats();
-        renderEditorList();
-        filterRelSearch();
-
-        initSkillTooltips(); 
-    }
-
-    async function loadSkills() {
-        try {
-            const response = await fetch('skillsDB.json');
-            if (!response.ok) throw new Error("Súbor nenájdený");
-            
-            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
-            skillsDB_new = await response.json();
-            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            
-            console.log("Dáta úspešne načítané");
-        } catch (error) {
-            console.error("Chyba pri načítaní JSON:", error);
-            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
-            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
-        }
-    }
 
     function toggleRelOverlay(show) {
         const container = document.getElementById('rel-add-container');
@@ -1770,3 +1697,53 @@ function initTooltips() {
 document.addEventListener('DOMContentLoaded', () => {
     initTooltips();
 });
+
+    async function loadTabContent(tabId) {
+        try {
+            const response = await fetch(`tabs/${tabId}.html`);
+            if (!response.ok) throw new Error(`Nepodarilo sa načítať tab: ${tabId}`);
+            const html = await response.text();
+            document.getElementById(tabId).innerHTML = html;
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function init() {
+        console.log("Inicializácia systému...");
+            
+        // 1. Načítaj dáta (Kritické)
+        await loadSkills(); 
+
+        // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
+        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
+        await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
+
+        // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
+        renderCharSelector();
+        updateGroupDropdown();
+        filterBuilder();
+        renderStats();
+        renderEditorList();
+        filterRelSearch();
+        initSkillTooltips(); 
+        handleRouting();
+        window.addEventListener('hashchange', handleRouting);
+    }
+
+    async function loadSkills() {
+        try {
+            const response = await fetch('skillsDB.json');
+            if (!response.ok) throw new Error("Súbor nenájdený");
+            
+            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
+            skillsDB_new = await response.json();
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
+            
+            console.log("Dáta úspešne načítané");
+        } catch (error) {
+            console.error("Chyba pri načítaní JSON:", error);
+            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+        }
+    }
