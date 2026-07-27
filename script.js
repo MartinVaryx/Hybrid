@@ -1,4 +1,4 @@
-    const articles = [
+const articles = [
         {   id: 'schopnosti',
             title: 'Nový systém schopností',
             date: '23. 05. 2026',
@@ -54,7 +54,19 @@
         const groups = [...new Set(Object.values(skillsDB_new).map(s => s[1]))].sort();
         const optionsHtml = groups.map(g => `<option value="${g}">${g}</option>`).join('');
         
-        builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+        // Počas počiatočnej fázy sú v builderi dostupné iba DANOSTI - nemá zmysel ponúkať ostatné skupiny
+        const char = characters[activeCharIdx];
+        const prevBuilderValue = builderSelect.value;
+        if (char && char.isInitialPhase) {
+            builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option><option value="DANOSTI">DANOSTI</option>';
+        } else {
+            builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+        }
+        // Zachovaj predchádzajúci výber, ak medzi aktuálnymi možnosťami stále existuje
+        if ([...builderSelect.options].some(o => o.value === prevBuilderValue)) {
+            builderSelect.value = prevBuilderValue;
+        }
+
         editorSelect.innerHTML = optionsHtml;
         // Nový filter v editore má tiež možnosť "VŠETKY"
         relFilterSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
@@ -448,7 +460,6 @@
 
     function getOptimalCostsForPhase2(char, skillsState) {
         const snapshot = char.initialSkillsSnapshot || {};
-        let initialSkillsState = { ...snapshot };
         let targetSkills = [];
 
         for (const [name, lvl] of Object.entries(skillsState)) {
@@ -460,78 +471,68 @@
             return { totalCost: 0, somoraCost: 0 };
         }
 
-        function calculateOrderDetails(skillOrder) {
-            let currentSkills = { ...initialSkillsState };
-            let totalCost = 0;
-            let somoraCost = 0;
+        const n = targetSkills.length;
+        const skillIndex = new Map(targetSkills.map((name, i) => [name, i]));
 
-            for (const skill of skillOrder) {
-                const targetLvl = skillsState[skill];
-                const data = skillsDB_new[skill];
-                const isSomora = data && data[1] === "SOMORA";
-                const baseLvl = snapshot[skill] || 0;
+        // Cost to fully apply targetSkills[idx] (base -> target level), given which target skills
+        // (bitmask) are already fully applied. This is order-independent within the applied set:
+        // once a skill is picked it always jumps straight from its base level to its target level,
+        // so only the SET of already-applied skills affects the relation discount — not the order
+        // they were applied in. That lets us use bitmask DP instead of trying every permutation.
+        function costOfAdding(idx, appliedMask) {
+            const skill = targetSkills[idx];
+            const data = skillsDB_new[skill];
+            const targetLvl = skillsState[skill];
+            const baseLvl = snapshot[skill] || 0;
+            const isSomora = data && data[1] === "SOMORA";
 
-                for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
-                    const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    const cost = Math.max(lvl, (lvl * data[0]) - discount);
-                    
-                    totalCost += cost;
-                    if (isSomora) somoraCost += cost;
-                    currentSkills[skill] = lvl;
-                }
+            const currentLevelOf = (name) => {
+                const i = skillIndex.get(name);
+                if (i !== undefined) return (appliedMask & (1 << i)) ? skillsState[name] : (snapshot[name] || 0);
+                return snapshot[name] || 0;
+            };
+
+            let cost = 0;
+            for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
+                const relLevels = (data[2] || [])
+                    .map(r => currentLevelOf(r))
+                    .sort((a, b) => b - a)
+                    .slice(0, 3);
+                const discount = relLevels.reduce((sum, l) => sum + l, 0);
+                cost += Math.max(lvl, (lvl * data[0]) - discount);
             }
-            return { totalCost, somoraCost };
+            return { cost, isSomora };
         }
 
-        let bestCost = Infinity;
-        let bestOrder = [];
+        const fullMask = (1 << n) - 1;
+        const memoTotal = new Int32Array(fullMask + 1).fill(-1);
+        const memoSomora = new Int32Array(fullMask + 1);
+        memoTotal[0] = 0;
+        memoSomora[0] = 0;
 
-        function findBestPath(currentOrder, remainingSkills, currentCost, currentSkillsState) {
-            if (currentCost >= bestCost) return;
-            if (remainingSkills.length === 0) {
-                if (currentCost < bestCost) {
-                    bestCost = currentCost;
-                    bestOrder = [...currentOrder];
+        function solve(mask) {
+            if (memoTotal[mask] !== -1) return { totalCost: memoTotal[mask], somoraCost: memoSomora[mask] };
+
+            let bestTotal = -1, bestSomora = 0;
+            for (let i = 0; i < n; i++) {
+                if (!(mask & (1 << i))) continue;
+                const prevMask = mask & ~(1 << i);
+                const prev = solve(prevMask);
+                const { cost, isSomora } = costOfAdding(i, prevMask);
+                const totalCost = prev.totalCost + cost;
+                const somoraCost = prev.somoraCost + (isSomora ? cost : 0);
+                // Tie-break: among orderings with equal BR cost, prefer the one costing least humanity
+                if (bestTotal === -1 || totalCost < bestTotal || (totalCost === bestTotal && somoraCost < bestSomora)) {
+                    bestTotal = totalCost;
+                    bestSomora = somoraCost;
                 }
-                return;
             }
-
-            let candidates = [...remainingSkills].sort((a, b) => {
-                const aHelpsB = skillsDB_new[b][2]?.includes(a);
-                const bHelpsA = skillsDB_new[a][2]?.includes(b);
-                if (aHelpsB && !bHelpsA) return -1;
-                if (bHelpsA && !aHelpsB) return 1;
-                const catA = skillsDB_new[a][0];
-                const catB = skillsDB_new[b][0];
-                if (catA !== catB) return catA - catB;
-                return a.localeCompare(b);
-            });
-
-            for (let i = 0; i < candidates.length; i++) {
-                const skill = candidates[i];
-                let nextSkillsState = { ...currentSkillsState };
-                let costAdded = 0;
-                const targetLvl = skillsState[skill];
-                const data = skillsDB_new[skill];
-                const baseLvl = snapshot[skill] || 0;
-
-                for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
-                    const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    costAdded += Math.max(lvl, (lvl * data[0]) - discount);
-                    nextSkillsState[skill] = lvl;
-                }
-
-                currentOrder.push(skill);
-                const nextRemaining = remainingSkills.filter(s => s !== skill);
-                findBestPath(currentOrder, nextRemaining, currentCost + costAdded, nextSkillsState);
-                currentOrder.pop();
-            }
+            memoTotal[mask] = bestTotal;
+            memoSomora[mask] = bestSomora;
+            return { totalCost: bestTotal, somoraCost: bestSomora };
         }
 
-        findBestPath([], targetSkills, 0, { ...initialSkillsState });
-        return calculateOrderDetails(bestOrder);
+        return solve(fullMask);
     }
 
 
@@ -652,6 +653,16 @@
         const container = document.getElementById('character-stats');
         const char = characters[activeCharIdx];
         container.innerHTML = '';
+
+        const brLeftEl = document.getElementById('br-left');
+        if (brLeftEl) brLeftEl.innerHTML = `<strong>Zostáva ti: ${char.sp} BR</strong>`;
+
+        const infoPanelTextEl = document.getElementById('info-panel-text');
+        if (infoPanelTextEl) {
+            infoPanelTextEl.textContent = char.isInitialPhase
+                ? "Máš k dispozícii 40 bodov určených len na DANOSTI. Keď ich minieš, získaš ďalších 20 bodov a odomknú sa ti ostatné schopnosti."
+                : "Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.";
+        }
 
         //MENO - pozícia na hárku
         addSheetText(container, char.name, "13%", "17.5%", "1.2rem", "380px", "left", "name-field");
@@ -860,6 +871,7 @@
 
 
     function filterBuilder() {
+        updateGroupDropdown();
         const list = document.getElementById('builder-list');
         const search = document.getElementById('builder-search').value.toUpperCase();
         const groupFilter = document.getElementById('builder-group-filter').value;
@@ -1716,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSkills(); 
 
         // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
-        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt'];
+        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt', 'nastroje', 'novinky', 'builder', 'editor', 'navod'];
         await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
 
         // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
