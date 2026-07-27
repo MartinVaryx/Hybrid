@@ -36,6 +36,7 @@
                 <button class="tab-btn active" onclick="openTab('uvod')">DOMOV</button>
                 <button class="tab-btn" onclick="openTab('novinky')">NOVINKY</button>
                 <button class="tab-btn" onclick="openTab('demo')">DEMO</button>
+                <button class="tab-btn" onclick="openTab('nastroje')">NÁSTROJE</button>
                 <button class="tab-btn" onclick="openTab('o-projekte')">TVORCOVIA</button>
                 <button class="tab-btn" onclick="openTab('kontakt')">KONTAKT</button>
         </div>
@@ -115,6 +116,7 @@
         <div id="uvod" class="tab-content active" ></div>
         <div id="o-projekte" class="tab-content" ></div>
         <div id="demo" class="tab-content" ></div>
+        <div id="nastroje" class="tab-content" ></div>
         <div id="kontakt" class="tab-content" ></div>
         <div id="builder" class="tab-content">
 
@@ -311,7 +313,10 @@
     <div class="info-panel-box">
         <button class="info-panel-close-btn" onclick="toggleInfoOverlay(false)">×</button>
         <h3 style="font-family: 'Archivo Black', sans-serif; margin-top: 0;">UPRAVIŤ SCHOPNOSŤ</h3>
-        <p style="font-family: 'Roboto Condensed', sans-serif;">Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.</p>
+        <div>
+            <p id="info-panel-text" style="font-family: 'Roboto Condensed', sans-serif;">Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.</p>
+            <p id="br-left" style="font-family: 'Roboto Condensed', sans-serif;"><strong>Zostáva ti: 0 BR</strong></p>
+        </div>
         <div class="info-panel">
             <div class="control-box">
                 <h3 id="sel-skill-name" style="margin:0; font-family:'Archivo Black';">VYBRAŤ SCHOPNOSŤ</h3>
