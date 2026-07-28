@@ -1728,7 +1728,7 @@ document.addEventListener('DOMContentLoaded', () => {
         await loadSkills(); 
 
         // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
-        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt', 'nastroje', 'novinky', 'builder', 'editor', 'navod'];
+        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt', 'doplnky', 'novinky'];
         await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
 
         // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
