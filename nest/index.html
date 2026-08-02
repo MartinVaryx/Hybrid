@@ -47,56 +47,59 @@
         </div>
     </div>
 
+    <header class="top" id="topBar">
+        <div class="brand-group">
+            <button class="nest-btn settings-btn" id="settingsBtn">
+                <span class="gear">⚙</span> <span data-i18n="settings.btn">Parametre</span>
+            </button>
+            <button class="nest-btn settings-btn" id="menuHeaderBtn" onclick="showMenu()" data-i18n="menu.header_btn">MENU</button>
+        </div>
+
+        <div class="head-readout">
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.step">Krok</div>
+                <div class="val" id="stepVal">000</div>
+            </div>
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.humans">Ľudia</div>
+                <div class="val bio" id="humansVal">200</div>
+            </div>
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.humans_killed">Zabito ľudí</div>
+                <div class="val alert" id="humansKilledVal">0</div>
+            </div>
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.insects">Hmyz</div>
+                <div class="val alert" id="insectsVal">150</div>
+            </div>
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.fort_def">Obrana pevností</div>
+                <div class="val amber" id="fortDefVal">50</div>
+            </div>
+            <div class="readout">
+                <div class="lbl" data-i18n="readout.action_points">Akčné body</div>
+                <div class="val amber" id="pointsVal">10</div>
+                <div class="points-row" id="pointsRow"></div>
+            </div>
+        </div>
+
+        <div class="action-block">
+            <div class="phase-text-container">
+                <div class="ptxt" id="phaseText" data-i18n="phase.idle_text">Pripravené. Otvorte <b>⚙ Parametre</b> pre konfiguráciu hniezda a potom spustite pozorovanie.</div>
+            </div>
+            <button class="nest-btn primary-btn pbtn" id="phaseBtn" data-i18n="phase.begin_simulation">Začať simuláciu</button>
+            <button class="nest-btn danger pbtn hidden" id="stopSimBtn" data-i18n="phase.stop_simulation">ZASTAVIŤ SIMULÁCIU</button>
+        </div>
+
+    </header>
+    
     <!-- Full-Width nest Container -->
     <div class="nest-container">
-        
+        <!-- Top Control & Readout Bar -->
+
+
         <div class="app">
-            <!-- Top Control & Readout Bar -->
-            <header class="top" id="topBar">
-                <div class="brand-group">
-                    <button class="nest-btn settings-btn" id="settingsBtn">
-                        <span class="gear">⚙</span> <span data-i18n="settings.btn">Parametre</span>
-                    </button>
-                    <button class="nest-btn settings-btn" id="menuHeaderBtn" onclick="showMenu()" data-i18n="menu.header_btn">MENU</button>
-                </div>
 
-                <div class="head-readout">
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.step">Krok</div>
-                        <div class="val" id="stepVal">000</div>
-                    </div>
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.humans">Ľudia</div>
-                        <div class="val bio" id="humansVal">200</div>
-                    </div>
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.humans_killed">Zabito ľudí</div>
-                        <div class="val alert" id="humansKilledVal">0</div>
-                    </div>
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.insects">Hmyz</div>
-                        <div class="val alert" id="insectsVal">150</div>
-                    </div>
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.fort_def">Obrana pevností</div>
-                        <div class="val amber" id="fortDefVal">50</div>
-                    </div>
-                    <div class="readout">
-                        <div class="lbl" data-i18n="readout.action_points">Akčné body</div>
-                        <div class="val amber" id="pointsVal">10</div>
-                        <div class="points-row" id="pointsRow"></div>
-                    </div>
-                </div>
-
-                <div class="action-block">
-                    <div class="phase-text-container">
-                        <div class="ptxt" id="phaseText" data-i18n="phase.idle_text">Pripravené. Otvorte <b>⚙ Parametre</b> pre konfiguráciu hniezda a potom spustite pozorovanie.</div>
-                    </div>
-                    <button class="nest-btn primary-btn pbtn" id="phaseBtn" data-i18n="phase.begin_simulation">Začať simuláciu</button>
-                    <button class="nest-btn danger pbtn hidden" id="stopSimBtn" data-i18n="phase.stop_simulation">ZASTAVIŤ SIMULÁCIU</button>
-                </div>
-
-            </header>
 
             <div class="main-grid">
 

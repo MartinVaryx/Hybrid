@@ -81,12 +81,12 @@ body {
 
 /* Sticky Header Bar */
 header.top {
+    width: 100%;
     position: sticky;
     top: 0;
     z-index: 100;
     background-color: rgba(231, 231, 231, 0.95);
-    border: var(--border-heavy);
-    border-radius: 10px;
+    border-bottom: var(--border-heavy);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     padding: 12px 20px;
     display: flex;
@@ -94,12 +94,15 @@ header.top {
     justify-content: space-between;
     gap: 20px;
     flex-wrap: wrap;
+    padding-left: 40px !important;
+    padding-right: 40px !important;
 }
 
 .brand-group {
     display: flex;
     align-items: center;
     gap: 10px;
+    margin-left: 40px;
 }
 
 .head-readout {
@@ -135,6 +138,7 @@ header.top {
     display: flex;
     align-items: center;
     gap: 15px;
+    margin-right: 40px;
 }
 
 .phase-text-container {
