@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="sk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title data-i18n="title.page">HYBRID - Simulátor Hniezda</title>
+    <link rel="icon" type="image/png" href="../assets/logo_icon.png">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Archivo+Black&family=Roboto+Condensed:wght@400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Rubik+Dirt&family=Protest+Revolution&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Oswald:wght@500;600;700&display=swap" rel="stylesheet">
+
+    <!-- External Chart JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+
+    <!-- Load ONNX Runtime Web -->
+    <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script>
+
+    <!-- Style Sheets -->
+    <link rel="stylesheet" href="../style.css">
+    <link rel="stylesheet" href="style.css">
+
+    <!-- Sandbox-only additions not covered by the shared stylesheet -->
+    <style>
+    .nest-btn.small{padding:6px 10px;font-size:1.1rem;}
+    .nest-btn.danger{border-color:#a8402c;color:#a8402c;}
+    .nest-btn.danger:hover{background:#a8402c;color:#fff;}
+    .sandbox-toolbar-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px;}
+    .sandbox-editor-panel .autosave-status{font-family:'IBM Plex Mono',monospace;font-size:.68rem;opacity:.7;}
+    .sandbox-fort-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:.8rem;}
+    .sandbox-fort-controls .sb-defense-label{display:flex;align-items:center;gap:6px;}
+    .sandbox-fort-controls #sbFortDefenseInput{width:64px;padding:4px 6px;font-size:.85rem;}
+    .sandbox-intro-textarea{width:100%;padding:8px 9px;font-family:'Roboto Condensed',sans-serif;font-size:.9rem;resize:vertical;}
+    .map-icon.sandbox-draggable{cursor:grab;}
+    .map-icon.sandbox-draggable.sandbox-dragging{cursor:grabbing;}
+    .map-event.fort-event.sandbox-selected .fort-icon{filter:drop-shadow(0 0 6px #ffb74d);}
+    </style>
+</head>
+<body>
+
+    <!-- Top Logo Navigation -->
+    <div class="top-logo-bar">
+        <div id="pc-logo-container" class="logo-container" onclick="window.location.href='../index.html'">
+            <img src="../assets/logo.png" alt="HYBRID" class="logo-img">
+        </div>
+    </div>
+
+    <!-- Full-Width nest Container -->
+    <div class="nest-container">
+        
+        <div class="app">
+            <!-- Top Control & Readout Bar -->
+            <header class="top" id="topBar">
+                <div class="brand-group">
+                    <button class="nest-btn settings-btn" id="settingsBtn">
+                        <span class="gear">⚙</span> <span data-i18n="settings.btn">Parametre</span>
+                    </button>
+                    <button class="nest-btn settings-btn" id="menuHeaderBtn" onclick="showMenu()" data-i18n="menu.header_btn">MENU</button>
+                </div>
+
+                <div class="head-readout">
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.step">Krok</div>
+                        <div class="val" id="stepVal">000</div>
+                    </div>
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.humans">Ľudia</div>
+                        <div class="val bio" id="humansVal">200</div>
+                    </div>
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.humans_killed">Zabito ľudí</div>
+                        <div class="val alert" id="humansKilledVal">0</div>
+                    </div>
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.insects">Hmyz</div>
+                        <div class="val alert" id="insectsVal">150</div>
+                    </div>
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.fort_def">Obrana pevností</div>
+                        <div class="val amber" id="fortDefVal">50</div>
+                    </div>
+                    <div class="readout">
+                        <div class="lbl" data-i18n="readout.action_points">Akčné body</div>
+                        <div class="val amber" id="pointsVal">10</div>
+                        <div class="points-row" id="pointsRow"></div>
+                    </div>
+                </div>
+
+                <div class="action-block">
+                    <div class="phase-text-container">
+                        <div class="ptxt" id="phaseText" data-i18n="phase.idle_text">Pripravené. Otvorte <b>⚙ Parametre</b> pre konfiguráciu hniezda a potom spustite pozorovanie.</div>
+                    </div>
+                    <button class="nest-btn primary-btn pbtn" id="phaseBtn" data-i18n="phase.begin_simulation">Začať simuláciu</button>
+                    <button class="nest-btn danger pbtn hidden" id="stopSimBtn" data-i18n="phase.stop_simulation">ZASTAVIŤ SIMULÁCIU</button>
+                </div>
+
+            </header>
+
+            <div class="main-grid">
+
+                <!-- SANDBOX MAP-EDITOR PANEL (sandbox mode only; hidden by default, shown by sandbox.js) -->
+                <section class="panel sandbox-editor-panel hidden" id="sandboxEditorPanel">
+                    <div class="panel-head">
+                        <h2 data-i18n="sandbox.editor_title">Úprava mapy (Sandbox)</h2>
+                        <span class="autosave-status" id="sbStatus"></span>
+                        <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
+                    </div>
+                    <div class="panel-body">
+                        <div class="setup-row">
+                            <div class="field">
+                                <label data-i18n="sandbox.lbl_level_name">Názov úrovne</label>
+                                <input type="text" id="sbLevelNameInput" value="">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="sandbox.lbl_level_desc">Popis (v zozname kampane)</label>
+                                <input type="text" id="sbLevelDescInput" placeholder="voliteľné, krátky popis" data-i18n-placeholder="sandbox.placeholder_level_desc">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="sandbox.lbl_level_file">Súbor pri exporte</label>
+                                <input type="text" id="sbLevelFileInput" value="level-1.json">
+                            </div>
+                            <div class="field">
+                                <label data-i18n="sandbox.lbl_background">Pozadie mapy</label>
+                                <input type="text" id="sbBackgroundInput" placeholder="napr. map_forest.jpg" data-i18n-placeholder="sandbox.placeholder_background">
+                            </div>
+                        </div>
+                        <div class="sandbox-toolbar-actions">
+                            <button class="nest-btn small" id="sbIntroBtn" type="button" data-i18n="sandbox.btn_intro">📝 Úvodná správa</button>
+                            <button class="nest-btn small" id="sbNewBtn" type="button" data-i18n="sandbox.btn_new">🆕 Nová úroveň</button>
+                            <button class="nest-btn small" id="sbLoadBtn" type="button" data-i18n="sandbox.btn_load">📂 Načítať JSON</button>
+                            <input style="display: none;" type="file" id="sbLoadFile" accept="application/json" class="hidden">
+                            <button class="nest-btn primary-btn small" id="sbExportCurrentBtn" type="button" data-i18n="sandbox.btn_export_current">⬇ Exportovať aktuálny stav</button>
+                            <button class="nest-btn small" id="sbExportDefaultBtn" type="button" data-i18n="sandbox.btn_export_default">⬇ Exportovať počiatočný stav</button>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- MAP PANEL (FULL WIDTH) -->
+                <section class="panel map-panel">
+                    <div class="panel-head">
+                        <h2 data-i18n="map.title">Mapa hniezda a pevností</h2>
+                        <div class="head-actions">
+                            <div class="sandbox-fort-controls hidden" id="sandboxFortControls">
+                                <button class="nest-btn header-btn small" id="sbAddFortBtn" type="button" data-i18n="sandbox.btn_add_fort">+ Pridať pevnosť</button>
+                                <button class="nest-btn header-btn small danger" id="sbRemoveFortBtn" type="button" data-i18n="sandbox.btn_remove_fort">🗑 Odstrániť</button>
+                                <label class="sb-defense-label" for="sbFortDefenseInput"><span data-i18n="sandbox.lbl_defense">Obrana:</span>
+                                    <input type="number" id="sbFortDefenseInput" min="1" max="1000" placeholder="--" disabled>
+                                </label>
+                            </div>
+                            <button class="act nest-btn header-btn" id="saveHumansBtn" onclick="saveHumans()"
+                                    data-i18n-title="map.evacuate_tooltip"
+                                    title="Evakuovať ľudí z loveckého bazéna skôr, než k nim hniezdo dosiahne. K dispozícii v ktoromkoľvek kroku, nezávisle od fronty.">
+                                <span data-i18n="map.evacuate_btn">Evakuovať ľudí</span> <span class="cost">(−<span id="saveHumansCostLbl">1</span> pt)</span>
+                            </button>
+                            <span class="tag" id="fortsTag">10/10 forts standing</span>
+                            <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
+                        </div>
+                    </div>
+                    <div class="panel-body">
+                        <div class="map-wrap" id="mapWrap"></div>
+                        <div class="map-legend">
+                            <span><img src="/nest/assets/nest_icon.png" alt="Nest"> <span data-i18n="map.legend_nest">Hniezdo</span></span>
+                            <span><img src="/nest/assets/fort_icon.png" alt="Fort standing"> <span data-i18n="map.legend_fort_standing">Stojaca pevnosť</span></span>
+                            <span><img src="/nest/assets/fort_icon.png" alt="Fort under assault" style="filter:drop-shadow(0 0 3px var(--hybrid-red));"> <span data-i18n="map.legend_nearest_fort">Najbližšia pevnosť</span></span>
+                            <span><img src="/nest/assets/scout.png" alt="Scout"> <span data-i18n="map.legend_scout_search">Prieskumná hliadka</span></span>
+                            <span><img src="/nest/assets/predator.png" alt="Predator"> <span data-i18n="map.legend_hunting_party">Lovecká svorka</span></span>
+                            <span><img src="/nest/assets/fort_icon.png" alt="Fort fallen" style="opacity:0.35; filter:grayscale(1);"> <span data-i18n="map.legend_fort_fallen">Padlá pevnosť</span></span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- FIELD LOG (FULL WIDTH) -->
+                <section class="panel log-panel">
+                    <div class="panel-head">
+                        <h2 data-i18n="log.title">Správy z terénu</h2>
+                        <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
+                    </div>
+                    <div class="panel-body" style="padding-top:6px;">
+                        <ul class="log-list" id="logList"></ul>
+                    </div>
+                </section>
+
+                <!-- Hidden Event Queue panel (kept in DOM so script logic remains functional) -->
+                <section class="panel queue-panel" style="display:none;">
+                    <div class="panel-head">
+                        <h2 data-i18n="log.event_queue_title">Fronta udalostí</h2>
+                        <span class="tag" id="queueTag">0 pending</span>
+                    </div>
+                    <ul class="queue-list" id="queueList"></ul>
+                </section>
+            </div>
+
+            <div class="footer-note" data-i18n="footer.note">
+                Každý krok ≈ 12 hodín · Akčné body sa obnovujú každý krok · Nastavenia upravte cez ⚙ Parametre pred spustením
+            </div>
+        </div>
+
+    </div>
+
+    <!-- EVENT DETAILS OVERLAY MODAL -->
+    <div class="overlay hidden" id="eventDetailOverlay">
+        <div class="overlay-card">
+            <button class="close-x" id="eventDetailCloseX">✕</button>
+            <div id="eventDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- PARAMETERS MODAL OVERLAY -->
+    <div class="overlay hidden" id="settingsOverlay">
+        <div class="overlay-card wide">
+            <button class="close-x" id="settingsCloseX">✕</button>
+            <h2 class="left" data-i18n="settings.title">Parametre hniezda</h2>
+            <p class="settings-note" id="settingsNote" data-i18n="settings.note_enabled">Upravte pred začatím simulácie. Tieto nastavenia sa uzamknú, kedykoľvek je hniezdo aktívne.</p>
+
+            <div class="settings-section" data-i18n="settings.sec_population">Populácia a zdroje</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_group_size">Veľkosť skupiny predátorov</label>
+                    <input type="number" id="groupSizeInput" min="1" max="20" value="4">
+                    <div class="hint" data-i18n="settings.hint_group_size">Predátori lovia v svorkách tejto veľkosti. Hniezdo udržiava ~1 prieskumníka na svorku.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_food_per_human">Výnos potravy za človeka</label>
+                    <input type="number" id="foodPerHumanInput" min="1" max="50" value="3">
+                    <div class="hint" data-i18n="settings.hint_food_per_human">Získaná potrava pre hniezdo za každého uloveného človeka.</div>
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_start_humans">Počiatočný počet ľudí</label>
+                    <input type="number" id="startHumansInput" min="1" max="5000" value="200">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_start_food">Počiatočné zásoby potravy</label>
+                    <input type="number" id="startFoodInput" min="0" max="5000" value="200">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_max_points">Akčné body za krok</label>
+                    <input type="number" id="maxPointsInput" min="1" max="50" value="10">
+                    <div class="hint" data-i18n="settings.hint_max_points">Body sa obnovujú na začiatku každého kroku a míňajú sa na zásahy.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_eggs_per_search">Bonusové vajíčka za úspešný prieskum</label>
+                    <input type="number" id="eggsPerSearchInput" min="0" max="20" value="2">
+                    <div class="hint" data-i18n="settings.hint_eggs_per_search">Extra vajíčka, ktoré kráľovná okamžite znesie za každý prieskum, ktorý nájde osídlenie.</div>
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_egg_cap">Limit kladenia vajíčok (za krok)</label>
+                    <input type="number" id="eggCapInput" min="0" max="500" value="20">
+                    <div class="hint" data-i18n="settings.hint_egg_cap">Maximálny počet vajíčok, ktoré môže kráľovná zniesť v jednom kroku bez ohľadu na bonusy.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_eggs_per_food">Vajíčka na spotrebovanú potravu</label>
+                    <input type="number" id="eggsPerFoodInput" min="0" max="50" value="5">
+                    <div class="hint" data-i18n="settings.hint_eggs_per_food">Každých tieto-koľko znesených vajíčok stojí 1 extra potravu. Nastavte na 0 pre vypnutie nákladov.</div>
+                </div>
+            </div>
+
+            <div class="settings-section" data-i18n="settings.sec_chances">Šance na úspech</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_search_base_chance">Základná šanca na prieskum (%)</label>
+                    <input type="number" id="searchBaseChanceInput" min="0" max="90" value="30">
+                    <div class="hint" data-i18n="settings.hint_search_base_chance">Minimálna šanca, že prieskumník nájde osídlenie, pred bonusom z pomeru ľudí a hmyzu.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_search_ratio_scale">Mierka pomeru prieskumu</label>
+                    <input type="number" id="searchRatioScaleInput" min="0" max="100" value="25" step="1">
+                    <div class="hint" data-i18n="settings.hint_search_ratio_scale">Šanca pridaná za každý bod pomeru ľudí k hmyzu. Celkovo max. 90%.</div>
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_hunt_base_chance">Základná šanca na lov (%)</label>
+                    <input type="number" id="huntBaseChanceInput" min="0" max="90" value="30">
+                    <div class="hint" data-i18n="settings.hint_hunt_base_chance">Minimálna šanca, že samostatný predátor chytí človeka, pred bonusom z pomeru.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_hunt_ratio_scale">Mierka pomeru lovu</label>
+                    <input type="number" id="huntRatioScaleInput" min="0" max="100" value="25" step="1">
+                    <div class="hint" data-i18n="settings.hint_hunt_ratio_scale">Šanca pridaná za každý bod pomeru ľudí k hmyzu na predátora. Max. 90%.</div>
+                </div>
+            </div>
+
+            <div class="settings-section" data-i18n="settings.sec_risk">Riziko lovu</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_hunt_death_risk">Riziko úmrtia predátora pri love (%)</label>
+                    <input type="number" id="huntDeathRiskInput" min="0" max="100" value="10">
+                    <div class="hint" data-i18n="settings.hint_hunt_death_risk">Nezávislá šanca, že každý loviaci predátor zahynie počas lovu.</div>
+                </div>
+            </div>
+
+            <div class="settings-section" data-i18n="settings.sec_caste">Vyváženie kast</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_scout_bias">Posun k prieskumníkom za neúspešný prieskum</label>
+                    <input type="number" id="scoutBiasPerFailedSearchInput" min="0" max="5" value="0.2" step="0.1">
+                    <div class="hint" data-i18n="settings.hint_scout_bias">Každý neúspešný prieskum mierne posunie dospievajúce nymfy v danom kroku smerom k prieskumníkom namiesto predátorov.</div>
+                </div>
+            </div>
+
+            <div class="settings-section" data-i18n="settings.sec_forts">Dobývanie a obrana pevností</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_limit">Počet pevností</label>
+                    <input type="number" id="fortLimitInput" min="1" max="30" value="10">
+                    <div class="hint" data-i18n="settings.hint_fort_limit">Pevnosti umiestnené na mape na začiatku. Keď padne posledná, útoky na pevnosti už nie sú možné.</div>
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_default_fort_def">Predvolená obrana pevnosti</label>
+                    <input type="number" id="defaultFortDefenseInput" min="1" max="1000" value="50">
+                    <div class="hint" data-i18n="settings.hint_default_fort_def">Počiatočná hodnota obrany priradená každej pevnosti na začiatku simulácie.</div>
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_food_low">Spúšťač: Potrava/Hmyz pre 100%</label>
+                    <input type="number" id="fortFoodLowInput" min="0" max="20" value="0.5" step="0.1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_food_high">Spúšťač: Potrava/Hmyz pre 0%</label>
+                    <input type="number" id="fortFoodHighInput" min="0" max="20" value="4" step="0.5">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_human_low">Spúšťač: Ľudia/Hmyz pre 100%</label>
+                    <input type="number" id="fortHumanLowInput" min="0" max="20" value="1" step="0.5">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_human_high">Spúšťač: Ľudia/Hmyz pre 0%</label>
+                    <input type="number" id="fortHumanHighInput" min="0" max="20" value="5" step="0.5">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_dist_low">Spúšťač: Vzdialenosť pre 100%</label>
+                    <input type="number" id="fortDistLowInput" min="0" max="150" value="15" step="1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_dist_high">Spúšťač: Vzdialenosť pre 0%</label>
+                    <input type="number" id="fortDistHighInput" min="0" max="150" value="70" step="1">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_predator_threshold">Spúšťač: Prah predátorov</label>
+                    <input type="number" id="fortPredatorThresholdInput" min="1" max="500" value="40">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_attack_threshold">Spúšťač: Prah útoku</label>
+                    <input type="number" id="fortAttackThresholdInput" min="0" max="10" value="5" step="0.1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_conquer_threshold">Prah dobytia</label>
+                    <input type="number" id="fortConquerThresholdInput" min="1" max="1" value="0.5">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_predator_loss">Straty predátorov pri dobytí</label>
+                    <input type="number" id="fortPredatorLossInput" min="0" max="200" value="20">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_human_gain">Získaní ľudia pri dobytí</label>
+                    <input type="number" id="fortHumanGainInput" min="0" max="2000" value="50">
+                </div>
+            </div>
+
+            <div class="settings-section" data-i18n="settings.sec_costs">Náklady na akcie hráča</div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_distract_scout">Odlákať prieskumníka (body)</label>
+                    <input type="number" id="costDistractScoutInput" min="0" max="50" value="1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_kill_scout">Zabiť prieskumníka (body)</label>
+                    <input type="number" id="costKillScoutInput" min="0" max="50" value="2">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_escape_predator">Pomôcť človeku uniknúť (body)</label>
+                    <input type="number" id="costEscapePredatorInput" min="0" max="50" value="1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_kill_predator">Zabiť predátora (body)</label>
+                    <input type="number" id="costKillPredatorInput" min="0" max="50" value="3">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_save_humans">Evakuovať ľudí (body)</label>
+                    <input type="number" id="costSaveHumansInput" min="0" max="50" value="1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_save_humans_amount">Evakuovaní ľudia za použitie</label>
+                    <input type="number" id="saveHumansAmountInput" min="0" max="500" value="5">
+                </div>
+            </div>
+
+            <button class="nest-btn primary-btn" id="settingsDoneBtn" data-i18n="settings.done_btn">Hotovo</button>
+        </div>
+    </div>
+
+    <!-- NEST ANALYTICS OVERLAY MODAL -->
+    <div class="overlay hidden" id="nestAnalyticsOverlay">
+        <div class="overlay-card wide">
+            <button class="close-x" id="nestAnalyticsCloseX">✕</button>
+            <div class="panel-head" style="margin-bottom:12px;">
+                <h2 data-i18n="analytics.title">Analytika hniezda</h2>
+            </div>
+            <div class="panel-body">
+                <!-- Nest Status Chips -->
+                <div class="stage-row" id="stageRow"></div>
+                
+                <hr class="panel-divider">
+                
+                <!-- Population Chart -->
+                <div class="graph-wrap"><canvas id="popChart"></canvas></div>
+                <!-- Updated Nest Analytics Legend -->
+                <div class="graph-legend" style="display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; font-size:0.78rem;">
+                    <span style="display:inline-flex; align-items:center; gap:5px;">
+                        <i style="background:#7ea23c; width:12px; height:3px; display:inline-block;"></i> <span data-i18n="analytics.legend_humans_actual">Ľudia (Skutočnosť)</span>
+                    </span>
+                    <span style="display:inline-flex; align-items:center; gap:5px;">
+                        <i style="border-top:2px dashed #7ea23c; width:14px; display:inline-block;"></i> <span data-i18n="analytics.legend_humans_forecast">Prognóza ľudí (10 krokov)</span>
+                    </span>
+
+
+                    <span style="display:inline-flex; align-items:center; gap:5px; margin-left:10px;">
+                        <i style="background:#a8402c; width:12px; height:3px; display:inline-block;"></i> <span data-i18n="analytics.legend_insects_actual">Hmyz (Skutočnosť)</span>
+                    </span>
+                    <span style="display:inline-flex; align-items:center; gap:5px;">
+                        <i style="border-top:2px dashed #a8402c; width:14px; display:inline-block;"></i> <span data-i18n="analytics.legend_insects_forecast">Prognóza hmyzu (10 krokov)</span>
+                    </span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GAME OVER MODAL OVERLAY -->
+    <div class="overlay hidden" id="gameOverOverlay">
+        <div class="overlay-card">
+            <button class="close-x" id="gameOverCloseX">✕</button>
+            <h2 id="overTitle" data-i18n="gameover.title">Simulácia skončila</h2>
+            <p id="overText"></p>
+            <button class="nest-btn primary-btn" id="restartBtn" data-i18n="gameover.restart_btn">Reštartovať simuláciu</button>
+        </div>
+    </div>
+
+    <div class="overlay" id="menuOverlay">
+        <div id="menu-title-container">
+            <h2 id="menuTitle1" data-i18n="menu.title1">HYBRIDNÁ</h2>
+            <h2 id="menuTitle2" data-i18n="menu.title2">VOJNA</h2>
+        </div>
+        <div class="overlay-card" id="menu-card">
+            <button class="nest-btn menu-btn" id="campaignBtn" data-i18n="menu.campaign_btn">KAMPAŇ</button>
+            <button class="nest-btn menu-btn" id="sandboxBtn" data-i18n="menu.sandbox_btn">SANDBOX MÓD</button>
+            <button class="nest-btn menu-btn" id="menuSettingsBtn" data-i18n="menu.settings_btn">NASTAVENIA</button>
+            <button class="nest-btn menu-btn" id="aboutBtn" data-i18n="menu.about_btn">O HRE</button>
+        </div>
+        <div id="menu-logo">
+            <img src="../assets/logo white.png" id="footer-logo" alt="HYBRID" style="height: 35px; align-self: flex-start;">
+        </div>
+    </div>
+
+    <!-- IN-GAME MENU OVERLAY -->
+    <div class="overlay hidden" id="ingameMenu">
+        <div class="overlay-card" id="ingame-menu-card">
+            <div style="margin: 10px; margin-bottom: 30px;">
+                <button onclick="hideMenu()" class="close-x" id="ingameMenuCloseX">✕</button>
+            </div>
+            <button class="nest-btn menu-btn" id="ingameRestartBtn" data-i18n="gameover.restart_btn">REŠTARTOVAŤ</button>
+            <button class="nest-btn menu-btn" id="ingameCampaignBtn" data-i18n="menu.campaign_btn">KAMPAŇ</button>
+            <button class="nest-btn menu-btn" id="ingameSandboxBtn" data-i18n="menu.sandbox_btn">SANDBOX MÓD</button>
+            <button class="nest-btn menu-btn" id="ingameSettingsBtn" data-i18n="ingame_menu.settings_btn">NASTAVENIA</button>
+            <button class="nest-btn menu-btn" id="ingameAboutBtn" data-i18n="menu.about_btn">O HRE</button>
+        </div>
+    </div>
+
+    <!-- ABOUT OVERLAY -->
+    <div class="overlay hidden" id="aboutOverlay">
+        <div class="overlay-card wide" id="about-card">
+            <button class="close-x" id="aboutCloseX">✕</button>
+            <h2 class="left" data-i18n="about.title">O hre</h2>
+            <p class="about-p" data-i18n="about.desc">HYBRIDNÁ VOJNA je prehliadačová simulácia hniezda hmyzu proti ľuďom. Riadite kráľovnú, prieskumníkov, predátorov a plod hniezda, ktoré loví ľudský bazén kvôli potrave a súčasne bráni svoje pevnosti pred protiútokom.</p>
+
+            <div class="settings-section" data-i18n="about.sec_how_to_play">Ako sa hrá</div>
+            <p class="about-p" data-i18n="about.how_to_play_text">Každý krok míňate akčné body na prieskum, lov, obranu hniezda alebo evakuáciu ľudí zo zdroja potravy. Neúspešný prieskum či lov môže hniezdo pripraviť o prieskumníkov a predátorov. Kráľovná musí byť nakŕmená ako prvá — ak jej dôjde potrava, hniezdo zaniká.</p>
+
+            <div class="settings-section" data-i18n="about.sec_game_modes">Herné režimy</div>
+            <p class="about-p" data-i18n="about.game_modes_text"><strong>Kampaň</strong> ponúka pripravené úrovne s vlastným rozložením pevností alebo úplne náhodne vygenerovanú mapu. <strong>Sandbox</strong> mód necháva rozloženie mapy aj všetky parametre simulácie plne v rukách hráča.</p>
+        </div>
+    </div>
+
+    <!-- OPTIONS OVERLAY -->
+    <div class="overlay hidden" id="optionsOverlay">
+        <div class="overlay-card wide" id="options-card">
+            <button class="close-x" id="optionsCloseX">✕</button>
+            <h2 class="left" data-i18n="options.title">NASTAVENIA</h2>
+
+            <label for="langSelect" data-i18n="settings.lang_label">Language / Jazyk:</label>
+            <select id="langSelect">
+                <option value="en">English</option>
+                <option value="sk">Slovenčina</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- CAMPAIGN OVERLAY -->
+    <div class="overlay hidden" id="campaignOverlay">
+        <div class="overlay-card wide" id="campaign-card">
+            <button class="close-x" id="campaignCloseX" onclick="closeCampaignMenu()">✕</button>
+            <p class="settings-note" data-i18n="campaign.note">Vyber si level alebo načítajte vlastný súbor mapy (.json).</p>
+            
+            <!-- Scrollable list: every campaign level as a row (thumbnail + start button + info) -->
+            <div class="campaign-level-list" id="campaignLevelList">
+                <span class="thumb-placeholder" data-i18n="campaign.loading">Načítavam úrovne...</span>
+            </div>
+
+            <!-- Skrytý vstup pre súbor -->
+            <input type="file" id="customLevelInput" accept=".json" style="display:none;" />
+
+            <!-- Tlačidlá pripnuté v pravom dolnom rohu karty -->
+            <div class="campaign-fixed-actions">
+                <button class="nest-btn campaign-fixed-btn" id="campaignGenerateBtn" onclick="generateAndStartLevel()" data-i18n="campaign.generate_btn">🎲 Vygeneruj level</button>
+                <button class="nest-btn primary-btn campaign-fixed-btn" id="campaignLoadCustomBtn" onclick="document.getElementById('customLevelInput').click()" data-i18n="campaign.load_custom_btn">📂 Načítať vlastný level</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- IMAGE LOAD OVERLAY MODAL -->
+    <div class="overlay hidden" id="imageLoadOverlay">
+        <div class="overlay-card">
+            <button class="close-x" id="imageLoadCloseX">✕</button>
+            <h2 class="left" data-i18n="image_load.title">Načítať obrázok pozadia</h2>
+            <div class="field" style="margin-top:12px;">
+                <label for="bgImageUrlInput" data-i18n="image_load.lbl_url">URL obrázka alebo cesta k súboru:</label>
+                <input type="text" id="bgImageUrlInput" placeholder="napr. ../assets/map_forest.jpg" data-i18n-placeholder="image_load.placeholder_url">
+            </div>
+            <div style="display:flex; gap:10px; margin-top:20px; justify-content:flex-end;">
+                <button class="nest-btn danger" id="imageLoadCancelBtn" type="button" data-i18n="image_load.cancel_btn">Zrušiť</button>
+                <button class="nest-btn primary-btn" id="imageLoadConfirmBtn" type="button" data-i18n="image_load.confirm_btn">OK / Načítať</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SANDBOX: INTRO MESSAGE OVERLAY -->
+    <div class="overlay hidden" id="sandboxIntroOverlay">
+        <div class="overlay-card">
+            <button class="close-x" id="sbIntroCloseX">✕</button>
+            <h2 class="left" data-i18n="sandbox_intro.title">Úvodná správa</h2>
+            <div class="field">
+                <textarea id="sbIntroInput" rows="6" class="sandbox-intro-textarea" placeholder="Text zobrazený hráčovi pred začiatkom úrovne (nepovinné)." data-i18n-placeholder="sandbox_intro.placeholder"></textarea>
+            </div>
+            <button class="nest-btn primary-btn" id="sbIntroDoneBtn" type="button" data-i18n="sandbox_intro.done_btn">Hotovo</button>
+        </div>
+    </div>
+
+    <!-- Shared Footer -->
+    <div class="footer">
+        <div class="footer-content">
+            <img src="../assets/logo.png" id="footer-logo" alt="HYBRID" style="height: 35px; align-self: flex-start;">
+            <div class="footer-copyright">
+                <p data-i18n="footer.copyright">&copy; 2026 HYBRID RPG. Všetky práva vyhradené.</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+{
+  "id": "level-1",
+  "name": "Nová úroveň",
+  "description": "",
+  "intro": "",
+  "background": "paris.png",
+  "nest": {
+    "x": 68.1,
+    "y": 58.4
+  },
+  "forts": [
+    {
+      "id": 1,
+      "x": 11.564227702407045,
+      "y": 19.96169483885013,
+      "defense": 50
+    },
+    {
+      "id": 2,
+      "x": 64.7,
+      "y": 28.8,
+      "defense": 50
+    },
+    {
+      "id": 3,
+      "x": 76.56583997165507,
+      "y": 30.59484946307163,
+      "defense": 50
+    },
+    {
+      "id": 4,
+      "x": 29.88884634595294,
+      "y": 87.81783078694231,
+      "defense": 50
+    },
+    {
+      "id": 5,
+      "x": 7.404730244580506,
+      "y": 75.5206466172143,
+      "defense": 50
+    },
+    {
+      "id": 6,
+      "x": 87.09457651121244,
+      "y": 64.1167925888784,
+      "defense": 50
+    },
+    {
+      "id": 7,
+      "x": 56.5,
+      "y": 45,
+      "defense": 50
+    },
+    {
+      "id": 8,
+      "x": 85.84240847045582,
+      "y": 91.76656653123946,
+      "defense": 50
+    },
+    {
+      "id": 9,
+      "x": 45.0870274382583,
+      "y": 91.78878540407031,
+      "defense": 50
+    },
+    {
+      "id": 10,
+      "x": 41.1,
+      "y": 57,
+      "defense": 50
+    }
+  ],
+  "settings": {
+    "groupSize": 4,
+    "foodPerHuman": 4,
+    "startHumans": 200,
+    "startFood": 200,
+    "maxPoints": 10,
+    "eggsPerSearch": 2,
+    "eggCap": 30,
+    "eggsPerFood": 3,
+    "searchBaseChance": 40,
+    "searchRatioScale": 25,
+    "huntBaseChance": 80,
+    "huntRatioScale": 25,
+    "huntDeathRisk": 70,
+    "scoutBiasPerFailedSearch": 0.1,
+    "fortLimit": 10,
+    "defaultFortDefense": 50,
+    "fortFoodLow": 2,
+    "fortFoodHigh": 4,
+    "fortHumanLow": 1,
+    "fortHumanHigh": 3,
+    "fortDistLow": 15,
+    "fortDistHigh": 70,
+    "fortPredatorThreshold": 40,
+    "fortAttackThreshold": 3.1,
+    "fortConquerThreshold": 0.7,
+    "fortPredatorLoss": 20,
+    "fortHumanGain": 100,
+    "costDistractScout": 1,
+    "costKillScout": 2,
+    "costEscapePredator": 1,
+    "costKillPredator": 3,
+    "costSaveHumans": 1,
+    "saveHumansAmount": 3
+  }
+}

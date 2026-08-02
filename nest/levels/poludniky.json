@@ -1,0 +1,84 @@
+{
+  "id": "level-1",
+  "name": "Nová úroveň",
+  "description": "",
+  "intro": "",
+  "background": "poludniky.png",
+  "nest": {
+    "x": 51.6,
+    "y": 73.9
+  },
+  "forts": [
+    {
+      "id": 1,
+      "x": 68.9,
+      "y": 84.6,
+      "defense": 50
+    },
+    {
+      "id": 3,
+      "x": 37.8,
+      "y": 47.4,
+      "defense": 50
+    },
+    {
+      "id": 6,
+      "x": 64.5,
+      "y": 12,
+      "defense": 50
+    },
+    {
+      "id": 8,
+      "x": 71,
+      "y": 57.9,
+      "defense": 50
+    },
+    {
+      "id": 9,
+      "x": 45.9,
+      "y": 88.1,
+      "defense": 50
+    },
+    {
+      "id": 10,
+      "x": 52.4,
+      "y": 44.8,
+      "defense": 50
+    }
+  ],
+  "settings": {
+    "groupSize": 4,
+    "foodPerHuman": 4,
+    "startHumans": 300,
+    "startFood": 300,
+    "maxPoints": 10,
+    "eggsPerSearch": 1,
+    "eggCap": 20,
+    "eggsPerFood": 5,
+    "searchBaseChance": 30,
+    "searchRatioScale": 25,
+    "huntBaseChance": 30,
+    "huntRatioScale": 25,
+    "huntDeathRisk": 10,
+    "scoutBiasPerFailedSearch": 0.2,
+    "fortLimit": 10,
+    "defaultFortDefense": 50,
+    "fortFoodLow": 1.5,
+    "fortFoodHigh": 7,
+    "fortHumanLow": 0.5,
+    "fortHumanHigh": 5.5,
+    "fortDistLow": 15,
+    "fortDistHigh": 70,
+    "fortPredatorThreshold": 35,
+    "fortAttackThreshold": 3.5,
+    "fortConquerThreshold": 0.5,
+    "fortPredatorLoss": 20,
+    "fortHumanGain": 50,
+    "costDistractScout": 1,
+    "costKillScout": 2,
+    "costEscapePredator": 1,
+    "costKillPredator": 3,
+    "costSaveHumans": 1,
+    "saveHumansAmount": 5
+  }
+}

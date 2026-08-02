@@ -1,0 +1,16 @@
+[
+{
+    "id": "poludniky",
+    "title": "Posledné dni pevnosti Poludniky",
+    "description": "Starosta pevnosti Poludniky sa dlho spoliehal na výhodnú polohu. Keď však padnú všetky pevnosti v okolí, Somory sa vrhnú aj na Poludniky.",
+    "thumbnail": "assets/poludniky.png",
+    "file": "levels/poludniky.json"
+  },
+  {
+    "id": "paris",
+    "title": "V troskach Paríža",
+    "description": "Kedysi jedno z najkrajších miest na svete. Dnes už len zvyšky jeho niekdajšej slávy.",
+    "thumbnail": "assets/paris.png",
+    "file": "levels/paris.json"
+  }
+]
