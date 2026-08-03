@@ -325,6 +325,178 @@ function sandboxWireBackgroundInput() {
   input.addEventListener('input', () => setMapBackground(input.value.trim()));
 }
 
+function sandboxGetConditionDefaults() {
+  return {
+    id: `cond-${Date.now()}-${Math.round(Math.random() * 10000)}`,
+    type: 'fort_falls',
+    fortId: 'any',
+    value: 1,
+    outcome: 'victory',
+    active: true,
+    label: ''
+  };
+}
+
+function sandboxReadConditionsFromEditor() {
+  const list = document.getElementById('sandboxConditionsList');
+  if (!list) return [];
+  const rows = [...list.querySelectorAll('.condition-row')];
+  return rows.map((row) => {
+    const rowId = row.dataset.conditionId || `cond-${Date.now()}-${Math.random()}`;
+    const type = row.querySelector('[data-role="type"]')?.value || 'fort_falls';
+    const outcome = row.querySelector('[data-role="outcome"]')?.value || 'victory';
+    const fortId = row.querySelector('[data-role="fortId"]')?.value || 'any';
+    const value = Number(row.querySelector('[data-role="value"]')?.value ?? 0);
+    const active = row.querySelector('[data-role="active"]')?.checked !== false;
+    const label = row.querySelector('[data-role="label"]')?.value || '';
+    return {
+      id: rowId,
+      type,
+      fortId: fortId === 'any' ? 'any' : Number(fortId),
+      value: Number.isFinite(value) ? value : 0,
+      outcome,
+      active,
+      label
+    };
+  });
+}
+
+function sandboxRenderConditionsEditor() {
+  const list = document.getElementById('sandboxConditionsList');
+  if (!list) return;
+  const current = Array.isArray(S.conditions) && S.conditions.length ? S.conditions : [];
+  list.innerHTML = '';
+
+  if (!current.length) {
+    const empty = document.createElement('div');
+    empty.className = 'conditions-empty';
+    empty.textContent = 'Žiadne podmienky. Pridajte prvú podmienku.';
+    list.appendChild(empty);
+    return;
+  }
+
+  current.forEach((cond) => {
+    const row = document.createElement('div');
+    row.className = 'condition-row';
+    row.dataset.conditionId = cond.id || `cond-${Date.now()}-${Math.random()}`;
+
+    const typeSelect = document.createElement('select');
+    typeSelect.dataset.role = 'type';
+    const types = [
+      ['fort_falls', 'Pevnosť padne'],
+      ['fort_defense_below', 'Obrana pevnosti klesne pod'],
+      ['fort_attacked', 'Pevnosť je napadnutá'],
+      ['forts_fallen_over', 'Viac ako X pevností padne'],
+      ['humans_killed_over', 'Zabitých ľudí > X'],
+      ['humans_remaining_below', 'Ľudia < X'],
+      ['nest_collapses', 'Hniezdo zanikne']
+    ];
+    types.forEach(([value, label]) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = label;
+      if ((cond.type || 'fort_falls') === value) opt.selected = true;
+      typeSelect.appendChild(opt);
+    });
+
+    const fortSelect = document.createElement('select');
+    fortSelect.dataset.role = 'fortId';
+    const fortOptions = [document.createElement('option')];
+    fortOptions[0].value = 'any';
+    fortOptions[0].textContent = 'Akákoľvek pevnosť';
+    if ((cond.fortId ?? 'any') === 'any') fortOptions[0].selected = true;
+    fortSelect.appendChild(fortOptions[0]);
+    S.forts.forEach((fort) => {
+      const opt = document.createElement('option');
+      opt.value = String(fort.id);
+      opt.textContent = `Pevnosť ${fort.id}`;
+      if (String(cond.fortId || 'any') === String(fort.id)) opt.selected = true;
+      fortSelect.appendChild(opt);
+    });
+
+    const outcomeSelect = document.createElement('select');
+    outcomeSelect.dataset.role = 'outcome';
+    ['victory', 'defeat'].forEach((value) => {
+      const opt = document.createElement('option');
+      opt.value = value;
+      opt.textContent = value === 'victory' ? 'Víťazstvo' : 'Prehra';
+      if ((cond.outcome || 'victory') === value) opt.selected = true;
+      outcomeSelect.appendChild(opt);
+    });
+
+    const valueInput = document.createElement('input');
+    valueInput.type = 'number';
+    valueInput.min = '0';
+    valueInput.dataset.role = 'value';
+    valueInput.value = Number(cond.value ?? 0);
+    valueInput.style.width = '72px';
+
+    const activeToggle = document.createElement('label');
+    activeToggle.className = 'condition-active';
+    const activeChk = document.createElement('input');
+    activeChk.type = 'checkbox';
+    activeChk.dataset.role = 'active';
+    activeChk.checked = cond.active !== false;
+    activeToggle.appendChild(activeChk);
+    activeToggle.append('Aktívna');
+
+    const labelInput = document.createElement('input');
+    labelInput.type = 'text';
+    labelInput.dataset.role = 'label';
+    labelInput.placeholder = 'Voliteľný popis';
+    labelInput.value = cond.label || '';
+
+    const removeBtn = document.createElement('button');
+    removeBtn.type = 'button';
+    removeBtn.className = 'nest-btn small danger';
+    removeBtn.textContent = 'Odstrániť';
+    removeBtn.onclick = () => {
+      S.conditions = (S.conditions || []).filter(item => item.id !== cond.id);
+      sandboxRenderConditionsEditor();
+    };
+
+    row.appendChild(typeSelect);
+    row.appendChild(fortSelect);
+    row.appendChild(outcomeSelect);
+    row.appendChild(valueInput);
+    row.appendChild(activeToggle);
+    row.appendChild(labelInput);
+    row.appendChild(removeBtn);
+    list.appendChild(row);
+  });
+}
+
+function sandboxWireConditionsOverlay() {
+  const overlay = document.getElementById('sandboxConditionsOverlay');
+  const openBtn = document.getElementById('sbConditionsBtn');
+  const closeX = document.getElementById('sbConditionsCloseX');
+  const doneBtn = document.getElementById('sbConditionsDoneBtn');
+  const addBtn = document.getElementById('sbAddConditionBtn');
+  if (!overlay || !openBtn) return;
+
+  const open = () => {
+    if (!Array.isArray(S.conditions)) S.conditions = [];
+    sandboxRenderConditionsEditor();
+    overlay.classList.remove('hidden');
+  };
+  const close = () => overlay.classList.add('hidden');
+
+  openBtn.onclick = open;
+  if (closeX) closeX.onclick = close;
+  if (doneBtn) doneBtn.onclick = () => {
+    S.conditions = sandboxReadConditionsFromEditor();
+    close();
+  };
+  if (addBtn) addBtn.onclick = () => {
+    const arr = Array.isArray(S.conditions) ? S.conditions.slice() : [];
+    arr.push({ ...sandboxGetConditionDefaults(), id: `cond-${Date.now()}-${Math.round(Math.random() * 10000)}` });
+    S.conditions = arr;
+    sandboxRenderConditionsEditor();
+  };
+
+  overlay.addEventListener('click', (ev) => { if (ev.target === overlay) close(); });
+}
+
 function sandboxWireIntroOverlay() {
   const overlay = document.getElementById('sandboxIntroOverlay');
   const openBtn = document.getElementById('sbIntroBtn');
@@ -370,6 +542,11 @@ function sandboxLoadLevelObject(obj) {
   if (fileEl) fileEl.value = (obj.id ? obj.id.replace(/\.json$/i, '') : 'level') + '.json';
   if (introEl) introEl.value = obj.intro || '';
   if (bgEl) bgEl.value = obj.background || '';
+
+  S.conditions = normalizeLevelConditions(obj.conditions || obj.goals || obj.objectives || []);
+  if (!Array.isArray(S.conditions) || !S.conditions.length) {
+    S.conditions = [{ id: 'cond-default-victory', type: 'nest_collapses', outcome: 'victory', value: 0, fortId: 'any', active: true }];
+  }
 
   applySettingsToInputs(obj.settings);
   setMapBackground(obj.background || null);
@@ -431,6 +608,7 @@ function sandboxBuildLevelObject(useCurrentState) {
     ? { nest: S.nest, forts: S.forts }
     : initialSandboxSnapshot;
 
+  const conditions = Array.isArray(S.conditions) ? S.conditions : [];
   return {
     id: (document.getElementById('sbLevelFileInput').value || sandboxSlugToFilename(name)).replace(/\.json$/i, ''),
     name: name,
@@ -439,6 +617,15 @@ function sandboxBuildLevelObject(useCurrentState) {
     background: document.getElementById('sbBackgroundInput').value.trim() || null,
     nest: { x: source.nest.x, y: source.nest.y },
     forts: source.forts.map(f => ({ id: f.id, x: f.x, y: f.y, defense: f.alive === false ? (f.maxDefense || f.defense) : f.defense })),
+    conditions: conditions.map(cond => ({
+      id: cond.id,
+      type: cond.type,
+      fortId: cond.fortId,
+      value: Number(cond.value || 0),
+      outcome: cond.outcome,
+      active: cond.active !== false,
+      label: cond.label || ''
+    })),
     settings: sandboxReadSettingsFromInputs()
   };
 }
@@ -499,9 +686,38 @@ function sandboxOnModeChanged() {
 
 function sandboxSetUIVisible(visible) {
   const panel = document.getElementById('sandboxEditorPanel');
-  const fortControls = document.getElementById('sandboxFortControls');
-  if (panel) panel.classList.toggle('hidden', !visible);
-  if (fortControls) fortControls.classList.toggle('hidden', !visible);
+  const fortControlsHead = document.getElementById('sandboxLogHead');
+  const editorToggleBtn = document.getElementById('sandboxEditorToggleBtn');
+  if (fortControlsHead) fortControlsHead.classList.toggle('hidden', !visible);
+  if (editorToggleBtn) editorToggleBtn.classList.toggle('hidden', !visible);
+  // The editor panel is now an overlay opened via the EDITOR button, so it
+  // always starts closed whenever sandbox UI visibility changes (entering or
+  // leaving sandbox mode).
+  if (panel) panel.classList.add('hidden');
+}
+
+function sandboxOpenEditorPanel() {
+  const panel = document.getElementById('sandboxEditorPanel');
+  if (panel) panel.classList.remove('hidden');
+}
+
+function sandboxCloseEditorPanel() {
+  const panel = document.getElementById('sandboxEditorPanel');
+  if (panel) panel.classList.add('hidden');
+}
+
+function sandboxWireEditorToggle() {
+  const editorToggleBtn = document.getElementById('sandboxEditorToggleBtn');
+  const closeBtn = document.getElementById('sbEditorCloseX');
+  const panel = document.getElementById('sandboxEditorPanel');
+  if (editorToggleBtn) editorToggleBtn.onclick = () => sandboxOpenEditorPanel();
+  if (closeBtn) closeBtn.onclick = () => sandboxCloseEditorPanel();
+  // Clicking the dimmed backdrop (outside the card) also closes it, like other overlays.
+  if (panel) {
+    panel.addEventListener('click', (ev) => {
+      if (ev.target === panel) sandboxCloseEditorPanel();
+    });
+  }
 }
 
 function sandboxInit() {
@@ -514,8 +730,10 @@ function sandboxInit() {
   sandboxWireKeyboardShortcuts();
   sandboxWireBackgroundInput();
   sandboxWireIntroOverlay();
+  sandboxWireConditionsOverlay();
   sandboxWireLoadButton();
   sandboxWireExportButtons();
+  sandboxWireEditorToggle();
 
   document.getElementById('sbNewBtn').onclick = sandboxNewLevel;
 

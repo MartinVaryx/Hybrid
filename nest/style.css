@@ -12,6 +12,7 @@
 html {
     font-size: 0.8rem;
     max-width: 100%;
+    height: 100%;
     overflow-x: clip;
 }
 
@@ -29,7 +30,8 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
 }
 
 /* Top Logo Bar */
@@ -55,28 +57,67 @@ body {
     width: 100%;
     max-width: 100%;
     background-color: transparent;
-    padding: 0 20px 20px 20px;
+    padding: 5px 5px 5px 5px;
     box-sizing: border-box;
     z-index: 1;
     flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Footer */
-.footer {
-    width: 100%;
-    margin-top: auto;
-    position: relative;
-    z-index: 10;
-    box-sizing: border-box;
-    padding: 20px;
-}
+
 
 .app {
     max-width: 1400px;
+    width: 100%;
     margin: 0 auto;
     display: flex;
     flex-direction: column;
     gap: 15px;
+    flex: 1;
+    min-height: 0;
+}
+
+/* Sticky Header Bar */
+#bottomBar {
+    width: 100%;
+    position: sticky;
+    bottom: 0;
+    z-index: 100;
+    background-color: rgba(231, 231, 231, 0.95);
+    border-top: var(--border-heavy);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 12px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    flex-wrap: wrap;
+    box-sizing: border-box;
+}
+
+#controls-containter {
+    width: 100%;
+    display: flex;
+    justify-content: flex-start;
+}
+
+.control-btn{
+    font-size: 1.3rem !important;
+    margin-left: 10px;
+}
+
+.control-btn:hover{
+    background: rgb(106, 106, 106) !important;
+}
+
+#controls-container{
+    display: flex;
+    width: 100%;
+    margin-left: 20px;
+    margin-right: 20px;
 }
 
 /* Sticky Header Bar */
@@ -94,8 +135,6 @@ header.top {
     justify-content: space-between;
     gap: 20px;
     flex-wrap: wrap;
-    padding-left: 40px !important;
-    padding-right: 40px !important;
 }
 
 .brand-group {
@@ -152,7 +191,9 @@ header.top {
    ========================================================= */
 .main-grid {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex: 1;
+    min-height: 0;
     gap: 15px;
 }
 
@@ -171,11 +212,17 @@ header.top {
 }
 
 .log-panel {
-    grid-column: 1 / -1;
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 .map-panel {
-    grid-column: 1 / -1;
+    flex: 3;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
 }
 
 /* Panels */
@@ -184,7 +231,23 @@ header.top {
     border: var(--border-heavy);
     border-radius: 10px;
     box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.1);
-    padding: 15px;
+    padding: 5px 10px 5px 7px;
+    box-sizing: border-box;
+}
+
+/* Map & log panels fill the static space between the top and bottom bars;
+   their body area flexes and scrolls internally instead of the page. */
+.map-panel .panel-body,
+.log-panel .panel-body {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+}
+
+/* A collapsed panel shouldn't keep claiming its flex share of the space. */
+.panel.collapsed {
+    flex: 0 0 auto;
 }
 
 
@@ -208,8 +271,10 @@ header.top {
 }
 
 .head-actions {
+    width: 100%;
     display: flex;
     align-items: center;
+    justify-content: right;
     gap: 8px;
 }
 
@@ -262,7 +327,7 @@ header.top {
 .tag {
     background: #969696;
     padding: 2px 8px;
-    font-size: 0.75rem;
+    font-size: 1rem;
     font-weight: bold;
     border: 1px solid #000;
     text-transform: uppercase;
@@ -286,8 +351,20 @@ header.top {
     display: flex;
     flex-direction: column;
     gap: 6px;
-    font-size: 12px;
+    font-size: 16px;
     color: whitesmoke;
+}
+
+/* Inside the static log panel, the list fills whatever space is left
+   between the top and bottom bars and scrolls internally. */
+.log-panel .log-list {
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+}
+
+.log-list li {
+    font-size: 14px !important;
 }
 
 .queue-list li {
@@ -465,6 +542,13 @@ header.top {
     gap: 6px;
 }
 
+#map-info{
+    font-family: 'IBM Plex Mono', monospace;
+    text-transform: lowercase;
+    font-size: 1.2rem;
+    padding: 3px 8px;
+}
+
 .actions .act:hover:not(:disabled),
 .actions .nest-btn:hover:not(:disabled) {
     background-color: #222222 !important;
@@ -549,14 +633,15 @@ header.top {
 .map-wrap {
     position: relative;
     width: 100%;
-    aspect-ratio: 5 / 2;
+    flex: 1;
+    min-height: 160px;
     background-color: #eef3e3;
     background-image:
         linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
     background-size: 3% 6%;
     border: 2px solid #000;
-    border-radius: 4px;
+    border-radius: 8px;
     overflow: hidden;
 }
 
@@ -912,16 +997,54 @@ header.top {
     cursor: not-allowed;
 }
 
-.map-legend {
+.map-stage {
+    position: relative;
+    flex: 1;
+    min-height: 0;
     display: flex;
-    flex-wrap: wrap;
-    gap: 24px;
+    flex-direction: column;
+}
+
+.map-info-wrap {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    z-index: 40;
+    display: flex;
+}
+
+.map-legend {
+    position: absolute;
+    top: 100%;
+    right: 0;
     margin-top: 8px;
-    align-items: center;
+    display: flex;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    align-items: flex-start;
+    flex-shrink: 0;
+    gap: 8px;
+    width: max-content;
+    max-width: 260px;
     background-color: var(--panel-bg);
     border-radius: 8px;
     border: #000 2px solid;
-    padding: 10px;
+    padding: 10px 14px;
+    box-shadow: 6px 6px 0px rgba(0, 0, 0, 0.25);
+    z-index: 60;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translateY(-4px);
+    transition: opacity 0.15s ease, transform 0.15s ease, visibility 0.15s;
+}
+
+.map-info-wrap:hover .map-legend,
+.map-info-wrap:focus-within .map-legend {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+    transform: translateY(0);
 }
 
 .map-legend span {
@@ -1164,6 +1287,10 @@ iframe {
     border-left: 5px solid var(--hybrid-red);
 }
 
+.settings-btn{
+    font-size: 1rem;
+}
+
 .setup-row {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
@@ -1397,14 +1524,119 @@ iframe {
     font-size: 1.5rem;
 }
 
-/* Responsive collapse */
+.card-p{
+    font-size: 1.5rem;
+    color: whitesmoke;
+    white-space:pre-wrap;
+    line-height:1.5;
+}
+#overTitle, #levelIntroTitle{
+    color: whitesmoke;
+}
+
+/* =========================================================
+   MOBILE / SMALL SCREEN RULES
+   ========================================================= */
+
+/* --- Force landscape orientation on phones held upright ---
+   Rotates the whole page 90° so the layout always renders in its
+   landscape design, regardless of how the device is physically held. */
+@media screen and (max-width: 968px) and (orientation: portrait) {
+    html {
+        overflow: hidden;
+    }
+
+    body {
+        width: 100vh;
+        height: 100vw;
+        transform: rotate(90deg);
+        transform-origin: top left;
+        position: absolute;
+        top: 0;
+        left: 100%;
+        overflow: hidden;
+    }
+}
+
+/* --- Compact top bar: keep brand / stats / action controls on one row --- */
 @media screen and (max-width: 968px) {
     header.top {
-        flex-direction: column;
-        align-items: stretch;
+        flex-direction: row;
+        flex-wrap: nowrap;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 10px;
+        padding: 8px 10px;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .brand-group {
+        margin-left: 0;
+        gap: 6px;
+        flex-shrink: 0;
+    }
+
+    .head-readout {
+        gap: 10px;
+        flex-shrink: 0;
+    }
+
+    .readout .lbl {
+        font-size: 0.6rem;
+    }
+
+    .readout .val {
+        font-size: 1rem;
+    }
+
+    .action-block {
+        margin-right: 0;
+        gap: 8px;
+        flex-shrink: 0;
+        white-space: nowrap;
+    }
+
+    .phase-text-container {
+        max-width: 140px;
+        font-size: 0.68rem;
+    }
+
+    .pbtn {
+        white-space: nowrap;
     }
 
     .side-by-side-row {
         grid-template-columns: 1fr;
+    }
+
+    /* --- Menu overlay: move the button card to the left so it stops
+       covering the second title line on narrow screens --- */
+    #menu-title-container {
+        left: 5%;
+        top: 4%;
+        width: 55%;
+    }
+
+    #menuTitle1,
+    #menuTitle2 {
+        font-size: 3.4rem;
+    }
+
+    #menu-card {
+        right: 3%;
+        bottom: 3%;
+        background-size: cover;
+        gap: 8px;
+        width: 22%;
+        height: 50%;
+    }
+
+    .nest-btn.menu-btn{
+        font-size: 1.2rem;
+    }
+
+    .control-btn{
+        font-size: 0.9rem !important;
     }
 }

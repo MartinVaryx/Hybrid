@@ -40,19 +40,14 @@
 </head>
 <body>
 
-    <!-- Top Logo Navigation -->
-    <div class="top-logo-bar">
-        <div id="pc-logo-container" class="logo-container" onclick="window.location.href='../index.html'">
-            <img src="../assets/logo.png" alt="HYBRID" class="logo-img">
-        </div>
-    </div>
 
     <header class="top" id="topBar">
         <div class="brand-group">
+            <button class="nest-btn settings-btn" id="menuHeaderBtn" onclick="showMenu()" data-i18n="menu.header_btn">MENU</button>
+            <button class="nest-btn settings-btn sandbox-only hidden" id="sandboxEditorToggleBtn" type="button">EDITOR</button>
             <button class="nest-btn settings-btn" id="settingsBtn">
                 <span class="gear">⚙</span> <span data-i18n="settings.btn">Parametre</span>
             </button>
-            <button class="nest-btn settings-btn" id="menuHeaderBtn" onclick="showMenu()" data-i18n="menu.header_btn">MENU</button>
         </div>
 
         <div class="head-readout">
@@ -84,15 +79,12 @@
         </div>
 
         <div class="action-block">
-            <div class="phase-text-container">
-                <div class="ptxt" id="phaseText" data-i18n="phase.idle_text">Pripravené. Otvorte <b>⚙ Parametre</b> pre konfiguráciu hniezda a potom spustite pozorovanie.</div>
-            </div>
             <button class="nest-btn primary-btn pbtn" id="phaseBtn" data-i18n="phase.begin_simulation">Začať simuláciu</button>
             <button class="nest-btn danger pbtn hidden" id="stopSimBtn" data-i18n="phase.stop_simulation">ZASTAVIŤ SIMULÁCIU</button>
         </div>
 
     </header>
-    
+
     <!-- Full-Width nest Container -->
     <div class="nest-container">
         <!-- Top Control & Readout Bar -->
@@ -103,82 +95,41 @@
 
             <div class="main-grid">
 
-                <!-- SANDBOX MAP-EDITOR PANEL (sandbox mode only; hidden by default, shown by sandbox.js) -->
-                <section class="panel sandbox-editor-panel hidden" id="sandboxEditorPanel">
-                    <div class="panel-head">
-                        <h2 data-i18n="sandbox.editor_title">Úprava mapy (Sandbox)</h2>
-                        <span class="autosave-status" id="sbStatus"></span>
-                        <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
-                    </div>
-                    <div class="panel-body">
-                        <div class="setup-row">
-                            <div class="field">
-                                <label data-i18n="sandbox.lbl_level_name">Názov úrovne</label>
-                                <input type="text" id="sbLevelNameInput" value="">
-                            </div>
-                            <div class="field">
-                                <label data-i18n="sandbox.lbl_level_desc">Popis (v zozname kampane)</label>
-                                <input type="text" id="sbLevelDescInput" placeholder="voliteľné, krátky popis" data-i18n-placeholder="sandbox.placeholder_level_desc">
-                            </div>
-                            <div class="field">
-                                <label data-i18n="sandbox.lbl_level_file">Súbor pri exporte</label>
-                                <input type="text" id="sbLevelFileInput" value="level-1.json">
-                            </div>
-                            <div class="field">
-                                <label data-i18n="sandbox.lbl_background">Pozadie mapy</label>
-                                <input type="text" id="sbBackgroundInput" placeholder="napr. map_forest.jpg" data-i18n-placeholder="sandbox.placeholder_background">
-                            </div>
-                        </div>
-                        <div class="sandbox-toolbar-actions">
-                            <button class="nest-btn small" id="sbIntroBtn" type="button" data-i18n="sandbox.btn_intro">📝 Úvodná správa</button>
-                            <button class="nest-btn small" id="sbNewBtn" type="button" data-i18n="sandbox.btn_new">🆕 Nová úroveň</button>
-                            <button class="nest-btn small" id="sbLoadBtn" type="button" data-i18n="sandbox.btn_load">📂 Načítať JSON</button>
-                            <input style="display: none;" type="file" id="sbLoadFile" accept="application/json" class="hidden">
-                            <button class="nest-btn primary-btn small" id="sbExportCurrentBtn" type="button" data-i18n="sandbox.btn_export_current">⬇ Exportovať aktuálny stav</button>
-                            <button class="nest-btn small" id="sbExportDefaultBtn" type="button" data-i18n="sandbox.btn_export_default">⬇ Exportovať počiatočný stav</button>
-                        </div>
-                    </div>
-                </section>
-
                 <!-- MAP PANEL (FULL WIDTH) -->
                 <section class="panel map-panel">
-                    <div class="panel-head">
-                        <h2 data-i18n="map.title">Mapa hniezda a pevností</h2>
-                        <div class="head-actions">
-                            <div class="sandbox-fort-controls hidden" id="sandboxFortControls">
-                                <button class="nest-btn header-btn small" id="sbAddFortBtn" type="button" data-i18n="sandbox.btn_add_fort">+ Pridať pevnosť</button>
-                                <button class="nest-btn header-btn small danger" id="sbRemoveFortBtn" type="button" data-i18n="sandbox.btn_remove_fort">🗑 Odstrániť</button>
-                                <label class="sb-defense-label" for="sbFortDefenseInput"><span data-i18n="sandbox.lbl_defense">Obrana:</span>
-                                    <input type="number" id="sbFortDefenseInput" min="1" max="1000" placeholder="--" disabled>
-                                </label>
-                            </div>
-                            <button class="act nest-btn header-btn" id="saveHumansBtn" onclick="saveHumans()"
-                                    data-i18n-title="map.evacuate_tooltip"
-                                    title="Evakuovať ľudí z loveckého bazéna skôr, než k nim hniezdo dosiahne. K dispozícii v ktoromkoľvek kroku, nezávisle od fronty.">
-                                <span data-i18n="map.evacuate_btn">Evakuovať ľudí</span> <span class="cost">(−<span id="saveHumansCostLbl">1</span> pt)</span>
-                            </button>
-                            <span class="tag" id="fortsTag">10/10 forts standing</span>
-                            <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
-                        </div>
-                    </div>
                     <div class="panel-body">
-                        <div class="map-wrap" id="mapWrap"></div>
-                        <div class="map-legend">
-                            <span><img src="/nest/assets/nest_icon.png" alt="Nest"> <span data-i18n="map.legend_nest">Hniezdo</span></span>
-                            <span><img src="/nest/assets/fort_icon.png" alt="Fort standing"> <span data-i18n="map.legend_fort_standing">Stojaca pevnosť</span></span>
-                            <span><img src="/nest/assets/fort_icon.png" alt="Fort under assault" style="filter:drop-shadow(0 0 3px var(--hybrid-red));"> <span data-i18n="map.legend_nearest_fort">Najbližšia pevnosť</span></span>
-                            <span><img src="/nest/assets/scout.png" alt="Scout"> <span data-i18n="map.legend_scout_search">Prieskumná hliadka</span></span>
-                            <span><img src="/nest/assets/predator.png" alt="Predator"> <span data-i18n="map.legend_hunting_party">Lovecká svorka</span></span>
-                            <span><img src="/nest/assets/fort_icon.png" alt="Fort fallen" style="opacity:0.35; filter:grayscale(1);"> <span data-i18n="map.legend_fort_fallen">Padlá pevnosť</span></span>
+                        <div class="map-stage">
+                            <div class="map-wrap" id="mapWrap"></div>
+                            <div class="map-info-wrap">
+                                <button class="nest-btn" id="map-info"><strong>i</strong></button>
+                                <div class="map-legend">
+                                    <span><img src="/nest/assets/nest_icon.png" alt="Nest"> <span data-i18n="map.legend_nest">Hniezdo</span></span>
+                                    <span><img src="/nest/assets/fort_icon.png" alt="Fort standing"> <span data-i18n="map.legend_fort_standing">Stojaca pevnosť</span></span>
+                                    <span><img src="/nest/assets/fort_icon.png" alt="Fort under assault" style="filter:drop-shadow(0 0 3px var(--hybrid-red));"> <span data-i18n="map.legend_nearest_fort">Najbližšia pevnosť</span></span>
+                                    <span><img src="/nest/assets/scout.png" alt="Scout"> <span data-i18n="map.legend_scout_search">Prieskumná hliadka</span></span>
+                                    <span><img src="/nest/assets/predator.png" alt="Predator"> <span data-i18n="map.legend_hunting_party">Lovecká svorka</span></span>
+                                    <span><img src="/nest/assets/fort_icon.png" alt="Fort fallen" style="opacity:0.35; filter:grayscale(1);"> <span data-i18n="map.legend_fort_fallen">Padlá pevnosť</span></span>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </section>
 
                 <!-- FIELD LOG (FULL WIDTH) -->
                 <section class="panel log-panel">
+                    <div class="panel-head hidden" id="sandboxLogHead">
+                        <div class="head-actions">
+                            <div class="sandbox-fort-controls" id="sandboxFortControls">
+                                <button class="nest-btn header-btn small" id="sbAddFortBtn" type="button" data-i18n="sandbox.btn_add_fort">+ Pridať pevnosť</button>
+                                <button class="nest-btn header-btn small danger" id="sbRemoveFortBtn" type="button" data-i18n="sandbox.btn_remove_fort">🗑 Odstrániť</button>
+                                <label class="sb-defense-label" for="sbFortDefenseInput"><span data-i18n="sandbox.lbl_defense">Obrana:</span>
+                                    <input type="number" id="sbFortDefenseInput" min="1" max="1000" placeholder="--" disabled>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
                     <div class="panel-head">
                         <h2 data-i18n="log.title">Správy z terénu</h2>
-                        <button class="panel-collapse-btn" type="button" aria-label="Collapse panel"><span class="arrow">▾</span></button>
                     </div>
                     <div class="panel-body" style="padding-top:6px;">
                         <ul class="log-list" id="logList"></ul>
@@ -195,11 +146,28 @@
                 </section>
             </div>
 
-            <div class="footer-note" data-i18n="footer.note">
-                Každý krok ≈ 12 hodín · Akčné body sa obnovujú každý krok · Nastavenia upravte cez ⚙ Parametre pred spustením
-            </div>
         </div>
 
+    </div>
+
+    <div class="bottom" id="bottomBar">
+        <div id="controls-containter">
+            <button class="nest-btn control-btn" id="scan-btn" onclick="scanForHidden()"
+                    data-i18n-title="map.scan_tooltip"
+                    title="Odhaliť skryté Skautky - čím viac ich je, tým viac odhalíš.">
+                <span>🔍</span><span data-i18n="map.scan_btn">SKENOVAŤ</span> <span class="cost">(<span id="scanCostLbl">1</span>)</span>
+            </button>
+            <button class="nest-btn control-btn" id="hire-btn" onclick="Hire()"
+                    data-i18n-title="map.hire_tooltip"
+                    title="Najať Hybrida (zvýši počet akčných bodov o 1).">
+                <span data-i18n="map.hire_btn">NAJAŤ (1)</span>
+            </button>
+            <button class="act nest-btn control-btn" id="saveHumansBtn" onclick="saveHumans()"
+                    data-i18n-title="map.evacuate_tooltip"
+                    title="Evakuovať ľudí z loveckého bazéna skôr, než k nim hniezdo dosiahne. K dispozícii v ktoromkoľvek kroku, nezávisle od fronty.">
+                <span data-i18n="map.evacuate_btn">Evakuovať ľudí</span> <span class="cost">(<span id="saveHumansCostLbl">1</span>)</span>
+            </button>
+        </div>
     </div>
 
     <!-- EVENT DETAILS OVERLAY MODAL -->
@@ -248,7 +216,7 @@
                 </div>
                 <div class="field">
                     <label data-i18n="settings.lbl_eggs_per_search">Bonusové vajíčka za úspešný prieskum</label>
-                    <input type="number" id="eggsPerSearchInput" min="0" max="20" value="2">
+                    <input type="number" id="eggsPerSearchInput" min="0" max="20" step="0.1" value="2">
                     <div class="hint" data-i18n="settings.hint_eggs_per_search">Extra vajíčka, ktoré kráľovná okamžite znesie za každý prieskum, ktorý nájde osídlenie.</div>
                 </div>
             </div>
@@ -366,10 +334,6 @@
                     <input type="number" id="fortConquerThresholdInput" min="1" max="1" value="0.5">
                 </div>
                 <div class="field">
-                    <label data-i18n="settings.lbl_fort_predator_loss">Straty predátorov pri dobytí</label>
-                    <input type="number" id="fortPredatorLossInput" min="0" max="200" value="20">
-                </div>
-                <div class="field">
                     <label data-i18n="settings.lbl_fort_human_gain">Získaní ľudia pri dobytí</label>
                     <input type="number" id="fortHumanGainInput" min="0" max="2000" value="50">
                 </div>
@@ -404,6 +368,10 @@
                 <div class="field">
                     <label data-i18n="settings.lbl_save_humans_amount">Evakuovaní ľudia za použitie</label>
                     <input type="number" id="saveHumansAmountInput" min="0" max="500" value="5">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_scan">Skenovať skryté skautky (body)</label>
+                    <input type="number" id="costScanInput" min="0" max="50" value="1">
                 </div>
             </div>
 
@@ -452,7 +420,7 @@
         <div class="overlay-card">
             <button class="close-x" id="gameOverCloseX">✕</button>
             <h2 id="overTitle" data-i18n="gameover.title">Simulácia skončila</h2>
-            <p id="overText"></p>
+            <p id="overText" class="card-p"></p>
             <button class="nest-btn primary-btn" id="restartBtn" data-i18n="gameover.restart_btn">Reštartovať simuláciu</button>
         </div>
     </div>
@@ -566,12 +534,56 @@
         </div>
     </div>
 
-    <!-- Shared Footer -->
-    <div class="footer">
-        <div class="footer-content">
-            <img src="../assets/logo.png" id="footer-logo" alt="HYBRID" style="height: 35px; align-self: flex-start;">
-            <div class="footer-copyright">
-                <p data-i18n="footer.copyright">&copy; 2026 HYBRID RPG. Všetky práva vyhradené.</p>
+    <!-- SANDBOX: WIN/LOSS CONDITIONS OVERLAY -->
+    <div class="overlay hidden" id="sandboxConditionsOverlay">
+        <div class="overlay-card wide">
+            <button class="close-x" id="sbConditionsCloseX">✕</button>
+            <h2 class="left">Podmienky víťazstva / prehry</h2>
+            <p class="settings-note">Pridajte viacero podmienok. Keď sa splní ktorákoľvek z nich, hra sa skončí. Hniezdo zrútenie je vždy víťazstvo.</p>
+            <div class="conditions-list" id="sandboxConditionsList"></div>
+            <div style="display:flex; justify-content:space-between; margin-top:18px; gap:10px; flex-wrap:wrap;">
+                <button class="nest-btn small" id="sbAddConditionBtn" type="button">+ Pridať podmienku</button>
+                <button class="nest-btn primary-btn" id="sbConditionsDoneBtn" type="button">Hotovo</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SANDBOX MAP-EDITOR OVERLAY (sandbox mode only; hidden by default, toggled by the EDITOR button) -->
+    <div class="overlay hidden sandbox-editor-panel" id="sandboxEditorPanel">
+        <div class="overlay-card wide sandbox-editor-card">
+            <button class="close-x" id="sbEditorCloseX">✕</button>
+            <div class="panel-head">
+                <h2 data-i18n="sandbox.editor_title">Úprava mapy (Sandbox)</h2>
+                <span class="autosave-status" id="sbStatus"></span>
+            </div>
+            <div class="panel-body">
+                <div class="setup-row">
+                    <div class="field">
+                        <label data-i18n="sandbox.lbl_level_name">Názov úrovne</label>
+                        <input type="text" id="sbLevelNameInput" value="">
+                    </div>
+                    <div class="field">
+                        <label data-i18n="sandbox.lbl_level_desc">Popis (v zozname kampane)</label>
+                        <input type="text" id="sbLevelDescInput" placeholder="voliteľné, krátky popis" data-i18n-placeholder="sandbox.placeholder_level_desc">
+                    </div>
+                    <div class="field">
+                        <label data-i18n="sandbox.lbl_level_file">Súbor pri exporte</label>
+                        <input type="text" id="sbLevelFileInput" value="level-1.json">
+                    </div>
+                    <div class="field">
+                        <label data-i18n="sandbox.lbl_background">Pozadie mapy</label>
+                        <input type="text" id="sbBackgroundInput" placeholder="napr. map_forest.jpg" data-i18n-placeholder="sandbox.placeholder_background">
+                    </div>
+                </div>
+                <div class="sandbox-toolbar-actions">
+                    <button class="nest-btn small" id="sbIntroBtn" type="button" data-i18n="sandbox.btn_intro">📝 Úvodná správa</button>
+                    <button class="nest-btn small" id="sbConditionsBtn" type="button">🎯 Podmienky víťazstva / prehry</button>
+                    <button class="nest-btn small" id="sbNewBtn" type="button" data-i18n="sandbox.btn_new">🆕 Nová úroveň</button>
+                    <button class="nest-btn small" id="sbLoadBtn" type="button" data-i18n="sandbox.btn_load">📂 Načítať JSON</button>
+                    <input style="display: none;" type="file" id="sbLoadFile" accept="application/json" class="hidden">
+                    <button class="nest-btn primary-btn small" id="sbExportCurrentBtn" type="button" data-i18n="sandbox.btn_export_current">⬇ Exportovať aktuálny stav</button>
+                    <button class="nest-btn small" id="sbExportDefaultBtn" type="button" data-i18n="sandbox.btn_export_default">⬇ Exportovať počiatočný stav</button>
+                </div>
             </div>
         </div>
     </div>

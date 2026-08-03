@@ -208,7 +208,7 @@ function renderNestAnalytics() {
     <div class="analytics-section">
       <h3>${t('analytics.population_title')}</h3>
       <div class="detail-meta">
-        <div>${t('stats.scouts')}: <b>${scoutsTotal()}</b> (${t('stats.available')}: ${S.scoutsAvailable}, ${t('stats.working')}: ${scoutsWorking()}, ${t('stats.cooldown')}: ${S.scoutsCooldown})</div>
+        <div>${t('stats.scouts')}: <b>${scoutsTotal()}</b> (${t('stats.available')}: ${S.scoutsAvailable}, ${t('stats.working')}: ${scoutsWorking()}, ${t('stats.cooldown')}: ${S.scoutsCooldown}, ${t('stats.hidden')}: ${S.scoutsHidden})</div>
         <div>${t('stats.predators')}: <b>${predatorsTotal()}</b> (${t('stats.available')}: ${S.predatorsAvailable}, ${t('stats.working')}: ${predatorsWorking()}, ${t('stats.cooldown')}: ${S.predatorsCooldown}, ${t('stats.fort_duty')}: ${predatorsFortDuty()})</div>
         <div>${t('analytics.total_population')}: <b>${totalInsectsCount}</b></div>
       </div>
@@ -248,36 +248,42 @@ function freshState(){
     points: 10,
     maxPoints: 10,
     phase: 'idle', // idle | active
-    humans: 200,
+    humans: 100,
     humansKilled: 0,
     food: 200,
+    conditions: [],
+    lastTriggeredCondition: null,
     settings: {
-      lang: 'en', // 'en' | 'sk'
-      groupSize: 4, foodPerHuman: 4, maxPoints: 10, eggsPerSearch: 2,
-      eggCap: 30, eggsPerFood: 3,
+      lang: 'sk', // 'en' | 'sk'
+      groupSize: 4, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 0.4,
+      eggCap: 10, eggsPerFood: 5,
       searchBaseChance: 0.4, searchRatioScale: 0.25,
-      huntBaseChance: 0.8, huntRatioScale: 0.25,
-      huntDeathRisk: 0.7,
-      scoutBiasPerFailedSearch: 0.1,
+      huntBaseChance: 0.9, huntRatioScale: 0.25,
+      huntDeathRisk: 0.5,
+      scoutBiasPerFailedSearch: 2,
       fortLimit: 10,
       defaultFortDefense: 50,
-      fortFoodLow: 2, fortFoodHigh: 4, fortHumanLow: 1, fortHumanHigh: 3,
+      fortFoodLow: 2, fortFoodHigh: 5, fortHumanLow: 1, fortHumanHigh: 3,
       fortDistLow: 15, fortDistHigh: 70,
-      fortPredatorThreshold: 40, fortAttackThreshold: 3.1, fortConquerThreshold: 0.7, fortPredatorLoss: 20,
+      fortPredatorThreshold: 40, fortAttackThreshold: 5, fortConquerThreshold: 0.7,
       fortHumanGain: 100, fortDefendCost: 10, fortDefendExtraLoss: 10,
       costDistractScout: 1, costKillScout: 2, costEscapePredator: 1, costKillPredator: 3,
-      costSaveHumans: 1, saveHumansAmount: 3
+      costSaveHumans: 1, saveHumansAmount: 2, costScan: 1
     },
     queen: { alive: true },
     fortCooldown: 1,
     nest: { x: 25, y: 25 },
     forts: [],
 
-    scoutsAvailable: 6,
+    scoutsAvailable: 4,
+    scoutsHidden: 2,
     scoutsCooldown: 6,
-    predatorsAvailable: 30,
-    predatorsCooldown: 30,
-    eggs: [], larva: [], cocoon: [], nymph: [],
+    predatorsAvailable: 20,
+    predatorsCooldown: 20,
+    eggs: [{age: 0, count: 3},{age: 1, count: 3}],
+    larva: [{age: 0, count: 3},{age: 1, count: 3}],
+    cocoon: [{age: 0, count: 3}, {age: 1, count: 3}],
+    nymph: [{age: 0, count: 3},{age: 1, count: 3}],    
     events: [],
     trails: [],
     animating: false,
@@ -362,6 +368,17 @@ function getFortPredatorStrength(targetFort) {
   return Math.max(1, Math.round(3 * distanceFactor));
 }
 
+// Share of predators (that reached the fort) killed in the assault, based on
+// the ratio of total predator damage to fort defense: defense at 2x damage
+// or more -> 90% die; damage at 2x defense or more -> 10% die; linear
+// interpolation in between.
+function conquestDeathPct(ratio){
+  if (!isFinite(ratio) || ratio >= 2) return 0.1;
+  if (ratio <= 0.5) return 0.9;
+  const frac = (ratio - 0.5) / 1.5;
+  return 0.9 - frac * 0.8;
+}
+
 function searchChanceWithDistance(loc) {
   const base = successChance(S.settings.searchBaseChance, S.settings.searchRatioScale, ratioHumansPerInsect());
   const target = loc || S.nest;
@@ -407,6 +424,102 @@ function pickTargetFort(distancePower = 3) {
   return aliveForts[0];
 }
 
+function normalizeLevelConditions(rawConditions) {
+  if (!Array.isArray(rawConditions)) return [];
+  return rawConditions.filter(Boolean).map((cond, index) => {
+    const outcome = String(cond.outcome || 'victory').toLowerCase();
+    const type = String(cond.type || 'fort_falls');
+    const fortId = cond.fortId ?? cond.targetFortId ?? 'any';
+    return {
+      id: cond.id || `cond-${index + 1}`,
+      outcome: outcome === 'defeat' ? 'defeat' : 'victory',
+      fortId: fortId === 'any' || fortId === 'all' ? 'any' : Number(fortId),
+      type,
+      value: Number(cond.value ?? 0),
+      active: cond.active !== false,
+      label: cond.label || ''
+    };
+  });
+}
+
+function describeCondition(cond) {
+  if (!cond || !cond.type) return 'Neznáma podmienka';
+  const fortLabel = cond.fortId && cond.fortId !== 'any' ? `pevnosť ${cond.fortId}` : 'akákoľvek pevnosť';
+  const value = Number(cond.value || 0);
+  switch (cond.type) {
+    case 'fort_falls':
+      return cond.fortId && cond.fortId !== 'any' ? `Pevnosť ${cond.fortId} padne.` : 'Niektorá pevnosť padne.';
+    case 'fort_defense_below':
+      return `${fortLabel} má obranu nižšiu ako ${value}.`;
+    case 'fort_attacked':
+      return `${fortLabel} je napadnutá.`;
+    case 'forts_fallen_over':
+      return `Padne viac než ${value} pevností.`;
+    case 'humans_killed_over':
+      return `Počet zabitých ľudí presiahne ${value}.`;
+    case 'humans_remaining_below':
+      return `Počet ľudí klesne pod ${value}.`;
+    case 'nest_collapses':
+      return 'Hniezdo zanikne.';
+    default:
+      return cond.label || `Podmienka: ${cond.type}`;
+  }
+}
+
+function summarizeConditions(conditions) {
+  const entries = Array.isArray(conditions) ? conditions.filter(c => c && c.active !== false) : [];
+  if (!entries.length) return '';
+  return entries.map(cond => `${cond.outcome === 'victory' ? 'Víťazstvo' : 'Porážka'}: ${describeCondition(cond)}`).join(' • ');
+}
+
+function conditionMatchesFort(cond, fort) {
+  if (!fort) return false;
+  if (!cond || !cond.fortId || cond.fortId === 'any') return true;
+  return Number(cond.fortId) === Number(fort.id);
+}
+
+function evaluateCustomCondition(cond) {
+  if (!cond || cond.active === false) return false;
+  const forts = Array.isArray(S.forts) ? S.forts : [];
+  switch (cond.type) {
+    case 'fort_falls':
+      return forts.some(f => conditionMatchesFort(cond, f) && !f.alive);
+    case 'fort_defense_below': {
+      const target = cond.fortId && cond.fortId !== 'any' ? forts.find(f => Number(f.id) === Number(cond.fortId)) : null;
+      if (!target) return false;
+      return Number(target.defense) < Number(cond.value || 0);
+    }
+    case 'fort_attacked': {
+      const target = cond.fortId && cond.fortId !== 'any' ? forts.find(f => Number(f.id) === Number(cond.fortId)) : null;
+      if (!target) return false;
+      return Boolean(target.lastAttackedStep != null && target.lastAttackedStep >= 0);
+    }
+    case 'forts_fallen_over':
+      return forts.filter(f => !f.alive).length > Number(cond.value || 0);
+    case 'humans_killed_over':
+      return Number(S.humansKilled || 0) > Number(cond.value || 0);
+    case 'humans_remaining_below':
+      return Number(S.humans || 0) < Number(cond.value || 0);
+    case 'nest_collapses':
+      return totalInsects() <= 0 || (S.humans <= 0 && (S.forts.length === 0 || S.forts.every(f => !f.alive)));
+    default:
+      return false;
+  }
+}
+
+function maybeTriggerConditionGameOver() {
+  if (S.gameOver || !Array.isArray(S.conditions)) return false;
+  for (const cond of S.conditions) {
+    if (!cond || cond.active === false) continue;
+    if (!evaluateCustomCondition(cond)) continue;
+    S.gameOver = true;
+    S.lastTriggeredCondition = cond;
+    S.gameOverMsg = `${cond.outcome === 'victory' ? 'Víťazstvo' : 'Prehra'}: ${describeCondition(cond)}`;
+    return true;
+  }
+  return false;
+}
+
 /* ============================= HELPER UTILS ============================= */
 function scoutsWorking(){
   return S.events.filter(e=>e.type==='search' && e.status==='pending').length;
@@ -419,7 +532,7 @@ function predatorsFortDuty(){
   const e = S.events.find(e=>e.type==='fort' && e.status==='pending');
   return e ? Math.max(0, e.originalAttackers - e.killed) : 0;
 }
-function scoutsTotal(){ return S.scoutsAvailable + scoutsWorking() + S.scoutsCooldown; }
+function scoutsTotal(){ return S.scoutsAvailable + scoutsWorking() + S.scoutsCooldown + S.scoutsHidden; }
 function predatorsTotal(){ return S.predatorsAvailable + predatorsWorking() + S.predatorsCooldown + predatorsFortDuty(); }
 
 function sumCohort(arr){ return arr.reduce((a,c)=>a+c.count,0); }
@@ -454,9 +567,9 @@ const SETTINGS_INPUT_IDS = [
   'huntDeathRiskInput','scoutBiasPerFailedSearchInput','fortLimitInput','defaultFortDefenseInput',
   'fortFoodLowInput','fortFoodHighInput','fortHumanLowInput','fortHumanHighInput',
   'fortDistLowInput','fortDistHighInput',
-  'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput','fortPredatorLossInput','fortHumanGainInput',
+  'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput','fortHumanGainInput',
   'costDistractScoutInput','costKillScoutInput','costEscapePredatorInput','costKillPredatorInput',
-  'costSaveHumansInput','saveHumansAmountInput'
+  'costSaveHumansInput','saveHumansAmountInput','costScanInput'
 ];
 
 function initGame(keepMap = false){
@@ -477,7 +590,7 @@ function initGame(keepMap = false){
   S.humans                         = clampInt(g('startHumansInput'), 1, 5000, D.humans);
   S.food                           = clampInt(g('startFoodInput'), 0, 5000, D.food);
   S.settings.maxPoints             = clampInt(g('maxPointsInput'), 1, 50, D.settings.maxPoints);
-  S.settings.eggsPerSearch         = clampInt(g('eggsPerSearchInput'), 0, 20, D.settings.eggsPerSearch);
+  S.settings.eggsPerSearch         = clampFloat(g('eggsPerSearchInput'), 0, 20, D.settings.eggsPerSearch);
   S.settings.eggCap                = clampInt(g('eggCapInput'), 0, 500, D.settings.eggCap);
   S.settings.eggsPerFood           = clampInt(g('eggsPerFoodInput'), 0, 50, D.settings.eggsPerFood);
   S.settings.searchBaseChance      = clampFloat(g('searchBaseChanceInput'), 0, 90, D.settings.searchBaseChance*100) / 100;
@@ -497,7 +610,6 @@ function initGame(keepMap = false){
   S.settings.fortPredatorThreshold = clampInt(g('fortPredatorThresholdInput'), 1, 500, D.settings.fortPredatorThreshold);
   S.settings.fortAttackThreshold   = clampFloat(g('fortAttackThresholdInput'), 0, 10, D.settings.fortAttackThreshold);
   S.settings.fortConquerThreshold  = clampFloat(g('fortConquerThresholdInput'), 0, 1, D.settings.fortConquerThreshold);
-  S.settings.fortPredatorLoss      = clampInt(g('fortPredatorLossInput'), 0, 200, D.settings.fortPredatorLoss);
   S.settings.fortHumanGain         = clampInt(g('fortHumanGainInput'), 0, 2000, D.settings.fortHumanGain);
   S.settings.costDistractScout     = clampInt(g('costDistractScoutInput'), 0, 50, D.settings.costDistractScout);
   S.settings.costKillScout         = clampInt(g('costKillScoutInput'), 0, 50, D.settings.costKillScout);
@@ -505,6 +617,7 @@ function initGame(keepMap = false){
   S.settings.costKillPredator      = clampInt(g('costKillPredatorInput'), 0, 50, D.settings.costKillPredator);
   S.settings.costSaveHumans        = clampInt(g('costSaveHumansInput'), 0, 50, D.settings.costSaveHumans);
   S.settings.saveHumansAmount      = clampInt(g('saveHumansAmountInput'), 0, 500, D.settings.saveHumansAmount);
+  S.settings.costScan              = clampInt(g('costScanInput'), 0, 50, D.settings.costScan);
   
 
   
@@ -536,6 +649,14 @@ function initGame(keepMap = false){
   } else {
     S.maxPoints = S.settings.maxPoints;
     S.points = S.maxPoints;
+  }
+
+  if (CURRENT_LEVEL && Array.isArray(CURRENT_LEVEL.conditions)) {
+    S.conditions = normalizeLevelConditions(CURRENT_LEVEL.conditions);
+  } else if (currentGameMode === 'campaign' && Array.isArray(S.conditions) && S.conditions.length === 0 && CURRENT_LEVEL && Array.isArray(CURRENT_LEVEL.goals)) {
+    S.conditions = normalizeLevelConditions(CURRENT_LEVEL.goals);
+  } else if (!Array.isArray(S.conditions) || S.conditions.length === 0) {
+    S.conditions = [];
   }
 
   S.history.push({step:0, humans:S.humans, insects: totalInsects()});
@@ -603,7 +724,6 @@ function applyDefaultsToInputs(){
     fortPredatorThresholdInput: d.settings.fortPredatorThreshold,
     fortAttackThresholdInput: d.settings.fortAttackThreshold,
     fortConquerThresholdInput: d.settings.fortConquerThreshold,
-    fortPredatorLossInput: d.settings.fortPredatorLoss,
     fortHumanGainInput: d.settings.fortHumanGain,
     costDistractScoutInput: d.settings.costDistractScout,
     costKillScoutInput: d.settings.costKillScout,
@@ -611,6 +731,7 @@ function applyDefaultsToInputs(){
     costKillPredatorInput: d.settings.costKillPredator,
     costSaveHumansInput: d.settings.costSaveHumans,
     saveHumansAmountInput: d.settings.saveHumansAmount,
+    costScanInput: d.settings.costScan,
   };
   Object.keys(map).forEach(id=>{
     const el = document.getElementById(id);
@@ -777,28 +898,39 @@ function beginSimulation() {
   });
 }
 
+let _lastPhaseLogSignature = null;
+
+function postPhaseLog(txt) {
+  const signature = S.phase + '|' + S.step + '|' + txt;
+  if (signature === _lastPhaseLogSignature) return;
+  _lastPhaseLogSignature = signature;
+  log(txt);
+}
+
 function renderPhaseBanner() {
-  const txt = document.getElementById('phaseText');
   const btn = document.getElementById('phaseBtn');
   const stopBtn = document.getElementById('stopSimBtn');
 
   if (stopBtn) stopBtn.classList.toggle('hidden', !(currentGameMode === 'sandbox' && S.phase === 'active' && !S.gameOver));
 
+  let txt;
+
   if (S.gameOver) {
-    txt.innerHTML = t('phase.simulation_ended');
+    txt = t('phase.simulation_ended');
     btn.textContent = t('phase.view_result');
     btn.disabled = false;
     btn.onclick = renderOverlay;
+    postPhaseLog(txt);
     return;
   }
 
   if (S.phase === 'idle') {
-    txt.innerHTML = t('phase.idle_text');
+    txt = t('phase.idle_text');
     btn.textContent = t('phase.begin_simulation');
     btn.disabled = false;
     btn.onclick = beginSimulation;
   } else if (S.phase === 'stopped') {
-    txt.innerHTML = 'Simulácia zastavená. Aktuálne rozloženie je nastavené ako nový štartovací stav.';
+    txt = 'Simulácia zastavená. Aktuálne rozloženie je nastavené ako nový štartovací stav.';
     btn.textContent = t('phase.begin_simulation');
     btn.disabled = false;
     btn.onclick = beginSimulation;
@@ -812,11 +944,13 @@ function renderPhaseBanner() {
     if (fortPending) parts.push(t('activity.fort'));
 
     const actStr = parts.length ? parts.join(', ') + '.' : t('phase.quiet_step');
-    txt.innerHTML = t('phase.active_text', { step: S.step, activity: actStr });
+    txt = t('phase.active_text', { step: S.step, activity: actStr });
     btn.textContent = S.animating ? t('phase.resolving') : t('phase.resolve_step');
     btn.disabled = !!S.animating;
     btn.onclick = advanceStep;
   }
+
+  postPhaseLog(txt);
 }
 
 /**
@@ -834,7 +968,7 @@ function stopSimulation() {
 
   // Clear insect population
   S.eggs = []; S.larva = []; S.cocoon = []; S.nymph = [];
-  S.scoutsAvailable = 0; S.scoutsCooldown = 0;
+  S.scoutsAvailable = 0; S.scoutsCooldown = 0; S.scoutsHidden = 0;
   S.predatorsAvailable = 0; S.predatorsCooldown = 0;
 
   // Clear events, trails, and active selections
@@ -861,6 +995,8 @@ function advanceStep(){
     return;
   }
 
+  maybeTriggerConditionGameOver();
+
   const outgoing = S.events.filter(e => e.status === 'resolved' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort'));
   const incoming = S.events.filter(e => e.status === 'pending' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort'));
 
@@ -880,6 +1016,16 @@ function ratioHumansPerInsect(){
   return S.humans / insects;
 }
 
+function minHuntersForFeeding(){
+  const s = S.settings;
+  // Hidden scouts aren't part of the fed population yet, so leave them out
+  // of the feeder count (mirrors processLifecycle's feederGroups).
+  const feeders = (scoutsTotal() - S.scoutsHidden) + predatorsTotal() + sumCohort(S.nymph);
+  const queenCost = S.queen.alive ? 1 : 0;
+  const deficit = Math.max(0, feeders + queenCost - S.food);
+  return s.foodPerHuman > 0 ? Math.ceil(deficit / s.foodPerHuman) : 0;
+}
+
 function fortFactorPct(value, low, high){
   if(high <= low) return value <= low ? 1 : 0;
   if(value <= low) return 1;
@@ -892,11 +1038,33 @@ function fortReadiness(targetFort){
   const insects = totalInsects();
   const foodPerInsect = insects > 0 ? S.food / insects : 0;
   const foodPct = insects > 0 ? fortFactorPct(foodPerInsect, s.fortFoodLow, s.fortFoodHigh) : 0;
-  const humanPct = insects > 0 ? fortFactorPct(ratioHumansPerInsect(), s.fortHumanLow, s.fortHumanHigh) : 0;
+  
+  // Revised humanPct logic
+  let humanPct = 0;
+  if (insects > 0) {
+    const ratio = ratioHumansPerInsect();
+    
+    // Check the ratio directly instead of S.humans
+    if (ratio < 1.0) {
+      // Scarcity ranges from 0 (humans equal insects) to 1 (humans reach 0)
+      const scarcity = 1 - ratio; 
+      
+      // Starts at 1.0 and grows steeply up to 3.0 using a quadratic curve
+      humanPct = 1 + 2 * Math.pow(scarcity, 2); 
+    } else {
+      humanPct = fortFactorPct(ratio, s.fortHumanLow, s.fortHumanHigh);
+    }
+  }
+
   const predatorPct = s.fortPredatorThreshold > 0 ? (predatorsTotal() / s.fortPredatorThreshold) : 0;
   const d = targetFort ? dist(S.nest, targetFort) : 0;
   const distPct = targetFort ? fortFactorPct(d, s.fortDistLow, s.fortDistHigh) : 0;
-  return { foodPct, humanPct, predatorPct, distPct, total: foodPct + humanPct + predatorPct + distPct };
+  const pendingHuntSlots = S.events.filter(e => e.type === 'hunt' && e.status === 'pending').length;
+  const idlePredators = Math.max(0, S.predatorsAvailable - pendingHuntSlots);
+  const idlePct = Math.min(1, idlePredators / 30);
+  
+  console.log(humanPct);
+  return { foodPct, humanPct, predatorPct, distPct, idlePct, total: foodPct + humanPct + predatorPct + distPct + idlePct };
 }
 
 function maybeTriggerFort() {
@@ -912,31 +1080,43 @@ function maybeTriggerFort() {
   const readiness = fortReadiness(targetFort);
   if (readiness.total < S.settings.fortAttackThreshold) return;
 
-  const cap = Math.max(0, S.settings.fortPredatorThreshold);
-  let needed = Math.min(cap, S.predatorsAvailable + predatorsWorking());
-  if (needed <= 0) return;
+  const pool = S.predatorsAvailable + predatorsWorking();
+  if (pool <= 0) return;
 
-  const fromAvailable = Math.min(needed, S.predatorsAvailable);
-  S.predatorsAvailable -= fromAvailable;
-  needed -= fromAvailable;
+  // Let some predators skip a few hunt slots if humans are scarce relative to
+  // the colony size, or if food is already sufficient that a fort conquest is
+  // more valuable than a full hunt fill.
+  let idlePredators = S.predatorsAvailable;
+  const insects = totalInsects();
+  const humanToInsectRatio = insects > 0 ? S.humans / insects : 0;
+  const humanScarcity = Math.max(0, Math.min(1, 1 - Math.min(2, humanToInsectRatio) / 2));
+  const foodPressure = Math.max(0, Math.min(1, readiness.foodPct));
+  const huntFillShare = Math.max(0.1, Math.min(0.9, 0.4 + foodPressure * 0.35 - humanScarcity * 1.3));
+  const huntAllowance = Math.max(0, Math.min(idlePredators, Math.floor(idlePredators * huntFillShare)));
 
-  let fromWorking = 0;
-  if (needed > 0) {
-    for (const e of S.events) {
-      if (needed <= 0) break;
-      if (e.type !== 'hunt' || e.status !== 'pending') continue;
-      const active = e.groupSize - e.neutralized - e.killed;
-      const take = Math.min(active, needed);
-      if (take <= 0) continue;
-      e.groupSize -= take;
-      fromWorking += take;
-      needed -= take;
-    }
+  let huntUsed = 0;
+  for (const e of S.events) {
+    if (idlePredators <= 0 || huntUsed >= huntAllowance) break;
+    if (e.type !== 'hunt' || e.status !== 'pending') continue;
+    const openSlots = Math.max(0, e.groupSize - e.neutralized - e.killed);
+    if (openSlots <= 0) continue;
+    const fill = Math.min(openSlots, idlePredators, huntAllowance - huntUsed);
+    if (fill <= 0) continue;
+    e.groupSize += fill;
+    idlePredators -= fill;
+    huntUsed += fill;
   }
 
-  S.events = S.events.filter(e => !(e.type === 'hunt' && (e.groupSize - e.neutralized - e.killed <= 0)));
+  const remaining = Math.max(0, idlePredators);
+  const conquestShare = Math.max(
+    0.8,
+    Math.min(1, (readiness.humanPct + (1 - readiness.distPct) + readiness.idlePct) / 2.5)
+  );
+  const attackers = Math.max(0, Math.min(remaining, Math.round(remaining * conquestShare)));
+  if (attackers <= 0) return;
 
-  const attackers = fromAvailable + fromWorking;
+  S.predatorsAvailable = remaining - attackers;
+
   S.events.push({ 
     id: nid(), 
     type: 'fort', 
@@ -961,7 +1141,6 @@ function maybeTriggerFort() {
     id: targetFort.id
   });
 
-  if (fromWorking > 0) msg += t('fort_trigger.pulled_hunt', { count: fromWorking });
   if (leftoverHunting > 0) msg += t('fort_trigger.leftover_hunt', { count: leftoverHunting });
   log(msg);
 }
@@ -996,10 +1175,31 @@ function advanceStepLogic(){
   const oldPredatorsAvailable = S.predatorsAvailable;
   const oldPredatorsCooldown = S.predatorsCooldown;
 
-  /* ---- 1. resolve searches ---- */
+  /* ---- 1. reveal hidden scouts and resolve the full search batch ---- */
+  const humansAreGone = S.humans <= 0;
+  if (S.scoutsHidden > 0) {
+    const revealedHidden = S.scoutsHidden;
+    S.scoutsHidden = 0;
+    if (!humansAreGone) {
+      for (let i = 0; i < revealedHidden; i++) {
+        const e = { id: nid(), type: 'search', status: 'pending', outcome: null };
+        assignEventCoords(e);
+        S.events.push(e);
+      }
+      log(t('log.hidden_scouts_revealed', { count: revealedHidden }));
+    } else {
+      log('Ľudia sú 0: skauti automaticky zlyhávajú a nevyvolávajú hľadanie potravy.');
+    }
+  }
+
   let successfulSearches = 0, naturalFailures = 0;
   S.events.filter(e=>e.type==='search' && e.status==='pending').forEach(e=>{
     e.status = 'resolved';
+    if (humansAreGone) {
+      e.outcome = 'failed';
+      naturalFailures++;
+      return;
+    }
     const searchChance = searchChanceWithDistance(e);
     if (!e.outcome) { 
         if(0.5 < searchChance){ e.outcome='succeeded'; successfulSearches++; }
@@ -1008,7 +1208,12 @@ function advanceStepLogic(){
         naturalFailures++;
     }
   });
-  const bonusEggs = successfulSearches * S.settings.eggsPerSearch;
+
+  // There can be at most as many successful searches as humans currently alive;
+  // this makes the zero-human edge case redundant while still guarding it.
+  successfulSearches = Math.max(0, Math.min(successfulSearches, S.humans));
+
+  const bonusEggs = Math.round(successfulSearches * S.settings.eggsPerSearch);
   let scoutSurvivorsThisTick = S.events.filter(e=>e.type==='search' && e.outcome!=='killed').length;
   if(successfulSearches>0) log(t('log.searches_succeeded', { count: successfulSearches, eggs: bonusEggs }));
   if(naturalFailures>0) log(t('log.searches_failed', { count: naturalFailures }));
@@ -1053,17 +1258,29 @@ function advanceStepLogic(){
     const targetFort = S.forts.find(f => f.id === e.targetFortId);
 
     if (targetFort && targetFort.alive) {
-      const predStrength = getFortPredatorStrength(targetFort);
-      const totalDamage = remaining * predStrength;
+      const s = S.settings;
+      const d = dist(S.nest, targetFort);
+      // % distance = how far along the close->far scale (fortDistLow..High)
+      // the fort sits; farther forts bleed more attackers on the way in.
+      const distanceFraction = 1 - fortFactorPct(d, s.fortDistLow, s.fortDistHigh);
+      const attritionDeaths = Math.round(remaining * 0.01 * distanceFraction);
+      const reaching = Math.max(0, remaining - attritionDeaths);
 
-      targetFort.defense = Math.max(0, targetFort.defense - totalDamage);
+      const predStrength = getFortPredatorStrength(targetFort);
+      const totalDamage = reaching * predStrength;
+      const defenseBefore = targetFort.defense;
+      const ratio = defenseBefore > 0 ? totalDamage / defenseBefore : Infinity;
+      const combatDeaths = Math.round(reaching * conquestDeathPct(ratio));
+
+      const lostInAssault = Math.min(remaining, attritionDeaths + combatDeaths);
+      predatorSurvivorsThisTick += remaining - lostInAssault;
+
+      targetFort.defense = Math.max(0, defenseBefore - totalDamage);
 
       if (targetFort.defense <= 0) {
         e.outcome = 'conquered';
         targetFort.alive = false;
-        const lostInAssault = Math.min(remaining, S.settings.fortPredatorLoss);
-        predatorSurvivorsThisTick += remaining - lostInAssault;
-        S.humans += S.settings.fortHumanGain;
+        S.humans += s.fortHumanGain;
         S.fortCooldown = 1;
         log(t('log.fort_fallen', {
           id: targetFort.id,
@@ -1071,18 +1288,18 @@ function advanceStepLogic(){
           attackers: remaining,
           strength: predStrength,
           lost: lostInAssault,
-          humans: S.settings.fortHumanGain
+          humans: s.fortHumanGain
         }));
       } else {
         e.outcome = 'defended';
-        predatorSurvivorsThisTick += remaining;
         log(t('log.fort_held', {
           id: targetFort.id,
           damage: totalDamage,
           defense: targetFort.defense,
           maxDefense: targetFort.maxDefense,
           attackers: remaining,
-          strength: predStrength
+          strength: predStrength,
+          lost: lostInAssault
         }));
       }
     }
@@ -1101,7 +1318,17 @@ function advanceStepLogic(){
 
   /* ---- 6. finalize buckets ---- */
   S.scoutsCooldown = scoutsAfter.survivors;
-  S.scoutsAvailable = scoutsAfter.available + scoutsAfter.cooldown + scoutsAfter.newlyMatured;
+  // Half of every batch of scouts becoming ready this step starts out hidden
+  // (mirrors the initial seed split). This must cover the whole ready pool
+  // (cooldown graduates + newly matured), not just newlyMatured: population
+  // growth plateaus once scoutsAlive catches up to predatorsAlive/groupSize,
+  // so newlyMatured alone permanently hits 0 after a few steps and would
+  // starve the hidden pool. Cooldown graduates keep cycling every step, so
+  // splitting off of the full pool keeps scanning relevant long-term.
+  const readyScouts = scoutsAfter.available + scoutsAfter.cooldown + scoutsAfter.newlyMatured;
+  const newlyHiddenScouts = Math.floor(readyScouts * 0.8);
+  S.scoutsHidden += newlyHiddenScouts;
+  S.scoutsAvailable = readyScouts - newlyHiddenScouts;
   S.predatorsCooldown = predatorsAfter.survivors;
   S.predatorsAvailable = predatorsAfter.available + predatorsAfter.cooldown + predatorsAfter.newlyMatured;
 
@@ -1112,22 +1339,29 @@ function advanceStepLogic(){
   if (S.humans <= 0 && allFortsConquered) {
     S.gameOver = true;
     S.gameOverMsg = t('gameover.all_humans_dead');
+    S.lastTriggeredCondition = { outcome: 'defeat', type: 'humans_remaining_below', value: 0 };
   } else if (totalInsects() <= 0) {
     S.gameOver = true;
     S.gameOverMsg = t('gameover.swarm_eliminated');
+    S.lastTriggeredCondition = { outcome: 'victory', type: 'nest_collapses', value: 0 };
+  }
+
+  if (!S.gameOver) {
+    maybeTriggerConditionGameOver();
   }
   if(S.gameOver){ return; }
 
   /* ---- 7. dispatch NEXT step ---- */
-  const scoutsToDispatch = S.scoutsAvailable;
+  const scoutsToDispatch = humansAreGone ? 0 : S.scoutsAvailable;
   S.scoutsAvailable = 0;
   for(let i=0;i<scoutsToDispatch;i++){ 
     const e = { id:nid(), type:'search', status:'pending', outcome:null }; 
     assignEventCoords(e);
     S.events.push(e); 
   }
+  maybeTriggerFort();
   const groupSize = S.settings.groupSize;
-  const numGroups = Math.max(0, Math.min(Math.floor(S.predatorsAvailable/groupSize), successfulSearches));
+  const numGroups = humansAreGone ? 0 : Math.max(0, Math.min(Math.floor(S.predatorsAvailable/groupSize), successfulSearches));
   const dispatched = numGroups*groupSize;
   S.predatorsAvailable -= dispatched;
   for(let i=0;i<numGroups;i++){ 
@@ -1145,7 +1379,6 @@ function advanceStepLogic(){
   }
   if(numGroups>0) log(t('log.hunts_dispatched', { count: numGroups }));
 
-  maybeTriggerFort();
 
   S.step += 1;
 
@@ -1168,9 +1401,7 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
   });
   S.nymph = stillNymph;
   for(let i=0;i<maturingCount;i++){
-    const desiredScouts = Math.ceil(predatorsAlive / S.settings.groupSize + scoutBias);
-    if(scoutsAlive < desiredScouts){ scoutsAlive += 1; newlyMaturedScouts += 1; }
-    else { predatorsAlive += 1; newlyMaturedPredators += 1; }
+    predatorsAlive += 1; newlyMaturedPredators += 1;
   }
   if(maturingCount>0){
     let matureMsg = t('log.nymphs_matured', { count: maturingCount });
@@ -1184,7 +1415,22 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
   }
 
   let newNymph = 0, stillCocoon = [];
-  S.cocoon.forEach(c=>{ c.age+=1; if(c.age>=1) newNymph+=c.count; else stillCocoon.push(c); });
+  S.cocoon.forEach(c=>{
+    c.age += 1;
+    if(c.age>=1){
+      for(let i=0;i<c.count;i++){
+        const desiredScouts = Math.ceil(predatorsAlive / S.settings.groupSize + scoutBias);
+        if(scoutsAlive < desiredScouts){
+          scoutsAlive += 1;
+          newlyMaturedScouts += 1;
+        } else {
+          newNymph += 1;
+        }
+      }
+    } else {
+      stillCocoon.push(c);
+    }
+  });
   S.cocoon = stillCocoon;
   if(newNymph>0) S.nymph.push({age:0, count:newNymph});
 
@@ -1237,8 +1483,8 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
     const foodRatio = S.food / insectCount;
     if(foodRatio >= 5){
       baseEggs = S.settings.eggCap;
-    } else if(foodRatio > 1){
-      baseEggs = Math.round(S.settings.eggCap * (foodRatio - 1) / 4);
+    } else {
+      baseEggs = Math.round(S.settings.eggCap * (foodRatio - 1) / 3);
     }
 
     const desiredEggs = baseEggs + bonusEggs;
@@ -1419,6 +1665,37 @@ function saveHumans(){
   render();
 }
 
+function scanForHidden(){
+  const cost = S.settings.costScan;
+  if(S.phase!=='active' || S.gameOver) return;
+  if(S.points<cost) return;
+  S.points -= cost;
+  if(S.scoutsHidden>0){
+    const revealed = Math.ceil(S.scoutsHidden / 3);
+    S.scoutsHidden -= revealed;
+    // Dispatch revealed scouts as pending search events right away so their
+    // icons show up on the map immediately, instead of parking them in
+    // scoutsAvailable where they'd stay invisible until the next step dispatch.
+    for (let i = 0; i < revealed; i++) {
+      const e = { id: nid(), type: 'search', status: 'pending', outcome: null };
+      assignEventCoords(e);
+      S.events.push(e);
+    }
+    log(t('log.scan_revealed', { count: revealed, remaining: S.scoutsHidden }));
+  }
+  render();
+}
+
+function Hire(){
+  const cost = 5;
+  if(S.phase!=='active' || S.gameOver) return;
+  if(S.points<cost) return;
+  S.points -= cost;
+  S.maxPoints += 1;
+  log(t('log.hybrid_hired'));
+  render();
+}
+
 function killFortAttacker(eid){
   const e = findEvent(eid);
   if(!e || e.type!=='fort' || e.status!=='pending') return;
@@ -1491,9 +1768,16 @@ function render(){
 
 function renderGlobalActions(){
   const btn = document.getElementById('saveHumansBtn');
-  if(!btn) return;
-  document.getElementById('saveHumansCostLbl').textContent = S.settings.costSaveHumans;
-  btn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costSaveHumans || S.humans<=0;
+  if(btn){
+    document.getElementById('saveHumansCostLbl').textContent = S.settings.costSaveHumans;
+    btn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costSaveHumans || S.humans<=0;
+  }
+  const scanBtn = document.getElementById('scan-btn');
+  if(scanBtn){
+    const costLbl = document.getElementById('scanCostLbl');
+    if(costLbl) costLbl.textContent = S.settings.costScan;
+    scanBtn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costScan;
+  }
 }
 
 function renderQueue(){
@@ -1744,7 +2028,8 @@ function renderStats(){
         { label: t('stats.total'), count: scoutsTotal(), cls: 'main' },
         { label: t('stats.available'), count: S.scoutsAvailable },
         { label: t('stats.working'), count: scoutsWorking() },
-        { label: t('stats.cooldown'), count: S.scoutsCooldown }
+        { label: t('stats.cooldown'), count: S.scoutsCooldown },
+        { label: t('stats.hidden'), count: S.scoutsHidden }
       ]
     },
     {
@@ -2493,7 +2778,7 @@ function renderLog(){
   list.innerHTML = '';
   S.log.slice(0,60).forEach(entry=>{
     const li = document.createElement('li');
-    li.innerHTML = '<span style="color:#666">[S: '+entry.step+']</span> '+entry.msg;
+    li.innerHTML = entry.msg;
     list.appendChild(li);
   });
 }
@@ -2653,7 +2938,8 @@ function renderOverlay(){
   const ov = document.getElementById('gameOverOverlay');
   if(S.gameOver){
     const allFortsConquered = S.forts.length === 0 || S.forts.every(f => !f.alive);
-    document.getElementById('overTitle').textContent = (S.humans<=0 && allFortsConquered) ? t('gameover.humanity_fallen') : t('gameover.nest_collapsed');
+    const isVictory = S.lastTriggeredCondition && S.lastTriggeredCondition.outcome === 'victory';
+    document.getElementById('overTitle').textContent = isVictory ? 'Víťazstvo' : ((S.humans<=0 && allFortsConquered) ? t('gameover.humanity_fallen') : t('gameover.nest_collapsed'));
     document.getElementById('overText').textContent = t('gameover.survived_msg', {
       msg: S.gameOverMsg,
       step: S.step,
@@ -2735,6 +3021,7 @@ function normalizeLevelData(rawLevel) {
           alive: f.alive ?? true
         }))
       : [],
+    conditions: normalizeLevelConditions(rawLevel.conditions || rawLevel.objectives || rawLevel.goals || []),
     settings: settings && typeof settings === 'object' ? { ...settings } : {}
   };
 }
@@ -2908,6 +3195,9 @@ function startCustomLevel() {
 
   // Spustenie hry s načítaným levelom
   initGame(false);
+  if (CURRENT_LEVEL && (CURRENT_LEVEL.intro || (CURRENT_LEVEL.conditions && CURRENT_LEVEL.conditions.length))) {
+    showLevelIntro(CURRENT_LEVEL.intro, CURRENT_LEVEL.name || CURRENT_LEVEL.title, CURRENT_LEVEL.conditions || []);
+  }
 
   // Skrytie hlavného menu a prípadných prekrývacích okien
   if (typeof hideMenu === 'function') {
@@ -3146,11 +3436,11 @@ const LEVEL_SETTINGS_INPUT_MAP = {
   fortHumanLow:'fortHumanLowInput', fortHumanHigh:'fortHumanHighInput',
   fortDistLow:'fortDistLowInput', fortDistHigh:'fortDistHighInput',
   fortPredatorThreshold:'fortPredatorThresholdInput', fortAttackThreshold:'fortAttackThresholdInput',
-  fortConquerThreshold:'fortConquerThresholdInput', fortPredatorLoss:'fortPredatorLossInput',
+  fortConquerThreshold:'fortConquerThresholdInput',
   fortHumanGain:'fortHumanGainInput', costDistractScout:'costDistractScoutInput',
   costKillScout:'costKillScoutInput', costEscapePredator:'costEscapePredatorInput',
   costKillPredator:'costKillPredatorInput', costSaveHumans:'costSaveHumansInput',
-  saveHumansAmount:'saveHumansAmountInput'
+  saveHumansAmount:'saveHumansAmountInput', costScan:'costScanInput'
 };
 
 function applySettingsToInputs(overrides) {
@@ -3165,10 +3455,11 @@ function applySettingsToInputs(overrides) {
 
 function loadLevelIntoGame(level) {
   CURRENT_LEVEL = level || null;
+  if (CURRENT_LEVEL) CURRENT_LEVEL.conditions = normalizeLevelConditions(CURRENT_LEVEL.conditions || CURRENT_LEVEL.objectives || CURRENT_LEVEL.goals || []);
   applySettingsToInputs(level && level.settings);
   initGame();
-  if (level && level.intro) {
-    showLevelIntro(level.intro, level.name);
+  if (level && (level.intro || (level.conditions && level.conditions.length))) {
+    showLevelIntro(level.intro, level.name, level.conditions || CURRENT_LEVEL.conditions || []);
   }
 }
 
@@ -3190,7 +3481,7 @@ function buildLevelIntroOverlay() {
     '<div class="overlay-card">' +
       '<button class="close-x" id="levelIntroCloseX">✕</button>' +
       '<h2 class="left" id="levelIntroTitle"></h2>' +
-      '<p id="levelIntroText" style="white-space:pre-wrap;line-height:1.5;"></p>' +
+      '<p id="levelIntroText" class="card-p"></p>' +
       '<button class="nest-btn primary-btn" id="levelIntroOkBtn">Pokračovať</button>' +
     '</div>';
   document.body.appendChild(overlay);
@@ -3203,10 +3494,14 @@ function buildLevelIntroOverlay() {
   return overlay;
 }
 
-function showLevelIntro(introText, levelName) {
+function showLevelIntro(introText, levelName, conditionList = []) {
   const overlay = buildLevelIntroOverlay();
   overlay.querySelector('#levelIntroTitle').textContent = levelName || 'Briefing';
-  overlay.querySelector('#levelIntroText').textContent = introText;
+  const summary = Array.isArray(conditionList) && conditionList.length
+    ? '\n\nPODMIENKY:\n' + conditionList.map(cond => `- ${cond.outcome === 'victory' ? 'Víťazstvo' : 'Prehra'}: ${describeCondition(cond)}`).join('\n')
+    : '';
+  const text = `${introText || ''}${summary}`.trim();
+  overlay.querySelector('#levelIntroText').textContent = text || 'Bez úvodnej správy.';
   overlay.classList.remove('hidden');
 }
 
@@ -3401,6 +3696,9 @@ async function startCampaignLevel(indexOrLevel = null) {
   if (menuOverlay) menuOverlay.classList.add('hidden');
 
   initGame(false);
+  if (CURRENT_LEVEL && (CURRENT_LEVEL.intro || (CURRENT_LEVEL.conditions && CURRENT_LEVEL.conditions.length))) {
+    showLevelIntro(CURRENT_LEVEL.intro, CURRENT_LEVEL.name || CURRENT_LEVEL.title, CURRENT_LEVEL.conditions || []);
+  }
 }
 
 /**
