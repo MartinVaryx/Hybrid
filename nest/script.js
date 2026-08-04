@@ -1,5 +1,6 @@
 /* ============================= I18N SYSTEM ============================= */
 let TRANSLATIONS = {};
+const DEBUG = false;
 /* ============================= MODE & RESTART STATE ============================= */
 let currentGameMode = 'sandbox'; // 'sandbox' | 'campaign'
 let initialSandboxSnapshot = null; // Stores initial layout/params when sandbox starts
@@ -92,6 +93,59 @@ function dist(p1, p2) {
   return Math.sqrt(dx * dx + dy * dy);
 }
 
+// ---------------------------------------------------------------------------
+// WORLD -> SCREEN CONVERSION
+//
+// The world/level coordinate space is a square 0-100 x 0-100 grid, and game
+// logic (dist(), search/hunt ranges, fort strength, etc.) treats both axes
+// identically - 1 unit north == 1 unit east, like a real physical map. If we
+// simply set left:X%; top:Y% on a container that ISN'T square, X% and Y%
+// resolve against different pixel bases (container width vs height), which
+// silently stretches the world and makes real, equal-in-world distances look
+// different on screen depending on direction - it doesn't touch dist() or
+// any other game logic, only the visuals lie.
+//
+// Fix: always convert world coordinates to pixels with ONE uniform
+// px-per-world-unit scale (the smaller of width/100 or height/100), and
+// letterbox (center, with margin on the shorter axis) instead of stretching.
+// Every place that positions something on #mapWrap should go through this.
+// ---------------------------------------------------------------------------
+
+function getMapLetterbox(wrap) {
+  const rect = wrap.getBoundingClientRect();
+  const scale = Math.min(rect.width, rect.height) / 100;
+  return {
+    scale,
+    offsetX: (rect.width - 100 * scale) / 2,
+    offsetY: (rect.height - 100 * scale) / 2
+  };
+}
+
+function worldToScreenPx(wrap, wx, wy) {
+  const lb = getMapLetterbox(wrap);
+  return {
+    left: lb.offsetX + wx * lb.scale,
+    top: lb.offsetY + wy * lb.scale,
+    scale: lb.scale
+  };
+}
+
+function setWorldPosition(el, wrap, wx, wy) {
+  const p = worldToScreenPx(wrap, wx, wy);
+  el.style.left = p.left + 'px';
+  el.style.top = p.top + 'px';
+}
+
+let _mapResizeHandle = null;
+window.addEventListener('resize', () => {
+  // positions are now computed in px (not %), so they need to be recomputed
+  // when the container size changes - re-run the map render, debounced.
+  clearTimeout(_mapResizeHandle);
+  _mapResizeHandle = setTimeout(() => {
+    if (typeof S !== 'undefined' && S && typeof renderMap === 'function') renderMap();
+  }, 100);
+});
+
 /* ============================= MAP & SPATIAL MATH ============================= */
 function assignEventCoords(e) {
   const minDistance = 10; // Minimum percentage distance between map elements
@@ -178,6 +232,7 @@ function renderNestAnalytics() {
       <div class="detail-meta">
         <div>${t('analytics.queen_state')}: <b class="${S.queen.alive ? 'good' : 'bad'}">${S.queen.alive ? t('stats.active') : t('stats.dead')}</b></div>
         <div>${t('analytics.food_storage')}: <b>${S.food}</b> (${foodPerInsect.toFixed(1)} ${t('analytics.per_insect')})</div>
+        <div>${t('analytics.queen_reserve')}: <b>${S.queenReserve}</b> / ${S.settings.queenFoodReserveCap}</div>
       </div>
     </div>
 
@@ -255,8 +310,8 @@ function freshState(){
     lastTriggeredCondition: null,
     settings: {
       lang: 'sk', // 'en' | 'sk'
-      groupSize: 4, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 0.4,
-      eggCap: 10, eggsPerFood: 5,
+      groupSize: 4, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 0.5,
+      eggCap: 20, eggsPerFood: 5,
       searchBaseChance: 0.4, searchRatioScale: 0.25,
       huntBaseChance: 0.9, huntRatioScale: 0.25,
       huntDeathRisk: 0.5,
@@ -265,25 +320,32 @@ function freshState(){
       defaultFortDefense: 50,
       fortFoodLow: 2, fortFoodHigh: 5, fortHumanLow: 1, fortHumanHigh: 3,
       fortDistLow: 15, fortDistHigh: 70,
-      fortPredatorThreshold: 40, fortAttackThreshold: 5, fortConquerThreshold: 0.7,
-      fortHumanGain: 100, fortDefendCost: 10, fortDefendExtraLoss: 10,
+      fortPredatorThreshold: 40, fortAttackThreshold: 4.8, fortConquerThreshold: 0.7,
+      fortDefendCost: 10, fortDefendExtraLoss: 10,
+      fortCapacityIncreaseAmount: 5, costIncreaseFortCapacity: 1,
+      fortReinforceCost: 4, fortReinforceDefenseBonus: 10,
       costDistractScout: 1, costKillScout: 2, costEscapePredator: 1, costKillPredator: 3,
-      costSaveHumans: 1, saveHumansAmount: 2, costScan: 1
+      costSaveHumans: 1, saveHumansAmount: 2, costScan: 1,
+      queenFoodReserveCap: 120,
+      minPopulationThreshold: 50
     },
     queen: { alive: true },
-    fortCooldown: 1,
+    queenReserve: 0,
+    bounceback: null, // { active, stepsElapsed } - reserve-funded recovery cycle, see processLifecycle
+    fortCooldown: 0,
+    reinforcedForts: [], // fort ids already reinforced this step (reset every advanceStepLogic)
     nest: { x: 25, y: 25 },
     forts: [],
 
     scoutsAvailable: 4,
     scoutsHidden: 2,
     scoutsCooldown: 6,
-    predatorsAvailable: 20,
-    predatorsCooldown: 20,
-    eggs: [{age: 0, count: 3},{age: 1, count: 3}],
-    larva: [{age: 0, count: 3},{age: 1, count: 3}],
-    cocoon: [{age: 0, count: 3}, {age: 1, count: 3}],
-    nymph: [{age: 0, count: 3},{age: 1, count: 3}],    
+    predatorsAvailable: 25,
+    predatorsCooldown: 25,
+    eggs: [{age: 0, count: 4},{age: 1, count: 4}],
+    larva: [{age: 0, count: 4},{age: 1, count: 4}],
+    cocoon: [{age: 0, count: 4}, {age: 1, count: 4}],
+    nymph: [{age: 0, count: 4},{age: 1, count: 4}],    
     events: [],
     trails: [],
     animating: false,
@@ -319,7 +381,9 @@ function generateMapElements() {
         y: 5 + Math.random() * 90,
         alive: true,
         defense: S.settings.defaultFortDefense || 50,
-        maxDefense: S.settings.defaultFortDefense || 50
+        maxDefense: S.settings.defaultFortDefense || 50,
+        capacity: 100,
+        population: Math.round(50 + Math.random() * 50)
       };
 
       let valid = true;
@@ -361,12 +425,63 @@ function getNearestAliveFortDistance(originLoc) {
   return minD;
 }
 
+const FORT_STRENGTH_DISTANCE_DIVISOR = 220; // tune this - overall falloff radius (map units) for fort predator strength
+const FORT_STRENGTH_COMPRESSION_POWER = 2; // tune this - >1 shrinks the "2 dmg" band closer to the "3 dmg" edge, WITHOUT changing the size of the "3 dmg" zone. 1 = original linear behavior.
+
+function getFortStrengthAtDistance(d) {
+  const x = Math.max(0, 1.0 - (d / FORT_STRENGTH_DISTANCE_DIVISOR));
+  const zone3Breakpoint = 0.8333; // x value where strength 3 -> 2 begins - untouched by compression, so the 3-dmg zone size stays fixed
+  const adjustedX = x >= zone3Breakpoint
+    ? x
+    : zone3Breakpoint * Math.pow(x / zone3Breakpoint, FORT_STRENGTH_COMPRESSION_POWER);
+  return Math.max(1, Math.round(3 * adjustedX));
+}
+
 function getFortPredatorStrength(targetFort) {
   if (!targetFort) return 3;
   const d = dist(S.nest, targetFort);
-  const distanceFactor = Math.max(0, 1.0 - (d / 80));
-  return Math.max(1, Math.round(3 * distanceFactor));
+  return getFortStrengthAtDistance(d);
 }
+
+/* ===== DEBUG: FORT STRENGTH ZONES (delete this block + its call in renderMap to remove) ===== */
+function debugRenderFortStrengthZones(wrap) {
+  if (!wrap || !S.nest) return;
+  const lb = getMapLetterbox(wrap);
+  if (!lb.scale) return;
+
+  // sample the actual curve to find where strength really changes - stays correct no matter how the curve above is tuned
+  const step = 0.25;
+  let r1 = null, r2 = null;
+  let prevStrength = getFortStrengthAtDistance(0);
+  for (let d = step; d <= FORT_STRENGTH_DISTANCE_DIVISOR * 1.5; d += step) {
+    const s = getFortStrengthAtDistance(d);
+    if (prevStrength === 3 && s === 2 && r1 === null) r1 = d;
+    if (prevStrength === 2 && s === 1 && r2 === null) r2 = d;
+    prevStrength = s;
+    if (r1 !== null && r2 !== null) break;
+  }
+
+  const zones = [];
+  if (r1 !== null) zones.push({ radius: r1, color: '#ff8c00', label: '3\u21922' }); // 3 -> 2 boundary
+  if (r2 !== null) zones.push({ radius: r2, color: '#ffd400', label: '2\u21921' }); // 2 -> 1 boundary
+
+  zones.forEach(z => {
+    const diameterPx = z.radius * 2 * lb.scale; // one uniform scale now that the map itself letterboxes correctly - a true circle, matching real dist()
+    const ring = document.createElement('div');
+    ring.style.position = 'absolute';
+    setWorldPosition(ring, wrap, S.nest.x, S.nest.y);
+    ring.style.width = diameterPx + 'px';
+    ring.style.height = diameterPx + 'px';
+    ring.style.transform = 'translate(-50%, -50%)';
+    ring.style.border = '3px dashed ' + z.color;
+    ring.style.borderRadius = '50%';
+    ring.style.pointerEvents = 'none';
+    ring.style.zIndex = '3';
+    ring.title = 'strength boundary ' + z.label;
+    wrap.appendChild(ring);
+  });
+}
+/* ===== END DEBUG: FORT STRENGTH ZONES ===== */
 
 // Share of predators (that reached the fort) killed in the assault, based on
 // the ratio of total predator damage to fort defense: defense at 2x damage
@@ -567,9 +682,11 @@ const SETTINGS_INPUT_IDS = [
   'huntDeathRiskInput','scoutBiasPerFailedSearchInput','fortLimitInput','defaultFortDefenseInput',
   'fortFoodLowInput','fortFoodHighInput','fortHumanLowInput','fortHumanHighInput',
   'fortDistLowInput','fortDistHighInput',
-  'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput','fortHumanGainInput',
+  'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput',
   'costDistractScoutInput','costKillScoutInput','costEscapePredatorInput','costKillPredatorInput',
-  'costSaveHumansInput','saveHumansAmountInput','costScanInput'
+  'costSaveHumansInput','saveHumansAmountInput','costScanInput',
+  'costIncreaseFortCapacityInput','fortCapacityIncreaseAmountInput','queenFoodReserveCapInput',
+  'minPopulationThresholdInput','fortReinforceCostInput','fortReinforceDefenseBonusInput'
 ];
 
 function initGame(keepMap = false){
@@ -610,7 +727,6 @@ function initGame(keepMap = false){
   S.settings.fortPredatorThreshold = clampInt(g('fortPredatorThresholdInput'), 1, 500, D.settings.fortPredatorThreshold);
   S.settings.fortAttackThreshold   = clampFloat(g('fortAttackThresholdInput'), 0, 10, D.settings.fortAttackThreshold);
   S.settings.fortConquerThreshold  = clampFloat(g('fortConquerThresholdInput'), 0, 1, D.settings.fortConquerThreshold);
-  S.settings.fortHumanGain         = clampInt(g('fortHumanGainInput'), 0, 2000, D.settings.fortHumanGain);
   S.settings.costDistractScout     = clampInt(g('costDistractScoutInput'), 0, 50, D.settings.costDistractScout);
   S.settings.costKillScout         = clampInt(g('costKillScoutInput'), 0, 50, D.settings.costKillScout);
   S.settings.costEscapePredator    = clampInt(g('costEscapePredatorInput'), 0, 50, D.settings.costEscapePredator);
@@ -618,7 +734,12 @@ function initGame(keepMap = false){
   S.settings.costSaveHumans        = clampInt(g('costSaveHumansInput'), 0, 50, D.settings.costSaveHumans);
   S.settings.saveHumansAmount      = clampInt(g('saveHumansAmountInput'), 0, 500, D.settings.saveHumansAmount);
   S.settings.costScan              = clampInt(g('costScanInput'), 0, 50, D.settings.costScan);
-  
+  S.settings.costIncreaseFortCapacity   = clampInt(g('costIncreaseFortCapacityInput'), 0, 50, D.settings.costIncreaseFortCapacity);
+  S.settings.fortCapacityIncreaseAmount = clampInt(g('fortCapacityIncreaseAmountInput'), 0, 500, D.settings.fortCapacityIncreaseAmount);
+  S.settings.queenFoodReserveCap        = clampInt(g('queenFoodReserveCapInput'), 0, 500, D.settings.queenFoodReserveCap);
+  S.settings.minPopulationThreshold = clampInt(g('minPopulationThresholdInput'), 0, 1000, D.settings.minPopulationThreshold);
+  S.settings.fortReinforceCost          = clampInt(g('fortReinforceCostInput'), 0, 50, D.settings.fortReinforceCost);
+  S.settings.fortReinforceDefenseBonus  = clampInt(g('fortReinforceDefenseBonusInput'), 0, 500, D.settings.fortReinforceDefenseBonus);
 
   
 
@@ -631,7 +752,9 @@ function initGame(keepMap = false){
     S.nest = { x: CURRENT_LEVEL.nest.x, y: CURRENT_LEVEL.nest.y };
     S.forts = CURRENT_LEVEL.forts.map(f => {
       const def = (f.defense != null) ? f.defense : S.settings.defaultFortDefense;
-      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def };
+      const capacity = (f.capacity != null) ? f.capacity : 100;
+      const population = (f.population != null) ? f.population : Math.round(50 + Math.random() * 50);
+      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population };
     });
     setMapBackground(CURRENT_LEVEL.background || null);
   } else {
@@ -724,7 +847,6 @@ function applyDefaultsToInputs(){
     fortPredatorThresholdInput: d.settings.fortPredatorThreshold,
     fortAttackThresholdInput: d.settings.fortAttackThreshold,
     fortConquerThresholdInput: d.settings.fortConquerThreshold,
-    fortHumanGainInput: d.settings.fortHumanGain,
     costDistractScoutInput: d.settings.costDistractScout,
     costKillScoutInput: d.settings.costKillScout,
     costEscapePredatorInput: d.settings.costEscapePredator,
@@ -732,6 +854,12 @@ function applyDefaultsToInputs(){
     costSaveHumansInput: d.settings.costSaveHumans,
     saveHumansAmountInput: d.settings.saveHumansAmount,
     costScanInput: d.settings.costScan,
+    costIncreaseFortCapacityInput: d.settings.costIncreaseFortCapacity,
+    fortCapacityIncreaseAmountInput: d.settings.fortCapacityIncreaseAmount,
+    queenFoodReserveCapInput: d.settings.queenFoodReserveCap,
+    minPopulationThresholdInput: d.settings.minPopulationThreshold,
+    fortReinforceCostInput: d.settings.fortReinforceCost,
+    fortReinforceDefenseBonusInput: d.settings.fortReinforceDefenseBonus,
   };
   Object.keys(map).forEach(id=>{
     const el = document.getElementById(id);
@@ -1280,7 +1408,9 @@ function advanceStepLogic(){
       if (targetFort.defense <= 0) {
         e.outcome = 'conquered';
         targetFort.alive = false;
-        S.humans += s.fortHumanGain;
+        const releasedHumans = targetFort.population || 0;
+        S.humans += releasedHumans;
+        targetFort.population = 0;
         S.fortCooldown = 1;
         log(t('log.fort_fallen', {
           id: targetFort.id,
@@ -1288,7 +1418,7 @@ function advanceStepLogic(){
           attackers: remaining,
           strength: predStrength,
           lost: lostInAssault,
-          humans: s.fortHumanGain
+          humans: releasedHumans
         }));
       } else {
         e.outcome = 'defended';
@@ -1383,175 +1513,976 @@ function advanceStepLogic(){
   S.step += 1;
 
   S.points = S.maxPoints;
+  S.reinforcedForts = []; // a fort can be reinforced again once the new step begins
 
   selectNextPendingEvent();
 }
 
+
 function processLifecycle(bonusEggs, pop, naturalFailures){
   let scoutsAlive = pop.scoutsAlive;
   let predatorsAlive = pop.predatorsAlive;
-  let newlyMaturedScouts = 0, newlyMaturedPredators = 0;
-  const scoutBias = (naturalFailures||0) * S.settings.scoutBiasPerFailedSearch;
+  let newlyMaturedScouts = 0;
+  let newlyMaturedPredators = 0;
+
+  // ---------------------------------------------------------------------------
+  // POPULATION STATUS
+  // ---------------------------------------------------------------------------
+
+  const isLowPopulation =
+    totalInsects() < S.settings.minPopulationThreshold;
+
+  const scoutBias = isLowPopulation
+    ? 0
+    : (naturalFailures || 0) * S.settings.scoutBiasPerFailedSearch;
+
+  const adultPopulationBeforeDevelopment =
+    scoutsAlive + predatorsAlive;
+
+
+  // ---------------------------------------------------------------------------
+  // NYMPHS -> PREDATORS
+  // ---------------------------------------------------------------------------
 
   let maturingCount = 0;
+  let recoveryPredatorsMaturedThisStep = 0;
   let stillNymph = [];
-  S.nymph.forEach(c=>{
+
+  S.nymph.forEach(c => {
     c.age += 1;
-    if(c.age>=1) maturingCount += c.count; else stillNymph.push(c);
+
+    if(c.age >= 2){
+      maturingCount += c.count;
+
+      if(c.recovery){
+        recoveryPredatorsMaturedThisStep += c.count;
+      }
+
+    } else {
+      stillNymph.push(c);
+    }
   });
+
   S.nymph = stillNymph;
-  for(let i=0;i<maturingCount;i++){
-    predatorsAlive += 1; newlyMaturedPredators += 1;
+
+  for(let i = 0; i < maturingCount; i++){
+    predatorsAlive += 1;
+    newlyMaturedPredators += 1;
   }
-  if(maturingCount>0){
-    let matureMsg = t('log.nymphs_matured', { count: maturingCount });
-    if(naturalFailures>0) {
+
+  if(maturingCount > 0){
+    let matureMsg = t('log.nymphs_matured', {
+      count: maturingCount
+    });
+
+    if(naturalFailures > 0 && !isLowPopulation){
       matureMsg += t('log.nymphs_bias_note', {
         failures: naturalFailures,
-        bias: scoutBias >= 1 ? t('bias.strongly') : t('bias.slightly')
+        bias: scoutBias >= 1
+          ? t('bias.strongly')
+          : t('bias.slightly')
       });
     }
+
     log(matureMsg);
   }
 
-  let newNymph = 0, stillCocoon = [];
-  S.cocoon.forEach(c=>{
+
+  // ---------------------------------------------------------------------------
+  // COCOONS -> SCOUTS / NYMPHS
+  //
+  // Recovery cohorts must be internally viable:
+  // 1 scout per predator group.
+  // ---------------------------------------------------------------------------
+
+  let newNymph = 0;
+  let newRecoveryNymph = 0;
+  let stillCocoon = [];
+
+  S.cocoon.forEach(c => {
     c.age += 1;
-    if(c.age>=1){
-      for(let i=0;i<c.count;i++){
-        const desiredScouts = Math.ceil(predatorsAlive / S.settings.groupSize + scoutBias);
-        if(scoutsAlive < desiredScouts){
+
+    if(c.age >= 1){
+
+      // -----------------------------------------------------------------------
+      // RECOVERY COHORT
+      // -----------------------------------------------------------------------
+
+      if(c.recovery){
+
+        const recoveryScoutsNeeded =
+          Math.max(
+            1,
+            Math.ceil(c.count / S.settings.groupSize)
+          );
+
+        const recoveryScoutsToCreate =
+          Math.min(
+            recoveryScoutsNeeded,
+            c.count
+          );
+
+        const recoveryPredatorsToCreate =
+          c.count - recoveryScoutsToCreate;
+
+        for(let i = 0; i < recoveryScoutsToCreate; i++){
+
           scoutsAlive += 1;
           newlyMaturedScouts += 1;
-        } else {
-          newNymph += 1;
+
+          if(
+            S.bounceback &&
+            S.bounceback.active
+          ){
+            S.bounceback.recoveryScouts =
+              (S.bounceback.recoveryScouts || 0) + 1;
+          }
+        }
+
+        if(recoveryPredatorsToCreate > 0){
+
+          newRecoveryNymph +=
+            recoveryPredatorsToCreate;
+        }
+
+      } else {
+
+        // ---------------------------------------------------------------------
+        // NORMAL COHORT
+        // ---------------------------------------------------------------------
+
+        for(let i = 0; i < c.count; i++){
+
+          const ratioScouts = Math.max(
+            1,
+            Math.ceil(
+              predatorsAlive /
+              S.settings.groupSize
+            )
+          );
+
+          const desiredScouts = isLowPopulation
+            ? ratioScouts
+            : Math.ceil(
+                predatorsAlive /
+                S.settings.groupSize +
+                scoutBias
+              );
+
+          if(scoutsAlive < desiredScouts){
+
+            scoutsAlive += 1;
+            newlyMaturedScouts += 1;
+
+          } else {
+
+            newNymph += 1;
+          }
         }
       }
+
     } else {
+
       stillCocoon.push(c);
     }
   });
+
   S.cocoon = stillCocoon;
-  if(newNymph>0) S.nymph.push({age:0, count:newNymph});
 
-  let newCocoon = 0, stillLarva = [];
-  S.larva.forEach(c=>{ c.age+=1; if(c.age>=2) newCocoon+=c.count; else stillLarva.push(c); });
+  if(newNymph > 0){
+    S.nymph.push({
+      age: 0,
+      count: newNymph,
+      recovery: false
+    });
+  }
+
+  if(newRecoveryNymph > 0){
+    S.nymph.push({
+      age: 0,
+      count: newRecoveryNymph,
+      recovery: true
+    });
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // LARVAE -> COCOONS
+  // ---------------------------------------------------------------------------
+
+  let newCocoon = 0;
+  let newRecoveryCocoon = 0;
+  let stillLarva = [];
+
+  S.larva.forEach(c => {
+    c.age += 1;
+
+    if(c.age >= 2){
+
+      if(c.recovery){
+        newRecoveryCocoon += c.count;
+      } else {
+        newCocoon += c.count;
+      }
+
+    } else {
+      stillLarva.push(c);
+    }
+  });
+
   S.larva = stillLarva;
-  if(newCocoon>0) S.cocoon.push({age:0, count:newCocoon});
 
-  let newLarva = 0, stillEggs = [];
-  S.eggs.forEach(c=>{ c.age+=1; if(c.age>=2) newLarva+=c.count; else stillEggs.push(c); });
+  if(newCocoon > 0){
+    S.cocoon.push({
+      age: 0,
+      count: newCocoon,
+      recovery: false
+    });
+  }
+
+  if(newRecoveryCocoon > 0){
+    S.cocoon.push({
+      age: 0,
+      count: newRecoveryCocoon,
+      recovery: true
+    });
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // EGGS -> LARVAE
+  // ---------------------------------------------------------------------------
+
+  let newLarva = 0;
+  let newRecoveryLarva = 0;
+  let stillEggs = [];
+
+  S.eggs.forEach(c => {
+    c.age += 1;
+
+    if(c.age >= 1){
+
+      if(c.recovery){
+        newRecoveryLarva += c.count;
+      } else {
+        newLarva += c.count;
+      }
+
+    } else {
+      stillEggs.push(c);
+    }
+  });
+
   S.eggs = stillEggs;
-  if(newLarva>0) S.larva.push({age:0, count:newLarva});
+
+  if(newLarva > 0){
+    S.larva.push({
+      age: 0,
+      count: newLarva,
+      recovery: false
+    });
+  }
+
+  if(newRecoveryLarva > 0){
+    S.larva.push({
+      age: 0,
+      count: newRecoveryLarva,
+      recovery: true
+    });
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // FEEDER COUNTS
+  // ---------------------------------------------------------------------------
+
+  const nymphCount = sumCohort(S.nymph);
+
+  const feederGroups = [
+    {
+      key: 'scouts',
+      count: scoutsAlive
+    },
+    {
+      key: 'predators',
+      count: predatorsAlive
+    },
+    {
+      key: 'nymphs',
+      count: nymphCount
+    }
+  ];
+
+  const totalFeeders = feederGroups.reduce(
+    (a, g) => a + g.count,
+    0
+  );
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK TRIGGER GATE
+  // ---------------------------------------------------------------------------
+
+  const queenReserveCap =
+    S.settings.queenFoodReserveCap || 0;
+
+  const queenReserveFull =
+    S.queenReserve >= queenReserveCap;
+
+  const criticalRecoveryPopulation =
+    totalInsects() <=
+    S.settings.minPopulationThreshold * 0.5;
+
+  const bouncebackTriggerAllowed =
+    queenReserveFull ||
+    criticalRecoveryPopulation;
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK START
+  // ---------------------------------------------------------------------------
+
+  let queenLaidBounceback = false;
+
+  if(
+    S.queen.alive &&
+    (!S.bounceback || (!S.bounceback.active && !S.bounceback.controlledRecovery)) &&
+    isLowPopulation &&
+    bouncebackTriggerAllowed &&
+    (S.food + S.queenReserve) > 0 &&
+    S.settings.eggCap > 0
+  ){
+
+    const totalAvailableFood =
+      S.food + S.queenReserve;
+
+    const emergencyReserve =
+      Math.min(10, totalAvailableFood);
+
+    S.queenReserve = emergencyReserve;
+
+    S.food =
+      totalAvailableFood - emergencyReserve;
+
+    S.eggs.push({
+      age: 0,
+      count: S.settings.eggCap,
+      recovery: true
+    });
+
+    S.bounceback = {
+      active: true,
+      recoveryScouts: 0,
+      recoveryPredatorsMatured:
+        recoveryPredatorsMaturedThisStep > 0,
+      controlledRecovery: false,
+      recoveryTick: 0
+    };
+
+    queenLaidBounceback = true;
+
+    log(t('log.bounceback_started', {
+      count: S.settings.eggCap
+    }));
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK PROGRESS
+  // ---------------------------------------------------------------------------
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    recoveryPredatorsMaturedThisStep > 0
+  ){
+    S.bounceback.recoveryPredatorsMatured = true;
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK CONTROLLED-RECOVERY LAYING UNLOCK
+  //
+  // Laying switches to the "1 food every other step" controlled pattern
+  // starting the step immediately after the bounceback batch itself -
+  // it does NOT wait for the recovery cohort to mature. `active` (and the
+  // reserve-funded feeding/scout protections tied to it) stays on until
+  // the cohort actually matures, handled separately below.
+  // ---------------------------------------------------------------------------
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    !S.bounceback.controlledRecovery &&
+    !queenLaidBounceback
+  ){
+    S.bounceback.controlledRecovery = true;
+    S.bounceback.recoveryTick = 0;
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // QUEEN FEEDING
+  // ---------------------------------------------------------------------------
 
   let queenStarved = false;
+
   if(S.queen.alive){
+
     if(S.food >= 1){
+
       S.food -= 1;
+
+    } else if(
+      S.bounceback &&
+      S.bounceback.active &&
+      S.queenReserve >= 1
+    ){
+
+      S.queenReserve -= 1;
+
+    } else if(S.queenReserve >= 1){
+
+      S.queenReserve -= 1;
+
     } else {
+
       S.queen.alive = false;
       queenStarved = true;
     }
   }
 
-  const nymphCount = sumCohort(S.nymph);
-  const feederGroups = [
-    { key:'scouts',    count: scoutsAlive },
-    { key:'predators', count: predatorsAlive },
-    { key:'nymphs',    count: nymphCount },
+
+  // ---------------------------------------------------------------------------
+  // RECOVERY SCOUT PROTECTION
+  // ---------------------------------------------------------------------------
+
+  let protectedRecoveryScouts = 0;
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    S.bounceback.recoveryScouts > 0
+  ){
+
+    const recoveryScouts = Math.min(
+      S.bounceback.recoveryScouts,
+      scoutsAlive
+    );
+
+    const fromFood = Math.min(
+      recoveryScouts,
+      S.food
+    );
+
+    S.food -= fromFood;
+    protectedRecoveryScouts += fromFood;
+
+    const stillNeeded =
+      recoveryScouts - protectedRecoveryScouts;
+
+    if(
+      stillNeeded > 0 &&
+      S.queenReserve > 0
+    ){
+
+      const fromReserve = Math.min(
+        stillNeeded,
+        S.queenReserve
+      );
+
+      S.queenReserve -= fromReserve;
+      protectedRecoveryScouts += fromReserve;
+    }
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // NORMAL FEEDING
+  // ---------------------------------------------------------------------------
+
+  const normalScouts =
+    Math.max(
+      0,
+      scoutsAlive - protectedRecoveryScouts
+    );
+
+  const normalFeederGroups = [
+    {
+      key: 'scouts',
+      count: normalScouts
+    },
+    {
+      key: 'predators',
+      count: predatorsAlive
+    },
+    {
+      key: 'nymphs',
+      count: nymphCount
+    }
   ];
-  const totalFeeders = feederGroups.reduce((a,g)=>a+g.count,0);
-  const shortage = S.food < totalFeeders;
+
+  const normalFeeders =
+    normalFeederGroups.reduce(
+      (a, g) => a + g.count,
+      0
+    );
+
+  const shortage =
+    S.food < normalFeeders;
 
   let unfed = 0;
+
   if(shortage){
-    unfed = totalFeeders - S.food;
+
+    unfed =
+      normalFeeders - S.food;
+
     S.food = 0;
+
   } else {
-    S.food -= totalFeeders;
+
+    S.food -= normalFeeders;
   }
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK COMPLETION
+  // ---------------------------------------------------------------------------
+
+  let bouncebackJustFinished = false;
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    S.bounceback.recoveryPredatorsMatured
+  ){
+
+    const recoveryStillDeveloping =
+      S.eggs.some(c => c.recovery) ||
+      S.larva.some(c => c.recovery) ||
+      S.cocoon.some(c => c.recovery) ||
+      S.nymph.some(c => c.recovery);
+
+    if(!recoveryStillDeveloping){
+
+      if(S.queenReserve > 0){
+
+        S.food += S.queenReserve;
+        S.queenReserve = 0;
+      }
+
+      S.bounceback.active = false;
+
+      bouncebackJustFinished = true;
+
+      log(t('log.bounceback_wave'));
+    }
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // QUEEN EGG LAYING
+  // ---------------------------------------------------------------------------
 
   let eggsLaid = 0;
   let eggFoodCost = 0;
   let eggsWereCapped = false;
   let baseEggs = 0;
-  if(S.queen.alive && !shortage){
-    // Base egg-laying scales with how well-stocked the colony is: no eggs if
-    // storage can't even cover 1 food per insect, ramping up to the full
-    // per-step cap once storage reaches 5 food per insect.
-    const insectCount = Math.max(1, totalInsects());
-    const foodRatio = S.food / insectCount;
-    if(foodRatio >= 5){
-      baseEggs = S.settings.eggCap;
-    } else {
-      baseEggs = Math.round(S.settings.eggCap * (foodRatio - 1) / 3);
-    }
 
-    const desiredEggs = baseEggs + bonusEggs;
-    const cappedEggs = Math.min(S.settings.eggCap, desiredEggs);
-    eggsWereCapped = cappedEggs < desiredEggs;
-    const foodRemaining = S.food;
-    const eggsPerFood = S.settings.eggsPerFood;
-    let affordableEggs = cappedEggs;
-    if(eggsPerFood > 0){
-      const foodBudget = Math.max(0, foodRemaining);
-      const maxAffordable = foodBudget*eggsPerFood + (eggsPerFood-1);
-      affordableEggs = Math.min(cappedEggs, maxAffordable);
-    }
-    eggsLaid = affordableEggs;
-    eggFoodCost = eggsPerFood > 0 ? Math.floor(eggsLaid / eggsPerFood) : 0;
-    if(eggsLaid > 0){
-      S.eggs.push({age:0, count: eggsLaid});
-      S.food -= eggFoodCost;
+  if(
+    S.queen.alive &&
+    (!S.bounceback || !S.bounceback.active || S.bounceback.controlledRecovery)
+  ){
+
+    const controlledRecovery =
+      S.bounceback &&
+      S.bounceback.controlledRecovery;
+
+    if(controlledRecovery){
+
+      S.bounceback.recoveryTick =
+        (S.bounceback.recoveryTick || 0) + 1;
+
+      const recoveryEggs =
+        Math.min(
+          S.settings.eggsPerFood,
+          S.settings.eggCap
+        );
+
+      const recoveryLayStep =
+        S.bounceback.recoveryTick % 2 === 0;
+
+      if(
+        recoveryLayStep &&
+        recoveryEggs > 0 &&
+        S.food >= 1
+      ){
+
+        S.food -= 1;
+
+        eggsLaid = recoveryEggs;
+        eggFoodCost = 1;
+
+        S.eggs.push({
+          age: 0,
+          count: recoveryEggs,
+          recovery: false
+        });
+      }
+
+      const adultPopulation =
+        scoutsAlive + predatorsAlive;
+
+      if(
+        adultPopulation >=
+        S.settings.minPopulationThreshold
+      ){
+        S.bounceback.controlledRecovery = false;
+      }
+
+    } else if(
+      isLowPopulation &&
+      (S.food >= 1 || S.queenReserve >= 1)
+    ){
+
+      if(S.food >= 1){
+
+        S.food -= 1;
+
+      } else {
+
+        S.queenReserve -= 1;
+      }
+
+      const countToLay = Math.min(
+        S.settings.eggCap,
+        S.settings.eggsPerFood + bonusEggs
+      );
+
+      if(countToLay > 0){
+
+        eggsLaid = countToLay;
+        eggFoodCost = 1;
+
+        S.eggs.push({
+          age: 0,
+          count: eggsLaid,
+          recovery: false
+        });
+      }
+
+    } else if(!shortage){
+
+      const insectCount =
+        Math.max(1, totalInsects());
+
+      const foodRatio =
+        S.food / insectCount;
+
+      if(foodRatio >= 5){
+
+        baseEggs =
+          S.settings.eggCap;
+
+      } else {
+
+        baseEggs = Math.round(
+          S.settings.eggCap *
+          (foodRatio - 1) / 3
+        );
+      }
+
+      const desiredEggs =
+        baseEggs + bonusEggs;
+
+      const cappedEggs =
+        Math.min(
+          S.settings.eggCap,
+          desiredEggs
+        );
+
+      eggsWereCapped =
+        cappedEggs < desiredEggs;
+
+      const foodRemaining =
+        S.food;
+
+      const eggsPerFood =
+        S.settings.eggsPerFood;
+
+      let affordableEggs =
+        cappedEggs;
+
+      if(eggsPerFood > 0){
+
+        const foodBudget =
+          Math.max(0, foodRemaining);
+
+        const maxAffordable =
+          foodBudget * eggsPerFood +
+          (eggsPerFood - 1);
+
+        affordableEggs =
+          Math.min(
+            cappedEggs,
+            maxAffordable
+          );
+      }
+
+      eggsLaid =
+        affordableEggs;
+
+      eggFoodCost =
+        eggsPerFood > 0
+          ? Math.floor(
+              eggsLaid / eggsPerFood
+            )
+          : 0;
+
+      if(eggsLaid > 0){
+
+        S.eggs.push({
+          age: 0,
+          count: eggsLaid,
+          recovery: false
+        });
+
+        S.food -= eggFoodCost;
+      }
     }
   }
 
-  if(eggsLaid>0){
-    let eggMsg = t('log.queen_laid_eggs', { count: eggsLaid });
-    if(eggFoodCost>0) eggMsg += t('log.cost_food', { cost: eggFoodCost });
-    if(eggsWereCapped) eggMsg += t('log.capped_at', { cap: S.settings.eggCap });
-    log(eggMsg+'.');
-  } else if(S.queen.alive && !shortage && (baseEggs+bonusEggs)>0 && S.settings.eggCap>0){
+
+  // ---------------------------------------------------------------------------
+  // EGG-LAYING LOG
+  // ---------------------------------------------------------------------------
+
+  if(eggsLaid > 0){
+
+    let eggMsg =
+      t('log.queen_laid_eggs', {
+        count: eggsLaid
+      });
+
+    if(eggFoodCost > 0){
+
+      eggMsg +=
+        t('log.cost_food', {
+          cost: eggFoodCost
+        });
+    }
+
+    if(eggsWereCapped){
+
+      eggMsg +=
+        t('log.capped_at', {
+          cap: S.settings.eggCap
+        });
+    }
+
+    log(eggMsg + '.');
+
+  } else if(
+    S.queen.alive &&
+    !shortage &&
+    !(
+      S.bounceback &&
+      (
+        S.bounceback.active ||
+        S.bounceback.controlledRecovery
+      )
+    ) &&
+    (baseEggs + bonusEggs) > 0 &&
+    S.settings.eggCap > 0
+  ){
+
     log(t('log.queen_withheld_food'));
   }
 
+
+  // ---------------------------------------------------------------------------
+  // IMMATURE CANNIBALISM
+  // ---------------------------------------------------------------------------
+
   let eatenImmature = 0;
-  if(unfed > 0){
-    eatenImmature = eatFromCohorts(unfed);
+
+  if(
+    unfed > 0 &&
+    !isLowPopulation &&
+    (!S.bounceback || !S.bounceback.active)
+  ){
+
+    eatenImmature =
+      eatFromCohorts(unfed);
+
     unfed -= eatenImmature;
   }
 
-  let deaths = { queen:0, scouts:0, predators:0, nymphs:0 };
+
+  // ---------------------------------------------------------------------------
+  // STARVATION
+  // ---------------------------------------------------------------------------
+
+  let deaths = {
+    queen: 0,
+    scouts: 0,
+    predators: 0,
+    nymphs: 0
+  };
+
   if(unfed > 0){
-    deaths = distributeDeaths(feederGroups, unfed);
+
+    deaths =
+      distributeDeaths(
+        normalFeederGroups,
+        unfed
+      );
+
     scoutsAlive -= deaths.scouts;
     predatorsAlive -= deaths.predators;
-    if(deaths.nymphs > 0) removeFromNymphCohorts(deaths.nymphs);
+
+    if(deaths.nymphs > 0){
+
+      removeFromNymphCohorts(
+        deaths.nymphs
+      );
+    }
   }
+
+
+  // ---------------------------------------------------------------------------
+  // QUEEN STARVATION LOG
+  // ---------------------------------------------------------------------------
 
   if(queenStarved){
     log(t('log.queen_starved'));
   }
 
+
+  // ---------------------------------------------------------------------------
+  // FAMINE LOG
+  // ---------------------------------------------------------------------------
+
   if(shortage){
-    let msg = t('log.famine', { feeders: totalFeeders });
-    if(eatenImmature > 0) msg += t('log.devoured_immature', { count: eatenImmature });
-    if(unfed > 0){
-      const parts = [];
-      if(deaths.scouts)    parts.push(deaths.scouts + ' ' + t('stats.scouts').toLowerCase());
-      if(deaths.predators) parts.push(deaths.predators + ' ' + t('stats.predators').toLowerCase());
-      if(deaths.nymphs)    parts.push(deaths.nymphs + ' ' + t('stats.nymphs').toLowerCase());
-      if(parts.length>0) msg += t('log.starved_breakdown', { parts: parts.join(', ') });
+
+    let msg =
+      t('log.famine', {
+        feeders: totalFeeders
+      });
+
+    if(eatenImmature > 0){
+
+      msg +=
+        t('log.devoured_immature', {
+          count: eatenImmature
+        });
     }
-    if(S.queen.alive) msg += t('log.queen_withheld_famine');
+
+    if(unfed > 0){
+
+      const parts = [];
+
+      if(deaths.scouts){
+
+        parts.push(
+          deaths.scouts +
+          ' ' +
+          t('stats.scouts').toLowerCase()
+        );
+      }
+
+      if(deaths.predators){
+
+        parts.push(
+          deaths.predators +
+          ' ' +
+          t('stats.predators').toLowerCase()
+        );
+      }
+
+      if(deaths.nymphs){
+
+        parts.push(
+          deaths.nymphs +
+          ' ' +
+          t('stats.nymphs').toLowerCase()
+        );
+      }
+
+      if(parts.length > 0){
+
+        msg +=
+          t('log.starved_breakdown', {
+            parts: parts.join(', ')
+          });
+      }
+    }
+
+    if(S.queen.alive){
+
+      msg +=
+        t('log.queen_withheld_famine');
+    }
+
     log(msg);
   }
 
+
+  // ---------------------------------------------------------------------------
+  // QUEEN RESERVE REFILL
+  //
+  // IMPORTANT:
+  // The reserve is replenished ONLY when the population is ABOVE
+  // minPopulationThreshold.
+  //
+  // At or below the threshold, ALL surplus food remains in normal storage.
+  // This prevents the queen from rebuilding her reserve while the colony is
+  // still in a vulnerable state.
+  //
+  // Bounceback also keeps the reserve locked while active.
+  // ---------------------------------------------------------------------------
+
+  let queenReserveTopUp = 0;
+
+  const populationRecovered =
+    totalInsects() >
+    S.settings.minPopulationThreshold;
+
+  if(
+    S.queen.alive &&
+    populationRecovered &&
+    (!S.bounceback || !S.bounceback.active) &&
+    S.food > 0 &&
+    S.queenReserve < queenReserveCap
+  ){
+
+    queenReserveTopUp = Math.min(
+      S.food,
+      queenReserveCap - S.queenReserve
+    );
+
+    if(queenReserveTopUp > 0){
+
+      S.queenReserve += queenReserveTopUp;
+      S.food -= queenReserveTopUp;
+    }
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // RETURN
+  // ---------------------------------------------------------------------------
+
   return {
-    newlyMaturedScouts, newlyMaturedPredators,
-    scoutDeaths: deaths.scouts, predatorDeaths: deaths.predators,
+    newlyMaturedScouts,
+    newlyMaturedPredators,
+    scoutDeaths: deaths.scouts,
+    predatorDeaths: deaths.predators,
   };
 }
+
+
 
 function eatFromCohorts(n){
   let remaining = n;
@@ -1653,14 +2584,25 @@ function killPredatorAction(eid){
   render();
 }
 
-function saveHumans(){
+function saveHumans(fortId){
   const cost = S.settings.costSaveHumans;
   if(S.phase!=='active' || S.gameOver) return;
   if(S.points<cost) return;
   if(S.humans<=0) return;
   const amount = Math.min(S.settings.saveHumansAmount, S.humans);
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  const capacity = Math.max(0, fort.capacity || 0);
+  const population = Math.max(0, Math.min(fort.population || 0, capacity));
+  const av_capacity = Math.max(0, capacity - population);
+
+  if (av_capacity < amount) {log(t('log.fort_capacity_limit')); render(); return } 
+  fort.population += amount;
   S.points -= cost;
   S.humans -= amount;
+
   log(t('log.humans_evacuated', { count: amount }));
   render();
 }
@@ -1727,33 +2669,14 @@ function render(){
 
   document.getElementById('insectsVal').textContent = totalInsects();
   document.getElementById('pointsVal').textContent = S.points;
+  document.getElementById('maxPointsVal').textContent = S.maxPoints;
+
 
   const aliveForts = S.forts.filter(f => f.alive);
   const activeFortEvent = S.events.find(e => e.type === 'fort' && e.status === 'pending');
   const targetFort = activeFortEvent ? S.forts.find(f => f.id === activeFortEvent.targetFortId) : null;
-  const fortDefEl = document.getElementById('fortDefVal');
-  if (fortDefEl) {
-    if (targetFort && targetFort.alive) {
-      fortDefEl.textContent = targetFort.defense;
-    } else if (aliveForts.length > 0) {
-      let minD = Infinity, nearestFort = aliveForts[0];
-      aliveForts.forEach(f => {
-        const d = dist(S.nest, f);
-        if (d < minD) { minD = d; nearestFort = f; }
-      });
-      fortDefEl.textContent = nearestFort.defense;
-    } else {
-      fortDefEl.textContent = '0';
-    }
-  }
 
-  const pr = document.getElementById('pointsRow');
-  pr.innerHTML='';
-  for(let i=0;i<S.maxPoints;i++){
-    const p = document.createElement('div');
-    p.className = 'pip' + (i<S.points ? ' filled':'');
-    pr.appendChild(p);
-  }
+
 
   renderPhaseBanner();
   renderGlobalActions();
@@ -1767,11 +2690,6 @@ function render(){
 
 
 function renderGlobalActions(){
-  const btn = document.getElementById('saveHumansBtn');
-  if(btn){
-    document.getElementById('saveHumansCostLbl').textContent = S.settings.costSaveHumans;
-    btn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costSaveHumans || S.humans<=0;
-  }
   const scanBtn = document.getElementById('scan-btn');
   if(scanBtn){
     const costLbl = document.getElementById('scanCostLbl');
@@ -2019,6 +2937,7 @@ function renderStats(){
       title: t('stats.core'),
       items: [
         { label: t('stats.food_storage'), count: S.food, cls: 'food' },
+        { label: t('stats.queenReserve'), count: S.queenReserve, cls: 'food' },
         { label: t('stats.queen'), count: S.queen.alive ? t('stats.active') : t('stats.dead'), cls: S.queen.alive ? 'good' : 'bad' }
       ]
     },
@@ -2147,7 +3066,7 @@ function buildTrailLayer(){
   const svgNS = 'http://www.w3.org/2000/svg';
   const svg = document.createElementNS(svgNS, 'svg');
   svg.setAttribute('viewBox', '0 0 100 100');
-  svg.setAttribute('preserveAspectRatio', 'none');
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.setAttribute('class', 'trail-layer');
   const defs = document.createElementNS(svgNS, 'defs');
   const filter = document.createElementNS(svgNS, 'filter');
@@ -2246,8 +3165,7 @@ function spawnTempIcon(type, x, y){
   const wrap = document.getElementById('mapWrap');
   const el = document.createElement('div');
   el.className = 'map-event transit-icon';
-  el.style.left = x + '%';
-  el.style.top = y + '%';
+  setWorldPosition(el, wrap, x, y);
   const img = document.createElement('img');
   img.className = 'map-icon event-icon';
   img.src = type === 'search' ? '/nest/assets/scout.png' : '/nest/assets/predator.png';
@@ -2261,6 +3179,7 @@ function easeInOutQuad(t){
 }
 
 function animateAlongPath(el, densePts, duration){
+  const wrap = document.getElementById('mapWrap');
   return new Promise(resolve => {
     const total = pathLength(densePts);
     const start = performance.now();
@@ -2268,8 +3187,7 @@ function animateAlongPath(el, densePts, duration){
       const t = Math.min(1, (now - start) / duration);
       const eased = easeInOutQuad(t);
       const p = pointAtDistance(densePts, total * eased);
-      el.style.left = p.x + '%';
-      el.style.top = p.y + '%';
+      setWorldPosition(el, wrap, p.x, p.y);
       if (t < 1) requestAnimationFrame(frame);
       else resolve();
     }
@@ -2429,26 +3347,67 @@ function reinforceFort(fortId) {
   const fort = S.forts.find(f => f.id === fortId);
   if (!fort || !fort.alive) return;
 
-  if (S.points < 1) {
+  if (!Array.isArray(S.reinforcedForts)) S.reinforcedForts = [];
+  if (S.reinforcedForts.includes(fort.id)) {
+    log(t('log.reinforce_already_done', { id: fort.id }));
+    render();
+    return;
+  }
+
+  const cost = S.settings.fortReinforceCost;
+  if (S.points < cost) {
     log(t('log.reinforce_no_ap', { id: fort.id }));
     render();
     return;
   }
 
-  S.points -= 1;
-  fort.defense += 5;
+  S.points -= cost;
+  fort.defense += S.settings.fortReinforceDefenseBonus;
   if (fort.defense > fort.maxDefense) {
     fort.maxDefense = fort.defense;
   }
+  S.reinforcedForts.push(fort.id);
   log(t('log.reinforce_success', { id: fort.id, def: fort.defense, maxDef: fort.maxDefense }));
+  render();
+}
+
+function increaseFortCapacity(fortId) {
+  if (S.gameOver) return;
+
+  if (S.phase !== 'active') {
+    log(t('log.reinforce_not_started'));
+    render();
+    return;
+  }
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  const cost = S.settings.costIncreaseFortCapacity;
+  if (S.points < cost) {
+    log(t('log.fort_capacity_no_ap', { id: fort.id }));
+    render();
+    return;
+  }
+
+  S.points -= cost;
+  fort.capacity += S.settings.fortCapacityIncreaseAmount;
+  log(t('log.fort_capacity_increased', { id: fort.id, capacity: fort.capacity }));
   render();
 }
 
 let activeOpenMapKey = null;
 
+function toggleMapSelection(key, ev) {
+  if (ev) ev.stopPropagation();
+  activeOpenMapKey = (activeOpenMapKey === key) ? null : key;
+  renderMap();
+}
+
 function renderMap() {
   const wrap = document.getElementById('mapWrap');
   const fortsTag = document.getElementById('fortsTag');
+  const controlsContainer = document.getElementById('controls-containter');
   if (!wrap) return;
 
   const aliveForts = S.forts.filter(f => f.alive);
@@ -2457,6 +3416,7 @@ function renderMap() {
   }
 
   wrap.innerHTML = '';
+  if (controlsContainer) controlsContainer.innerHTML = '';
 
   const trailLayer = buildTrailLayer();
   if (trailLayer) wrap.appendChild(trailLayer);
@@ -2464,11 +3424,12 @@ function renderMap() {
   const nestImg = document.createElement('img');
   nestImg.src = '/nest/assets/nest_icon.png';
   nestImg.className = 'map-icon nest-icon';
-  nestImg.style.left = S.nest.x + '%';
-  nestImg.style.top = S.nest.y + '%';
+  setWorldPosition(nestImg, wrap, S.nest.x, S.nest.y);
   nestImg.title = t('map.nest_title');
   nestImg.onclick = openNestAnalytics;
   wrap.appendChild(nestImg);
+
+  if(DEBUG) debugRenderFortStrengthZones(wrap); // DEBUG - remove this line to disable fort-strength zone rings
 
   const activeFortEvent = S.events.find(e => e.type === 'fort' && e.status === 'pending');
   const activeTargetId = activeFortEvent ? activeFortEvent.targetFortId : null;
@@ -2491,8 +3452,7 @@ function renderMap() {
     fortContainer.className = 'map-event fort-event' + (activeOpenMapKey === fortKey ? ' open' : '');
     fortContainer.dataset.fortId = f.id;
     fortContainer.style.position = 'absolute';
-    fortContainer.style.left = f.x + '%';
-    fortContainer.style.top = f.y + '%';
+    setWorldPosition(fortContainer, wrap, f.x, f.y);
     fortContainer.style.transform = 'translate(-50%, -50%)';
     fortContainer.style.width = '4%';
     fortContainer.style.minWidth = '42px';
@@ -2517,33 +3477,51 @@ function renderMap() {
       fortImg.title = t('map.fort_active', { id: f.id, def: f.defense, maxDef: f.maxDefense });
       fortContainer.style.cursor = 'pointer';
 
-      fortContainer.onmouseenter = () => {
-        activeOpenMapKey = fortKey;
-        document.querySelectorAll('.map-event.open').forEach(el => {
-          if (el !== fortContainer) el.classList.remove('open');
-        });
-        fortContainer.classList.add('open');
+      fortContainer.onclick = (ev) => {
+        toggleMapSelection(fortKey, ev);
       };
 
-      if (S.phase === 'active') {
-        fortContainer.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = fortKey;
-          reinforceFort(f.id);
-        };
-
+      if (S.phase === 'active' && activeOpenMapKey === fortKey && controlsContainer) {
+        const alreadyReinforced = Array.isArray(S.reinforcedForts) && S.reinforcedForts.includes(f.id);
         const reinforceBtn = document.createElement('button');
-        reinforceBtn.className = 'map-event-btn right';
+        reinforceBtn.className = 'nest-btn control-btn map-action-btn';
         reinforceBtn.textContent = '🛡️';
-        reinforceBtn.title = t('map.fort_reinforce_btn');
-        reinforceBtn.disabled = S.points < 1;
+        reinforceBtn.title = alreadyReinforced
+          ? t('map.fort_reinforce_done_btn', { id: f.id })
+          : t('map.fort_reinforce_btn', { cost: S.settings.fortReinforceCost, amount: S.settings.fortReinforceDefenseBonus });
+        reinforceBtn.disabled = S.points < S.settings.fortReinforceCost || alreadyReinforced;
         reinforceBtn.onclick = (ev) => {
           ev.stopPropagation();
           activeOpenMapKey = fortKey;
           reinforceFort(f.id);
         };
-        fortContainer.appendChild(reinforceBtn);
-      } 
+
+        const capacityBtn = document.createElement('button');
+        capacityBtn.className = 'nest-btn control-btn map-action-btn';
+        capacityBtn.textContent = '📦';
+        capacityBtn.title = t('map.fort_capacity_btn', { cost: S.settings.costIncreaseFortCapacity, amount: S.settings.fortCapacityIncreaseAmount });
+        capacityBtn.disabled = S.points < S.settings.costIncreaseFortCapacity;
+        capacityBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          activeOpenMapKey = fortKey;
+          increaseFortCapacity(f.id);
+        };
+
+        const evacuateBtn = document.createElement('button');
+        evacuateBtn.className = 'nest-btn control-btn map-action-btn';
+        evacuateBtn.textContent = '🚑';
+        evacuateBtn.title = t('map.evacuate_tooltip', { cost: S.settings.costSaveHumans, amount: S.settings.saveHumansAmount });
+        evacuateBtn.disabled = S.gameOver || S.phase !== 'active' || S.points < S.settings.costSaveHumans || S.humans <= 0;
+        evacuateBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          activeOpenMapKey = fortKey;
+          saveHumans(f.id);
+        };
+
+        controlsContainer.appendChild(reinforceBtn);
+        controlsContainer.appendChild(capacityBtn);
+        controlsContainer.appendChild(evacuateBtn);
+      }
     }
 
     fortImg.className = cls;
@@ -2573,6 +3551,21 @@ function renderMap() {
 
     fortContainer.appendChild(fortImg);
     fortContainer.appendChild(defBadge);
+
+    const capacity = Math.max(0, f.capacity || 0);
+    const population = Math.max(0, Math.min(f.population || 0, capacity));
+    const popPct = capacity > 0 ? (population / capacity) * 100 : 0;
+
+    const popBarTrack = document.createElement('div');
+    popBarTrack.className = 'fort-pop-bar';
+    popBarTrack.title = t('map.fort_population', { pop: population, cap: capacity });
+
+    const popBarFill = document.createElement('div');
+    popBarFill.className = 'fort-pop-bar-fill';
+    popBarFill.style.width = popPct + '%';
+    popBarTrack.appendChild(popBarFill);
+
+    fortContainer.appendChild(popBarTrack);
     wrap.appendChild(fortContainer);
   });
 
@@ -2603,17 +3596,8 @@ function renderMap() {
         const container = document.createElement('div');
         container.className = 'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
         container.style.position = 'absolute';
-        container.style.left = fx + '%';
-        container.style.top = fy + '%';
+        setWorldPosition(container, wrap, fx, fy);
         container.style.zIndex = '10';
-
-        container.onmouseenter = () => {
-          activeOpenMapKey = eventKey;
-          document.querySelectorAll('.map-event.open').forEach(el => {
-            if (el !== container) el.classList.remove('open');
-          });
-          container.classList.add('open');
-        };
 
         const iconImg = document.createElement('img');
         iconImg.className = 'map-icon event-icon';
@@ -2621,42 +3605,42 @@ function renderMap() {
         iconImg.title = t('event.fort_attacker_map', { count: rem, id: targetFort.id });
 
         iconImg.onclick = (ev) => {
-          ev.stopPropagation();
-          const isOpen = container.classList.contains('open');
-          document.querySelectorAll('.map-event.open').forEach(el => el.classList.remove('open'));
-          if (!isOpen) {
-            container.classList.add('open');
-            activeOpenMapKey = eventKey;
-          } else {
-            activeOpenMapKey = null;
-          }
+          toggleMapSelection(eventKey, ev);
         };
 
+        container.appendChild(iconImg);
+        wrap.appendChild(container);
+      }
+
+      if (activeOpenMapKey === eventKey && controlsContainer) {
         const infoBtn = document.createElement('button');
-        infoBtn.className = 'map-event-btn info';
-        infoBtn.textContent = 'i';
+        infoBtn.className = 'nest-btn control-btn map-action-btn';
+        infoBtn.textContent = 'ℹ';
         infoBtn.title = t('ui.info_btn');
         infoBtn.onclick = (ev) => {
           ev.stopPropagation();
-          container.classList.remove('open');
+          activeOpenMapKey = null;
           openEventDetails(e.id);
         };
 
-        const rightBtn = document.createElement('button');
-        rightBtn.className = 'map-event-btn right';
-        rightBtn.textContent = '✕';
+        const rightBtn = document.createElement('img');
+        rightBtn.className = 'btn-icon';
+        rightBtn.src = '../sim/assets/THREAT.png';
         rightBtn.title = t('actions.defend_fort_tooltip', { id: targetFort.id, cost: S.settings.costKillPredator });
-        rightBtn.disabled = S.points < S.settings.costKillPredator;
-        rightBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = eventKey;
-          killFortAttacker(e.id);
-        };
+        
+        if (S.points < S.settings.costKillPredator) {
+          rightBtn.style.opacity = '0.5';
+          rightBtn.style.pointerEvents = 'none';
+        } else {
+          rightBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = eventKey;
+            killFortAttacker(e.id);
+          };
+        }
 
-        container.appendChild(infoBtn);
-        container.appendChild(rightBtn);
-        container.appendChild(iconImg);
-        wrap.appendChild(container);
+        controlsContainer.appendChild(infoBtn);
+        controlsContainer.appendChild(rightBtn);
       }
       return;
     }
@@ -2666,17 +3650,8 @@ function renderMap() {
     const container = document.createElement('div');
     container.className = 'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
     container.style.position = 'absolute';
-    container.style.left = e.x + '%';
-    container.style.top = e.y + '%';
+    setWorldPosition(container, wrap, e.x, e.y);
     container.style.zIndex = '10';
-
-    container.onmouseenter = () => {
-      activeOpenMapKey = eventKey;
-      document.querySelectorAll('.map-event.open').forEach(el => {
-        if (el !== container) el.classList.remove('open');
-      });
-      container.classList.add('open');
-    };
 
     const iconImg = document.createElement('img');
     iconImg.className = 'map-icon event-icon';
@@ -2691,73 +3666,76 @@ function renderMap() {
     }
 
     iconImg.onclick = (ev) => {
-      ev.stopPropagation();
-      const isOpen = container.classList.contains('open');
-      document.querySelectorAll('.map-event.open').forEach(el => el.classList.remove('open'));
-      if (!isOpen) {
-        container.classList.add('open');
-        activeOpenMapKey = eventKey;
-      } else {
+      toggleMapSelection(eventKey, ev);
+    };
+
+    if (activeOpenMapKey === eventKey && controlsContainer) {
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'nest-btn control-btn map-action-btn';
+      infoBtn.textContent = 'ℹ';
+      infoBtn.title = t('ui.info_btn');
+      infoBtn.onclick = (ev) => {
+        ev.stopPropagation();
         activeOpenMapKey = null;
+        openEventDetails(e.id);
+      };
+
+      const leftBtn = document.createElement('button');
+      leftBtn.className = 'nest-btn control-btn map-action-btn';
+
+      const rightBtn = document.createElement('img');
+      rightBtn.className = 'btn-icon';
+      rightBtn.src = '../sim/assets/THREAT.png';
+
+      if (e.type === 'search') {
+        leftBtn.textContent = '⚡';
+        leftBtn.title = t('actions.distract_tooltip', { cost: S.settings.costDistractScout });
+        leftBtn.disabled = S.points < S.settings.costDistractScout;
+        leftBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          activeOpenMapKey = eventKey;
+          distractScout(e.id);
+        };
+
+        rightBtn.title = t('actions.kill_scout_tooltip', { cost: S.settings.costKillScout });
+        if (S.points < S.settings.costKillScout) {
+          rightBtn.style.opacity = '0.5';
+          rightBtn.style.pointerEvents = 'none';
+        } else {
+          rightBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = eventKey;
+            killScout(e.id);
+          };
+        }
+      } else {
+        leftBtn.textContent = '🏃';
+        leftBtn.title = t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
+        leftBtn.disabled = S.points < S.settings.costEscapePredator;
+        leftBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          activeOpenMapKey = eventKey;
+          escapePredator(e.id);
+        };
+
+        rightBtn.title = t('actions.kill_predator_tooltip', { cost: S.settings.costKillPredator });
+        if (S.points < S.settings.costKillPredator) {
+          rightBtn.style.opacity = '0.5';
+          rightBtn.style.pointerEvents = 'none';
+        } else {
+          rightBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = eventKey;
+            killPredatorAction(e.id);
+          };
+        }
       }
-    };
 
-    const infoBtn = document.createElement('button');
-    infoBtn.className = 'map-event-btn info';
-    infoBtn.textContent = 'i';
-    infoBtn.title = t('ui.info_btn');
-    infoBtn.onclick = (ev) => {
-      ev.stopPropagation();
-      container.classList.remove('open');
-      openEventDetails(e.id);
-    };
-
-    const leftBtn = document.createElement('button');
-    leftBtn.className = 'map-event-btn left';
-
-    const rightBtn = document.createElement('button');
-    rightBtn.className = 'map-event-btn right';
-    rightBtn.textContent = '✕';
-
-    if (e.type === 'search') {
-      leftBtn.textContent = '⚡';
-      leftBtn.title = t('actions.distract_tooltip', { cost: S.settings.costDistractScout });
-      leftBtn.disabled = S.points < S.settings.costDistractScout;
-      leftBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        activeOpenMapKey = eventKey;
-        distractScout(e.id);
-      };
-
-      rightBtn.title = t('actions.kill_scout_tooltip', { cost: S.settings.costKillScout });
-      rightBtn.disabled = S.points < S.settings.costKillScout;
-      rightBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        activeOpenMapKey = eventKey;
-        killScout(e.id);
-      };
-    } else {
-      leftBtn.textContent = '🏃';
-      leftBtn.title = t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
-      leftBtn.disabled = S.points < S.settings.costEscapePredator;
-      leftBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        activeOpenMapKey = eventKey;
-        escapePredator(e.id);
-      };
-
-      rightBtn.title = t('actions.kill_predator_tooltip', { cost: S.settings.costKillPredator });
-      rightBtn.disabled = S.points < S.settings.costKillPredator;
-      rightBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        activeOpenMapKey = eventKey;
-        killPredatorAction(e.id);
-      };
+      controlsContainer.appendChild(infoBtn);
+      controlsContainer.appendChild(leftBtn);
+      controlsContainer.appendChild(rightBtn);
     }
 
-    container.appendChild(infoBtn);
-    container.appendChild(leftBtn);
-    container.appendChild(rightBtn);
     container.appendChild(iconImg);
     wrap.appendChild(container);
   });
@@ -2766,9 +3744,11 @@ function renderMap() {
 }
 
 document.addEventListener('click', (ev) => {
-  if (!ev.target.closest('.map-event')) {
-    activeOpenMapKey = null;
-    document.querySelectorAll('.map-event.open').forEach(el => el.classList.remove('open'));
+  if (!ev.target.closest('.map-event') && !ev.target.closest('#controls-containter')) {
+    if (activeOpenMapKey !== null) {
+      activeOpenMapKey = null;
+      renderMap();
+    }
   }
 });
 
@@ -3437,10 +4417,13 @@ const LEVEL_SETTINGS_INPUT_MAP = {
   fortDistLow:'fortDistLowInput', fortDistHigh:'fortDistHighInput',
   fortPredatorThreshold:'fortPredatorThresholdInput', fortAttackThreshold:'fortAttackThresholdInput',
   fortConquerThreshold:'fortConquerThresholdInput',
-  fortHumanGain:'fortHumanGainInput', costDistractScout:'costDistractScoutInput',
+  costDistractScout:'costDistractScoutInput',
   costKillScout:'costKillScoutInput', costEscapePredator:'costEscapePredatorInput',
   costKillPredator:'costKillPredatorInput', costSaveHumans:'costSaveHumansInput',
-  saveHumansAmount:'saveHumansAmountInput', costScan:'costScanInput'
+  saveHumansAmount:'saveHumansAmountInput', costScan:'costScanInput',
+  costIncreaseFortCapacity:'costIncreaseFortCapacityInput',
+  fortCapacityIncreaseAmount:'fortCapacityIncreaseAmountInput',
+  queenFoodReserveCap:'queenFoodReserveCapInput'
 };
 
 function applySettingsToInputs(overrides) {

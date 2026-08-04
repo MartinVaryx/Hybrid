@@ -91,10 +91,9 @@ body {
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
     padding: 12px 20px;
     display: flex;
+    flex-direction: row;
     align-items: center;
-    justify-content: space-between;
-    gap: 20px;
-    flex-wrap: wrap;
+    gap: 10px;
     box-sizing: border-box;
 }
 
@@ -102,11 +101,23 @@ body {
     width: 100%;
     display: flex;
     justify-content: flex-start;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+#static-ctrls{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
 }
 
 .control-btn{
+    display: flex;
+    flex-direction: row;
     font-size: 1.3rem !important;
     margin-left: 10px;
+    gap: 8px;
 }
 
 .control-btn:hover{
@@ -172,6 +183,61 @@ header.top {
 .readout .val.bio { color: var(--hybrid-green); }
 .readout .val.alert { color: var(--hybrid-red); }
 .readout .val.amber { color: var(--hybrid-amber); }
+
+.val.amber { 
+    color: var(--hybrid-amber); 
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
+.val.black { 
+    color: var(--hybrid-black); 
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.4rem;
+    font-weight: 700;
+}
+
+.stat-container{
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
+    border: 2px solid black;
+    padding: 4px 6px 4px 6px;
+    border-radius: 8px;
+}
+
+.ap-icon{
+    height: 30px;
+    width: 30px;
+    border-radius: 50%;
+    object-fit: cover; /* Keeps image proportions intact */
+    box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+}
+
+.btn-icon {
+  height: 36px;
+  width: 36px;
+  padding: 0px;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  object-fit: cover; /* Keeps image proportions intact */
+  box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+/* Hover: slightly expand */
+.btn-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Press: slightly shrink */
+.btn-icon:active {
+  transform: scale(0.92);
+}
 
 .action-block {
     display: flex;
@@ -617,7 +683,7 @@ header.top {
 .stage-chip.good { background: #d4edda; color: #155724; }
 .stage-chip.bad { background: #f8d7da; color: #721c24; }
 
-.chip-label { color: #343434; font-size: 0.75rem; }
+.chip-label { color: #343434; font-size: 1rem; }
 .chip-val { font-weight: bold; color: #000; }
 
 .graph-wrap {
@@ -730,18 +796,43 @@ header.top {
     z-index: 10;
 }
 
-/* Map Event Hover Action Buttons */
+/* Map Event Marker (click to select) */
 .map-event {
     position: absolute;
     transform: translate(-50%, -50%);
-    z-index: 4;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 5%;
+    aspect-ratio: 1;
+    min-width: 16px;
+    min-height: 16px;
 }
 
-.map-event:hover .map-event-btn,
-.map-event.open .map-event-btn {
-    display: flex !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
+/* Selected marker sits above everything else */
+.map-event.open {
+    z-index: 100;
+}
+
+.map-event .map-icon.event-icon {
+    position: static;
+    transform: none;
+    pointer-events: auto;
+    cursor: pointer;
+    width: 100%;
+    height: 100%;
+    min-width: 50px;
+    min-height: 50px;
+    object-fit: contain;
+    transition: transform 0.15s ease, filter 0.15s ease;
+}
+
+/* Hover: visual feedback only, no selection */
+.map-event:hover .map-icon.event-icon,
+.map-event.open .map-icon.event-icon {
+    transform: scale(1.28);
+    filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
 }
 
 .map-icon.fort-icon.nearest {
@@ -764,138 +855,25 @@ header.top {
     transform: translate(-50%, -50%) scale(1.1);
 }
 
-/* =========================================================
-   MAP ACTION BUTTON VISIBILITY FIX
-   ========================================================= */
-
-/* Strictly hide all map action buttons unless the container has .open */
-.map-event:not(.open) .map-event-btn {
-    display: none !important;
-    opacity: 0 !important;
-    visibility: hidden !important;
-    pointer-events: none !important;
-}
-
-/* Style disabled action buttons only when the container IS open */
-.map-event.open .map-event-btn:disabled {
-    opacity: 0.4;
-    cursor: not-allowed;
-    pointer-events: none;
-}
-
-@keyframes fort-under-attack-pulse {
-    0%, 100% {
-        filter: drop-shadow(0 0 8px var(--hybrid-red)) drop-shadow(0 0 16px var(--hybrid-red)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
-    }
-    50% {
-        filter: drop-shadow(0 0 14px var(--hybrid-red)) drop-shadow(0 0 26px var(--hybrid-red)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
-    }
-}
-
-/* Map Event Container */
-.map-event {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    width: 5%;
-    aspect-ratio: 1;
-    min-width: 16px;
-    min-height: 16px;
-    z-index: 6;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-}
-
-/* FIX: Elevate opened event above all other map elements */
-.map-event.open {
-    z-index: 100;
-}
-
-.map-event .map-icon.event-icon {
-    position: static;
-    transform: none;
+/* Fort capacity pill: shows occupied (red) vs free capacity */
+.fort-pop-bar {
+    position: relative;
+    margin: 3px auto 0;
+    width: 80%;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--hybrid-green);
+    border: 1px solid rgba(0,0,0,0.6);
+    overflow: hidden;
     pointer-events: auto;
-    cursor: pointer;
-    width: 100%;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+}
+
+.fort-pop-bar-fill {
     height: 100%;
-    object-fit: contain;
-    transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.map-event:hover .map-icon.event-icon,
-.map-event.open .map-icon.event-icon {
-    transform: scale(1.28);
-    filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
-}
-
-/* Popout Action Buttons */
-.map-event-btn {
-    position: absolute;
-    top: 50%;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 800;
-    font-size: 0.68rem;
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.16s ease;
-    box-shadow: 2px 2px 0px rgba(0,0,0,0.35);
-    z-index: 10;
-}
-
-.map-event-btn.left {
-    right: 100%;
-    margin-right: 8px;
-    transform: translateY(-50%) scale(0.4);
-    background: #000000;
-    color: #ffffff;
-}
-
-.map-event-btn.right {
-    left: 100%;
-    margin-left: 8px;
-    transform: translateY(-50%) scale(0.4);
+    border-radius: 999px 0 0 999px;
     background: var(--hybrid-red);
-    color: #ffffff;
-}
-
-.map-event-btn.info {
-    top: auto;
-    bottom: 100%;
-    left: 50%;
-    margin-bottom: 8px;
-    transform: translateX(-50%) scale(0.4);
-    background: #222222;
-    color: #ffffff;
-}
-
-.map-event.open .map-event-btn {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.map-event.open .map-event-btn.left { transform: translateY(-50%) scale(1); }
-.map-event.open .map-event-btn.right { transform: translateY(-50%) scale(1); }
-.map-event.open .map-event-btn.info { transform: translateX(-50%) scale(1); }
-
-.map-event-btn:hover:not(:disabled) {
-    filter: brightness(1.25);
-}
-
-.map-event-btn:disabled {
-    cursor: not-allowed;
-}
-
-/* FIX: Prevent disabled buttons from staying visible when container is closed */
-.map-event.open .map-event-btn:disabled {
-    opacity: 0.35;
+    transition: width 0.3s ease;
 }
 
 @keyframes fort-under-attack-pulse {
@@ -907,93 +885,27 @@ header.top {
     }
 }
 
-/* Search/hunt events rendered directly on the map */
-.map-event {
-    position: absolute;
-    transform: translate(-50%, -50%);
-    z-index: 6;
-}
-
-.map-event .map-icon.event-icon {
-    position: static;
-    transform: none;
-    pointer-events: auto;
-    cursor: pointer;
-    width: 8%;
-    height: 8%;
-    min-width: 50px;
-    min-height: 50px;
-    transition: transform 0.15s ease, filter 0.15s ease;
-}
-
-.map-event:hover .map-icon.event-icon,
-.map-event.open .map-icon.event-icon {
-    transform: scale(1.28);
-    filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
-}
-
-.map-event-btn {
-    position: absolute;
-    top: 50%;
-    width: 24px;
-    height: 24px;
-    border-radius: 50%;
-    border: 2px solid #000;
-    display: flex;
+/* Action buttons for the currently-selected map icon, rendered in #controls-containter */
+.map-action-btn {
+    padding: 8px 12px;
+    font-size: 1.1rem !important;
+    min-width: 42px;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    font-family: 'IBM Plex Mono', monospace;
-    font-weight: 800;
-    font-size: 0.68rem;
-    cursor: pointer;
-    opacity: 0;
-    pointer-events: none;
-    transition: all 0.16s ease;
-    box-shadow: 2px 2px 0px rgba(0,0,0,0.35);
-    z-index: 7;
 }
 
-.map-event-btn.left {
-    right: 100%;
-    margin-right: 8px;
-    transform: translateY(-50%) scale(0.4);
-    background: #000000;
-    color: #ffffff;
-}
-
-.map-event-btn.right {
-    left: 100%;
-    margin-left: 8px;
-    transform: translateY(-50%) scale(0.4);
+.map-action-btn.danger {
     background: var(--hybrid-red);
-    color: #ffffff;
+    border-color: #000;
 }
 
-.map-event-btn.info {
-    top: auto;
-    bottom: 100%;
-    left: 50%;
-    margin-bottom: 8px;
-    transform: translateX(-50%) scale(0.4);
-    background: #222222;
-    color: #ffffff;
+.map-action-btn.danger:hover:not(:disabled) {
+    background: #8f1f1f;
 }
 
-.map-event.open .map-event-btn {
-    opacity: 1;
-    pointer-events: auto;
-}
-
-.map-event.open .map-event-btn.left { transform: translateY(-50%) scale(1); }
-.map-event.open .map-event-btn.right { transform: translateY(-50%) scale(1); }
-.map-event.open .map-event-btn.info { transform: translateX(-50%) scale(1); }
-
-.map-event-btn:hover:not(:disabled) {
-    filter: brightness(1.25);
-}
-
-.map-event-btn:disabled {
-    opacity: 0.35 !important;
+.map-action-btn:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
 }
 

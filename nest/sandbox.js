@@ -276,7 +276,9 @@ function sandboxAddFort() {
     y: sandboxClampPct(50 + jitter()),
     alive: true,
     defense: defDefense,
-    maxDefense: defDefense
+    maxDefense: defDefense,
+    capacity: 100,
+    population: Math.round(50 + Math.random() * 50)
   });
   recordSandboxHistory();
   renderMap();
@@ -616,7 +618,14 @@ function sandboxBuildLevelObject(useCurrentState) {
     intro: document.getElementById('sbIntroInput').value,
     background: document.getElementById('sbBackgroundInput').value.trim() || null,
     nest: { x: source.nest.x, y: source.nest.y },
-    forts: source.forts.map(f => ({ id: f.id, x: f.x, y: f.y, defense: f.alive === false ? (f.maxDefense || f.defense) : f.defense })),
+    forts: source.forts.map(f => ({
+      id: f.id,
+      x: f.x,
+      y: f.y,
+      defense: f.alive === false ? (f.maxDefense || f.defense) : f.defense,
+      capacity: f.capacity != null ? f.capacity : 100,
+      population: f.population != null ? f.population : Math.round(50 + Math.random() * 50)
+    })),
     conditions: conditions.map(cond => ({
       id: cond.id,
       type: cond.type,

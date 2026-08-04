@@ -1,0 +1,131 @@
+{
+  "id": "level-1",
+  "name": "Nová úroveň",
+  "description": "",
+  "intro": "",
+  "background": null,
+  "nest": {
+    "x": 70,
+    "y": 70
+  },
+  "forts": [
+    {
+      "id": 1,
+      "x": 32.15156325838723,
+      "y": 93.07086809100386,
+      "defense": 50,
+      "capacity": 100,
+      "population": 77
+    },
+    {
+      "id": 2,
+      "x": 66.93654083079467,
+      "y": 32.9094715733555,
+      "defense": 50,
+      "capacity": 100,
+      "population": 79
+    },
+    {
+      "id": 3,
+      "x": 67.6244066619364,
+      "y": 48.86834733217183,
+      "defense": 50,
+      "capacity": 100,
+      "population": 100
+    },
+    {
+      "id": 4,
+      "x": 18.368479601827538,
+      "y": 65.28674576230874,
+      "defense": 50,
+      "capacity": 100,
+      "population": 57
+    },
+    {
+      "id": 5,
+      "x": 44.57575936521679,
+      "y": 34.917228926538556,
+      "defense": 50,
+      "capacity": 100,
+      "population": 51
+    },
+    {
+      "id": 6,
+      "x": 80.82670379567246,
+      "y": 9.387350170080015,
+      "defense": 50,
+      "capacity": 100,
+      "population": 59
+    },
+    {
+      "id": 7,
+      "x": 46.67267415367092,
+      "y": 60.15501278818373,
+      "defense": 50,
+      "capacity": 100,
+      "population": 95
+    },
+    {
+      "id": 8,
+      "x": 54.703805293164166,
+      "y": 87.64740699790933,
+      "defense": 50,
+      "capacity": 100,
+      "population": 86
+    },
+    {
+      "id": 9,
+      "x": 28.636268502392767,
+      "y": 11.70947755772712,
+      "defense": 50,
+      "capacity": 100,
+      "population": 89
+    },
+    {
+      "id": 10,
+      "x": 94.78978945973132,
+      "y": 53.13761786109369,
+      "defense": 50,
+      "capacity": 100,
+      "population": 73
+    }
+  ],
+  "conditions": [],
+  "settings": {
+    "groupSize": 4,
+    "foodPerHuman": 5,
+    "startHumans": 100,
+    "startFood": 200,
+    "maxPoints": 10,
+    "eggsPerSearch": 0.4,
+    "eggCap": 10,
+    "eggsPerFood": 5,
+    "searchBaseChance": 40,
+    "searchRatioScale": 25,
+    "huntBaseChance": 90,
+    "huntRatioScale": 25,
+    "huntDeathRisk": 50,
+    "scoutBiasPerFailedSearch": 2,
+    "fortLimit": 10,
+    "defaultFortDefense": 50,
+    "fortFoodLow": 2,
+    "fortFoodHigh": 5,
+    "fortHumanLow": 1,
+    "fortHumanHigh": 3,
+    "fortDistLow": 15,
+    "fortDistHigh": 70,
+    "fortPredatorThreshold": 40,
+    "fortAttackThreshold": 4.5,
+    "fortConquerThreshold": 0.7,
+    "costDistractScout": 1,
+    "costKillScout": 2,
+    "costEscapePredator": 1,
+    "costKillPredator": 3,
+    "costSaveHumans": 1,
+    "saveHumansAmount": 2,
+    "costScan": 1,
+    "costIncreaseFortCapacity": 1,
+    "fortCapacityIncreaseAmount": 5,
+    "queenFoodReserveCap": 100
+  }
+}

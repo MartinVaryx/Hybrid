@@ -67,15 +67,6 @@
                 <div class="lbl" data-i18n="readout.insects">Hmyz</div>
                 <div class="val alert" id="insectsVal">150</div>
             </div>
-            <div class="readout">
-                <div class="lbl" data-i18n="readout.fort_def">Obrana pevností</div>
-                <div class="val amber" id="fortDefVal">50</div>
-            </div>
-            <div class="readout">
-                <div class="lbl" data-i18n="readout.action_points">Akčné body</div>
-                <div class="val amber" id="pointsVal">10</div>
-                <div class="points-row" id="pointsRow"></div>
-            </div>
         </div>
 
         <div class="action-block">
@@ -151,22 +142,24 @@
     </div>
 
     <div class="bottom" id="bottomBar">
-        <div id="controls-containter">
+        <div id="static-ctrls">
+            <div class="stat-container">
+                <span class="val amber" id="pointsVal">10</span><span class="val black">/</span><span class="val amber" id="maxPointsVal"></span><span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>
+            </div>
+            <button class="nest-btn control-btn" id="hire-btn" onclick="Hire()"
+                    data-i18n-title="map.hire_tooltip"
+                    title="Najať Hybrida (zvýši počet akčných bodov o 1).">
+                <span>+</span>
+            </button>
             <button class="nest-btn control-btn" id="scan-btn" onclick="scanForHidden()"
                     data-i18n-title="map.scan_tooltip"
                     title="Odhaliť skryté Skautky - čím viac ich je, tým viac odhalíš.">
                 <span>🔍</span><span data-i18n="map.scan_btn">SKENOVAŤ</span> <span class="cost">(<span id="scanCostLbl">1</span>)</span>
             </button>
-            <button class="nest-btn control-btn" id="hire-btn" onclick="Hire()"
-                    data-i18n-title="map.hire_tooltip"
-                    title="Najať Hybrida (zvýši počet akčných bodov o 1).">
-                <span data-i18n="map.hire_btn">NAJAŤ (1)</span>
-            </button>
-            <button class="act nest-btn control-btn" id="saveHumansBtn" onclick="saveHumans()"
-                    data-i18n-title="map.evacuate_tooltip"
-                    title="Evakuovať ľudí z loveckého bazéna skôr, než k nim hniezdo dosiahne. K dispozícii v ktoromkoľvek kroku, nezávisle od fronty.">
-                <span data-i18n="map.evacuate_btn">Evakuovať ľudí</span> <span class="cost">(<span id="saveHumansCostLbl">1</span>)</span>
-            </button>
+        </div>
+
+        <div id="controls-containter">
+
         </div>
     </div>
 
@@ -230,6 +223,13 @@
                     <label data-i18n="settings.lbl_eggs_per_food">Vajíčka na spotrebovanú potravu</label>
                     <input type="number" id="eggsPerFoodInput" min="0" max="50" value="5">
                     <div class="hint" data-i18n="settings.hint_eggs_per_food">Každých tieto-koľko znesených vajíčok stojí 1 extra potravu. Nastavte na 0 pre vypnutie nákladov.</div>
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_queen_food_reserve">Zásoba potravy kráľovnej</label>
+                    <input type="number" id="queenFoodReserveCapInput" min="0" max="500" value="10">
+                    <div class="hint" data-i18n="settings.hint_queen_food_reserve">Súkromná zásoba potravy vyhradená pre kráľovnú — ostatné Somory ju nikdy nespotrebujú, ani keď hladujú. Akákoľvek potrava navyše (po nakŕmení kolónie) sa najprv doplní sem, kým sa nezaplní, až potom sa použije inde.</div>
                 </div>
             </div>
 
@@ -333,10 +333,6 @@
                     <label data-i18n="settings.lbl_fort_conquer_threshold">Prah dobytia</label>
                     <input type="number" id="fortConquerThresholdInput" min="1" max="1" value="0.5">
                 </div>
-                <div class="field">
-                    <label data-i18n="settings.lbl_fort_human_gain">Získaní ľudia pri dobytí</label>
-                    <input type="number" id="fortHumanGainInput" min="0" max="2000" value="50">
-                </div>
             </div>
 
             <div class="settings-section" data-i18n="settings.sec_costs">Náklady na akcie hráča</div>
@@ -372,6 +368,16 @@
                 <div class="field">
                     <label data-i18n="settings.lbl_cost_scan">Skenovať skryté skautky (body)</label>
                     <input type="number" id="costScanInput" min="0" max="50" value="1">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_fort_capacity">Zvýšiť kapacitu pevnosti (body)</label>
+                    <input type="number" id="costIncreaseFortCapacityInput" min="0" max="50" value="1">
+                </div>
+                <div class="field">
+                    <label data-i18n="settings.lbl_fort_capacity_amount">Nárast kapacity za použitie</label>
+                    <input type="number" id="fortCapacityIncreaseAmountInput" min="0" max="500" value="5">
                 </div>
             </div>
 

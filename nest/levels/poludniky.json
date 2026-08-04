@@ -63,8 +63,8 @@
     "startHumans": 100,
     "startFood": 200,
     "maxPoints": 10,
-    "eggsPerSearch": 0.4,
-    "eggCap": 10,
+    "eggsPerSearch": 0.5,
+    "eggCap": 15,
     "eggsPerFood": 5,
     "searchBaseChance": 40,
     "searchRatioScale": 25,
@@ -81,15 +81,17 @@
     "fortDistLow": 15,
     "fortDistHigh": 70,
     "fortPredatorThreshold": 40,
-    "fortAttackThreshold": 5,
+    "fortAttackThreshold": 4.2,
     "fortConquerThreshold": 0.7,
-    "fortHumanGain": 100,
     "costDistractScout": 1,
     "costKillScout": 2,
     "costEscapePredator": 1,
     "costKillPredator": 3,
     "costSaveHumans": 1,
     "saveHumansAmount": 2,
-    "costScan": 1
+    "costScan": 1,
+    "costIncreaseFortCapacity": 1,
+    "fortCapacityIncreaseAmount": 5,
+    "queenFoodReserveCap": 100
   }
 }
