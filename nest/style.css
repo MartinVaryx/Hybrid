@@ -113,16 +113,57 @@ body {
 }
 
 .control-btn{
-    display: flex;
-    flex-direction: row;
+    align-items: center;
+    justify-content: center;
     font-size: 1.3rem !important;
     margin-left: 10px;
-    gap: 8px;
+    gap: 2px;
+    line-height: 1;
+    min-height: 40px;
 }
 
 .control-btn:hover{
     background: rgb(106, 106, 106) !important;
 }
+
+/* Generic stacked "label / cost" notation used across action buttons:
+   main label on top, AP cost badge below at half the button's font size. */
+.btn-main{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-container{
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    gap: 10px
+}
+
+.btn-cost{
+    display: flex;
+    align-items:flex-end;
+    justify-content: center;
+    gap: 3px;
+    font-size: 1rem;
+    line-height: 1;
+    margin-top: 5px;
+    min-width: 60px;
+}
+
+.btn-cost-val{
+    font-weight: 700;
+}
+
+.btn-cost .ap-icon{
+    height: 1.2em;
+    width: 1.2em;
+    margin-left: 3px;
+    box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+}
+
 
 #controls-container{
     display: flex;
@@ -216,6 +257,15 @@ header.top {
     box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
 }
 
+.build-fort-icon {
+  height: 25px;
+  width: 25px;
+  margin: 0px;
+  object-fit: contain;
+  filter: drop-shadow(0 0 1px rgba(0, 0, 0, 0.6));
+  vertical-align: middle;
+}
+
 .btn-icon {
   height: 36px;
   width: 36px;
@@ -225,6 +275,19 @@ header.top {
   border-radius: 50%;
   object-fit: cover; /* Keeps image proportions intact */
   box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+#distract-scout-icon {
+  height: 40px;
+  width: 40px;
+  padding: 0px;
+  border: none;
+  border-radius: 0%;
+  background: transparent;
+  box-shadow: none;
+  object-fit: cover; /* Keeps image proportions intact */
   cursor: pointer;
   transition: transform 0.1s ease, opacity 0.1s ease;
 }
@@ -596,16 +659,17 @@ header.top {
     border-radius: 8px;
     padding: 10px 14px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.82rem;
+    font-size: 1rem;
     font-weight: 600;
     text-transform: uppercase;
     cursor: pointer;
     transition: all 0.15s ease;
     box-shadow: 3px 3px 0px rgba(0, 0, 0, 0.25);
     display: inline-flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 6px;
+    gap: 4px;
 }
 
 #map-info{
@@ -698,17 +762,39 @@ header.top {
    ========================================================= */
 .map-wrap {
     position: relative;
+    aspect-ratio: 2 / 1; /* MUST match WORLD_ASPECT_RATIO in script.js - the territory is twice as wide as tall; distance math there is baked to this same ratio */
     width: 100%;
-    flex: 1;
+    max-height: 100%;
+    flex: none;
     min-height: 160px;
     background-color: #eef3e3;
     background-image:
         linear-gradient(rgba(0,0,0,0.06) 1px, transparent 1px),
         linear-gradient(90deg, rgba(0,0,0,0.06) 1px, transparent 1px);
-    background-size: 3% 6%;
+    background-size: 2.5% 5%; /* halved on x vs y to render square grid cells on the 2:1 map-wrap */
     border: 2px solid #000;
     border-radius: 8px;
     overflow: hidden;
+}
+
+.map-wrap.fort-placement-active {
+    cursor: crosshair;
+    box-shadow: inset 0 0 0 3px var(--hybrid-amber);
+}
+
+#build-fort-btn{
+    padding: 5px;
+}
+
+#build-fort-btn.placing {
+    background: var(--hybrid-amber) !important;
+    color: #000 !important;
+    animation: build-fort-pulse 1s ease-in-out infinite;
+}
+
+@keyframes build-fort-pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(255, 183, 77, 0.6); }
+    50% { box-shadow: 0 0 0 6px rgba(255, 183, 77, 0); }
 }
 
 .map-icon {
@@ -915,14 +1001,26 @@ header.top {
     min-height: 0;
     display: flex;
     flex-direction: column;
+    align-items: center;
+    justify-content: center;
 }
 
 .map-info-wrap {
     position: absolute;
-    top: 10px;
-    right: 10px;
+    top: 5px;
+    right: 5px;
     z-index: 40;
     display: flex;
+}
+
+#map-top{
+    position: absolute;
+    top: 5px;
+    right: 10px;
+    display: flex;
+    flex-direction: row;
+    width: 98%;
+    justify-content: space-between;
 }
 
 .map-legend {
@@ -1168,9 +1266,10 @@ iframe {
     position: absolute;
     top: 18px;
     right: 18px;
-    background: #000000;
+    background: var(--hybrid-red);
     color: #ffffff;
     border: 2px solid #000000;
+    border-radius: 8px;
     width: 32px;
     height: 32px;
     font-size: 1rem;
@@ -1183,8 +1282,7 @@ iframe {
 }
 
 .close-x:hover {
-    background: var(--hybrid-red);
-    border-color: var(--hybrid-red);
+    background: rgb(119, 30, 0);
 }
 
 .settings-section {
@@ -1234,7 +1332,7 @@ iframe {
     background: #fdfdfd;
     color: #000000;
     transition: all 0.15s ease;
-    border-radius: 2px;
+    border-radius: 8px;
 }
 
 .field input:focus {
@@ -1242,6 +1340,23 @@ iframe {
     background: #ffffff;
     border-color: #000000;
     box-shadow: 3px 3px 0px #000000;
+}
+
+.conditions-list{
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.condition-row{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.condition-row select, input{
+    border-radius: 8px;
 }
 
 .hint {
@@ -1446,6 +1561,63 @@ iframe {
     color: whitesmoke;
 }
 
+#sbIntroInput{
+    margin-bottom: 10px;
+    width: 95%;
+    font-size: 1.8rem;
+    border-radius: 8px;
+}
+
+#fortPopulationInput input{
+    display: flex;
+    justify-content: flex-end;
+    max-width: 40px !important;
+}
+
+/* ============================= Sandbox: pause / insect drag / scout toggle ============================= */
+.sandbox-draggable {
+    cursor: grab;
+}
+.sandbox-dragging {
+    cursor: grabbing;
+    opacity: 0.85;
+}
+#sbPauseBtn.sandbox-selected {
+    background: #b33;
+    color: #fff;
+}
+
+#sbToggleHiddenScoutsBtn{
+    font-size: 1.3rem;
+    padding: 5px 10px 5px 10px;
+    position: absolute;
+    left: 5px;
+    top: 5px;
+}
+
+#sbToggleHiddenScoutsBtn.hidden {
+    display: none;
+}
+.sandbox-visibility-btn.sandbox-state-visible {
+    background: #2e7d32;
+    color: #fff;
+    border-color: #1b5e20;
+}
+.sandbox-visibility-btn.sandbox-state-hidden {
+    background: #b33;
+    color: #fff;
+    border-color: #7a1f1f;
+}
+#sbToggleHiddenScoutsBtn.sandbox-peeking {
+    background: #2e7d32;
+    color: #fff;
+}
+
+.fort-attacker {
+  transition: none !important;
+}
+
+
 /* =========================================================
    MOBILE / SMALL SCREEN RULES
    ========================================================= */
@@ -1469,6 +1641,8 @@ iframe {
         overflow: hidden;
     }
 }
+
+
 
 /* --- Compact top bar: keep brand / stats / action controls on one row --- */
 @media screen and (max-width: 968px) {

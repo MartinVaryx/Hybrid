@@ -147,21 +147,25 @@ function sandboxClampPct(v) { return Math.max(0, Math.min(100, v)); }
 
 function sandboxPointerToMapPercent(ev) {
   const wrap = document.getElementById('mapWrap');
-  const rect = wrap.getBoundingClientRect();
-  const x = sandboxClampPct(((ev.clientX - rect.left) / rect.width) * 100);
-  const y = sandboxClampPct(((ev.clientY - rect.top) / rect.height) * 100);
+  // Use script.js's shared world<->screen conversion (screenPxToWorld/getMapLetterbox)
+  // instead of a separate naive %-of-rect calculation - two independent implementations
+  // of the same conversion drift apart and produce inconsistent, aspect-distorted results.
+  const world = screenPxToWorld(wrap, ev.clientX, ev.clientY);
+  const x = sandboxClampPct(world.x);
+  const y = sandboxClampPct(world.y);
   return { x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10 };
 }
 
-function sandboxMakeDraggable(el, onDrag, onEnd) {
+function sandboxMakeDraggable(el, onDrag, onEnd, isEnabled = () => sandboxEditEnabled) {
   const img = el.tagName === 'IMG' ? el : el.querySelector('img');
+
   if (img) {
     img.draggable = false;
     img.ondragstart = (e) => e.preventDefault();
   }
 
   el.addEventListener('pointerdown', (ev) => {
-    if (!sandboxEditEnabled) return;
+    if (!isEnabled()) return;
 
     ev.preventDefault();
     ev.stopPropagation();
@@ -198,7 +202,11 @@ function sandboxMakeDraggable(el, onDrag, onEnd) {
 
 // Called by script.js's renderMap()
 function sandboxOnMapRendered() {
+  sandboxWireToggleAllHiddenScoutsControl();
   if (currentGameMode !== 'sandbox') return;
+
+  sandboxWireInsectDrag();
+  sandboxWireMapEventExtras();
 
   // --- NEST DRAG ---
   const nestImg = document.querySelector('#mapWrap .nest-icon');
@@ -207,8 +215,7 @@ function sandboxOnMapRendered() {
     sandboxMakeDraggable(nestImg, (x, y) => {
       S.nest.x = x;
       S.nest.y = y;
-      nestImg.style.left = x + '%';
-      nestImg.style.top = y + '%';
+      setWorldPosition(nestImg, document.getElementById('mapWrap'), x, y);
     }, (hasMoved) => {
       if (hasMoved) {
         recordSandboxHistory();
@@ -231,8 +238,7 @@ function sandboxOnMapRendered() {
     sandboxMakeDraggable(container, (x, y) => {
       f.x = x;
       f.y = y;
-      container.style.left = x + '%';
-      container.style.top = y + '%';
+      setWorldPosition(container, document.getElementById('mapWrap'), x, y);
     }, (hasMoved) => {
       if (!hasMoved) {
         if (sandboxEditEnabled) sandboxSelectFort(f.id);
@@ -479,9 +485,13 @@ function sandboxWireConditionsOverlay() {
   const open = () => {
     if (!Array.isArray(S.conditions)) S.conditions = [];
     sandboxRenderConditionsEditor();
+    sandboxCloseEditorPanel();
     overlay.classList.remove('hidden');
   };
-  const close = () => overlay.classList.add('hidden');
+  const close = () => {
+    overlay.classList.add('hidden');
+    sandboxOpenEditorPanel();
+  };
 
   openBtn.onclick = open;
   if (closeX) closeX.onclick = close;
@@ -505,8 +515,14 @@ function sandboxWireIntroOverlay() {
   const closeX = document.getElementById('sbIntroCloseX');
   const doneBtn = document.getElementById('sbIntroDoneBtn');
   if (!overlay || !openBtn) return;
-  const open = () => overlay.classList.remove('hidden');
-  const close = () => overlay.classList.add('hidden');
+  const open = () => {
+    overlay.classList.remove('hidden');
+    sandboxCloseEditorPanel();
+  };
+  const close = () => {
+    overlay.classList.add('hidden');
+    sandboxOpenEditorPanel()
+  };
   openBtn.onclick = open;
   if (closeX) closeX.onclick = close;
   if (doneBtn) doneBtn.onclick = close;
@@ -520,6 +536,8 @@ function sandboxNewLevel() {
   startSandboxMode();
   sandboxUndoStack = [];
   sandboxRedoStack = [];
+  sandboxResetHiddenScoutsPeek();
+  sandboxHiddenScoutPositions = [];
   recordSandboxHistory();
 }
 
@@ -557,6 +575,7 @@ function sandboxLoadLevelObject(obj) {
   
   sandboxUndoStack = [];
   sandboxRedoStack = [];
+  sandboxResetHiddenScoutsPeek();
   recordSandboxHistory();
   sandboxSetStatus('Načítané zo súboru');
 }
@@ -654,9 +673,7 @@ function sandboxDownloadLevel(level) {
 
 function sandboxWireExportButtons() {
   const currentBtn = document.getElementById('sbExportCurrentBtn');
-  const defaultBtn = document.getElementById('sbExportDefaultBtn');
   if (currentBtn) currentBtn.onclick = () => sandboxDownloadLevel(sandboxBuildLevelObject(true));
-  if (defaultBtn) defaultBtn.onclick = () => sandboxDownloadLevel(sandboxBuildLevelObject(false));
 }
 
 /* ============================= STATUS + ENABLE/DISABLE ============================= */
@@ -669,7 +686,7 @@ function sandboxSetStatus(text) {
 function sandboxSetEditEnabled(enabled) {
   sandboxEditEnabled = enabled;
   ['sbLevelNameInput', 'sbLevelDescInput', 'sbLevelFileInput', 'sbBackgroundInput',
-   'sbIntroBtn', 'sbNewBtn', 'sbLoadBtn', 'sbExportCurrentBtn', 'sbExportDefaultBtn',
+   'sbIntroBtn', 'sbNewBtn', 'sbLoadBtn', 'sbExportCurrentBtn',
    'sbAddFortBtn', 'sbRemoveFortBtn'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !enabled;
@@ -729,6 +746,529 @@ function sandboxWireEditorToggle() {
   }
 }
 
+/* ============================= PAUSE MODE ============================= */
+// Dragging insects mutates S.events (e.x/e.y) directly, outside the normal
+// render()/runStepAnimation() flow. If a step animation or auto-advance were
+// to run while the user is mid-drag, the two writers could stomp on each
+// other. Pause mode blocks anything that mutates simulation state (advancing
+// a step, hiring, scanning, building a fort) while editing, same spirit as
+// sandboxEditEnabled but for time rather than layout.
+
+let sandboxPaused = false;
+const SANDBOX_PAUSE_GUARDED_FNS = ['advanceStep', 'Hire', 'scanForHidden', 'buildFort'];
+let sandboxPauseWrapped = false;
+
+function sandboxWrapGuardedFunctions() {
+  if (sandboxPauseWrapped) return;
+  sandboxPauseWrapped = true;
+  SANDBOX_PAUSE_GUARDED_FNS.forEach(name => {
+    const orig = window[name];
+    if (typeof orig !== 'function') return;
+    window[name] = function (...args) {
+      if (sandboxPaused && currentGameMode === 'sandbox') {
+        sandboxSetStatus('Simulácia je pozastavená (Pauza)');
+        return;
+      }
+      return orig.apply(this, args);
+    };
+  });
+}
+
+function sandboxSetPaused(paused) {
+  sandboxPaused = paused;
+
+  const btn = document.getElementById('sbPauseBtn');
+
+  if (btn) {
+    btn.classList.toggle('sandbox-selected', paused);
+    btn.textContent = paused
+      ? t('sandbox.btn_resume')
+      : t('sandbox.btn_pause');
+    btn.title = t('sandbox.title_pause');
+  }
+
+  // Immediately enable/disable scout + predator dragging.
+  sandboxWireInsectDrag();
+
+  sandboxSetStatus(paused ? 'Pozastavené' : 'Beží');
+}
+
+function sandboxTogglePaused() {
+  sandboxSetPaused(!sandboxPaused);
+}
+
+function sandboxWirePauseControl() {
+  const btn = document.getElementById('sbPauseBtn');
+  if (!btn) return;
+  btn.onclick = sandboxTogglePaused;
+  sandboxSetPaused(sandboxPaused);
+  sandboxWrapRenderPhaseBanner();
+  sandboxSyncPauseBtnVisibility();
+}
+
+// The pause button lives next to #stopSimBtn in the header and should follow
+// the exact same show/hide rule (sandbox mode + phase active + not game
+// over). Rather than duplicating that rule here, we just mirror stopSimBtn's
+// own "hidden" class after every renderPhaseBanner() call, which is the
+// single place script.js already computes it.
+function sandboxSyncPauseBtnVisibility() {
+  const btn = document.getElementById('sbPauseBtn');
+  if (!btn) return;
+  const stopBtn = document.getElementById('stopSimBtn');
+  const visible = stopBtn
+    ? !stopBtn.classList.contains('hidden')
+    : (currentGameMode === 'sandbox' && S.phase === 'active' && !S.gameOver);
+  btn.classList.toggle('hidden', !visible);
+  // Don't leave the sim stuck paused once the pause control itself
+  // disappears (simulation stopped/ended, or we left sandbox mode).
+  if (!visible && sandboxPaused) sandboxSetPaused(false);
+}
+
+let sandboxRenderPhaseBannerWrapped = false;
+function sandboxWrapRenderPhaseBanner() {
+  if (sandboxRenderPhaseBannerWrapped) return;
+  const orig = window.renderPhaseBanner;
+  if (typeof orig !== 'function') return;
+  sandboxRenderPhaseBannerWrapped = true;
+  window.renderPhaseBanner = function (...args) {
+    const result = orig.apply(this, args);
+    sandboxSyncPauseBtnVisibility();
+    return result;
+  };
+}
+
+/* ============================= DRAG (insects: scouts / predators) ============================= */
+// Reuses the same pointer-drag machinery as the nest/fort drag above, applied
+// to the .map-event containers script.js tags with data-event-id/data-event-type.
+
+function sandboxWireInsectDrag() {
+  if (currentGameMode !== 'sandbox') return;
+
+  document.querySelectorAll('#mapWrap .map-event[data-event-id]').forEach(container => {
+    const img = container.querySelector('.event-icon');
+    if (!img) return;
+
+    const enabled = sandboxPaused;
+
+    img.classList.toggle('sandbox-draggable', enabled);
+
+    const eid = Number(container.dataset.eventId);
+
+    sandboxMakeDraggable(
+      container,
+      (x, y) => {
+        const e = S.events.find(ev => ev.id === eid);
+        if (!e) return;
+
+        e.x = x;
+        e.y = y;
+
+        setWorldPosition(
+          container,
+          document.getElementById('mapWrap'),
+          x,
+          y
+        );
+      },
+      (hasMoved) => {
+        if (hasMoved) renderMap();
+      },
+      () => sandboxPaused
+    );
+  });
+}
+
+/* ============================= FORCE FORT CONQUEST ============================= */
+
+const SANDBOX_FORCE_CONQUEST_REINFORCEMENT = 10;
+
+// Predators "available" to be thrown at a forced conquest: the idle pool
+// plus anything currently out on a hunt elsewhere (it gets redirected to
+// the fort). Predators on cooldown are never available for this.
+function sandboxHuntActivePredators() {
+  return S.events
+    .filter(e => e.type === 'hunt' && e.status === 'pending')
+    .reduce((sum, e) => sum + Math.max(0, e.groupSize - e.neutralized - e.killed), 0);
+}
+
+function sandboxPredatorsAvailableForConquest() {
+  return Math.max(0, S.predatorsAvailable || 0) + sandboxHuntActivePredators();
+}
+
+// Pulls up to `count` predators for a forced/reinforced fort attack: idle
+// predators first, then predators redirected off active hunts. Returns how
+// many were actually drawn (may be less than requested if not enough are
+// available).
+function sandboxDrawPredatorsForConquest(count) {
+  let remaining = count;
+
+  const fromIdle = Math.min(remaining, Math.max(0, S.predatorsAvailable || 0));
+  S.predatorsAvailable = Math.max(0, (S.predatorsAvailable || 0) - fromIdle);
+  remaining -= fromIdle;
+
+  if (remaining > 0) {
+    const huntEvents = S.events.filter(e => e.type === 'hunt' && e.status === 'pending');
+    for (const e of huntEvents) {
+      if (remaining <= 0) break;
+      const active = Math.max(0, e.groupSize - e.neutralized - e.killed);
+      const take = Math.min(active, remaining);
+      if (take <= 0) continue;
+      e.groupSize -= take;
+      remaining -= take;
+    }
+  }
+
+  return count - remaining;
+}
+
+function sandboxForceConquest(fortId) {
+  if (currentGameMode !== 'sandbox' || sandboxPaused) return;
+  const fort = S.forts.find(f => f.id === fortId && f.alive);
+  if (!fort) return;
+
+  const existingAttack = S.events.find(e => e.type === 'fort' && e.status === 'pending');
+  if (existingAttack && existingAttack.targetFortId !== fort.id) {
+    sandboxSetStatus('Útok na inú pevnosť už prebieha');
+    return;
+  }
+
+  const availablePool = sandboxPredatorsAvailableForConquest();
+  if (availablePool <= 0) {
+    sandboxSetStatus('Žiadni dostupní predátori');
+    return;
+  }
+
+  if (existingAttack) {
+    const attackers = sandboxDrawPredatorsForConquest(Math.min(SANDBOX_FORCE_CONQUEST_REINFORCEMENT, availablePool));
+    existingAttack.originalAttackers += attackers;
+    delete existingAttack.iconPositions; // force renderMap to re-lay-out icons for the new count
+
+    log('[Sandbox] ' + t('sandbox.log_forced_conquest_reinforced', { id: fort.id, count: attackers }));
+    renderMap();
+    sandboxSetStatus('Útok posilnený o ' + attackers + ' predátorov');
+    return;
+  }
+
+  const attackers = sandboxDrawPredatorsForConquest(Math.max(1, Math.min(S.predatorsAvailable || 1, availablePool)));
+  S.fortCooldown = 0;
+
+  S.events.push({
+    id: nid(),
+    type: 'fort',
+    status: 'pending',
+    outcome: null,
+    originalAttackers: attackers,
+    killed: 0,
+    targetFortId: fort.id
+  });
+
+  log('[Sandbox] ' + t('sandbox.log_forced_conquest', { id: fort.id, count: attackers }));
+  renderMap();
+  sandboxSetStatus('Útok vynútený');
+}
+
+/* ============================= SCOUT VISIBILITY ============================= */
+
+let sandboxPeekedHiddenScoutIds = null;
+
+// Persistent positions for scouts currently in S.scoutsHidden.
+// These survive show/hide-all toggles.
+let sandboxHiddenScoutPositions = [];
+
+
+/*
+ * Make sure every hidden scout has a permanent sandbox position.
+ *
+ * We only create positions for NEW hidden scouts. Existing positions
+ * are never regenerated.
+ */
+function sandboxEnsureHiddenScoutPositions() {
+  const hiddenCount = Math.max(0, Number(S.scoutsHidden || 0));
+
+  while (sandboxHiddenScoutPositions.length < hiddenCount) {
+    const temp = {
+      type: 'search',
+      status: 'pending',
+      outcome: null
+    };
+
+    assignEventCoords(temp);
+
+    sandboxHiddenScoutPositions.push({
+      x: temp.x,
+      y: temp.y
+    });
+  }
+
+  // If the hidden population decreased permanently, discard only the
+  // positions that no longer correspond to hidden scouts.
+  if (sandboxHiddenScoutPositions.length > hiddenCount) {
+    sandboxHiddenScoutPositions.length = hiddenCount;
+  }
+}
+
+
+/* ---- INDIVIDUAL SCOUT: permanently hide this scout ---- */
+
+function sandboxToggleScoutVisibility(eventId) {
+  const e = S.events.find(
+    ev => ev.id === eventId &&
+         ev.type === 'search' &&
+         ev.status === 'pending' &&
+         !ev.outcome
+  );
+
+  if (!e) return;
+
+  /*
+   * If this scout was temporarily revealed by "Show All",
+   * clicking its individual button means:
+   *
+   *   "I want this scout to stay revealed."
+   *
+   * Therefore remove it from the temporary peek set and keep
+   * it as a normal visible scout.
+   */
+  if (
+    sandboxPeekedHiddenScoutIds &&
+    sandboxPeekedHiddenScoutIds.has(eventId)
+  ) {
+    sandboxPeekedHiddenScoutIds.delete(eventId);
+
+    if (sandboxPeekedHiddenScoutIds.size === 0) {
+      sandboxPeekedHiddenScoutIds = null;
+    }
+
+    /*
+     * Keep the scout in S.events.
+     * Do NOT increase S.scoutsHidden.
+     * Do NOT remove the event.
+     *
+     * Its current x/y position is preserved automatically.
+     */
+    renderMap();
+    return;
+  }
+
+  /*
+   * Normal scout:
+   * permanently hide it and return it to S.scoutsHidden.
+   */
+
+  // Preserve its current map position.
+  sandboxHiddenScoutPositions.push({
+    x: e.x,
+    y: e.y
+  });
+
+  S.events = S.events.filter(
+    ev => ev.id !== eventId
+  );
+
+  S.scoutsHidden = (S.scoutsHidden || 0) + 1;
+
+  renderMap();
+}
+
+
+/* ---- RESET TEMPORARY SHOW-ALL ---- */
+
+function sandboxResetHiddenScoutsPeek() {
+  if (!sandboxPeekedHiddenScoutIds) return;
+
+  const temporaryIds = sandboxPeekedHiddenScoutIds;
+
+  // Remove only the temporary materialized scouts.
+  S.events = S.events.filter(
+    e => !temporaryIds.has(e.id)
+  );
+
+  // The scouts return to S.scoutsHidden.
+  S.scoutsHidden =
+    (S.scoutsHidden || 0) + temporaryIds.size;
+
+  sandboxPeekedHiddenScoutIds = null;
+
+  /*
+   * IMPORTANT:
+   * Do NOT regenerate sandboxHiddenScoutPositions here.
+   * Those positions belong to these hidden scouts and must survive
+   * the toggle.
+   */
+  renderMap();
+}
+
+
+/* ---- SHOW / HIDE ALL HIDDEN SCOUTS ---- */
+
+function sandboxToggleAllHiddenScouts() {
+
+  /* SECOND PRESS — hide the temporary scouts again */
+  if (sandboxPeekedHiddenScoutIds) {
+    const count = sandboxPeekedHiddenScoutIds.size;
+
+    sandboxResetHiddenScoutsPeek();
+
+    sandboxSetStatus(
+      `Skrytí skauti opäť skrytí (${count})`
+    );
+
+    return;
+  }
+
+
+  const hiddenCount =
+    Math.max(0, Number(S.scoutsHidden || 0));
+
+  if (hiddenCount <= 0) {
+    sandboxSetStatus('Žiadni skrytí skauti');
+    return;
+  }
+
+
+  /*
+   * Ensure the hidden pool has stable coordinates.
+   *
+   * This only creates positions for scouts that don't have one yet.
+   */
+  sandboxEnsureHiddenScoutPositions();
+
+
+  /*
+   * Materialize the hidden scouts temporarily.
+   */
+  sandboxPeekedHiddenScoutIds = new Set();
+
+  for (let i = 0; i < hiddenCount; i++) {
+
+    const pos = sandboxHiddenScoutPositions[i];
+
+    const e = {
+      id: nid(),
+      type: 'search',
+      status: 'pending',
+      outcome: null,
+      x: pos.x,
+      y: pos.y,
+
+      // Marker so we know this is only a temporary visual reveal.
+      _sandboxTemporaryHiddenReveal: true
+    };
+
+    S.events.push(e);
+    sandboxPeekedHiddenScoutIds.add(e.id);
+  }
+
+  // They are now represented by temporary events.
+  S.scoutsHidden = 0;
+
+  renderMap();
+
+  sandboxSetStatus(
+    `Zobrazení skrytí skauti (${hiddenCount})`
+  );
+}
+
+
+/* ---- SHOW/HIDE-ALL BUTTON ---- */
+
+function sandboxWireToggleAllHiddenScoutsControl() {
+
+  let btn = document.getElementById(
+    'sbToggleHiddenScoutsBtn'
+  );
+
+  if (!btn) {
+    const parent = document.getElementById('static-ctrls');
+    if (!parent) return;
+
+    btn = document.createElement('button');
+    btn.id = '';
+    btn.className = 'nest-btn control-btn';
+
+    const main = document.createElement('span');
+    main.className = 'btn-main';
+    main.textContent = '👁';
+
+    btn.appendChild(main);
+    parent.appendChild(btn);
+  }
+
+  const isPeeking =
+    !!sandboxPeekedHiddenScoutIds;
+
+  btn.title = t(
+    'sandbox.title_toggle_hidden_scouts'
+  );
+
+  btn.classList.toggle(
+    'sandbox-peeking',
+    isPeeking
+  );
+
+  btn.onclick =
+    sandboxToggleAllHiddenScouts;
+
+  btn.classList.toggle(
+    'hidden',
+    currentGameMode !== 'sandbox'
+  );
+}
+
+/* ============================= BOTTOM-BAR ACTION EXTRAS ============================= */
+// script.js's renderMap() already builds the fort (reinforce/capacity) and
+// scout/predator (distract/kill) action buttons into #controls-containter
+// based on which map-event is "open" (activeOpenMapKey). We append our extra
+// sandbox-only buttons to that same container after renderMap() runs, using
+// the DOM's .open marker rather than touching script.js's internal state.
+
+function sandboxWireMapEventExtras() {
+  if (currentGameMode !== 'sandbox') return;
+  const controlsContainer = document.getElementById('controls-containter');
+  if (!controlsContainer) return;
+
+  const openFortEl = document.querySelector('#mapWrap .fort-event.open');
+  if (openFortEl) {
+    const fortId = Number(openFortEl.dataset.fortId);
+    const fort = S.forts.find(f => f.id === fortId);
+    if (fort && fort.alive) {
+      const btn = document.createElement('button');
+      btn.className = 'nest-btn control-btn map-action-btn';
+      const main = document.createElement('span');
+      main.className = 'btn-main';
+      main.textContent = '⚔';
+      btn.appendChild(main);
+      btn.title = t('sandbox.title_force_conquest');
+      btn.disabled = sandboxPaused;
+      btn.onclick = (ev) => { ev.stopPropagation(); sandboxForceConquest(fort.id); };
+      controlsContainer.appendChild(btn);
+    }
+  }
+
+  const openScoutEl = document.querySelector('#mapWrap .map-event.open[data-event-type="search"]');
+  if (openScoutEl) {
+    const eid = Number(openScoutEl.dataset.eventId);
+    const e = S.events.find(ev => ev.id === eid);
+    if (e) {
+      const btn = document.createElement('button');
+      btn.className = 'nest-btn control-btn map-action-btn sandbox-visibility-btn';
+      btn.classList.add(e._hideOnMap ? 'sandbox-state-hidden' : 'sandbox-state-visible');
+      const main = document.createElement('span');
+      main.className = 'btn-main';
+      main.textContent = '👁';
+      btn.appendChild(main);
+      btn.title = e._hideOnMap ? t('sandbox.title_show_scout') : t('sandbox.title_hide_scout');
+      btn.onclick = (ev) => { ev.stopPropagation(); sandboxToggleScoutVisibility(e.id); };
+      controlsContainer.appendChild(btn);
+
+      btn.classList.toggle(
+        'hidden',
+        currentGameMode !== 'sandbox'
+      );
+    }
+  }
+}
+
 function sandboxInit() {
   sandboxSetUIVisible(currentGameMode === 'sandbox');
   if (sandboxWired) return;
@@ -743,6 +1283,8 @@ function sandboxInit() {
   sandboxWireLoadButton();
   sandboxWireExportButtons();
   sandboxWireEditorToggle();
+  sandboxWrapGuardedFunctions();
+  sandboxWirePauseControl();
 
   document.getElementById('sbNewBtn').onclick = sandboxNewLevel;
 
@@ -763,3 +1305,7 @@ window.sandboxSetUIVisible = sandboxSetUIVisible;
 window.sandboxSetEditEnabled = sandboxSetEditEnabled;
 window.sandboxUndo = sandboxUndo;
 window.sandboxRedo = sandboxRedo;
+window.sandboxTogglePaused = sandboxTogglePaused;
+window.sandboxForceConquest = sandboxForceConquest;
+window.sandboxToggleScoutVisibility = sandboxToggleScoutVisibility;
+window.sandboxToggleAllHiddenScouts = sandboxToggleAllHiddenScouts;

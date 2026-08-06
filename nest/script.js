@@ -1,6 +1,11 @@
 /* ============================= I18N SYSTEM ============================= */
 let TRANSLATIONS = {};
 const DEBUG = false;
+const BUILD_FORT_COST = 8;
+const BUILD_FORT_CAPACITY = 10;
+const BUILD_FORT_DEFENSE = 10;
+const HIRE_COST = 5;
+const DIST_FROM_FORT = 10;
 /* ============================= MODE & RESTART STATE ============================= */
 let currentGameMode = 'sandbox'; // 'sandbox' | 'campaign'
 let initialSandboxSnapshot = null; // Stores initial layout/params when sandbox starts
@@ -87,8 +92,25 @@ function t(key, params = {}) {
 let S = null;
 let chart = null;
 
+// ---------------------------------------------------------------------------
+// WORLD ASPECT RATIO
+//
+// The world/level coordinate space is a 0-100 x 0-100 grid, but the TERRITORY
+// it represents is not square - it's WORLD_ASPECT_RATIO times wider than it
+// is tall (like a real map of a wide region: 1 coordinate-unit east covers
+// more real ground than 1 coordinate-unit north). This is a FIXED, baked-in
+// constant, not measured live from the DOM - game logic (dist(), search/hunt
+// ranges, fort strength falloff, etc.) must stay a pure function of world
+// coordinates so it's deterministic and matches rl_loop.py's Python mirror,
+// which has no access to CSS/browser layout at all. If this ever changes,
+// #mapWrap's `aspect-ratio` in style.css must be updated to the same ratio -
+// they're required to agree for the map to render without distortion or
+// wasted margin.
+// ---------------------------------------------------------------------------
+const WORLD_ASPECT_RATIO = 2; // width:height - keep in sync with #mapWrap's CSS aspect-ratio
+
 function dist(p1, p2) {
-  const dx = p1.x - p2.x;
+  const dx = (p1.x - p2.x) * WORLD_ASPECT_RATIO;
   const dy = p1.y - p2.y;
   return Math.sqrt(dx * dx + dy * dy);
 }
@@ -96,27 +118,20 @@ function dist(p1, p2) {
 // ---------------------------------------------------------------------------
 // WORLD -> SCREEN CONVERSION
 //
-// The world/level coordinate space is a square 0-100 x 0-100 grid, and game
-// logic (dist(), search/hunt ranges, fort strength, etc.) treats both axes
-// identically - 1 unit north == 1 unit east, like a real physical map. If we
-// simply set left:X%; top:Y% on a container that ISN'T square, X% and Y%
-// resolve against different pixel bases (container width vs height), which
-// silently stretches the world and makes real, equal-in-world distances look
-// different on screen depending on direction - it doesn't touch dist() or
-// any other game logic, only the visuals lie.
-//
-// Fix: always convert world coordinates to pixels with ONE uniform
-// px-per-world-unit scale (the smaller of width/100 or height/100), and
-// letterbox (center, with margin on the shorter axis) instead of stretching.
+// Converts world coordinates to pixels using ONE uniform px-per-REAL-unit
+// scale (accounting for WORLD_ASPECT_RATIO), letterboxing only if the actual
+// container doesn't exactly match WORLD_ASPECT_RATIO (it should, via CSS,
+// but this degrades gracefully instead of distorting if it doesn't - e.g. a
+// very small viewport where min-height overrides the aspect-ratio).
 // Every place that positions something on #mapWrap should go through this.
 // ---------------------------------------------------------------------------
 
 function getMapLetterbox(wrap) {
   const rect = wrap.getBoundingClientRect();
-  const scale = Math.min(rect.width, rect.height) / 100;
+  const scale = Math.min(rect.width / WORLD_ASPECT_RATIO, rect.height) / 100; // px per REAL unit
   return {
     scale,
-    offsetX: (rect.width - 100 * scale) / 2,
+    offsetX: (rect.width - 100 * WORLD_ASPECT_RATIO * scale) / 2,
     offsetY: (rect.height - 100 * scale) / 2
   };
 }
@@ -124,7 +139,7 @@ function getMapLetterbox(wrap) {
 function worldToScreenPx(wrap, wx, wy) {
   const lb = getMapLetterbox(wrap);
   return {
-    left: lb.offsetX + wx * lb.scale,
+    left: lb.offsetX + wx * WORLD_ASPECT_RATIO * lb.scale,
     top: lb.offsetY + wy * lb.scale,
     scale: lb.scale
   };
@@ -134,6 +149,15 @@ function setWorldPosition(el, wrap, wx, wy) {
   const p = worldToScreenPx(wrap, wx, wy);
   el.style.left = p.left + 'px';
   el.style.top = p.top + 'px';
+}
+
+function screenPxToWorld(wrap, clientX, clientY) {
+  const rect = wrap.getBoundingClientRect();
+  const lb = getMapLetterbox(wrap);
+  return {
+    x: (clientX - rect.left - lb.offsetX) / (WORLD_ASPECT_RATIO * lb.scale),
+    y: (clientY - rect.top - lb.offsetY) / lb.scale
+  };
 }
 
 let _mapResizeHandle = null;
@@ -146,61 +170,7 @@ window.addEventListener('resize', () => {
   }, 100);
 });
 
-/* ============================= MAP & SPATIAL MATH ============================= */
-function assignEventCoords(e) {
-  const minDistance = 10; // Minimum percentage distance between map elements
-  let bestCand = null;
-  let maxMinDist = -1;
 
-  for (let attempt = 0; attempt < 300; attempt++) {
-    const cand = {
-      x: Math.floor(20 + Math.random() * 60),
-      y: Math.floor(20 + Math.random() * 60)
-    };
-
-    let minDist = Infinity;
-
-    if (S.nest) {
-      const d = dist(cand, S.nest);
-      if (d < minDist) minDist = d;
-    }
-
-    if (S.forts) {
-      for (const f of S.forts) {
-        const d = dist(cand, f);
-        if (d < minDist) minDist = d;
-      }
-    }
-
-    if (S.events) {
-      for (const other of S.events) {
-        if (other !== e && other.x !== undefined && other.y !== undefined && other.status === 'pending') {
-          const d = dist(cand, other);
-          if (d < minDist) minDist = d;
-        }
-      }
-    }
-
-    if (minDist >= minDistance) {
-      e.x = cand.x;
-      e.y = cand.y;
-      return;
-    }
-
-    if (minDist > maxMinDist) {
-      maxMinDist = minDist;
-      bestCand = cand;
-    }
-  }
-
-  if (bestCand) {
-    e.x = bestCand.x;
-    e.y = bestCand.y;
-  } else {
-    e.x = Math.floor(20 + Math.random() * 60);
-    e.y = Math.floor(20 + Math.random() * 60);
-  }
-}
 
 function openNestAnalytics() {
   renderNestAnalytics(); 
@@ -358,10 +328,75 @@ function freshState(){
   };
 }
 
+
+
+function assignEventCoords(e) {
+  const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
+  const MARGIN_Y = 10; // Top/Bottom edge margin (y: 10 to 90)
+  const minDistance = 18; // Minimum percentage distance between map elements
+  let bestCand = null;
+  let maxMinDist = -1;
+
+  for (let attempt = 0; attempt < 300; attempt++) {
+    const cand = {
+      x: Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X)),
+      y: Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y))
+    };
+
+    let minDist = Infinity;
+
+    if (S.nest) {
+      const d = dist(cand, S.nest);
+      if (d < minDist) minDist = d;
+    }
+
+    if (S.forts) {
+      for (const f of S.forts) {
+        const d = dist(cand, f);
+        if (d < minDist) minDist = d;
+      }
+    }
+
+    if (S.events) {
+      for (const other of S.events) {
+        if (other !== e && other.x !== undefined && other.y !== undefined && other.status === 'pending') {
+          const d = dist(cand, other);
+          if (d < minDist) minDist = d;
+        }
+      }
+    }
+
+    if (minDist >= minDistance) {
+      e.x = cand.x;
+      e.y = cand.y;
+      return;
+    }
+
+    if (minDist > maxMinDist) {
+      maxMinDist = minDist;
+      bestCand = cand;
+    }
+  }
+
+  if (bestCand) {
+    e.x = bestCand.x;
+    e.y = bestCand.y;
+  } else {
+    e.x = Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X));
+    e.y = Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y));
+  }
+}
+
 function generateMapElements() {
+  const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
+  const MARGIN_Y = 10; // Top/Bottom edge margin (y: 10 to 90)
+  const MIN_NEST_DIST = 18; // Minimum distance between a fort and the nest
+  const MIN_FORT_DIST = 30; // Minimum distance between forts
+
+  // 1. Generate Nest position within custom margins
   S.nest = {
-    x: Math.max(30, Math.min(70, Math.random() * 100)),
-    y: Math.max(30, Math.min(70, Math.random() * 100))
+    x: Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X)),
+    y: Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y))
   };
 
   const count = S.settings.fortLimit || 10;
@@ -373,12 +408,13 @@ function generateMapElements() {
     let bestCand = null;
     let maxMinDist = -1;
 
-    while (attempts < 1000) {
+    while (attempts < 3000) {
       attempts++;
+      
       const cand = {
         id: i + 1,
-        x: 5 + Math.random() * 90,
-        y: 5 + Math.random() * 90,
+        x: MARGIN_X + Math.random() * (100 - 2 * MARGIN_X),
+        y: MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y),
         alive: true,
         defense: S.settings.defaultFortDefense || 50,
         maxDefense: S.settings.defaultFortDefense || 50,
@@ -387,16 +423,22 @@ function generateMapElements() {
       };
 
       let valid = true;
-      let minDistToOther = Infinity;
+      let minDistToAll = Infinity;
 
+      // Distance check: Fort to Nest
+      const dNest = dist(cand, S.nest);
+      if (dNest < minDistToAll) minDistToAll = dNest;
+      if (dNest < MIN_NEST_DIST) valid = false;
+
+      // Distance check: Fort to other Forts
       for (const existing of S.forts) {
-        const d = dist(cand, existing);
-        if (d < minDistToOther) minDistToOther = d;
-        if (d < 15) valid = false;
+        const dFort = dist(cand, existing);
+        if (dFort < minDistToAll) minDistToAll = dFort;
+        if (dFort < MIN_FORT_DIST) valid = false;
       }
 
-      if (minDistToOther > maxMinDist) {
-        maxMinDist = minDistToOther;
+      if (minDistToAll > maxMinDist) {
+        maxMinDist = minDistToAll;
         bestCand = cand;
       }
 
@@ -520,7 +562,8 @@ function huntChanceWithDistance(loc) {
 }
 
 function pickTargetFort(distancePower = 3) {
-  const aliveForts = S.forts.filter(f => f.alive);
+  // Empty forts (no sheltering population) aren't worth conquering, so predators never target them.
+  const aliveForts = S.forts.filter(f => f.alive && (f.population || 0) > 0);
   if (aliveForts.length === 0) return null;
 
   const weights = aliveForts.map(f => {
@@ -1131,10 +1174,12 @@ function advanceStep(){
   incoming.forEach(e => { e._hideOnMap = true; });
   render();
 
-  runStepAnimation(outgoing, incoming, () => {
-    incoming.forEach(e => { delete e._hideOnMap; });
-    S.animating = false;
-    render();
+  waitForAnimationAssets().then(() => {
+    runStepAnimation(outgoing, incoming, () => {
+      incoming.forEach(e => { delete e._hideOnMap; });
+      S.animating = false;
+      render();
+    });
   });
 }
 
@@ -1199,7 +1244,7 @@ function maybeTriggerFort() {
   if (S.events.some(e => e.type === 'fort' && e.status === 'pending')) return;
   if (S.fortCooldown > 0) { S.fortCooldown -= 1; return; }
 
-  const aliveForts = S.forts.filter(f => f.alive);
+  const aliveForts = S.forts.filter(f => f.alive && (f.population || 0) > 0);
   if (aliveForts.length === 0) return;
 
   const targetFort = pickTargetFort();
@@ -2629,13 +2674,126 @@ function scanForHidden(){
 }
 
 function Hire(){
-  const cost = 5;
+  const cost = HIRE_COST;
   if(S.phase!=='active' || S.gameOver) return;
   if(S.points<cost) return;
   S.points -= cost;
   S.maxPoints += 1;
   log(t('log.hybrid_hired'));
   render();
+}
+
+let fortPlacementMode = false;
+
+function buildFort(){
+  if(S.phase!=='active' || S.gameOver) return;
+
+  if(fortPlacementMode){
+    cancelFortPlacement();
+    return;
+  }
+
+  if(S.points<BUILD_FORT_COST){
+    log(t('log.build_fort_no_ap'));
+    render();
+    return;
+  }
+
+  fortPlacementMode = true;
+  log(t('log.build_fort_place_prompt'));
+  render();
+}
+
+function cancelFortPlacement(){
+  if(!fortPlacementMode) return;
+  fortPlacementMode = false;
+  log(t('log.build_fort_cancelled'));
+  render();
+}
+
+function placeFortAt(clientX, clientY){
+  const wrap = document.getElementById('mapWrap');
+  fortPlacementMode = false;
+
+  if(!wrap || S.phase!=='active' || S.gameOver){
+    render();
+    return;
+  }
+  if(S.points<BUILD_FORT_COST){
+    log(t('log.build_fort_no_ap'));
+    render();
+    return;
+  }
+
+  const world = screenPxToWorld(wrap, clientX, clientY);
+  const x = Math.max(3, Math.min(97, world.x));
+  const y = Math.max(3, Math.min(97, world.y));
+
+  S.points -= BUILD_FORT_COST;
+
+  const newId = S.forts.reduce((max, f) => Math.max(max, f.id), 0) + 1;
+  const fort = {
+    id: newId,
+    x, y,
+    alive: true,
+    defense: BUILD_FORT_DEFENSE,
+    maxDefense: BUILD_FORT_DEFENSE,
+    capacity: BUILD_FORT_CAPACITY,
+    population: 0
+  };
+
+  S.forts.push(fort);
+  log(t('log.fort_built', { id: fort.id, capacity: fort.capacity, defense: fort.defense }));
+  render();
+}
+
+function costBadgeHTML(cost){
+  return `<span class="btn-cost"><span class="btn-cost-val"><strong>${cost}</strong></span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>`;
+}
+
+function buildCostBadgeEl(cost){
+  const span = document.createElement('span');
+  span.className = 'btn-cost';
+  const val = document.createElement('span');
+  val.className = 'btn-cost-val';
+  val.textContent = cost;
+  const icon = document.createElement('img');
+  icon.src = '../assets/logo_icon.png';
+  icon.alt = 'ap-icon';
+  icon.className = 'ap-icon';
+  span.appendChild(val);
+  span.appendChild(icon);
+  return span;
+}
+
+// Wraps a control button together with its AP cost badge using the same
+// layout as the hire/scan/build-fort buttons: cost shown above the button
+// rather than inside it.
+function wrapButtonWithCostAbove(button, cost, alignRight = false){
+  const container = document.createElement('div');
+  container.className = 'btn-container';
+
+  const costHolder = document.createElement('div');
+  costHolder.appendChild(buildCostBadgeEl(cost));
+
+  // Keep the cost badge aligned with the action below it
+  if (alignRight) {
+    costHolder.style.display = 'flex';
+    costHolder.style.justifyContent = 'center';
+  }
+
+  container.appendChild(costHolder);
+
+  // Right-align the kill image without changing its size
+  if (alignRight) {
+    button.style.display = 'block';
+    button.style.marginLeft = 'auto';
+    button.style.marginRight = '6px';
+  }
+
+  container.appendChild(button);
+
+  return container;
 }
 
 function killFortAttacker(eid){
@@ -2695,6 +2853,21 @@ function renderGlobalActions(){
     const costLbl = document.getElementById('scanCostLbl');
     if(costLbl) costLbl.textContent = S.settings.costScan;
     scanBtn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costScan;
+  }
+
+  const hireBtn = document.getElementById('hire-btn');
+  if(hireBtn){
+    const costLbl = document.getElementById('hireCostLbl');
+    if(costLbl) costLbl.textContent = HIRE_COST;
+  }
+
+  const buildFortBtn = document.getElementById('build-fort-btn');
+  if(buildFortBtn){
+    const costLbl = document.getElementById('buildFortCostLbl');
+    if(costLbl) costLbl.textContent = BUILD_FORT_COST;
+    buildFortBtn.disabled = S.gameOver || S.phase!=='active' || (S.points<BUILD_FORT_COST && !fortPlacementMode);
+    buildFortBtn.classList.toggle('placing', fortPlacementMode);
+    buildFortBtn.title = fortPlacementMode ? t('map.build_fort_placing_tooltip') : t('map.build_fort_tooltip');
   }
 }
 
@@ -2868,7 +3041,7 @@ function getEventDetailsHTML(eid){
     html += '</div>';
     if(e.status==='pending'){
       html += '<div class="actions">';
-      html += `<button class="act danger" ${((S.points<s.costKillPredator || remaining<=0)?'disabled':'')} onclick="killFortAttacker(${e.id}); openEventDetails(${e.id});">${t('actions.defend_fort')} <span class="cost">(−${s.costKillPredator} pt)</span></button>`;
+      html += `<button class="act danger" ${((S.points<s.costKillPredator || remaining<=0)?'disabled':'')} onclick="killFortAttacker(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.defend_fort')}</span>${costBadgeHTML(s.costKillPredator)}</button>`;
       html += '</div>';
       if(remaining<=0){
         html += `<div class="detail-desc" style="margin-top:8px;">${t('event.fort_safe', { id: e.targetFortId })}</div>`;
@@ -2885,8 +3058,8 @@ function getEventDetailsHTML(eid){
     html += `<div class="detail-desc">${t('event.search_desc', { chance, eggs: S.settings.eggsPerSearch })}</div>`;
     if(e.status==='pending' && !e.outcome){
       html += '<div class="actions">';
-      html += `<button class="act" ${(S.points<S.settings.costDistractScout?'disabled':'')} onclick="distractScout(${e.id}); openEventDetails(${e.id});">${t('actions.distract_scout')} <span class="cost">(−${S.settings.costDistractScout} pt)</span></button>`;
-      html += `<button class="act danger" ${(S.points<S.settings.costKillScout?'disabled':'')} onclick="killScout(${e.id}); openEventDetails(${e.id});">${t('actions.kill_scout')} <span class="cost">(−${S.settings.costKillScout} pt)</span></button>`;
+      html += `<button class="act" ${(S.points<S.settings.costDistractScout?'disabled':'')} onclick="distractScout(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.distract_scout')}</span>${costBadgeHTML(S.settings.costDistractScout)}</button>`;
+      html += `<button class="act danger" ${(S.points<S.settings.costKillScout?'disabled':'')} onclick="killScout(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.kill_scout')}</span>${costBadgeHTML(S.settings.costKillScout)}</button>`;
       html += '</div>';
     } else {
       html += `<div class="detail-meta"><div>${t('outcome.label')}<b>${outcomeLabel(e)}</b></div></div>`;
@@ -2907,8 +3080,8 @@ function getEventDetailsHTML(eid){
     html += '</div>';
     if(e.status==='pending' && active>0){
       html += '<div class="actions">';
-      html += `<button class="act" ${(S.points<S.settings.costEscapePredator?'disabled':'')} onclick="escapePredator(${e.id}); openEventDetails(${e.id});">${t('actions.help_escape')} <span class="cost">(−${S.settings.costEscapePredator} pt)</span></button>`;
-      html += `<button class="act danger" ${(S.points<S.settings.costKillPredator?'disabled':'')} onclick="killPredatorAction(${e.id}); openEventDetails(${e.id});">${t('actions.kill_predator')} <span class="cost">(−${S.settings.costKillPredator} pt)</span></button>`;
+      html += `<button class="act" ${(S.points<S.settings.costEscapePredator?'disabled':'')} onclick="escapePredator(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.help_escape')}</span>${costBadgeHTML(S.settings.costEscapePredator)}</button>`;
+      html += `<button class="act danger" ${(S.points<S.settings.costKillPredator?'disabled':'')} onclick="killPredatorAction(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.kill_predator')}</span>${costBadgeHTML(S.settings.costKillPredator)}</button>`;
       html += '</div>';
     } else if(e.status==='pending'){
       html += `<div class="detail-desc" style="margin-top:8px;">${t('event.hunt_neutralized')}</div>`;
@@ -3057,66 +3230,120 @@ function pointAtDistance(pts, d){
   return pts[pts.length - 1];
 }
 
-const TRAIL_DRAW_MS = 900;
+const TRAIL_DRAW_MS = 1200;
 const TRAIL_FADE_MS = 1400;
 
 function buildTrailLayer(){
   if (!S.trails || !S.trails.length) return null;
+
   const now = performance.now();
   const svgNS = 'http://www.w3.org/2000/svg';
+
   const svg = document.createElementNS(svgNS, 'svg');
-  svg.setAttribute('viewBox', '0 0 100 100');
+  svg.setAttribute('viewBox', `0 0 ${100 * WORLD_ASPECT_RATIO} 100`);
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.setAttribute('class', 'trail-layer');
-  const defs = document.createElementNS(svgNS, 'defs');
-  const filter = document.createElementNS(svgNS, 'filter');
-  filter.setAttribute('id', 'trailSmoke');
-  filter.setAttribute('x', '-30%'); filter.setAttribute('y', '-30%');
-  filter.setAttribute('width', '160%'); filter.setAttribute('height', '160%');
-  const blur = document.createElementNS(svgNS, 'feGaussianBlur');
-  blur.setAttribute('stdDeviation', '0.9');
-  filter.appendChild(blur);
-  defs.appendChild(filter);
-  svg.appendChild(defs);
+
+  const scaleG = document.createElementNS(svgNS, 'g');
+  scaleG.setAttribute(
+    'transform',
+    `scale(${WORLD_ASPECT_RATIO}, 1)`
+  );
+
   const g = document.createElementNS(svgNS, 'g');
-  g.setAttribute('filter', 'url(#trailSmoke)');
+
   S.trails.forEach(trail => {
     const pts = trail.waypoints;
     const n = pts.length;
+
     if (n < 2) return;
 
     const revealFrac = trail.bornAt != null
-      ? easeInOutQuad(Math.max(0, Math.min(1, (now - trail.bornAt) / TRAIL_DRAW_MS)))
+      ? easeInOutQuad(
+          Math.max(
+            0,
+            Math.min(
+              1,
+              (now - trail.bornAt) / TRAIL_DRAW_MS
+            )
+          )
+        )
       : 1;
 
     const baseLifeFactor = trail.fadingOutSince != null
       ? trail.retiredLifeFactor
-      : Math.max(0, Math.min(1, trail.stepsLeft / 2));
+      : Math.max(
+          0,
+          Math.min(1, trail.stepsLeft / 2)
+        );
 
     const fadeFactor = trail.fadingOutSince != null
-      ? Math.max(0, 1 - (now - trail.fadingOutSince) / TRAIL_FADE_MS)
+      ? Math.max(
+          0,
+          1 - (now - trail.fadingOutSince) / TRAIL_FADE_MS
+        )
       : 1;
 
-    if (revealFrac <= 0 || baseLifeFactor <= 0 || fadeFactor <= 0) return;
+    if (
+      revealFrac <= 0 ||
+      baseLifeFactor <= 0 ||
+      fadeFactor <= 0
+    ) {
+      return;
+    }
 
-    const segStep = Math.max(1, Math.floor(n / 22));
+    // Fewer segments = much less SVG work.
+    const segStep = Math.max(1, Math.floor(n / 14));
+
     for (let i = 0; i < n - segStep; i += segStep) {
       const r = i / (n - 1);
+
       if (r > revealFrac) break;
-      const edgeFade = Math.sin(Math.PI * Math.min(1, r));
-      const alpha = Math.max(0, edgeFade * 0.5 * baseLifeFactor * fadeFactor);
+
+      const edgeFade = 0.35 + 0.65 * Math.min(1, r);
+
+      const alpha = Math.max(
+        0,
+        edgeFade *
+        0.68 *
+        baseLifeFactor *
+        fadeFactor
+      );
+
       if (alpha <= 0.012) continue;
-      const p1 = pts[i], p2 = pts[Math.min(n - 1, i + segStep)];
-      const line = document.createElementNS(svgNS, 'line');
-      line.setAttribute('x1', p1.x); line.setAttribute('y1', p1.y);
-      line.setAttribute('x2', p2.x); line.setAttribute('y2', p2.y);
-      line.setAttribute('stroke', `rgba(147,51,234,${alpha.toFixed(3)})`);
-      line.setAttribute('stroke-width', '1.8');
+
+      const p1 = pts[i];
+      const p2 = pts[Math.min(n - 1, i + segStep)];
+
+      const line = document.createElementNS(
+        svgNS,
+        'line'
+      );
+
+      line.setAttribute('x1', p1.x);
+      line.setAttribute('y1', p1.y);
+      line.setAttribute('x2', p2.x);
+      line.setAttribute('y2', p2.y);
+
+      line.setAttribute(
+        'stroke',
+        `rgba(168, 85, 247, ${alpha.toFixed(3)})`
+      );
+
+      line.setAttribute('stroke-width', '2.2');
       line.setAttribute('stroke-linecap', 'round');
+      line.setAttribute(
+        'vector-effect',
+        'non-scaling-stroke'
+      );
+
       g.appendChild(line);
     }
   });
-  svg.appendChild(g);
+
+  scaleG.appendChild(g);
+  svg.appendChild(scaleG);
+
   return svg;
 }
 
@@ -3205,6 +3432,29 @@ function fadeOut(el, delay){
   });
 }
 
+function waitForAnimationAssets() {
+  const assets = [
+    '/nest/assets/scout.png',
+    '/nest/assets/predator.png'
+  ];
+
+  return Promise.all(
+    assets.map(src => new Promise(resolve => {
+      const img = new Image();
+
+      if (img.complete) {
+        resolve();
+        return;
+      }
+
+      img.onload = resolve;
+      img.onerror = resolve; // Don't block the game if an asset fails.
+
+      img.src = src;
+    }))
+  );
+}
+
 function runStepAnimation(outgoing, incoming, onComplete){
   const wrap = document.getElementById('mapWrap');
   if (!wrap || !S.nest) { onComplete(); return; }
@@ -3265,8 +3515,23 @@ function runStepAnimation(outgoing, incoming, onComplete){
           const count = Math.max(1, Math.ceil(rem / 10));
           for (let i = 0; i < count; i++) {
             const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-            const fx = Math.max(3, Math.min(97, targetFort.x + 4.5 * Math.cos(angle)));
-            const fy = Math.max(3, Math.min(97, targetFort.y + 4.5 * Math.sin(angle)));
+            const ATTACKER_SCATTER_DISTANCE = 26;
+
+            const fx = Math.max(
+              3,
+              Math.min(
+                97,
+                targetFort.x + (ATTACKER_SCATTER_DISTANCE / WORLD_ASPECT_RATIO) * Math.cos(angle)
+              )
+            );
+
+            const fy = Math.max(
+              3,
+              Math.min(
+                97,
+                targetFort.y + ATTACKER_SCATTER_DISTANCE * Math.sin(angle)
+              )
+            );            
             const dense = denseSmoothPath(curveWaypoints({ x: fx, y: fy }, nestPt, 1, 6));
             const el = spawnTempIcon('hunt', fx, fy);
             promises.push(animateAlongPath(el, dense, 900).then(() => fadeOut(el)));
@@ -3315,17 +3580,46 @@ function runStepAnimation(outgoing, incoming, onComplete){
       if (targetFort) {
         const rem = Math.max(0, e.originalAttackers - e.killed);
         if (rem > 0) {
-          const count = Math.max(1, Math.ceil(rem / 10));
-          for (let i = 0; i < count; i++) {
-            const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-            const fx = Math.max(3, Math.min(97, targetFort.x + 4.5 * Math.cos(angle)));
-            const fy = Math.max(3, Math.min(97, targetFort.y + 4.5 * Math.sin(angle)));
-            const dense = denseSmoothPath(curveWaypoints(nestPt, { x: fx, y: fy }, 2, 10));
+        const count = Math.max(1, Math.ceil(rem / 10));
+
+        // If attackers were killed, just remove excess positions.
+        // Do NOT regenerate the survivors.
+        if (e.iconPositions) {
+            while (e.iconPositions.length > count) {
+                e.iconPositions.pop();
+            }
+        }
+
+        // Generate coordinates only once.
+        if (!e.iconPositions) {
+            e.iconPositions = [];
+            for (let i = 0; i < count; i++) {
+                const angle = (2 * Math.PI * i) / count - Math.PI / 2;
+                const fx = Math.max(
+                    3,
+                    Math.min(
+                        97,
+                        targetFort.x + (DIST_FROM_FORT / WORLD_ASPECT_RATIO) * Math.cos(angle)
+                    )
+                );
+                const fy = Math.max(
+                    3,
+                    Math.min(
+                        97,
+                        targetFort.y + DIST_FROM_FORT * Math.sin(angle)
+                    )
+                );
+                e.iconPositions.push({ x: fx, y: fy });
+            }
+        }
+          // 2. Animate to the saved positions
+          e.iconPositions.forEach((pos) => {
+            const dense = denseSmoothPath(curveWaypoints(nestPt, pos, 2, 10));
             const el = spawnTempIcon('hunt', nestPt.x, nestPt.y);
             el.style.opacity = '0';
             requestAnimationFrame(() => { el.style.transition = 'opacity 0.3s ease'; el.style.opacity = '1'; });
             promises.push(animateAlongPath(el, dense, 1000));
-          }
+          });
         }
       }
       return;
@@ -3410,6 +3704,8 @@ function renderMap() {
   const controlsContainer = document.getElementById('controls-containter');
   if (!wrap) return;
 
+  wrap.classList.toggle('fort-placement-active', fortPlacementMode);
+
   const aliveForts = S.forts.filter(f => f.alive);
   if (fortsTag) {
     fortsTag.textContent = t('ui.forts_standing', { alive: aliveForts.length, total: S.forts.length });
@@ -3429,7 +3725,7 @@ function renderMap() {
   nestImg.onclick = openNestAnalytics;
   wrap.appendChild(nestImg);
 
-  if(DEBUG) debugRenderFortStrengthZones(wrap); // DEBUG - remove this line to disable fort-strength zone rings
+  if (DEBUG) debugRenderFortStrengthZones(wrap); // DEBUG - remove this line to disable fort-strength zone rings
 
   const activeFortEvent = S.events.find(e => e.type === 'fort' && e.status === 'pending');
   const activeTargetId = activeFortEvent ? activeFortEvent.targetFortId : null;
@@ -3438,6 +3734,7 @@ function renderMap() {
   if (!activeTargetId) {
     let minD = Infinity;
     aliveForts.forEach(f => {
+      if ((f.population || 0) <= 0) return; // empty forts can't be attacked, so skip for the "likely next target" hint
       const d = dist(S.nest, f);
       if (d < minD) {
         minD = d;
@@ -3481,46 +3778,83 @@ function renderMap() {
         toggleMapSelection(fortKey, ev);
       };
 
-      if (S.phase === 'active' && activeOpenMapKey === fortKey && controlsContainer) {
-        const alreadyReinforced = Array.isArray(S.reinforcedForts) && S.reinforcedForts.includes(f.id);
-        const reinforceBtn = document.createElement('button');
-        reinforceBtn.className = 'nest-btn control-btn map-action-btn';
-        reinforceBtn.textContent = '🛡️';
-        reinforceBtn.title = alreadyReinforced
-          ? t('map.fort_reinforce_done_btn', { id: f.id })
-          : t('map.fort_reinforce_btn', { cost: S.settings.fortReinforceCost, amount: S.settings.fortReinforceDefenseBonus });
-        reinforceBtn.disabled = S.points < S.settings.fortReinforceCost || alreadyReinforced;
-        reinforceBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = fortKey;
-          reinforceFort(f.id);
-        };
+      if (activeOpenMapKey === fortKey && controlsContainer) {
+        if (S.phase === 'active') {
+          const alreadyReinforced = Array.isArray(S.reinforcedForts) && S.reinforcedForts.includes(f.id);
+          const reinforceBtn = document.createElement('button');
+          reinforceBtn.className = 'nest-btn control-btn map-action-btn';
+          const reinforceMain = document.createElement('span');
+          reinforceMain.className = 'btn-main';
+          reinforceMain.textContent = '🛡️';
+          reinforceBtn.appendChild(reinforceMain);
+          reinforceBtn.title = alreadyReinforced
+            ? t('map.fort_reinforce_done_btn', { id: f.id })
+            : t('map.fort_reinforce_btn', { cost: S.settings.fortReinforceCost, amount: S.settings.fortReinforceDefenseBonus });
+          reinforceBtn.disabled = S.points < S.settings.fortReinforceCost || alreadyReinforced;
+          reinforceBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = fortKey;
+            reinforceFort(f.id);
+          };
 
-        const capacityBtn = document.createElement('button');
-        capacityBtn.className = 'nest-btn control-btn map-action-btn';
-        capacityBtn.textContent = '📦';
-        capacityBtn.title = t('map.fort_capacity_btn', { cost: S.settings.costIncreaseFortCapacity, amount: S.settings.fortCapacityIncreaseAmount });
-        capacityBtn.disabled = S.points < S.settings.costIncreaseFortCapacity;
-        capacityBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = fortKey;
-          increaseFortCapacity(f.id);
-        };
+          const capacityBtn = document.createElement('button');
+          capacityBtn.className = 'nest-btn control-btn map-action-btn';
+          const capacityMain = document.createElement('span');
+          capacityMain.className = 'btn-main';
+          capacityMain.textContent = '📦';
+          capacityBtn.appendChild(capacityMain);
+          capacityBtn.title = t('map.fort_capacity_btn', { cost: S.settings.costIncreaseFortCapacity, amount: S.settings.fortCapacityIncreaseAmount });
+          capacityBtn.disabled = S.points < S.settings.costIncreaseFortCapacity;
+          capacityBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = fortKey;
+            increaseFortCapacity(f.id);
+          };
 
-        const evacuateBtn = document.createElement('button');
-        evacuateBtn.className = 'nest-btn control-btn map-action-btn';
-        evacuateBtn.textContent = '🚑';
-        evacuateBtn.title = t('map.evacuate_tooltip', { cost: S.settings.costSaveHumans, amount: S.settings.saveHumansAmount });
-        evacuateBtn.disabled = S.gameOver || S.phase !== 'active' || S.points < S.settings.costSaveHumans || S.humans <= 0;
-        evacuateBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = fortKey;
-          saveHumans(f.id);
-        };
+          const evacuateBtn = document.createElement('button');
+          evacuateBtn.className = 'nest-btn control-btn map-action-btn';
+          const evacuateMain = document.createElement('span');
+          evacuateMain.className = 'btn-main';
+          evacuateMain.textContent = '🚑';
+          evacuateBtn.appendChild(evacuateMain);
+          evacuateBtn.title = t('map.evacuate_tooltip', { cost: S.settings.costSaveHumans, amount: S.settings.saveHumansAmount });
+          evacuateBtn.disabled = S.gameOver || S.phase !== 'active' || S.points < S.settings.costSaveHumans || S.humans <= 0;
+          evacuateBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = fortKey;
+            saveHumans(f.id);
+          };
 
-        controlsContainer.appendChild(reinforceBtn);
-        controlsContainer.appendChild(capacityBtn);
-        controlsContainer.appendChild(evacuateBtn);
+          controlsContainer.appendChild(wrapButtonWithCostAbove(reinforceBtn, S.settings.fortReinforceCost));
+          controlsContainer.appendChild(wrapButtonWithCostAbove(capacityBtn, S.settings.costIncreaseFortCapacity));
+          controlsContainer.appendChild(wrapButtonWithCostAbove(evacuateBtn, S.settings.costSaveHumans));
+        }
+
+        // Fort population - shown whenever a fort is selected, in every mode.
+        // Read-only here; sandbox.js re-enables it and wires editing when
+        // sandbox edit mode is active (see sandboxWireMapEventExtras).
+        const popField = document.createElement('div');
+        popField.className = 'btn-container';
+        const popLabelWrap = document.createElement('div');
+        const popLabel = document.createElement('label');
+        popLabel.className = 'sb-defense-label';
+        popLabel.htmlFor = 'fortPopulationInput';
+        const popLabelSpan = document.createElement('span');
+        popLabelSpan.setAttribute('data-i18n', 'sandbox.lbl_population');
+        popLabelSpan.textContent = t('sandbox.lbl_population');
+        popLabel.appendChild(popLabelSpan);
+        popLabelWrap.appendChild(popLabel);
+        const popInput = document.createElement('input');
+        popInput.type = 'number';
+        popInput.id = 'fortPopulationInput';
+        popInput.min = '0';
+        popInput.max = String(Math.max(0, f.capacity || 0));
+        popInput.value = String(Math.max(0, Math.min(f.population || 0, f.capacity || 0)));
+        popInput.readOnly = true;
+        popInput.disabled = true;
+        popField.appendChild(popLabelWrap);
+        popField.appendChild(popInput);
+        controlsContainer.appendChild(popField);
       }
     }
 
@@ -3588,15 +3922,49 @@ function renderMap() {
       if (rem <= 0) return;
 
       const count = Math.max(1, Math.ceil(rem / 10));
-      for (let i = 0; i < count; i++) {
-        const angle = (2 * Math.PI * i) / count - Math.PI / 2;
-        const fx = Math.max(3, Math.min(97, targetFort.x + 4.5 * Math.cos(angle)));
-        const fy = Math.max(3, Math.min(97, targetFort.y + 4.5 * Math.sin(angle)));
 
+      // Remove only the icons that no longer exist.
+      // Leave the remaining positions untouched.
+      if (e.iconPositions) {
+          while (e.iconPositions.length > count) {
+              e.iconPositions.pop();
+          }
+      }
+
+      // Generate the positions only once.
+      if (!e.iconPositions) {
+          const originalCount = count;
+
+          e.iconPositions = [];
+
+          for (let i = 0; i < originalCount; i++) {
+              const angle = (2 * Math.PI * i) / originalCount - Math.PI / 2;
+
+              e.iconPositions.push({
+                  x: Math.max(
+                      3,
+                      Math.min(
+                          97,
+                          targetFort.x + (DIST_FROM_FORT / WORLD_ASPECT_RATIO) * Math.cos(angle)
+                      )
+                  ),
+                  y: Math.max(
+                      3,
+                      Math.min(
+                          97,
+                          targetFort.y + DIST_FROM_FORT * Math.sin(angle)
+                      )
+                  )
+              });
+          }
+      }
+
+      // Render each predator icon using its stored coordinate
+      e.iconPositions.forEach((pos) => {
         const container = document.createElement('div');
         container.className = 'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
         container.style.position = 'absolute';
-        setWorldPosition(container, wrap, fx, fy);
+        setWorldPosition(container, wrap, pos.x, pos.y);
         container.style.zIndex = '10';
 
         const iconImg = document.createElement('img');
@@ -3610,7 +3978,7 @@ function renderMap() {
 
         container.appendChild(iconImg);
         wrap.appendChild(container);
-      }
+      });
 
       if (activeOpenMapKey === eventKey && controlsContainer) {
         const infoBtn = document.createElement('button');
@@ -3650,6 +4018,8 @@ function renderMap() {
     const container = document.createElement('div');
     container.className = 'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
     container.style.position = 'absolute';
+    container.dataset.eventId = e.id;
+    container.dataset.eventType = e.type;
     setWorldPosition(container, wrap, e.x, e.y);
     container.style.zIndex = '10';
 
@@ -3674,30 +4044,40 @@ function renderMap() {
       infoBtn.className = 'nest-btn control-btn map-action-btn';
       infoBtn.textContent = 'ℹ';
       infoBtn.title = t('ui.info_btn');
+
       infoBtn.onclick = (ev) => {
         ev.stopPropagation();
         activeOpenMapKey = null;
         openEventDetails(e.id);
       };
 
-      const leftBtn = document.createElement('button');
-      leftBtn.className = 'nest-btn control-btn map-action-btn';
+      const leftBtn = document.createElement('img');
+      leftBtn.className = 'btn-icon';
+      leftBtn.id = 'distract-scout-icon';
+      leftBtn.src = '/nest/assets/distract-scout.png';
 
       const rightBtn = document.createElement('img');
       rightBtn.className = 'btn-icon';
       rightBtn.src = '../sim/assets/THREAT.png';
 
       if (e.type === 'search') {
-        leftBtn.textContent = '⚡';
-        leftBtn.title = t('actions.distract_tooltip', { cost: S.settings.costDistractScout });
+        // SCOUT — distract
+        leftBtn.title = t('actions.distract_tooltip', {
+          cost: S.settings.costDistractScout
+        });
         leftBtn.disabled = S.points < S.settings.costDistractScout;
+
         leftBtn.onclick = (ev) => {
           ev.stopPropagation();
           activeOpenMapKey = eventKey;
           distractScout(e.id);
         };
 
-        rightBtn.title = t('actions.kill_scout_tooltip', { cost: S.settings.costKillScout });
+        // SCOUT — kill
+        rightBtn.title = t('actions.kill_scout_tooltip', {
+          cost: S.settings.costKillScout
+        });
+
         if (S.points < S.settings.costKillScout) {
           rightBtn.style.opacity = '0.5';
           rightBtn.style.pointerEvents = 'none';
@@ -3708,17 +4088,38 @@ function renderMap() {
             killScout(e.id);
           };
         }
+
+        // Actions first
+        controlsContainer.appendChild(
+          wrapButtonWithCostAbove(leftBtn, S.settings.costDistractScout, true)
+        );
+
+        controlsContainer.appendChild(
+          wrapButtonWithCostAbove(rightBtn, S.settings.costKillScout, true)
+        );
+
+        // INFO LAST
+        controlsContainer.appendChild(infoBtn);
+
       } else {
+        // PREDATOR — help humans escape
         leftBtn.textContent = '🏃';
-        leftBtn.title = t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
+        leftBtn.title = t('actions.rescue_tooltip', {
+          cost: S.settings.costEscapePredator
+        });
         leftBtn.disabled = S.points < S.settings.costEscapePredator;
+
         leftBtn.onclick = (ev) => {
           ev.stopPropagation();
           activeOpenMapKey = eventKey;
           escapePredator(e.id);
         };
 
-        rightBtn.title = t('actions.kill_predator_tooltip', { cost: S.settings.costKillPredator });
+        // PREDATOR — kill
+        rightBtn.title = t('actions.kill_predator_tooltip', {
+          cost: S.settings.costKillPredator
+        });
+
         if (S.points < S.settings.costKillPredator) {
           rightBtn.style.opacity = '0.5';
           rightBtn.style.pointerEvents = 'none';
@@ -3729,11 +4130,19 @@ function renderMap() {
             killPredatorAction(e.id);
           };
         }
-      }
 
-      controlsContainer.appendChild(infoBtn);
-      controlsContainer.appendChild(leftBtn);
-      controlsContainer.appendChild(rightBtn);
+        // Actions first
+        controlsContainer.appendChild(
+          wrapButtonWithCostAbove(leftBtn, S.settings.costEscapePredator)
+        );
+
+        controlsContainer.appendChild(
+          wrapButtonWithCostAbove(rightBtn, S.settings.costKillPredator, true)
+        );
+
+        // INFO LAST
+        controlsContainer.appendChild(infoBtn);
+      }
     }
 
     container.appendChild(iconImg);
@@ -3744,6 +4153,18 @@ function renderMap() {
 }
 
 document.addEventListener('click', (ev) => {
+  if (fortPlacementMode) {
+    if (ev.target.closest('#build-fort-btn')) return; // handled by buildFort()'s own onclick (toggles off)
+
+    const wrap = document.getElementById('mapWrap');
+    if (wrap && wrap.contains(ev.target)) {
+      placeFortAt(ev.clientX, ev.clientY);
+    } else {
+      cancelFortPlacement();
+    }
+    return;
+  }
+
   if (!ev.target.closest('.map-event') && !ev.target.closest('#controls-containter')) {
     if (activeOpenMapKey !== null) {
       activeOpenMapKey = null;
@@ -4685,79 +5106,38 @@ async function startCampaignLevel(indexOrLevel = null) {
 }
 
 /**
- * Vytvorí objekt levelu s hniezdom a pevnosťami na náhodných miestach
- * (rovnaký rozostupový algoritmus ako generateMapElements() v sandboxe),
- * s pozadím poludniky.png.
+ * Vytvorí objekt levelu s hniezdom a pevnosťami pomocou generateMapElements(),
+ * pričom prečíta hodnoty z formulára a nastaví pozadie poludniky.png.
  */
 function generateRandomLevel() {
-  const fortCount = clampInt(
+  // 1. Načítanie hodnôt z UI prvkov a uloženie do S.settings pre generateMapElements()
+  if (!S.settings) S.settings = {};
+
+  S.settings.fortLimit = clampInt(
     document.getElementById('fortLimitInput')?.value, 1, 30, 10
   );
-  const defaultDefense = clampInt(
+  S.settings.defaultFortDefense = clampInt(
     document.getElementById('defaultFortDefenseInput')?.value, 1, 1000, 50
   );
 
-  const nest = {
-    x: Math.max(30, Math.min(70, Math.random() * 100)),
-    y: Math.max(30, Math.min(70, Math.random() * 100))
-  };
+  // 2. Vygenerovanie hniezda a pevností pomocou existujúcej funkcie generateMapElements()
+  generateMapElements();
 
-  const forts = [];
-  for (let i = 0; i < fortCount; i++) {
-    let placed = false;
-    let attempts = 0;
-    let bestCand = null;
-    let maxMinDist = -1;
-
-    while (attempts < 1000) {
-      attempts++;
-      const cand = {
-        id: i + 1,
-        x: 5 + Math.random() * 90,
-        y: 5 + Math.random() * 90,
-        alive: true,
-        defense: defaultDefense,
-        maxDefense: defaultDefense
-      };
-
-      let valid = true;
-      let minDistToOther = Infinity;
-
-      for (const existing of forts) {
-        const d = dist(cand, existing);
-        if (d < minDistToOther) minDistToOther = d;
-        if (d < 15) valid = false;
-      }
-
-      if (minDistToOther > maxMinDist) {
-        maxMinDist = minDistToOther;
-        bestCand = cand;
-      }
-
-      if (valid) {
-        forts.push(cand);
-        placed = true;
-        break;
-      }
-    }
-
-    if (!placed && bestCand) forts.push(bestCand);
-  }
-
+  // 3. Vrátenie kompletnej štruktúry levelu
   return {
     id: 'generated-' + Date.now(),
     title: 'Vygenerovaná úroveň',
     description: 'Náhodne vygenerované hniezdo a pevnosti.',
     background: 'poludniky.png',
-    nest,
-    forts,
-    settings: {}
+    nest: S.nest,
+    forts: S.forts,
+    settings: { ...S.settings }
   };
 }
 
 /**
  * Tlačidlo "Vygeneruj level": vytvorí náhodný level a hneď ho spustí
- * v kampaňovom režime, s čerstvým stavom (fresh nest/forts, nie zo sandboxu).
+ * v kampaňovom režime s čerstvým stavom.
  */
 function generateAndStartLevel() {
   const level = generateRandomLevel();
