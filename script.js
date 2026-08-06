@@ -450,6 +450,16 @@ const articles = [
         finishUpgrade();
     }
 
+    function increaseSP(){
+        const char = characters[activeCharIdx];
+        if (char.isInitialPhase) {
+            showCustomAlert("Vo fáze DANOSTÍ nie je možné pridať body. Najskôr musíš minúť všetky BR, ktoré máš a uzavrieť fázu DANOSTÍ.");
+        }
+        char.sp += 1;
+        saveState();
+        renderStats();
+    }
+
     // Zjednodušená pomocná funkcia bez volania neexistujúceho kódu
     function finishUpgrade() {
         saveState();

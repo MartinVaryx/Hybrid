@@ -130,15 +130,17 @@
 
     <div class="char-header">
         <div id="char-table">
-            <div>
+            <div class="extra-buttons">
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()" data-tooltip="STIAHNUŤ PDF BEZ LEVELOV SCHOPNOSTÍ, BR A ĽUDSKOSTI">EXPORTOVAŤ</button>
+                <button class="builder-btn" style="padding: 8px 15px;" onclick="toggleEditorOverlay(true)" data-tooltip="VYTVORIŤ, ODSTRÁNIŤ, ZMENIŤ HODNOTY A VZŤAHY...">UPRAVIŤ SCHOPNOSTI</button>
+                <button class="builder-btn"  style="padding: 8px 15px;" onclick="zdielatVsetkoDiscord()" data-tooltip="POSLAŤ SVOJE VÝTVORY TVORCOM, VEĽMI SA POTEŠIA!">PODELIŤ SA!</button>
             </div>
-            <button class="builder-btn" id="share-btn" style="padding: 8px 15px;" onclick="zdielatVsetkoDiscord()" data-tooltip="POSLAŤ SVOJE VÝTVORY TVORCOM, VEĽMI SA POTEŠIA!">PODELIŤ SA!</button>
-            <div class="char-buttons" >
+            <div class="char-buttons">
+                <h3 id="char-title">POSTAVA:</h3>
                 <select id="char-selector" onchange="switchCharacter()"></select>
                 <button class="builder-btn" style="padding: 8px 15px;" onclick="deleteCharacter()" data-tooltip="ODSTRÁNIŤ VYBRANÚ POSTAVU">ODSTRÁNIŤ</button>
                 <button class="builder-btn" style="padding: 8px 15px;" onclick="createNewCharacter()" data-tooltip="PRIDAŤ NOVÚ POSTAVU"> PRIDAŤ </button>
-                <button class="builder-btn" style="padding: 8px 15px;" onclick="exportpng()" data-tooltip="STIAHNUŤ PDF BEZ LEVELOV SCHOPNOSTÍ, BR A ĽUDSKOSTI">EXPORTOVAŤ</button>
-                <button class="builder-btn" style="padding: 8px 15px;" onclick="toggleEditorOverlay(true)" data-tooltip="VYTVORIŤ, ODSTRÁNIŤ, ZMENIŤ HODNOTY A VZŤAHY...">UPRAVIŤ SCHOPNOSTI</button>
+                <button class="builder-btn" id="increase-sp" style="padding: 8px 15px;" onclick="increaseSP()" data-tooltip="Pridať body rastu získané počas hry. (Alebo ak si chceš vytvoriť skúsenejšiu postavu.)">PRIDAŤ BR</button>
             </div>
         </div>
     </div>

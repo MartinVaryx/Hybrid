@@ -675,10 +675,30 @@
 
         .char-buttons{
             display: flex;
+            justify-content: space-between;
             width: 100%;
             flex-wrap: wrap;
             gap: 2vh;
-            margin-top: 1vh;
+            margin-top: 2vh;
+        }
+
+        .extra-buttons{
+            display: flex;
+            justify-content: flex-end;
+            width: 100%;
+            flex-wrap: wrap;
+            gap: 2vh;
+        }
+
+        #char-table{
+            width: 100%;
+        }
+
+        #char-title{
+            padding: 10px;
+            color: #ffffff;
+            font-family: 'Archivo Black', sans-serif;
+            margin: 0px
         }
 
         #share-btn:hover {
@@ -689,6 +709,7 @@
             border-radius: 8px;
             min-width: 140px;
             flex: auto;
+            margin-right: 15px;
         }
 
         .skill-slot {
@@ -1087,13 +1108,19 @@
 
         .modal-box {
             background: seashell;
-            padding: 30px;
+            padding: 15px;
+            font-size: 1.6rem;
             border: 4px solid var(--hybrid-red);
+            border-radius: 8px;
             max-width: 450px;
             width: 90%;
             text-align: center;
             box-shadow: 15px 15px 0px rgba(0,0,0,0.5);
             color: black;
+        }
+
+        #modal-message{
+            font-size: 1.5rem !important;
         }
 
         .modal-actions {
