@@ -459,7 +459,9 @@ function sandboxRenderConditionsEditor() {
     removeBtn.className = 'nest-btn small danger';
     removeBtn.textContent = 'Odstrániť';
     removeBtn.onclick = () => {
-      S.conditions = (S.conditions || []).filter(item => item.id !== cond.id);
+      // Read current input values from the DOM before removing the row
+      const current = sandboxReadConditionsFromEditor();
+      S.conditions = current.filter(item => item.id !== cond.id);
       sandboxRenderConditionsEditor();
     };
 
@@ -500,7 +502,8 @@ function sandboxWireConditionsOverlay() {
     close();
   };
   if (addBtn) addBtn.onclick = () => {
-    const arr = Array.isArray(S.conditions) ? S.conditions.slice() : [];
+    // Read current input values from the DOM first so unsaved edits are kept
+    const arr = sandboxReadConditionsFromEditor();
     arr.push({ ...sandboxGetConditionDefaults(), id: `cond-${Date.now()}-${Math.round(Math.random() * 10000)}` });
     S.conditions = arr;
     sandboxRenderConditionsEditor();
