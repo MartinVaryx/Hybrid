@@ -65,7 +65,7 @@
         ]
     },
     "Predátorka_2": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "type": "Predátorka",
         "case_success": [
             "set_WRECKS_PREDATOR_2_false",
@@ -118,7 +118,7 @@
         "back": true
     },
     "BASEMENT_PREDATOR_2": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Opäť ťa objavila predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -149,7 +149,7 @@
         ]
     },
     "Predátorka_1": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "type": "Predátorka",
         "case_success": [
             "set_BASEMENT_PREDATOR_2_false",
@@ -158,7 +158,7 @@
         ]
     },
     "BASEMENT_PREDATOR": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Skautka, ktorú si nezabil, ušla a zanechala pachovú stopu. Vďaka nej ťa teraz našla predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -225,7 +225,7 @@
         "case_E": "WALK_0"
     },
     "IN_BASEMENT": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Mohli to tu pred odchodom upratať...",
         "skills": [
             "ZMYSLY",
@@ -260,7 +260,7 @@
         "failure_msg": "Je tu strašný neporiadok. Zatiaľ nič užitočné."
     },
     "SKAUTKA_2": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "type": "Skautka",
         "case_success": [
             "set_BASEMENT_ENTRANCE_false",
@@ -278,7 +278,7 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Na zemi nájdeš sklenenú fľašu. Hádžeš ju čo najďalej. Snáď to Skautku odláka.",
         "success_msg": "Podarilo sa, uteká za fľašou.",
         "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
@@ -298,7 +298,7 @@
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENCOUNTER": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Čo urobíš so Skautkou?",
         "choice_A": "Odlákať ju preč.",
         "choice_B": "Poďme sa biť.",
@@ -332,7 +332,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Blížiš sa ku vchodu. Hluk zrazu nachvíľu prestane.",
         "success_msg": "Všimneš si, že tam je ďalšia Skautka.",
         "threat_msg": "Stúpiš na suchú vetvičku a Skautka to počuje. Teraz je na teba pripravená.",
@@ -351,7 +351,7 @@
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENTRANCE": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom si ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
         "choice_A": "Preskúmať.",
         "choice_B": "Ísť späť.",
@@ -373,7 +373,7 @@
             "BASEMENT_PREDATOR_2",
             "WRECKS_PREDATOR_2"
         ],
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Si v meste. Kam teraz?",
         "choice_A": "Do centra.",
         "choice_B": "Na sídlisko.",
@@ -387,7 +387,7 @@
         "case_E": "IN_BASEMENT_0"
     },
     "SKAUTKA_1": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "type": "Skautka",
         "on_death": [
             "set_CITY_0_false",
@@ -417,7 +417,7 @@
         ],
         "difficulty": 8,
         "threat": 2,
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Snažíš sa prekĺznuť. Zdá sa, že zatiaľ si ťa nevšimla.",
         "success_msg": "Úspech! Skautka si ťa nevšimla a môžeš ísť ďalej.",
         "threat_msg": "Pozeráš na Skautku, nevšimneš si plot pod nohami a poškriabeš sa na ňom.",
@@ -492,7 +492,7 @@
         "choice_A": "Zaútočiť na skautku.",
         "choice_B": "Pokúsiť sa ju nenápadne obísť.",
         "back": true,
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "choice_C": "Nastražiť jej pascu.",
         "case_C": "SNEAK_0"
     },
@@ -522,7 +522,7 @@
         "case_D": "TOWER_1"
     },
     "WALK_0": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Pred tebou je nekonečne dlhá cesta.",
         "case_success": "",
         "case_failure": "",
@@ -579,7 +579,7 @@
         "case_C": "WALK_0"
     },
     "WALK_1": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Kráčaš, ale pôsobí to, že si stále na tom istom mieste. Len keď sa obzieš dozadu, vidíš, že auto sa ti vzďaľuje.",
         "case_success": "",
         "case_failure": "",
@@ -1372,7 +1372,7 @@
         "back": true
     },
     "WALK_3": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Chceš pokračovať?",
         "case_success": "",
         "case_failure": "",
@@ -1382,7 +1382,7 @@
         "case_B": "WALK_0"
     },
     "WALK_4": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Ešte nemáš dosť?",
         "case_success": "",
         "case_failure": "",
@@ -1392,28 +1392,28 @@
         "case_B": "PREDÁTORKA_3"
     },
     "SKAUTKA_3": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Ešte vládzeš?",
         "case_success": "WALK_4",
         "case_failure": "",
         "type": "Skautka"
     },
     "PREDÁTORKA_6": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Asi si vošiel do ich teritória!",
         "case_success": "SKAUTKA_3",
         "case_failure": "",
         "type": "Predátorka"
     },
     "SKAUTKA_0": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Napadne ťa Skautka.",
         "case_success": "WALK_2",
         "case_failure": "",
         "type": "Skautka"
     },
     "WALK_2": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Chceš ísť ďalej?",
         "case_success": "",
         "case_failure": "",
@@ -1423,14 +1423,14 @@
         "case_B": "WALK_0"
     },
     "PREDÁTORKA_0": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Ďalšie Somora!",
         "case_success": "WALK_3",
         "case_failure": "",
         "type": "Predátorka"
     },
     "WALK_5": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Ešte nemáš dosť?",
         "case_success": "",
         "case_failure": "",
@@ -1440,28 +1440,28 @@
         "case_B": "GAME_FINISHED"
     },
     "PREDÁTORKA_3": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Pozor, ďalšia!",
         "case_success": "PREDÁTORKA_4",
         "case_failure": "",
         "type": "Predátorka"
     },
     "PREDÁTORKA_4": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Toto nemá konca...",
         "case_success": "PREDÁTORKA_5",
         "case_failure": "",
         "type": "Predátorka"
     },
     "PREDÁTORKA_5": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Koľko ich ešte bude?",
         "case_success": "WALK_5",
         "case_failure": "",
         "type": "Predátorka"
     },
     "GAME_FINISHED": {
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "To ty si pravé monštrum! Monštrum, ktoré sa prebilo cez teritórium Somôr a objavilo pevnosť. Koniec hry.",
         "case_success": "",
         "case_failure": ""
@@ -1779,7 +1779,7 @@
         ],
         "difficulty": 7,
         "threat": 3,
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Nájdeš nejaké dosky, plachtu, jamu a drôt, to by mohlo stačiť.",
         "success_msg": "Urobíš hluk, Skautka si ťa všimne a vbehne rovno do pasce.",
         "threat_msg": "Stúpiš na klinec trčiaci z dosky.",
@@ -1803,7 +1803,7 @@
         ],
         "difficulty": 7,
         "threat": 3,
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Nájdeš nejaké dosky, plachtu, jamu a drôt, to by mohlo stačiť.",
         "success_msg": "Urobíš hluk, Somora si ťa všimne a vbehne rovno do pasce.",
         "threat_msg": "Stúpiš na klinec trčiaci z dosky.",
@@ -1838,7 +1838,7 @@
             "delayed_BASEMENT_PREDATOR_add",
             "if_basementEncounter:true_IN_BASEMENT_0_else_CITY"
         ],
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "FINISH_SKAUTKA": {
         "initial_msg": "Skautka sa zmieta v pasci. Necháš ju tak alebo ju dorazíš?",
@@ -1856,7 +1856,7 @@
             "delayed_BASEMENT_PREDATOR_add",
             "CITY"
         ],
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "INTERROGATE": {
         "case_success": "INTERROGATE_0",
@@ -2033,7 +2033,7 @@
             "tu už nemám čo hľadať."
         ],
         "case_A": "DEPART",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "ANALYZE": {
         "initial_msg": "Vyhrnieš si rukávy a ideš na to.",
@@ -2059,7 +2059,7 @@
         ],
         "threat_avoided_msg": "Pri kontrole filtra ho omylom vytiahneš, ale zarazíš sa.",
         "failure_msg": "Vôbec netušíš, kde je problém.",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "ANALYZE_0": {
         "initial_msg": "Vyhrnieš si rukávy a ideš na to.",
@@ -2085,13 +2085,13 @@
         "case_threat": "stress+1",
         "threat_avoided_msg": "Pocítiš, ako ti niečo jemne privrie prst a povolíš tlak. Netreba sa ponáhľať.",
         "failure_msg": "Vôbec netušíš, kde je problém.",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "DEPART": {
         "initial_msg": "Otočíš kľúčom a tentoraz auto začne drnčať. Nedá sa povedať, že motor znie dobre, ale to neznel ani pred tým. Môžeš vyraziť.",
         "case_success": "",
         "case_failure": "",
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "next": "DRIVE"
     },
     "CHANGE_FILTER": {
@@ -2100,7 +2100,7 @@
         "case_failure": "",
         "choice_A": "Tak poďme na to...",
         "case_A": "CHANGE_FILTER_1",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "CHANGE_FILTER_0": {
         "initial_msg": "Nemáš náhradný filter.",
@@ -2108,7 +2108,7 @@
         "case_failure": "",
         "choice_A": "Doriti...",
         "case_A": "CAR_6",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "CHANGE_FILTER_1": {
         "initial_msg": "Snáď to nepokašleš.",
@@ -2134,7 +2134,7 @@
             "MECHANIKA",
             "OPRAVA"
         ],
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "DAM": {
         "initial_msg": "Keď obchádzaš bunker, všimneš si bobriu hrádzu. Teoreticky, ak by tam hrádza nebola, hladina by bola omnoho nižšie. Lenže hrádza tam je.",
@@ -2277,7 +2277,7 @@
         "case_A": "CITY",
         "choice_B": "Skúsim vyrobiť bombu.",
         "case_B": "MAKE_BOMB",
-        "image": "assets/CITY.png",
+        "image": "assets/CITY.PNG",
         "choice_C": "Skúsim vyrobiť feromóny.",
         "case_C": "if_item_ŽĽAZA SOMORY>0_MAKE_PHEROMONES",
         "choice_D": "Prehľadám to tu.",
@@ -2304,7 +2304,7 @@
         "case_threat": "stress+3",
         "threat_avoided_msg": "Kým sa pustíš do veľkovýroby, skúsiš každý krok na malom množstve. A to je dobre, pretože prvá zmes bola nestabilná a mohla narobiť pekný neporiadok.",
         "failure_msg": "Zapáliš malú vzorku, ale nič to nerobí. Niečoho je tam priveľa alebo primálo. A už nezostalo dosť surovín na ďalší pokus.",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "WRECKS_1": {
         "initial_msg": "Lekárničku neunesieš. Môžeš sa ošetriť teraz alebo nikdy. Len pozor, nech si do rán nezanesieš infekciu.",
@@ -2458,7 +2458,7 @@
         "case_threat": "item_ŽĽAZA SOMORY-1",
         "threat_avoided_msg": "Nie je to najčistejšie prostredie. Takmer položíš vzorku na misku, na ktorej je akási pleseň, ale včas si to všimneš.",
         "failure_msg": "Len narobíš neporiadok a nič z toho.",
-        "image": "assets/CITY.png"
+        "image": "assets/CITY.PNG"
     },
     "BUNKER_6": {
         "initial_msg": "Tu už nemáš čo robiť. Bunker je prehľadaný.",
@@ -3053,7 +3053,7 @@
         ],
         "difficulty": 5,
         "threat": 2,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.PNG",
         "initial_msg": "Na zemi nájdeš sklenenú fľašu. Potrieš ju feromónmi a hádžeš ju čo najďalej. Snáď to Skautku odláka.",
         "success_msg": "Podarilo sa, uteká za fľašou.",
         "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
