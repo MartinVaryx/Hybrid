@@ -1568,10 +1568,46 @@ iframe {
     border-radius: 8px;
 }
 
-#fortPopulationInput input{
+.sb-stat-value-wrap{
     display: flex;
+    align-items: center;
     justify-content: flex-end;
-    max-width: 40px !important;
+    gap: 2px;
+}
+
+#fortPopulationInput,
+#fortDefenseInput,
+#fortCapacityInput{
+    text-align: right;
+    max-width: 44px !important;
+}
+
+.sb-stat-capacity{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    color: inherit;
+    white-space: nowrap;
+    display: flex;
+    align-items: center;
+    gap: 1px;
+    min-height: 40px ;
+}
+
+#fortCapacityInput{
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    background: transparent;
+    border: 1px solid transparent;
+    color: inherit;
+    padding: 0;
+    min-height: 30px;
+}
+
+#fortCapacityInput:not(:disabled){
+    border-color: currentColor;
+    background: rgba(255,255,255,0.08);
+    border-radius: 3px;
+    padding: 0 2px;
 }
 
 /* ============================= Sandbox: pause / insect drag / scout toggle ============================= */

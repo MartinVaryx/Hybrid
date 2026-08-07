@@ -291,6 +291,7 @@ function freshState(){
       fortFoodLow: 2, fortFoodHigh: 5, fortHumanLow: 1, fortHumanHigh: 3,
       fortDistLow: 15, fortDistHigh: 70,
       fortPredatorThreshold: 40, fortAttackThreshold: 4.8, fortConquerThreshold: 0.7,
+      scoutMarkChance: 0.2, fortMarkThreshold: 3.0,
       fortDefendCost: 10, fortDefendExtraLoss: 10,
       fortCapacityIncreaseAmount: 5, costIncreaseFortCapacity: 1,
       fortReinforceCost: 4, fortReinforceDefenseBonus: 10,
@@ -562,24 +563,145 @@ function huntChanceWithDistance(loc) {
 }
 
 function pickTargetFort(distancePower = 3) {
-  // Empty forts (no sheltering population) aren't worth conquering, so predators never target them.
-  const aliveForts = S.forts.filter(f => f.alive && (f.population || 0) > 0);
-  if (aliveForts.length === 0) return null;
+  // Only forts that have survived the scout-marking phase can be conquered.
+  const markedForts = S.forts.filter(
+    f =>
+      f.alive &&
+      f.marked &&
+      !f.markedAttackDispatched &&
+      (f.population || 0) > 0
+  );
 
-  const weights = aliveForts.map(f => {
+  if (markedForts.length === 0) return null;
+
+  const weights = markedForts.map(f => {
     const d = Math.max(1, dist(S.nest, f));
-    // Increasing exponent increases the penalty for distance
-    return 1 / Math.pow(d, distancePower); 
+    return 1 / Math.pow(d, distancePower);
   });
 
   const totalWeight = weights.reduce((a, b) => a + b, 0);
   let rand = Math.random() * totalWeight;
 
-  for (let i = 0; i < aliveForts.length; i++) {
-    if (rand < weights[i]) return aliveForts[i];
+  for (let i = 0; i < markedForts.length; i++) {
+    if (rand < weights[i]) return markedForts[i];
     rand -= weights[i];
   }
-  return aliveForts[0];
+
+  return markedForts[0];
+}
+
+// Scouts returning from a search have a small chance of spotting a fort
+// that looks ripe for conquest and marking it - a cheap early warning that
+// fires at a lower readiness bar than the real predator assault
+// (fortAttackThreshold). Unlike pickTargetFort (used to actually launch an
+// assault), this considers every alive, unmarked, populated fort that
+// clears the lower bar, so a single tick can mark more than one fort if
+// scout count and threshold both allow it.
+function maybeMarkFortsFromSearch(scoutCount) {
+  if (scoutCount <= 0) return [];
+
+  const s = S.settings;
+
+  const candidates = S.forts.filter(
+    f =>
+      f.alive &&
+      !f.marked &&
+      !f.markingScoutPending &&
+      (f.population || 0) > 0
+  );
+
+  if (candidates.length === 0) return [];
+
+  const newlyMarked = [];
+
+  for (let i = 0; i < scoutCount; i++) {
+
+    const eligible = candidates.filter(
+      f =>
+        !f.marked &&
+        !f.markingScoutPending &&
+        fortReadiness(f).total >= s.fortMarkThreshold
+    );
+
+    if (eligible.length === 0) continue;
+
+    const weights = eligible.map(
+      f => 1 / Math.pow(Math.max(1, dist(S.nest, f)), 3)
+    );
+
+    const totalWeight = weights.reduce((a, b) => a + b, 0);
+    let rand = Math.random() * totalWeight;
+
+    let picked = eligible[eligible.length - 1];
+
+    for (let j = 0; j < eligible.length; j++) {
+      if (rand < weights[j]) {
+        picked = eligible[j];
+        break;
+      }
+      rand -= weights[j];
+    }
+
+    // Fort readiness increases the chance that the scout successfully marks it.
+    // At fortMarkThreshold -> base scoutMarkChance.
+    // At fortAttackThreshold or above -> 100%.
+    const readiness = fortReadiness(picked).total;
+
+    const readinessFactor = Math.max(
+      0,
+      Math.min(
+        1,
+        (readiness - s.fortMarkThreshold) /
+          Math.max(1, s.fortAttackThreshold - s.fortMarkThreshold)
+      )
+    );
+
+    const markChance =
+      s.scoutMarkChance +
+      readinessFactor * (1 - s.scoutMarkChance);
+
+    if (Math.random() >= markChance) continue;
+
+    // Prevent another scout from selecting the same fort this step.
+    picked.markingScoutPending = true;
+
+    // Same positioning convention as predator icons around a fort.
+    const SCOUT_FORT_DISTANCE = 5;
+    const angle = -Math.PI / 2;
+
+    const scoutEvent = {
+      id: nid(),
+      type: 'search',
+      status: 'pending',
+      outcome: null,
+
+      // Special scout whose only purpose is to mark a fort.
+      fortMarkScout: true,
+      targetFortId: picked.id,
+
+      x: Math.max(
+        3,
+        Math.min(
+          97,
+          picked.x +
+            (SCOUT_FORT_DISTANCE / WORLD_ASPECT_RATIO) * Math.cos(angle)
+        )
+      ),
+
+      y: Math.max(
+        3,
+        Math.min(
+          97,
+          picked.y + SCOUT_FORT_DISTANCE * Math.sin(angle)
+        )
+      )
+    };
+
+    S.events.push(scoutEvent);
+    newlyMarked.push(picked);
+  }
+
+  return newlyMarked;
 }
 
 function normalizeLevelConditions(rawConditions) {
@@ -726,6 +848,7 @@ const SETTINGS_INPUT_IDS = [
   'fortFoodLowInput','fortFoodHighInput','fortHumanLowInput','fortHumanHighInput',
   'fortDistLowInput','fortDistHighInput',
   'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput',
+  'scoutMarkChanceInput','fortMarkThresholdInput',
   'costDistractScoutInput','costKillScoutInput','costEscapePredatorInput','costKillPredatorInput',
   'costSaveHumansInput','saveHumansAmountInput','costScanInput',
   'costIncreaseFortCapacityInput','fortCapacityIncreaseAmountInput','queenFoodReserveCapInput',
@@ -770,6 +893,8 @@ function initGame(keepMap = false){
   S.settings.fortPredatorThreshold = clampInt(g('fortPredatorThresholdInput'), 1, 500, D.settings.fortPredatorThreshold);
   S.settings.fortAttackThreshold   = clampFloat(g('fortAttackThresholdInput'), 0, 10, D.settings.fortAttackThreshold);
   S.settings.fortConquerThreshold  = clampFloat(g('fortConquerThresholdInput'), 0, 1, D.settings.fortConquerThreshold);
+  S.settings.scoutMarkChance       = clampFloat(g('scoutMarkChanceInput'), 0, 100, D.settings.scoutMarkChance*100) / 100;
+  S.settings.fortMarkThreshold     = clampFloat(g('fortMarkThresholdInput'), 0, 10, D.settings.fortMarkThreshold);
   S.settings.costDistractScout     = clampInt(g('costDistractScoutInput'), 0, 50, D.settings.costDistractScout);
   S.settings.costKillScout         = clampInt(g('costKillScoutInput'), 0, 50, D.settings.costKillScout);
   S.settings.costEscapePredator    = clampInt(g('costEscapePredatorInput'), 0, 50, D.settings.costEscapePredator);
@@ -797,7 +922,7 @@ function initGame(keepMap = false){
       const def = (f.defense != null) ? f.defense : S.settings.defaultFortDefense;
       const capacity = (f.capacity != null) ? f.capacity : 100;
       const population = (f.population != null) ? f.population : Math.round(50 + Math.random() * 50);
-      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population };
+      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population, marked: false };
     });
     setMapBackground(CURRENT_LEVEL.background || null);
   } else {
@@ -890,6 +1015,8 @@ function applyDefaultsToInputs(){
     fortPredatorThresholdInput: d.settings.fortPredatorThreshold,
     fortAttackThresholdInput: d.settings.fortAttackThreshold,
     fortConquerThresholdInput: d.settings.fortConquerThreshold,
+    scoutMarkChanceInput: Math.round(d.settings.scoutMarkChance*100),
+    fortMarkThresholdInput: d.settings.fortMarkThreshold,
     costDistractScoutInput: d.settings.costDistractScout,
     costKillScoutInput: d.settings.costKillScout,
     costEscapePredatorInput: d.settings.costEscapePredator,
@@ -1057,8 +1184,18 @@ function beginSimulation() {
   log(t('log.step_begins', { step: S.step, scouts: n }));
   selectNextPendingEvent();
 
-  const incoming = S.events.filter(e => e.status === 'pending' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort'));
-  incoming.forEach(e => e._hideOnMap = true);
+  const incoming = S.events.filter(
+    e => e.status === 'pending' &&
+        (e.type === 'search' || e.type === 'hunt' || e.type === 'fort')
+  );
+
+  // Normal incoming events are hidden while their movement animation runs.
+  // Fort-marking scouts are an exception: they must remain visible.
+  incoming.forEach(e => {
+    if (!e.forceVisible) {
+      e._hideOnMap = true;
+    }
+  });
   S.animating = true;
 
   render();
@@ -1244,15 +1381,10 @@ function maybeTriggerFort() {
   if (S.events.some(e => e.type === 'fort' && e.status === 'pending')) return;
   if (S.fortCooldown > 0) { S.fortCooldown -= 1; return; }
 
-  const aliveForts = S.forts.filter(f => f.alive && (f.population || 0) > 0);
-  if (aliveForts.length === 0) return;
-
   const targetFort = pickTargetFort();
   if (!targetFort) return;
 
   const readiness = fortReadiness(targetFort);
-  if (readiness.total < S.settings.fortAttackThreshold) return;
-
   const pool = S.predatorsAvailable + predatorsWorking();
   if (pool <= 0) return;
 
@@ -1289,6 +1421,8 @@ function maybeTriggerFort() {
   if (attackers <= 0) return;
 
   S.predatorsAvailable = remaining - attackers;
+
+  targetFort.markedAttackDispatched = true;
 
   S.events.push({ 
     id: nid(), 
@@ -1365,8 +1499,47 @@ function advanceStepLogic(){
     }
   }
 
-  let successfulSearches = 0, naturalFailures = 0;
-  S.events.filter(e=>e.type==='search' && e.status==='pending').forEach(e=>{
+// Resolve scout sent to mark a fort.
+// This scout can be killed, but cannot be distracted.
+S.events
+  .filter(e => e.type === 'search' && e.fortMarkScout && e.status === 'pending')
+  .forEach(e => {
+    const targetFort = S.forts.find(f => f.id === e.targetFortId);
+
+    e.status = 'resolved';
+
+    if (e.outcome === 'killed') {
+      if (targetFort) {
+        targetFort.markingScoutPending = false;
+      }
+
+      // Killing the marking scout has no other effect.
+      return;
+    }
+
+    if (!targetFort || !targetFort.alive) return;
+
+    targetFort.markingScoutPending = false;
+    targetFort.marked = true;
+
+    // Visible during steps 2 and 3.
+    targetFort.markedUntilStep = S.step + 2;
+    targetFort.markedAttackDispatched = false;
+
+    e.outcome = 'fort_marked';
+
+    log(`Skaut označil pevnosť ${targetFort.id} ako cieľ na dobytie.`);
+  });
+
+let successfulSearches = 0, naturalFailures = 0, activeSearchers = 0;
+
+S.events
+  .filter(e =>
+    e.type === 'search' &&
+    !e.fortMarkScout &&
+    e.status === 'pending'
+  )
+  .forEach(e=>{
     e.status = 'resolved';
     if (humansAreGone) {
       e.outcome = 'failed';
@@ -1375,6 +1548,7 @@ function advanceStepLogic(){
     }
     const searchChance = searchChanceWithDistance(e);
     if (!e.outcome) { 
+        activeSearchers++;
         if(0.5 < searchChance){ e.outcome='succeeded'; successfulSearches++; }
         else { e.outcome='failed'; naturalFailures++; }
     } else if (e.outcome === 'distracted' || e.outcome === 'killed') {
@@ -1390,6 +1564,11 @@ function advanceStepLogic(){
   let scoutSurvivorsThisTick = S.events.filter(e=>e.type==='search' && e.outcome!=='killed').length;
   if(successfulSearches>0) log(t('log.searches_succeeded', { count: successfulSearches, eggs: bonusEggs }));
   if(naturalFailures>0) log(t('log.searches_failed', { count: naturalFailures }));
+
+  const newlyMarkedForts = maybeMarkFortsFromSearch(activeSearchers);
+  newlyMarkedForts.forEach(f => {
+    log(`Skaut označil pevnosť ${f.id} ako cieľ na dobytie.`);
+  });
 
   /* ---- 2. resolve hunts ---- */
   let totalHunted = 0, totalHuntDeaths = 0, predatorSurvivorsThisTick = 0;
@@ -1453,6 +1632,7 @@ function advanceStepLogic(){
       if (targetFort.defense <= 0) {
         e.outcome = 'conquered';
         targetFort.alive = false;
+        targetFort.marked = false;
         const releasedHumans = targetFort.population || 0;
         S.humans += releasedHumans;
         targetFort.population = 0;
@@ -1556,6 +1736,19 @@ function advanceStepLogic(){
 
 
   S.step += 1;
+
+  S.forts.forEach(f => {
+    if (
+      f.marked &&
+      f.markedUntilStep != null &&
+      S.step >= f.markedUntilStep
+    ) {
+      f.marked = false;
+      f.markedUntilStep = null;
+      f.markedAttackDispatched = false;
+      f.markingScoutPending = false;
+    }
+  });
 
   S.points = S.maxPoints;
   S.reinforcedForts = []; // a fort can be reinforced again once the new step begins
@@ -2579,6 +2772,9 @@ function findEvent(id){ return S.events.find(e=>e.id===id); }
 
 function distractScout(eid){
   const e = findEvent(eid);
+
+  if (e && e.fortMarkScout) return;
+
   const cost = S.settings.costDistractScout;
   if(!e || e.status!=='pending' || e.outcome || S.points<cost) return;
   
@@ -2739,7 +2935,8 @@ function placeFortAt(clientX, clientY){
     defense: BUILD_FORT_DEFENSE,
     maxDefense: BUILD_FORT_DEFENSE,
     capacity: BUILD_FORT_CAPACITY,
-    population: 0
+    population: 0,
+    marked: false
   };
 
   S.forts.push(fort);
@@ -3300,7 +3497,7 @@ function buildTrailLayer(){
 
       if (r > revealFrac) break;
 
-      const edgeFade = 0.35 + 0.65 * Math.min(1, r);
+      const edgeFade = 0.65 + 0.35 * Math.min(1, r);
 
       const alpha = Math.max(
         0,
@@ -3330,7 +3527,7 @@ function buildTrailLayer(){
         `rgba(168, 85, 247, ${alpha.toFixed(3)})`
       );
 
-      line.setAttribute('stroke-width', '2.2');
+      line.setAttribute('stroke-width', '3');
       line.setAttribute('stroke-linecap', 'round');
       line.setAttribute(
         'vector-effect',
@@ -3463,6 +3660,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
 
   S.trails.forEach(t => {
     if (t.fadingOutSince != null) return;
+    if (t.claimedByHuntId != null) return; 
     const preDecrementFactor = Math.max(0, Math.min(1, t.stepsLeft / 2));
     t.stepsLeft -= 1;
     if (t.stepsLeft <= 0) retireTrail(t.id, preDecrementFactor);
@@ -3471,19 +3669,79 @@ function runStepAnimation(outgoing, incoming, onComplete){
   outgoing.forEach(e => {
     if (e.type === 'search') {
       if (e.x === undefined || e.y === undefined) return;
-      if (e.outcome === 'killed') {
+
+      // Fort-marking scout:
+      // - survived and marked the fort -> return to nest
+      // - killed -> disappear at the fort
+      if (e.fortMarkScout) {
+        if (e.outcome === 'fort_marked') {
+          const wp = curveWaypoints(
+            { x: e.x, y: e.y },
+            nestPt,
+            1,
+            6
+          );
+
+          const dense = denseSmoothPath(wp);
+
+          const el = spawnTempIcon('search', e.x, e.y);
+
+          promises.push(
+            animateAlongPath(el, dense, TRAIL_DRAW_MS)
+              .then(() => fadeOut(el))
+          );
+
+          return;
+        }
+
+        // Marking scout was killed.
+        if (e.outcome === 'killed') {
+          const el = spawnTempIcon('search', e.x, e.y);
+          promises.push(fadeOut(el));
+          return;
+        }
+
+        return;
+      }
+
+      // Normal scout behaviour stays unchanged.
+      if (e.outcome !== 'succeeded') {
         const el = spawnTempIcon('search', e.x, e.y);
         promises.push(fadeOut(el));
         return;
       }
-      const wp = curveWaypoints({ x: e.x, y: e.y }, nestPt, 1, 6);
+
+      const wp = curveWaypoints(
+        { x: e.x, y: e.y },
+        nestPt,
+        1,
+        6
+      );
+
       const dense = denseSmoothPath(wp);
-      S.trails.push({ id: 'trail_' + e.id, waypoints: dense, stepsLeft: 2, claimedByHuntId: null, bornAt: performance.now(), fadingOutSince: null, retiredLifeFactor: null });
+
+      S.trails.push({
+        id: 'trail_' + e.id,
+        waypoints: dense,
+        stepsLeft: 2,
+        claimedByHuntId: null,
+        bornAt: performance.now(),
+        fadingOutSince: null,
+        retiredLifeFactor: null
+      });
+
       ensureTrailAnimationLoop();
+
       const el = spawnTempIcon('search', e.x, e.y);
-      promises.push(animateAlongPath(el, dense, TRAIL_DRAW_MS).then(() => fadeOut(el)));
+
+      promises.push(
+        animateAlongPath(el, dense, TRAIL_DRAW_MS)
+          .then(() => fadeOut(el))
+      );
+
       return;
     }
+
 
     if (e.type === 'hunt') {
       if (e.x === undefined || e.y === undefined) return;
@@ -3730,18 +3988,6 @@ function renderMap() {
   const activeFortEvent = S.events.find(e => e.type === 'fort' && e.status === 'pending');
   const activeTargetId = activeFortEvent ? activeFortEvent.targetFortId : null;
 
-  let nearestAliveId = null;
-  if (!activeTargetId) {
-    let minD = Infinity;
-    aliveForts.forEach(f => {
-      if ((f.population || 0) <= 0) return; // empty forts can't be attacked, so skip for the "likely next target" hint
-      const d = dist(S.nest, f);
-      if (d < minD) {
-        minD = d;
-        nearestAliveId = f.id;
-      }
-    });
-  }
 
   S.forts.forEach(f => {
     const fortKey = 'fort_' + f.id;
@@ -3768,8 +4014,6 @@ function renderMap() {
     } else {
       if (isUnderAssault) {
         cls += ' under-attack';
-      } else if (nearestAliveId === f.id) {
-        cls += ' nearest';
       }
       fortImg.title = t('map.fort_active', { id: f.id, def: f.defense, maxDef: f.maxDefense });
       fortContainer.style.cursor = 'pointer';
@@ -3833,6 +4077,9 @@ function renderMap() {
         // Fort population - shown whenever a fort is selected, in every mode.
         // Read-only here; sandbox.js re-enables it and wires editing when
         // sandbox edit mode is active (see sandboxWireMapEventExtras).
+        // Displayed/edited as "current population", with the fort's capacity
+        // shown alongside as a fixed "/capacity" suffix.
+        const fortCapacity = Math.max(0, f.capacity || 0);
         const popField = document.createElement('div');
         popField.className = 'btn-container';
         const popLabelWrap = document.createElement('div');
@@ -3844,22 +4091,91 @@ function renderMap() {
         popLabelSpan.textContent = t('sandbox.lbl_population');
         popLabel.appendChild(popLabelSpan);
         popLabelWrap.appendChild(popLabel);
+        const popValueWrap = document.createElement('div');
+        popValueWrap.className = 'sb-stat-value-wrap';
         const popInput = document.createElement('input');
         popInput.type = 'number';
         popInput.id = 'fortPopulationInput';
         popInput.min = '0';
-        popInput.max = String(Math.max(0, f.capacity || 0));
-        popInput.value = String(Math.max(0, Math.min(f.population || 0, f.capacity || 0)));
+        popInput.max = String(fortCapacity);
+        popInput.value = String(Math.max(0, Math.min(f.population || 0, fortCapacity)));
         popInput.readOnly = true;
         popInput.disabled = true;
+        // Capacity suffix - a plain "/N" label in campaign mode, but in
+        // sandbox mode it's an editable input alongside the slash. Read-only
+        // here; sandbox.js re-enables it and wires editing when sandbox
+        // edit mode is active (see sandboxWireMapEventExtras).
+        const popCapacitySuffix = document.createElement('span');
+        popCapacitySuffix.id = 'fortPopulationCapacity';
+        popCapacitySuffix.className = 'sb-stat-capacity';
+        if (currentGameMode === 'sandbox') {
+          const popCapacitySlash = document.createElement('span');
+          popCapacitySlash.textContent = '/';
+          const capacityInput = document.createElement('input');
+          capacityInput.type = 'number';
+          capacityInput.id = 'fortCapacityInput';
+          capacityInput.className = 'sb-stat-capacity-input';
+          capacityInput.min = '0';
+          capacityInput.value = String(fortCapacity);
+          capacityInput.readOnly = true;
+          capacityInput.disabled = true;
+          popCapacitySuffix.appendChild(popCapacitySlash);
+          popCapacitySuffix.appendChild(capacityInput);
+        } else {
+          popCapacitySuffix.textContent = '/' + String(fortCapacity);
+        }
+        popValueWrap.appendChild(popInput);
+        popValueWrap.appendChild(popCapacitySuffix);
         popField.appendChild(popLabelWrap);
-        popField.appendChild(popInput);
+        popField.appendChild(popValueWrap);
         controlsContainer.appendChild(popField);
+
+        // Scout-marked indicator - shown whenever a fort is selected and a
+        // scout has flagged it as ripe for conquest (see
+        // maybeMarkFortsFromSearch). Purely informational, every mode.
+        if (f.alive && f.marked) {
+          const markNote = document.createElement('div');
+          markNote.className = 'sb-fort-marked-note';
+          markNote.textContent = '⚑ Skauti ju označili ako cieľ na dobytie';
+          markNote.style.color = '#ff5252';
+          markNote.style.fontSize = '0.8rem';
+          markNote.style.marginTop = '2px';
+          controlsContainer.appendChild(markNote);
+        }
+
+        // Fort defense - parallel to the population field above, but only
+        // ever shown in sandbox mode. Read-only here; sandbox.js re-enables
+        // it and wires editing when sandbox edit mode is active (see
+        // sandboxWireMapEventExtras).
+        if (currentGameMode === 'sandbox') {
+          const defField = document.createElement('div');
+          defField.className = 'btn-container';
+          const defLabelWrap = document.createElement('div');
+          const defLabel = document.createElement('label');
+          defLabel.className = 'sb-defense-label';
+          defLabel.htmlFor = 'fortDefenseInput';
+          const defLabelSpan = document.createElement('span');
+          defLabelSpan.setAttribute('data-i18n', 'sandbox.lbl_defense');
+          defLabelSpan.textContent = t('sandbox.lbl_defense');
+          defLabel.appendChild(defLabelSpan);
+          defLabelWrap.appendChild(defLabel);
+          const defInput = document.createElement('input');
+          defInput.type = 'number';
+          defInput.id = 'fortDefenseInput';
+          defInput.min = '0';
+          defInput.value = String(Math.max(0, f.defense || 0));
+          defInput.readOnly = true;
+          defInput.disabled = true;
+          defField.appendChild(defLabelWrap);
+          defField.appendChild(defInput);
+          controlsContainer.appendChild(defField);
+        }
       }
     }
 
     fortImg.className = cls;
     fortImg.style.position = 'relative';
+    fortImg.style.zIndex = '1';
     fortImg.style.transform = 'none';
     fortImg.style.width = '100%';
     fortImg.style.height = 'auto';
@@ -3885,6 +4201,33 @@ function renderMap() {
 
     fortContainer.appendChild(fortImg);
     fortContainer.appendChild(defBadge);
+
+    if (f.alive && f.marked) {
+      const glow = document.createElement('div');
+
+      glow.className = 'fort-pheromone-glow';
+
+      glow.style.position = 'absolute';
+      glow.style.left = '-45%';
+      glow.style.top = '-45%';
+      glow.style.width = '190%';
+      glow.style.height = '190%';
+      glow.style.borderRadius = '50%';
+      glow.style.pointerEvents = 'none';
+      glow.style.zIndex = '0';
+
+      glow.style.background =
+        'radial-gradient(circle, ' +
+        'rgba(180, 70, 255, 0.72) 0%, ' +
+        'rgba(150, 40, 255, 0.42) 32%, ' +
+        'rgba(120, 0, 255, 0.18) 52%, ' +
+        'rgba(100, 0, 255, 0) 75%)';
+
+      glow.style.filter = 'blur(5px)';
+      glow.style.opacity = '0.9';
+
+      fortContainer.insertBefore(glow, fortContainer.firstChild);
+    }
 
     const capacity = Math.max(0, f.capacity || 0);
     const population = Math.max(0, Math.min(f.population || 0, capacity));
@@ -3914,6 +4257,82 @@ function renderMap() {
 
   activeMapEvents.forEach(e => {
     const eventKey = 'event_' + e.id;
+
+
+  if (e.type === 'search' && e.fortMarkScout) {
+    const targetFort = S.forts.find(f => f.id === e.targetFortId);
+    if (!targetFort) return;
+
+    const container = document.createElement('div');
+    container.className =
+      'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
+
+    container.style.position = 'absolute';
+    container.dataset.eventId = e.id;
+    container.dataset.eventType = e.type;
+    setWorldPosition(container, wrap, e.x, e.y);
+    container.style.zIndex = '12';
+
+    const iconImg = document.createElement('img');
+    iconImg.className = 'map-icon event-icon';
+    iconImg.src = '/nest/assets/scout.png';
+    iconImg.title = `Skaut označuje pevnosť ${targetFort.id}`;
+
+    iconImg.onclick = (ev) => {
+      toggleMapSelection(eventKey, ev);
+    };
+
+    container.appendChild(iconImg);
+    wrap.appendChild(container);
+
+    // Controls for the fort-marking scout.
+    // It can be KILLED, but it cannot be DISTRACTED.
+    if (activeOpenMapKey === eventKey && controlsContainer) {
+      const infoBtn = document.createElement('button');
+      infoBtn.className = 'nest-btn control-btn map-action-btn';
+      infoBtn.textContent = 'ℹ';
+      infoBtn.title = t('ui.info_btn');
+
+      infoBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        activeOpenMapKey = null;
+        openEventDetails(e.id);
+      };
+
+      const killBtn = document.createElement('img');
+      killBtn.className = 'btn-icon';
+      killBtn.src = '../sim/assets/THREAT.png';
+      killBtn.title = t('actions.kill_scout_tooltip', {
+        cost: S.settings.costKillScout
+      });
+
+      if (S.points < S.settings.costKillScout) {
+        killBtn.style.opacity = '0.5';
+        killBtn.style.pointerEvents = 'none';
+      } else {
+        killBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          activeOpenMapKey = eventKey;
+          killScout(e.id);
+        };
+      }
+
+      // Kill only — deliberately NO distract button.
+      controlsContainer.appendChild(
+        wrapButtonWithCostAbove(
+          killBtn,
+          S.settings.costKillScout,
+          true
+        )
+      );
+
+      // INFO LAST
+      controlsContainer.appendChild(infoBtn);
+    }
+
+    return;
+  }
+
 
     if (e.type === 'fort') {
       const targetFort = S.forts.find(f => f.id === e.targetFortId);
@@ -4838,6 +5257,7 @@ const LEVEL_SETTINGS_INPUT_MAP = {
   fortDistLow:'fortDistLowInput', fortDistHigh:'fortDistHighInput',
   fortPredatorThreshold:'fortPredatorThresholdInput', fortAttackThreshold:'fortAttackThresholdInput',
   fortConquerThreshold:'fortConquerThresholdInput',
+  scoutMarkChance:'scoutMarkChanceInput', fortMarkThreshold:'fortMarkThresholdInput',
   costDistractScout:'costDistractScoutInput',
   costKillScout:'costKillScoutInput', costEscapePredator:'costEscapePredatorInput',
   costKillPredator:'costKillPredatorInput', costSaveHumans:'costSaveHumansInput',

@@ -284,7 +284,8 @@ function sandboxAddFort() {
     defense: defDefense,
     maxDefense: defDefense,
     capacity: 100,
-    population: Math.round(50 + Math.random() * 50)
+    population: Math.round(50 + Math.random() * 50),
+    marked: false
   });
   recordSandboxHistory();
   renderMap();
@@ -1245,6 +1246,50 @@ function sandboxWireMapEventExtras() {
       btn.disabled = sandboxPaused;
       btn.onclick = (ev) => { ev.stopPropagation(); sandboxForceConquest(fort.id); };
       controlsContainer.appendChild(btn);
+    }
+
+    // Fort population + defense fields (script.js's renderMap creates them
+    // read-only by default). Enable editing here, gated on the layout
+    // edit-lock, same as every other sandbox layout control.
+    if (fort && fort.alive) {
+      const popInput = document.getElementById('fortPopulationInput');
+      if (popInput) {
+        popInput.readOnly = !sandboxEditEnabled;
+        popInput.disabled = !sandboxEditEnabled;
+        popInput.onchange = () => {
+          const capacity = Math.max(0, fort.capacity || 0);
+          const val = parseInt(popInput.value, 10);
+          fort.population = isNaN(val) ? 0 : Math.max(0, Math.min(val, capacity));
+          recordSandboxHistory();
+          renderMap();
+        };
+      }
+
+      const defInput = document.getElementById('fortDefenseInput');
+      if (defInput) {
+        defInput.readOnly = !sandboxEditEnabled;
+        defInput.disabled = !sandboxEditEnabled;
+        defInput.onchange = () => {
+          const val = parseInt(defInput.value, 10);
+          fort.defense = isNaN(val) ? 0 : Math.max(0, val);
+          fort.maxDefense = fort.defense;
+          recordSandboxHistory();
+          renderMap();
+        };
+      }
+
+      const capacityInput = document.getElementById('fortCapacityInput');
+      if (capacityInput) {
+        capacityInput.readOnly = !sandboxEditEnabled;
+        capacityInput.disabled = !sandboxEditEnabled;
+        capacityInput.onchange = () => {
+          const val = parseInt(capacityInput.value, 10);
+          fort.capacity = isNaN(val) ? 0 : Math.max(0, val);
+          fort.population = Math.max(0, Math.min(fort.population || 0, fort.capacity));
+          recordSandboxHistory();
+          renderMap();
+        };
+      }
     }
   }
 
