@@ -617,7 +617,7 @@
         "case_E": ""
     },
     "SHACK_0": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Stojíš pri starej chatrči. Je obrastená tŕnistým krovím. Ak tu niekto za posledný mesiac bol, dal si naozaj záležať na tom, aby to nebolo vidno. Chceš sa skúsiť dostať dnu?",
         "case_success": "",
         "case_failure": "",
@@ -634,7 +634,7 @@
         "case_A": "SHACK_DOOR"
     },
     "NO_BOMB_SHACK": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Nemáš bombu.",
         "next": "SHACK_0"
     },
@@ -928,7 +928,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Objavíš tajný vchod, vedie do pivnice a vôbec nie je zamknutý.",
         "threat_msg": "Poriadne sa na kríkoch doškriabeš.",
         "threat_avoided_msg": "Máš čo robiť, aby ti tŕne nerozdriapali kožu. Ale nejakým zázrakom sa ti to podarí.",
@@ -942,7 +942,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Dvere neodolali tvojmu šarmu.",
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
@@ -968,7 +968,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Dvere neodolali tvojmu šarmu.",
         "threat_msg": "Pri vykopávaní dverí si poriadne narazíš nohu. To ešte chvíľu budeš cítiť.",
         "threat_avoided_msg": "Ak by dvere vykopával niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
@@ -993,7 +993,7 @@
         ],
         "difficulty": 7,
         "threat": 5,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Dvere sa rozletia na kúsky. Všade je dym a prach.",
         "threat_msg": "Zdá sa, že tam bolo priveľa trhaviny. Celá chatrč sa zatrasie a počuješ rinčanie skla.",
         "threat_avoided_msg": "Chatrč sa zachveje. Ak by tam bolo trochu viac trhaviny, výbuch mohol narobiť väčší neporiadok, ako bolo treba.",
@@ -1035,7 +1035,7 @@
         ],
         "difficulty": 8,
         "threat": 3,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Zaprieš sa do mreží, zapraská drevo a prekotíš sa dozadu aj s mrežami. Okno už taký problém nerobilo. Môžeš ísť dnu.",
         "threat_msg": "Všade to prekliate tŕnie. Už máš doškriabané ruky.",
         "threat_avoided_msg": "Stále si musíš dávať pozor na tŕnie. Ale aspoň si nedoškriabeš ruky. Tentoraz.",
@@ -1044,7 +1044,7 @@
         "back": true
     },
     "SHACK_CELLAR": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Ocitneš sa v pivnici.",
         "case_success": "",
         "case_failure": "",
@@ -1056,7 +1056,7 @@
         "case_C": "SHACK_CELLAR_0"
     },
     "SHACK_1": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Vojdeš dnu a zacítiš mŕtvolný zápach. Je prítmie, ale vidíš, že chatrč má len jednu veľkú miestnosť - v jednom rohu primitívna kuchynka, v druhom krb a v strede stôl. Okrem toho vidíš dvere do pivnice a rebrík do podkrovia.",
         "case_success": "",
         "case_failure": "",
@@ -1108,7 +1108,7 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Zdalo sa, že žiadna z tých harabúrd nebude užitočná, ale aha - objavíš sekeru v celkom fajn stave! Zoberieš si aj záhradnú lopatku a hadicu.",
         "threat_msg": "Pri prehľadávaní políc ti niečo spadne na hlavu. Nevieš, na čo to slúži, ale vieš, že keď to človeka trafí do hlavy, bolí to.",
         "threat_avoided_msg": "Pri prehľadávaní políc niečo zhodíš a takmer ti to spadne na hlavu. V poslednej chvíli sa uhneš.",
@@ -1117,7 +1117,7 @@
         "back": true
     },
     "UNLOCK_CELLAR": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Dvere sú zamknuté.",
         "case_success": "",
         "case_failure": "",
@@ -1147,7 +1147,7 @@
         ],
         "difficulty": 9,
         "threat": 3,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "threat_msg": "Nevydržíš to a vyvrátiš obed. Nie, že by bolo jedla nazvyš.",
         "success_msg": "Objavíš mŕtvolu, ako sa hovorí - v pokročilom štádiu rozkladu - a pri nej nejaké papiere. Papiere rýchlo zoberieš. Nájdeš aj staré lano a kľúč, ale potom musíš ísť dole.",
         "threat_avoided_msg": "Napne ťa, ale z posledných síl zvratky zatlačíš späť.",
@@ -1155,7 +1155,7 @@
         "case_threat": "stress+1"
     },
     "SHACK_2": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Si späť v hlavnej miestnosti chatrče. Na stole sú papiere, ktoré boli pri mŕtvole.",
         "case_success": "",
         "case_failure": "",
@@ -1200,7 +1200,7 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "To vôbec nie je zlé. 3 nože, brokovnica aj s pár nábojmi a na skrini si všimneš fľašu - zdá sa, že slivovica.",
         "threat_msg": "Načiahneš sa po fľašu, do drgneš do skrine, fľaša spadne na zem a rozbije sa. Hej, bola to slivovica. Škoda.",
         "threat_avoided_msg": "Načiahneš sa po fľašu, do drgneš do skrine, fľaša spadne, ale v poslednej sekunde ju chytíš. Otvoríš ju - hej, je to slivovica.",
@@ -1228,14 +1228,14 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "To vôbec nie je zlé. 3 nože a brokovnica aj s pár nábojmi.",
         "threat_msg": "Porežeš sa na rozbitom skle.",
         "threat_avoided_msg": "Všimneš si, že všade je plno rozbitého skla a dáš si pozor, nech sa neporežeš.",
         "failure_msg": "Nedarí sa ti nájsť nič užitočné."
     },
     "SHACK_EXPLORE_2": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Dostaneš sa k slivovici. Tej by bolo škoda.",
         "case_success": "",
         "case_failure": "",
@@ -1246,7 +1246,7 @@
         ]
     },
     "DEAD_LETTERS": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Volám sa Svetlana. Ak si náhodou puritán, tak dúfam, že zhoríš v pekle. To vy ste skutoční diabli, nie my. Ak nie si... Nech si, kto chceš, mne už asi nepomôžeš.",
         "case_success": "",
         "case_failure": "",
@@ -1258,7 +1258,7 @@
         "back": true
     },
     "DEAD_LETTERS_0": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Som tu v podstate odkedy dostali Reného, môjho priateľa. Nikdy sme nikomu neublížili. Puritáni to odmietajú pochopiť, ale aj my máme zmysel pre morálku. Aspoň niektorí z nás. My s Reném sme nikdy sme nikomu neublížili.",
         "case_success": "",
         "case_failure": "",
@@ -1269,7 +1269,7 @@
         "back": true
     },
     "DEAD_LETTERS_1": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Mali sme striktnú zásadu - jedli sme len mäso tých, ktorých sme nemali šancu zachrániť. Nikdy by sme nikoho nenechali zomrieť, aby sme.... Nie to ešte niekoho zabiť! To sú klamstvá!",
         "case_success": "",
         "case_failure": "",
@@ -1280,7 +1280,7 @@
         "back": true
     },
     "DEAD_LETTERS_2": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Ak nie si jeden z nás, možno sa pýtaš, prečo by vôbec niekto jedol ľudksé mäso. Ale nech sa ľudia pozrú okolo seba! Toto je jediná šanca, ako prežiť. Streliva je stále menej a palicami Somory neutlčieme.",
         "case_success": "",
         "case_failure": "",
@@ -1291,7 +1291,7 @@
         "back": true
     },
     "DEAD_LETTERS_3": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Ak ľudí požerú Somory, to je akože lepšie? Ale už je to aj tak jedno. Dúfala som, že to vzdajú, no sliedia za mnou ako psy. Míňa sa mi jedlo, ale... Videla som, čo spravili Renému, bastardi! Radšej zomriem od hladu, ako by som sa nimi mala nechať chytiť.",
         "case_success": "",
         "case_failure": "",
@@ -1302,7 +1302,7 @@
         "back": true
     },
     "DEAD_LETTERS_4": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Už sem raz vtrhli. Bolo to o chlp, našťastie som ich zbadala, kým boli ešte ďaleko. Vyliezla som cez pivnicu a odplazila som sa preč. Odvtedy už tejto skrýši nevenujú veľkú pozornosť. No vždy, keď sa odtiaľto pohnem, narazím na jedného z nich. Už mi je to vlastne aj jedno.",
         "case_success": "",
         "case_failure": "",
@@ -1313,7 +1313,7 @@
         "back": true
     },
     "DEAD_LETTERS_5": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Po tej mäsiarčine, ktorej sa dopustili na poslednom človeku - pardón - Hybridovi, čo mi zostával, už s týmto svetom nechcem nič mať. Ak ich boh existuje a nezabráni v tom svojim vlastným stúpencom, tak v skutočnosti uctievajú démona a nie boha.",
         "case_success": "",
         "case_failure": "",
@@ -1325,7 +1325,7 @@
         "back": true
     },
     "DEAD_LETTERS_6": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Ja už som sa dokonca naučila pohybovať medzi nimi a vôbec na mňa neútočili - ak som nebola v ich teritóriu. To som si kedysi nedokázala ani predstaviť - žiť bez strachu, že ma čoskoro dostane jedna z tých beštií. Ak máme možnosť získať tieto schopnosti, prečo by sme ich nevyužili?",
         "case_success": "",
         "case_failure": "",
@@ -2951,7 +2951,7 @@
         "back": true
     },
     "UNLOCK_CELLAR_0": {
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "initial_msg": "Dvere sú odomknuté.",
         "case_success": "",
         "case_failure": "",
@@ -2967,7 +2967,7 @@
         "case_success": "",
         "case_failure": "",
         "next": "BACK_ACTION_2",
-        "image": "assets/SHACK.png"
+        "image": "assets/SHACK.PNG"
     },
     "DESTROY_TRANSMITTER_0": {
         "initial_msg": "Hľadáš miesto, kde by výbuch narobil najväčšie škody... Rátaj s tým, že to privolá puritánov.",
@@ -3117,7 +3117,7 @@
     },
     "SHACK_DOOR": {
         "initial_msg": "Nový vytvorený príbehový uzol.",
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "case_success": "",
         "case_failure": "",
         "case_A": [
@@ -3142,7 +3142,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Rozložíš zámku na súčiastky.",
         "threat_msg": "Vyšmykne sa ti nástroj a bodneš sa do ruky.",
         "threat_avoided_msg": "Ak by to robil niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
@@ -3169,7 +3169,7 @@
         ],
         "difficulty": 9,
         "threat": 2,
-        "image": "assets/SHACK.png",
+        "image": "assets/SHACK.PNG",
         "success_msg": "Rozložíš zámku na súčiastky.",
         "threat_msg": "Vyšmykne sa ti nástroj a bodneš sa do ruky.",
         "threat_avoided_msg": "Ak by to robil niekto iný, asi by si ublížil. Ale nie ty. Ty máš techniku. Však to nerobíš prvý raz?",
