@@ -420,8 +420,9 @@ const articles = [
         simulatedSkills[selectedSkill] = targetLvl;
 
         const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
-        const simulatedSP = 20 - afterDetails.totalCost;
-
+        const totalSP = char.sp + beforeDetails.totalCost;
+        const simulatedSP = totalSP - afterDetails.totalCost;
+        
         if (simulatedSP < 0) {
             showCustomAlert("NEDOSTATOK BODOV RASTU!");
             return;
@@ -589,7 +590,8 @@ const articles = [
         if (simulatedSkills[selectedSkill] === 0) delete simulatedSkills[selectedSkill];
 
         const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
-        const simulatedSP = 20 - afterDetails.totalCost;
+        const totalSP = char.sp + beforeDetails.totalCost;
+        const simulatedSP = totalSP - afterDetails.totalCost;
 
         if (simulatedSP < 0) {
             showCustomAlert("Zrušením schopnosti padnú zľavy. Build by prekročil 20 bodov.", "BLOKOVANÉ");
@@ -649,8 +651,9 @@ const articles = [
 
         // Kompletný prepočet bodov pre nový stav
         const afterDetails = getOptimalCostsForPhase2(char, char.skills);
-        
-        char.sp = 20 - afterDetails.totalCost;
+        const totalSP = char.sp + beforeDetails.totalCost;
+
+        char.sp = totalSP - afterDetails.totalCost;
         char.humanity = (char.humanity || 10) - (afterDetails.somoraCost - beforeDetails.somoraCost);
 
         saveState();
