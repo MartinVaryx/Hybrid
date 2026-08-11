@@ -118,7 +118,7 @@
         "back": true
     },
     "BASEMENT_PREDATOR_2": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Opäť ťa objavila predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -158,7 +158,7 @@
         ]
     },
     "BASEMENT_PREDATOR": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Skautka, ktorú si nezabil, ušla a zanechala pachovú stopu. Vďaka nej ťa teraz našla predátorka.",
         "choice_A": "Odlákať ju kameňom",
         "choice_B": "Pustiť sa do nej",
@@ -223,7 +223,7 @@
         "case_E": "WALK_0"
     },
     "IN_BASEMENT": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Mohli to tu pred odchodom upratať...",
         "skills": [
             "ZMYSLY",
@@ -276,7 +276,7 @@
         ],
         "difficulty": 7,
         "threat": 2,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Na zemi nájdeš sklenenú fľašu. Hádžeš ju čo najďalej. Snáď to Skautku odláka.",
         "success_msg": "Podarilo sa, uteká za fľašou.",
         "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
@@ -296,7 +296,7 @@
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENCOUNTER": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Čo urobíš so Skautkou?",
         "choice_A": "Odlákať ju preč.",
         "choice_B": "Poďme sa biť.",
@@ -330,7 +330,7 @@
         ],
         "difficulty": 8,
         "threat": 4,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Blížiš sa ku vchodu. Hluk zrazu nachvíľu prestane.",
         "success_msg": "Všimneš si, že tam je ďalšia Skautka.",
         "threat_msg": "Stúpiš na suchú vetvičku a Skautka to počuje. Teraz je na teba pripravená.",
@@ -349,7 +349,7 @@
         "enemy_escape_delayed": "BASEMENT_PREDATOR"
     },
     "BASEMENT_ENTRANCE": {
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom si ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
         "choice_A": "Preskúmať.",
         "choice_B": "Ísť späť.",
@@ -2984,7 +2984,7 @@
         ],
         "difficulty": 5,
         "threat": 2,
-        "image": "assets/BASEMENT.png",
+        "image": "assets/CITY.png",
         "initial_msg": "Na zemi nájdeš sklenenú fľašu. Potrieš ju feromónmi a hádžeš ju čo najďalej. Snáď to Skautku odláka.",
         "success_msg": "Podarilo sa, uteká za fľašou.",
         "threat_msg": "Fľaša bola rozbitá. Porežeš si ruku.",
