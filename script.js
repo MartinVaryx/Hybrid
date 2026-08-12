@@ -744,6 +744,17 @@ const articles = [
         
         if (isMobile) {
             // Mobile layout: flexbox-based, dynamically split into columns
+            const skillsTitle = document.createElement('div');
+            skillsTitle.className = 'mobile-section-title';
+            skillsTitle.style.cssText = `
+                font-weight: bold;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                padding: 10px 10px 0 10px;
+            `;
+            skillsTitle.innerText = 'SCHOPNOSTI';
+            container.appendChild(skillsTitle);
+
             const skillsContainer = document.createElement('div');
             skillsContainer.style.cssText = `
                 display: grid;
@@ -805,47 +816,143 @@ const articles = [
 
             container.appendChild(skillsContainer);
 
-            // ZBRANE (mobilná verzia) - zatiaľ len biologické zbrane získané ako schopnosti,
-            // klik na ne otvorí prehľad schopností s automaticky vybranou zbraňou.
-            if (bioWeaponSkills.length > 0) {
-                const weaponsContainer = document.createElement('div');
-                weaponsContainer.style.cssText = `
-                    display: grid;
-                    grid-template-columns: repeat(${columns}, 1fr);
-                    gap: 10px;
-                    padding: 10px;
+            // ZBRANE (mobilná verzia) - rovnaká logika ako na PC: spolu 6 pozícií,
+            // prvé zaberajú biologické zbrane (schopnosti), zvyšné sú manuálne
+            // zbrane vyberané cez dropdown (vrátane možnosti "VLASTNÁ...").
+            const totalWeaponSlots = 6;
+            if (!char.weapons) char.weapons = [];
+
+            const weaponsTitle = document.createElement('div');
+            weaponsTitle.className = 'mobile-section-title';
+            weaponsTitle.style.cssText = `
+                font-weight: bold;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                padding: 10px 10px 0 10px;
+            `;
+            weaponsTitle.innerText = 'ZBRANE';
+            container.appendChild(weaponsTitle);
+
+            const weaponsContainer = document.createElement('div');
+            weaponsContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(${columns}, 1fr);
+                gap: 10px;
+                padding: 10px;
+            `;
+
+            for (let index = 0; index < totalWeaponSlots; index++) {
+                const div = document.createElement('div');
+                div.className = 'skill-slot weapon-slot';
+                div.style.cssText = `
+                    padding: 8px;
+                    background: #f5f5f5;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    min-width: 0;
                 `;
 
-                bioWeaponSkills.forEach(([name]) => {
-                    const displayName = truncateString(name, 18);
-                    const div = document.createElement('div');
-                    div.className = `skill-slot weapon-slot bio-weapon-slot ${selectedSkill === name ? 'selected' : ''}`;
-                    div.style.cssText = `
-                        padding: 8px;
-                        background: #f5f5f5;
-                        border: 1px solid #ccc;
-                        border-radius: 4px;
-                        display: flex;
-                        justify-content: space-between;
-                        align-items: center;
-                        cursor: pointer;
-                        min-width: 0;
+                if (index < bioWeaponSkills.length) {
+                    // --- BIOLOGICKÁ ZBRAŇ (Nahradí dropdown) ---
+                    const [bioName] = bioWeaponSkills[index];
+                    div.classList.add('bio-weapon-slot');
+                    if (selectedSkill === bioName) div.classList.add('selected');
+                    div.style.cursor = "pointer";
+
+                    div.innerHTML = `
+                        <div class="skill-name-text" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${truncateString(bioName, 18)}</div>
+                        <div class="weapon-value-box" style="font-weight: bold; flex-shrink: 0;">${findWeaponValue(bioName)}</div>
                     `;
 
                     div.onclick = () => {
-                        selectSkill(name);
+                        selectSkill(bioName);
                         toggleInfoOverlay(true);
                     };
+                } else {
+                    // --- MANUÁLNA ZBRAŇ (Dropdown) ---
+                    const manualIndex = index - bioWeaponSkills.length;
+                    const weaponKey = char.weapons[manualIndex] || "";
 
-                    div.innerHTML = `
-                        <div class="skill-name-text" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${displayName}</div>
-                        <div class="weapon-value-box" style="font-weight: bold; flex-shrink: 0;">${findWeaponValue(name)}</div>
+                    const select = document.createElement('select');
+                    select.className = 'weapon-select';
+                    select.style.cssText = `
+                        flex: 1;
+                        min-width: 0;
+                        max-width: 100%;
+                        font: inherit;
+                        font-size: 0.85rem;
+                        border: 1px solid #000;
+                        background: transparent;
+                        padding: 2px 4px;
+                        box-sizing: border-box;
+                        height: 28px;
+                        line-height: normal;
                     `;
-                    weaponsContainer.appendChild(div);
-                });
 
-                container.appendChild(weaponsContainer);
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = "";
+                    emptyOpt.innerText = "-";
+                    select.appendChild(emptyOpt);
+
+                    Object.entries(getMergedWeaponList()).forEach(([category, weapons]) => {
+                        const group = document.createElement('optgroup');
+                        group.label = category;
+                        let hasOptions = false;
+                        Object.keys(weapons).forEach(name => {
+                            if (isBioWeaponSkill(name)) return;
+
+                            const val = `${category}::${name}`;
+                            const opt = document.createElement('option');
+                            opt.value = val;
+                            opt.innerText = `${name.toUpperCase()} (${weapons[name]})`;
+                            if (val === weaponKey) opt.selected = true;
+                            group.appendChild(opt);
+                            hasOptions = true;
+                        });
+                        if (hasOptions) select.appendChild(group);
+                    });
+
+                    const customOpt = document.createElement('option');
+                    customOpt.value = "__CUSTOM__";
+                    customOpt.innerText = "VLASTNÁ...";
+                    select.appendChild(customOpt);
+
+                    select.onchange = () => {
+                        if (select.value === "__CUSTOM__") {
+                            openCustomWeaponOverlay(manualIndex);
+                            return;
+                        }
+                        char.weapons[manualIndex] = select.value;
+                        saveState();
+                        renderStats();
+                    };
+
+                    div.appendChild(select);
+
+                    // Hodnota zbrane (dmg) pre vybranú zbraň z dropdownu
+                    let damage = "";
+                    if (weaponKey) {
+                        const [cat, name] = weaponKey.split("::");
+                        const mergedWeapons = getMergedWeaponList();
+                        if (mergedWeapons[cat] && mergedWeapons[cat][name] !== undefined) {
+                            damage = mergedWeapons[cat][name];
+                        }
+                    }
+
+                    const valBox = document.createElement('div');
+                    valBox.className = 'weapon-value-box';
+                    valBox.style.cssText = "font-weight: bold; flex-shrink: 0; margin-left: 8px;";
+                    valBox.innerText = damage;
+                    div.appendChild(valBox);
+                }
+
+                weaponsContainer.appendChild(div);
             }
+
+            container.appendChild(weaponsContainer);
         } else {
             for (let col = 0; col < 2; col++) {
                 for (let row = 0; row < 8; row++) {
@@ -982,6 +1089,9 @@ const articles = [
                     select.style.height = "88%";
                     select.style.font = "inherit";
                     select.style.border = "none";
+                    select.style.padding = "0 4px";
+                    select.style.boxSizing = "border-box";
+                    select.style.lineHeight = "normal";
 
                     const emptyOpt = document.createElement('option');
                     emptyOpt.value = "";
