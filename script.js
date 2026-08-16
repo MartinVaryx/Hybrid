@@ -293,6 +293,7 @@ const articles = [
         const char = characters[activeCharIdx];
         const data = skillsDB_new[name];
         const targetLvl = (char.skills[name] || 0) + 1;
+        const isCategory1 = data[0] === 1; // Kategória 1: zľava sa nikdy neuplatňuje, cena = cieľová úroveň
         const baseCost = targetLvl * data[0];
         
         let discount = 0;
@@ -300,8 +301,11 @@ const articles = [
 
         if (data[2] && data[2].length > 0) {
             let relsWithLvls = data[2].map(r => ({ name: r, lvl: char.skills[r] || 0 }));
-            let sortedForDiscount = [...relsWithLvls].sort((a,b) => b.lvl - a.lvl);
-            discount = sortedForDiscount.slice(0, 3).reduce((sum, r) => sum + r.lvl, 0);
+
+            if (!isCategory1) {
+                let sortedForDiscount = [...relsWithLvls].sort((a,b) => b.lvl - a.lvl);
+                discount = sortedForDiscount.slice(0, 3).reduce((sum, r) => sum + r.lvl, 0);
+            }
 
             relDisplayStrings = relsWithLvls.map(r => {
                 const label = r.lvl > 0 ? `${r.name} (${r.lvl})` : r.name;
@@ -318,7 +322,8 @@ const articles = [
         relsBox.innerHTML = relDisplayStrings.length ? "PRÍBUZNÉ SCHOPNOSTI: " + relDisplayStrings.join(", ") : "";
         
         const costCont = document.getElementById('cost-container');
-        if (discount > 0) {
+        // Kategória 1 nemá zľavu, takže pôvodná cena sa nikdy nezobrazuje
+        if (!isCategory1 && discount > 0) {
             costCont.style.display = 'inline-block';
             document.getElementById('cost-orig').innerText = `${baseCost} BR`;
         } else { costCont.style.display = 'none'; }
