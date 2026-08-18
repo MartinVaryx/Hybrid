@@ -6,6 +6,128 @@ const BUILD_FORT_CAPACITY = 10;
 const BUILD_FORT_DEFENSE = 10;
 const HIRE_COST = 5;
 const DIST_FROM_FORT = 10;
+const CONQUEST_PRIORITY = 20;
+
+/* ============================= MULTI-NEST SUPPORT ============================= */
+// Nests compete for the same shared pool of humans/forts. Each nest keeps its
+// own food storage, queen, brood cohorts, scouts and predators. Which nest's
+// fields S.food / S.queen / S.eggs / ... (etc) "point at" is controlled by
+// S.activeNestIndex - see the accessor properties installed in freshState().
+const DEFAULT_NEST_COUNT = 2;
+const MIN_NEST_DIST_FROM_OTHER_NEST = 100; // map units kept between two nests when generating a sandbox map
+
+// How much closer-to-an-enemy-nest hunting raises a predator's death risk.
+// Within ENEMY_NEST_DEATH_RISK_RADIUS map units of a rival, alive nest, a
+// hunting predator's death chance climbs linearly up to
+// +ENEMY_NEST_MAX_DEATH_RISK_BONUS at zero distance - nests fight over the
+// same humans, so hunting deep in a rival's territory is dangerous.
+const ENEMY_NEST_DEATH_RISK_RADIUS = 70;
+const ENEMY_NEST_MAX_DEATH_RISK_BONUS = 0.85;
+
+function makeNestState(id, x, y, settings){
+  return {
+    id, x, y,
+    alive: true,
+    food: 200,
+    queen: { alive: true },
+    queenReserve: settings ? settings.startQueenReserve : 230,
+    bounceback: null,
+    fortCooldown: 0,
+    reinforcedForts: [],
+    scoutsAvailable: 3,
+    scoutsHidden: 2,
+    scoutsCooldown: 4,
+    predatorsAvailable: 12,
+    predatorsCooldown: 12,
+    eggs: [{age: 0, count: 1},{age: 1, count: 0}],
+    larva: [{age: 0, count: 0},{age: 1, count: 0}],
+    cocoon: [{age: 0, count: 1}, {age: 1, count: 1}],
+    nymph: [{age: 0, count: 0},{age: 1, count: 1}]
+  };
+}
+
+// Installs S.nest / S.food / S.queen / ... as accessor properties that
+// forward to whichever nest is "active" (S.activeNestIndex). This lets the
+// large body of existing single-nest simulation code (processLifecycle,
+// searchChanceWithDistance, etc.) keep working completely unchanged - it's
+// simply re-run once per alive nest, with the active pointer moved between
+// runs. Direct multi-nest code (rendering, generation, save/load) works with
+// S.nests directly instead of going through these accessors.
+const NEST_SCOPED_FIELDS = [
+  'food', 'queenReserve', 'queen', 'eggs', 'larva', 'cocoon', 'nymph',
+  'scoutsAvailable', 'scoutsHidden', 'scoutsCooldown',
+  'predatorsAvailable', 'predatorsCooldown',
+  'fortCooldown', 'bounceback'
+];
+function installNestAccessors(state){
+  Object.defineProperty(state, 'nest', {
+    configurable: true, enumerable: true,
+    get(){ return this.nests[this.activeNestIndex]; },
+    set(v){
+      // Legacy single-nest assignment (e.g. `S.nest = {x,y}`): applied to
+      // the currently active nest's position only.
+      const n = this.nests[this.activeNestIndex];
+      if (n) { n.x = v.x; n.y = v.y; }
+    }
+  });
+  NEST_SCOPED_FIELDS.forEach(key => {
+    Object.defineProperty(state, key, {
+      configurable: true, enumerable: true,
+      get(){ return this.nests[this.activeNestIndex][key]; },
+      set(v){ this.nests[this.activeNestIndex][key] = v; }
+    });
+  });
+}
+
+function fortMark(fort, nestId){
+  if (!fort.marks) fort.marks = {};
+  if (!fort.marks[nestId]) {
+    fort.marks[nestId] = { marked: false, markedAttackDispatched: false, markingScoutCount: 0, markedUntilStep: null };
+  }
+  return fort.marks[nestId];
+}
+function fortAnyMarked(fort){
+  return !!(fort.marks && Object.values(fort.marks).some(m => m.marked));
+}
+
+function totalInsectsForNest(nest){
+  if (!nest) return 0;
+  const scouts = nest.scoutsAvailable + nest.scoutsCooldown + nest.scoutsHidden +
+    S.events.filter(e=>e.type==='search' && e.status==='pending' && !e.fortMarkScout && e.nestId===nest.id).length;
+  const predators = nest.predatorsAvailable + nest.predatorsCooldown +
+    S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nest.id).reduce((a,e)=>a + (e.groupSize - e.killed), 0) +
+    (() => { const e = S.events.find(e=>e.type==='fort' && e.status==='pending' && e.nestId===nest.id); return e ? Math.max(0, e.originalAttackers - e.killed) : 0; })();
+  return (nest.queen.alive?1:0) + scouts + predators +
+    sumCohort(nest.eggs) + sumCohort(nest.larva) + sumCohort(nest.cocoon) + sumCohort(nest.nymph);
+}
+function totalInsectsAll(){
+  return S.nests.reduce((a,n)=> a + (n.alive ? totalInsectsForNest(n) : 0), 0);
+}
+// Per-nest breakdown used by S.history entries, so the Nest Analytics chart
+// can plot the historical line for whichever nest is selected (rather than
+// the combined total across all nests) - see renderChart().
+function insectsByNestSnapshot(){
+  const out = {};
+  S.nests.forEach(n => { out[n.id] = n.alive ? totalInsectsForNest(n) : 0; });
+  return out;
+}
+function nearestEnemyNestDistance(loc, ownNestId){
+  let minD = Infinity;
+  S.nests.forEach(n => {
+    if (!n.alive || n.id === ownNestId) return;
+    const d = dist(loc, n);
+    if (d < minD) minD = d;
+  });
+  return minD;
+}
+// The closer `loc` (a hunt event's position) is to a rival, alive nest, the
+// higher the extra death-risk bonus returned here (0 when no rival is near).
+function enemyProximityDeathRisk(loc, ownNestId){
+  const d = nearestEnemyNestDistance(loc, ownNestId);
+  if (!isFinite(d)) return 0;
+  const closeness = Math.max(0, 1 - d / ENEMY_NEST_DEATH_RISK_RADIUS);
+  return closeness * ENEMY_NEST_MAX_DEATH_RISK_BONUS;
+}
 /* ============================= MODE & RESTART STATE ============================= */
 let currentGameMode = 'sandbox'; // 'sandbox' | 'campaign'
 let initialSandboxSnapshot = null; // Stores initial layout/params when sandbox starts
@@ -16,10 +138,9 @@ let initialSandboxSnapshot = null; // Stores initial layout/params when sandbox 
 function recordSandboxSnapshot() {
   if (!S) return;
   initialSandboxSnapshot = {
-    nest: { ...S.nest },
+    nests: JSON.parse(JSON.stringify(S.nests)),
     forts: JSON.parse(JSON.stringify(S.forts)),
     humans: S.humans,
-    food: S.food,
     settings: JSON.parse(JSON.stringify(S.settings))
   };
 }
@@ -34,9 +155,10 @@ function restartGame() {
   } else {
     // Sandbox Restart: restore initial nest, forts, and parameters
     if (initialSandboxSnapshot) {
-      S.nest = { ...initialSandboxSnapshot.nest };
+      S.nests = JSON.parse(JSON.stringify(initialSandboxSnapshot.nests));
       S.forts = JSON.parse(JSON.stringify(initialSandboxSnapshot.forts));
-      initGame(true); // Keep recorded layout intact
+      initGame(true); // Keep recorded layout intact (nests + forts)
+      render();
     } else {
       initGame(false);
     }
@@ -173,88 +295,126 @@ window.addEventListener('resize', () => {
 
 
 function openNestAnalytics() {
-  renderNestAnalytics(); 
+  openNestAnalyticsFor(S.focusedNestIndex || 0);
+}
+
+// Opens the analytics overlay scoped to a specific nest. This moves both
+// S.focusedNestIndex (remembered across steps/renders - see advanceStepLogic,
+// which resets S.activeNestIndex to it after each per-nest simulation pass)
+// and S.activeNestIndex (so the S.food/S.queen/S.eggs/... accessor shim
+// immediately reflects the chosen nest for renderNestAnalytics below).
+function openNestAnalyticsFor(idx) {
+  if (!S || !S.nests || !S.nests[idx]) return;
+  S.focusedNestIndex = idx;
+  S.activeNestIndex = idx;
+  renderNestAnalytics();
   const el = document.getElementById('nestAnalyticsOverlay');
+  const nestIdEl = document.getElementById('AnalNestId');
+  if (nestIdEl) {
+    nestIdEl.textContent = ` #${idx + 1}`; // Displays "Analytika hniezda #1"
+  }
   if (el) el.classList.remove('hidden');
 }
 
 /* ============================= NEST ANALYTICS RENDERER ============================= */
 function renderNestAnalytics() {
-  const container = document.getElementById('nestAnalyticsContent');
-  if (!container || !S) return;
+  const row = document.getElementById('stageRow');
+  if (!row || !S) return;
 
-  const totalInsectsCount = typeof totalInsects === 'function' ? totalInsects() : 0;
-  const foodPerInsect = totalInsectsCount > 0 ? (S.food / totalInsectsCount) : 0;
+  // 1. Render multi-nest selector buttons if selector container exists
+  const selector = document.getElementById('nestAnalyticsSelector');
+  if (selector) {
+    selector.innerHTML = '';
+    if (S.nests && S.nests.length > 1) {
+      selector.classList.remove('hidden');
+      S.nests.forEach((nest, idx) => {
+        const btn = document.createElement('button');
+        btn.className = 'nest-btn control-btn nest-selector-btn' +
+          (idx === S.activeNestIndex ? ' active' : '') +
+          (!nest.alive ? ' fallen' : '');
+        btn.textContent = t('analytics.nest_label') !== 'analytics.nest_label'
+          ? t('analytics.nest_label', { id: nest.id })
+          : ('Hniezdo ' + nest.id);
+        btn.disabled = idx === S.activeNestIndex;
+        btn.onclick = () => openNestAnalyticsFor(idx);
+        selector.appendChild(btn);
+      });
+    } else {
+      selector.classList.add('hidden');
+    }
+  }
 
-  // Spočítanie jednotlivých štádií
-  const eggsCount = sumCohort(S.eggs);
-  const larvaCount = sumCohort(S.larva);
-  const cocoonCount = sumCohort(S.cocoon);
-  const nymphCount = sumCohort(S.nymph);
+  // 2. Render structured stat groups into #stageRow (replacing renderStats)
+  row.innerHTML = '';
 
-  // Spočítanie kŕmených dospelých jedincov (feeders)
-  const feedersCount = (S.queen.alive ? 1 : 0) + scoutsTotal() + predatorsTotal() + nymphCount;
+  const groups = [
+    {
+      title: t('stats.core'),
+      items: [
+        { key: 'food', label: t('stats.food_storage'), count: S.food, cls: 'food' },
+        { key: 'queenReserve', label: t('stats.queenReserve'), count: S.queenReserve, cls: 'food' },
+        { key: 'queenState', label: t('stats.queen'), count: S.queen.alive ? t('stats.active') : t('stats.dead'), cls: S.queen.alive ? 'good' : 'bad' }
+      ]
+    },
+    {
+      title: t('stats.scouts'),
+      items: [
+        { key: 'scoutsTotal', label: t('stats.total'), count: scoutsTotal(), cls: 'main' },
+        { key: 'scoutsAvailable', label: t('stats.available'), count: S.scoutsAvailable },
+        { key: 'scoutsWorking', label: t('stats.working'), count: scoutsWorking() },
+        { key: 'scoutsCooldown', label: t('stats.cooldown'), count: S.scoutsCooldown },
+        { key: 'scoutsHidden', label: t('stats.hidden'), count: S.scoutsHidden }
+      ]
+    },
+    {
+      title: t('stats.predators'),
+      items: [
+        { key: 'predatorsTotal', label: t('stats.total'), count: predatorsTotal(), cls: 'main' },
+        { key: 'predatorsAvailable', label: t('stats.available'), count: S.predatorsAvailable },
+        { key: 'predatorsWorking', label: t('stats.working'), count: predatorsWorking() },
+        { key: 'predatorsCooldown', label: t('stats.cooldown'), count: S.predatorsCooldown },
+        { key: 'predatorsFortDuty', label: t('stats.fort_duty'), count: predatorsFortDuty() }
+      ]
+    },
+    {
+      title: t('stats.immatures'),
+      items: [
+        { key: 'eggs', label: t('stats.eggs'), count: sumCohort(S.eggs) },
+        { key: 'larva', label: t('stats.larvae'), count: sumCohort(S.larva) },
+        { key: 'cocoon', label: t('stats.cocoons'), count: sumCohort(S.cocoon) },
+        { key: 'nymph', label: t('stats.nymphs'), count: sumCohort(S.nymph) }
+      ]
+    }
+  ];
 
-  let html = `
-    <!-- 1. Kráľovná & Stav hniezda -->
-    <div class="analytics-section">
-      <h3>${t('analytics.queen_status_title')}</h3>
-      <div class="detail-meta">
-        <div>${t('analytics.queen_state')}: <b class="${S.queen.alive ? 'good' : 'bad'}">${S.queen.alive ? t('stats.active') : t('stats.dead')}</b></div>
-        <div>${t('analytics.food_storage')}: <b>${S.food}</b> (${foodPerInsect.toFixed(1)} ${t('analytics.per_insect')})</div>
-        <div>${t('analytics.queen_reserve')}: <b>${S.queenReserve}</b> / ${S.settings.queenFoodReserveCap}</div>
-      </div>
-    </div>
+  groups.forEach(g => {
+    const groupEl = document.createElement('div');
+    groupEl.className = 'stat-group-row';
 
-    <!-- 2. Vývojové štádiá (Brood Lifecycle) -->
-    <div class="analytics-section">
-      <h3>${t('analytics.brood_lifecycle_title')}</h3>
-      <div class="stage-chips-grid">
-        <div class="stage-chip">
-          <span class="chip-label">${t('stats.eggs')}</span>
-          <span class="chip-val">${eggsCount}</span>
-        </div>
-        <div class="stage-chip">
-          <span class="chip-label">${t('stats.larvae')}</span>
-          <span class="chip-val">${larvaCount}</span>
-        </div>
-        <div class="stage-chip">
-          <span class="chip-label">${t('stats.cocoons')}</span>
-          <span class="chip-val">${cocoonCount}</span>
-        </div>
-        <div class="stage-chip">
-          <span class="chip-label">${t('stats.nymphs')}</span>
-          <span class="chip-val">${nymphCount}</span>
-        </div>
-      </div>
-    </div>
+    const titleEl = document.createElement('span');
+    titleEl.className = 'group-title';
+    titleEl.textContent = g.title + ':';
+    groupEl.appendChild(titleEl);
 
-    <!-- 3. Dospelá populácia (Insect Roster) -->
-    <div class="analytics-section">
-      <h3>${t('analytics.population_title')}</h3>
-      <div class="detail-meta">
-        <div>${t('stats.scouts')}: <b>${scoutsTotal()}</b> (${t('stats.available')}: ${S.scoutsAvailable}, ${t('stats.working')}: ${scoutsWorking()}, ${t('stats.cooldown')}: ${S.scoutsCooldown}, ${t('stats.hidden')}: ${S.scoutsHidden})</div>
-        <div>${t('stats.predators')}: <b>${predatorsTotal()}</b> (${t('stats.available')}: ${S.predatorsAvailable}, ${t('stats.working')}: ${predatorsWorking()}, ${t('stats.cooldown')}: ${S.predatorsCooldown}, ${t('stats.fort_duty')}: ${predatorsFortDuty()})</div>
-        <div>${t('analytics.total_population')}: <b>${totalInsectsCount}</b></div>
-      </div>
-    </div>
+    const chipsWrap = document.createElement('div');
+    chipsWrap.className = 'chips-wrap';
 
-    <!-- 4. Spotreba a kŕmenie -->
-    <div class="analytics-section">
-      <h3>${t('analytics.consumption_title')}</h3>
-      <div class="detail-meta">
-        <div>${t('analytics.feeders_count')}: <b>${feedersCount}</b></div>
-        <div>${t('analytics.food_needed_step')}: <b>${feedersCount}</b> ${t('analytics.food_units')}</div>
-        <div>${t('analytics.status')}: 
-          <b class="${S.food >= feedersCount ? 'good' : 'bad'}">
-            ${S.food >= feedersCount ? t('analytics.food_sufficient') : t('analytics.famine_risk')}
-          </b>
-        </div>
-      </div>
-    </div>
-  `;
+    g.items.forEach(item => {
+      const chip = document.createElement('div');
+      chip.className = 'stage-chip ' + (item.cls || '');
+      chip.dataset.statKey = item.key;
+      chip.innerHTML = `<span class="chip-label">${item.label}</span> <span class="chip-val">${item.count}</span>`;
+      chipsWrap.appendChild(chip);
+    });
 
-  container.innerHTML = html;
+    groupEl.appendChild(chipsWrap);
+    row.appendChild(groupEl);
+  });
+
+  // 3. Refresh chart if chart logic exists
+  if (typeof updatePopulationChart === 'function') {
+    updatePopulationChart();
+  }
 }
 
 function closeNestAnalytics() {
@@ -268,55 +428,55 @@ document.getElementById('nestAnalyticsOverlay').addEventListener('click', (ev) =
 });
 
 function freshState(){
-  return {
+  const state = {
     step: 0,
     points: 10,
     maxPoints: 10,
     phase: 'idle', // idle | active
-    humans: 100,
+    humans: 150,
     humansKilled: 0,
-    food: 200,
     conditions: [],
     lastTriggeredCondition: null,
     settings: {
       lang: 'sk', // 'en' | 'sk'
-      groupSize: 4, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 0.5,
+      groupSize: 5, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 1,
       eggCap: 20, eggsPerFood: 5,
-      searchBaseChance: 0.4, searchRatioScale: 0.25,
+      searchBaseChance: 0.5, searchRatioScale: 0.25,
       huntBaseChance: 0.9, huntRatioScale: 0.25,
-      huntDeathRisk: 0.5,
-      scoutBiasPerFailedSearch: 2,
+      huntDeathRisk: 0.4, searchDeathRisk: 0.6,
+      scoutBiasPerFailedSearch: 0,
       fortLimit: 10,
       defaultFortDefense: 50,
       fortFoodLow: 2, fortFoodHigh: 5, fortHumanLow: 1, fortHumanHigh: 3,
       fortDistLow: 15, fortDistHigh: 70,
-      fortPredatorThreshold: 40, fortAttackThreshold: 4.8, fortConquerThreshold: 0.7,
-      scoutMarkChance: 0.2, fortMarkThreshold: 3.0,
-      fortDefendCost: 10, fortDefendExtraLoss: 10,
+      fortPredatorThreshold: 30, fortAttackThreshold: 4.2,
+      scoutMarkChance: 0.2, fortMarkThreshold: 3.5,
       fortCapacityIncreaseAmount: 5, costIncreaseFortCapacity: 1,
       fortReinforceCost: 4, fortReinforceDefenseBonus: 10,
       costDistractScout: 1, costKillScout: 2, costEscapePredator: 1, costKillPredator: 3,
       costSaveHumans: 1, saveHumansAmount: 2, costScan: 1,
-      queenFoodReserveCap: 120,
-      minPopulationThreshold: 50
+      costNestAnalytics: 1,
+      // Attacking a nest directly is pricier than killing the same unit
+      // type mid-event (costKillPredator/costKillScout above), so these are
+      // deliberately separate settings rather than reusing those.
+      costAttackNestPredator: 4, costAttackNestScout: 3,
+      costKillNymph: 3, costAttackQueen: 6,
+      queenFoodReserveCap: 130,
+      startQueenReserve: 130, // defaults to full reserve (== queenFoodReserveCap above)
+      minPopulationThreshold: 30,
+      nestCount: DEFAULT_NEST_COUNT // how many rival nests to generate in sandbox/random levels
     },
-    queen: { alive: true },
-    queenReserve: 0,
-    bounceback: null, // { active, stepsElapsed } - reserve-funded recovery cycle, see processLifecycle
-    fortCooldown: 0,
-    reinforcedForts: [], // fort ids already reinforced this step (reset every advanceStepLogic)
-    nest: { x: 25, y: 25 },
     forts: [],
+    reinforcedForts: [], // fort ids the player reinforced this step (shared - a player action, not per-nest)
 
-    scoutsAvailable: 4,
-    scoutsHidden: 2,
-    scoutsCooldown: 6,
-    predatorsAvailable: 25,
-    predatorsCooldown: 25,
-    eggs: [{age: 0, count: 4},{age: 1, count: 4}],
-    larva: [{age: 0, count: 4},{age: 1, count: 4}],
-    cocoon: [{age: 0, count: 4}, {age: 1, count: 4}],
-    nymph: [{age: 0, count: 4},{age: 1, count: 4}],    
+    // Multiple nests compete for the same shared `humans`/`forts` above.
+    // activeNestIndex selects which nest S.food/S.queen/S.eggs/... (etc,
+    // see NEST_SCOPED_FIELDS) currently point at; focusedNestIndex is the
+    // nest shown in the Nest Analytics panel and defaults to the first one.
+    nests: [ makeNestState(1, 25, 25, null) ],
+    activeNestIndex: 0,
+    focusedNestIndex: 0,
+
     events: [],
     trails: [],
     animating: false,
@@ -327,9 +487,57 @@ function freshState(){
     gameOverMsg: '',
     nextEventId: 1
   };
+  installNestAccessors(state);
+  return state;
 }
 
+/**
+ * Extracts the initial population fields (scouts, predators, eggs, larva,
+ * cocoon, nymph) from S in a plain, JSON-cloneable shape, suitable for
+ * saving into an exported level file.
+ */
+function capturePopulationSnapshot() {
+  if (!S) return null;
+  return {
+    food: S.food,
+    queenReserve: S.queenReserve,
+    scoutsAvailable: S.scoutsAvailable,
+    scoutsHidden: S.scoutsHidden,
+    scoutsCooldown: S.scoutsCooldown,
+    predatorsAvailable: S.predatorsAvailable,
+    predatorsCooldown: S.predatorsCooldown,
+    eggs: JSON.parse(JSON.stringify(S.eggs || [])),
+    larva: JSON.parse(JSON.stringify(S.larva || [])),
+    cocoon: JSON.parse(JSON.stringify(S.cocoon || [])),
+    nymph: JSON.parse(JSON.stringify(S.nymph || []))
+  };
+}
 
+/**
+ * Applies an (optional, partial) population object - as produced by
+ * capturePopulationSnapshot() and stored in level JSON - onto the current
+ * S. Any field left out of `pop` keeps whatever freshState() already put
+ * there, so old level files without population data keep working unchanged.
+ *
+ * food/queenReserve are included here (rather than read from a settings
+ * input) because they're only editable via the Nest Analytics "Edit
+ * values" panel now — the Settings overlay no longer has its own
+ * duplicate fields for them.
+ */
+function applyPopulationOverrides(pop) {
+  if (!pop || !S || typeof pop !== 'object') return;
+  if (pop.food != null) S.food = Math.max(0, Math.round(Number(pop.food)) || 0);
+  if (pop.queenReserve != null) S.queenReserve = Math.max(0, Math.min(S.settings.queenFoodReserveCap, Math.round(Number(pop.queenReserve)) || 0));
+  if (pop.scoutsAvailable != null) S.scoutsAvailable = Math.max(0, Math.round(Number(pop.scoutsAvailable)) || 0);
+  if (pop.scoutsHidden != null) S.scoutsHidden = Math.max(0, Math.round(Number(pop.scoutsHidden)) || 0);
+  if (pop.scoutsCooldown != null) S.scoutsCooldown = Math.max(0, Math.round(Number(pop.scoutsCooldown)) || 0);
+  if (pop.predatorsAvailable != null) S.predatorsAvailable = Math.max(0, Math.round(Number(pop.predatorsAvailable)) || 0);
+  if (pop.predatorsCooldown != null) S.predatorsCooldown = Math.max(0, Math.round(Number(pop.predatorsCooldown)) || 0);
+  if (Array.isArray(pop.eggs)) S.eggs = JSON.parse(JSON.stringify(pop.eggs));
+  if (Array.isArray(pop.larva)) S.larva = JSON.parse(JSON.stringify(pop.larva));
+  if (Array.isArray(pop.cocoon)) S.cocoon = JSON.parse(JSON.stringify(pop.cocoon));
+  if (Array.isArray(pop.nymph)) S.nymph = JSON.parse(JSON.stringify(pop.nymph));
+}
 
 function assignEventCoords(e) {
   const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
@@ -346,9 +554,11 @@ function assignEventCoords(e) {
 
     let minDist = Infinity;
 
-    if (S.nest) {
-      const d = dist(cand, S.nest);
-      if (d < minDist) minDist = d;
+    if (S.nests) {
+      S.nests.forEach(n => {
+        const d = dist(cand, n);
+        if (d < minDist) minDist = d;
+      });
     }
 
     if (S.forts) {
@@ -391,13 +601,40 @@ function assignEventCoords(e) {
 function generateMapElements() {
   const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
   const MARGIN_Y = 10; // Top/Bottom edge margin (y: 10 to 90)
-  const MIN_NEST_DIST = 18; // Minimum distance between a fort and the nest
+  const MIN_NEST_DIST = 18; // Minimum distance between a fort and a nest
   const MIN_FORT_DIST = 30; // Minimum distance between forts
 
-  // 1. Generate Nest position within custom margins
-  S.nest = {
-    x: Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X)),
-    y: Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y))
+  // 1. Generate nest positions within custom margins. Nests are also kept
+  // apart from each other (MIN_NEST_DIST_FROM_OTHER_NEST) so rival colonies
+  // don't start on top of one another.
+  const nestCount = Math.max(1, S.settings.nestCount || DEFAULT_NEST_COUNT);
+  const nestPositions = [];
+  for (let i = 0; i < nestCount; i++) {
+    let attempts = 0;
+    let bestCand = null;
+    let maxMinDist = -1;
+    let placed = false;
+    while (attempts < 3000) {
+      attempts++;
+      const cand = {
+        x: Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X)),
+        y: Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y))
+      };
+      let minDist = Infinity;
+      for (const other of nestPositions) {
+        const d = dist(cand, other);
+        if (d < minDist) minDist = d;
+      }
+      if (minDist > maxMinDist) { maxMinDist = minDist; bestCand = cand; }
+      if (minDist >= MIN_NEST_DIST_FROM_OTHER_NEST) { nestPositions.push(cand); placed = true; break; }
+    }
+    if (!placed) nestPositions.push(bestCand || { x: 25, y: 25 });
+  }
+  S.nests = nestPositions.map((p, i) => makeNestState(i + 1, p.x, p.y, S.settings));
+
+  S.locationIcon = {
+    x: 10,
+    y: 10
   };
 
   const count = S.settings.fortLimit || 10;
@@ -420,16 +657,19 @@ function generateMapElements() {
         defense: S.settings.defaultFortDefense || 50,
         maxDefense: S.settings.defaultFortDefense || 50,
         capacity: 100,
-        population: Math.round(50 + Math.random() * 50)
+        population: Math.round(50 + Math.random() * 50),
+        marks: {}
       };
 
       let valid = true;
       let minDistToAll = Infinity;
 
-      // Distance check: Fort to Nest
-      const dNest = dist(cand, S.nest);
-      if (dNest < minDistToAll) minDistToAll = dNest;
-      if (dNest < MIN_NEST_DIST) valid = false;
+      // Distance check: Fort to every nest
+      S.nests.forEach(nest => {
+        const dNest = dist(cand, nest);
+        if (dNest < minDistToAll) minDistToAll = dNest;
+        if (dNest < MIN_NEST_DIST) valid = false;
+      });
 
       // Distance check: Fort to other Forts
       for (const existing of S.forts) {
@@ -468,8 +708,8 @@ function getNearestAliveFortDistance(originLoc) {
   return minD;
 }
 
-const FORT_STRENGTH_DISTANCE_DIVISOR = 220; // tune this - overall falloff radius (map units) for fort predator strength
-const FORT_STRENGTH_COMPRESSION_POWER = 2; // tune this - >1 shrinks the "2 dmg" band closer to the "3 dmg" edge, WITHOUT changing the size of the "3 dmg" zone. 1 = original linear behavior.
+const FORT_STRENGTH_DISTANCE_DIVISOR = 280; // tune this - overall falloff radius (map units) for fort predator strength
+const FORT_STRENGTH_COMPRESSION_POWER = 1.4; // tune this - >1 shrinks the "2 dmg" band closer to the "3 dmg" edge, WITHOUT changing the size of the "3 dmg" zone. 1 = original linear behavior.
 
 function getFortStrengthAtDistance(d) {
   const x = Math.max(0, 1.0 - (d / FORT_STRENGTH_DISTANCE_DIVISOR));
@@ -531,10 +771,10 @@ function debugRenderFortStrengthZones(wrap) {
 // or more -> 90% die; damage at 2x defense or more -> 10% die; linear
 // interpolation in between.
 function conquestDeathPct(ratio){
-  if (!isFinite(ratio) || ratio >= 2) return 0.1;
-  if (ratio <= 0.5) return 0.9;
+  if (!isFinite(ratio) || ratio >= 2) return 0.05;
+  if (ratio <= 0.5) return 0.7;
   const frac = (ratio - 0.5) / 1.5;
-  return 0.9 - frac * 0.8;
+  return 0.8 - frac * 0.7;
 }
 
 function searchChanceWithDistance(loc) {
@@ -562,13 +802,16 @@ function huntChanceWithDistance(loc) {
   return Math.max(0.01, base * combinedMultiplier);
 }
 
-function pickTargetFort(distancePower = 3) {
-  // Only forts that have survived the scout-marking phase can be conquered.
+function pickTargetFort(distancePower = 6) {
+  // Only forts that have survived the scout-marking phase (for the active
+  // nest specifically - each nest tracks its own marks on a fort) can be
+  // conquered.
+  const nestId = S.nest.id;
   const markedForts = S.forts.filter(
     f =>
       f.alive &&
-      f.marked &&
-      !f.markedAttackDispatched &&
+      fortMark(f, nestId).marked &&
+      !fortMark(f, nestId).markedAttackDispatched &&
       (f.population || 0) > 0
   );
 
@@ -597,16 +840,31 @@ function pickTargetFort(distancePower = 3) {
 // assault), this considers every alive, unmarked, populated fort that
 // clears the lower bar, so a single tick can mark more than one fort if
 // scout count and threshold both allow it.
+//
+// Normally only one scout at a time will approach a given fort to mark it.
+// But once a fort's readiness climbs to the same level that would trigger
+// a full predator assault (fortAttackThreshold), multiple scouts are
+// allowed to converge on it at once - a swarm racing to confirm the same
+// juicy target. Like the predator icons that ring a fort during an
+// assault, these scouts are positioned evenly around the fort instead of
+// stacking on the same spot.
+const MARKING_SWARM_SIZE = 3; // ring size once a fort's readiness is really high
+const SCOUT_FORT_DISTANCE = 5; // same positioning convention as predator icons around a fort
+
+function maxMarkingScoutsForFort(f) {
+  return fortReadiness(f).total >= S.settings.fortAttackThreshold ? MARKING_SWARM_SIZE : 1;
+}
+
 function maybeMarkFortsFromSearch(scoutCount) {
   if (scoutCount <= 0) return [];
 
   const s = S.settings;
+  const nestId = S.nest.id;
 
   const candidates = S.forts.filter(
     f =>
       f.alive &&
-      !f.marked &&
-      !f.markingScoutPending &&
+      (fortMark(f, nestId).markingScoutCount || 0) < maxMarkingScoutsForFort(f) &&
       (f.population || 0) > 0
   );
 
@@ -618,8 +876,7 @@ function maybeMarkFortsFromSearch(scoutCount) {
 
     const eligible = candidates.filter(
       f =>
-        !f.marked &&
-        !f.markingScoutPending &&
+        (fortMark(f, nestId).markingScoutCount || 0) < maxMarkingScoutsForFort(f) &&
         fortReadiness(f).total >= s.fortMarkThreshold
     );
 
@@ -662,18 +919,22 @@ function maybeMarkFortsFromSearch(scoutCount) {
 
     if (Math.random() >= markChance) continue;
 
-    // Prevent another scout from selecting the same fort this step.
-    picked.markingScoutPending = true;
+    // Claim a ring slot for this scout. The ring size is fixed for the
+    // whole swarm (maxMarkingScoutsForFort), so every scout's angle stays
+    // put even as its siblings resolve independently.
+    const ringSize = maxMarkingScoutsForFort(picked);
+    const pickedMark = fortMark(picked, nestId);
+    const slot = pickedMark.markingScoutCount || 0;
+    pickedMark.markingScoutCount = slot + 1;
 
-    // Same positioning convention as predator icons around a fort.
-    const SCOUT_FORT_DISTANCE = 5;
-    const angle = -Math.PI / 2;
+    const angle = (2 * Math.PI * slot) / ringSize - Math.PI / 2;
 
     const scoutEvent = {
       id: nid(),
       type: 'search',
       status: 'pending',
       outcome: null,
+      nestId,
 
       // Special scout whose only purpose is to mark a fort.
       fortMarkScout: true,
@@ -802,14 +1063,22 @@ function maybeTriggerConditionGameOver() {
 
 /* ============================= HELPER UTILS ============================= */
 function scoutsWorking(){
-  return S.events.filter(e=>e.type==='search' && e.status==='pending').length;
+  // fortMarkScout events are a visual stand-in for an already-counted
+  // searcher confirming a fort target, not an additional body - excluding
+  // them here keeps scoutsTotal()/totalInsects() (and everything derived
+  // from them, like ratioHumansPerInsect() and searchChance) from being
+  // silently inflated every time a fort attracts confirming scouts.
+  const nestId = S.nest.id;
+  return S.events.filter(e=>e.type==='search' && e.status==='pending' && !e.fortMarkScout && e.nestId===nestId).length;
 }
 function predatorsWorking(){
-  return S.events.filter(e=>e.type==='hunt' && e.status==='pending')
+  const nestId = S.nest.id;
+  return S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nestId)
     .reduce((a,e)=>a + (e.groupSize - e.killed), 0);
 }
 function predatorsFortDuty(){
-  const e = S.events.find(e=>e.type==='fort' && e.status==='pending');
+  const nestId = S.nest.id;
+  const e = S.events.find(e=>e.type==='fort' && e.status==='pending' && e.nestId===nestId);
   return e ? Math.max(0, e.originalAttackers - e.killed) : 0;
 }
 function scoutsTotal(){ return S.scoutsAvailable + scoutsWorking() + S.scoutsCooldown + S.scoutsHidden; }
@@ -841,13 +1110,13 @@ function selectNextPendingEvent(){
 
 /* ============================= SETUP ============================= */
 const SETTINGS_INPUT_IDS = [
-  'langSelect','groupSizeInput','foodPerHumanInput','startHumansInput','startFoodInput',
+  'langSelect','groupSizeInput','foodPerHumanInput','startHumansInput',
   'maxPointsInput','eggsPerSearchInput','eggCapInput','eggsPerFoodInput',
   'searchBaseChanceInput','searchRatioScaleInput','huntBaseChanceInput','huntRatioScaleInput',
-  'huntDeathRiskInput','scoutBiasPerFailedSearchInput','fortLimitInput','defaultFortDefenseInput',
+  'huntDeathRiskInput','searchDeathRiskInput','scoutBiasPerFailedSearchInput','fortLimitInput','defaultFortDefenseInput',
   'fortFoodLowInput','fortFoodHighInput','fortHumanLowInput','fortHumanHighInput',
   'fortDistLowInput','fortDistHighInput',
-  'fortPredatorThresholdInput','fortAttackThresholdInput','fortConquerThresholdInput',
+  'fortPredatorThresholdInput','fortAttackThresholdInput',
   'scoutMarkChanceInput','fortMarkThresholdInput',
   'costDistractScoutInput','costKillScoutInput','costEscapePredatorInput','costKillPredatorInput',
   'costSaveHumansInput','saveHumansAmountInput','costScanInput',
@@ -856,8 +1125,9 @@ const SETTINGS_INPUT_IDS = [
 ];
 
 function initGame(keepMap = false){
-  const existingNest = S ? S.nest : null;
+  const existingNests = S ? S.nests : null;
   const existingForts = S ? S.forts : null;
+  const existingLocationIcon = S ? S.locationIcon : null;
 
   const D = freshState();
   S = freshState();
@@ -867,11 +1137,19 @@ function initGame(keepMap = false){
     return el ? el.value : null;
   };
 
+  // Starting food and starting queen reserve are no longer set via the
+  // Settings (parametre) overlay — those fields duplicated the "Edit values"
+  // panel in the Nest Analytics overlay (sandbox.js), which can set them at
+  // any time while in sandbox mode. They're still respected when loading a
+  // saved level that specifies them explicitly.
+  const levelSettings = (typeof CURRENT_LEVEL !== 'undefined' && CURRENT_LEVEL && CURRENT_LEVEL.settings) ? CURRENT_LEVEL.settings : null;
+  const levelFood = levelSettings ? (levelSettings.food ?? levelSettings.startFood) : undefined;
+
   S.settings.lang                 = g('langSelect') || D.settings.lang;
   S.settings.groupSize            = clampInt(g('groupSizeInput'), 1, 20, D.settings.groupSize);
   S.settings.foodPerHuman          = clampInt(g('foodPerHumanInput'), 1, 50, D.settings.foodPerHuman);
   S.humans                         = clampInt(g('startHumansInput'), 1, 5000, D.humans);
-  S.food                           = clampInt(g('startFoodInput'), 0, 5000, D.food);
+  const startFood                  = clampInt(levelFood, 0, 5000, D.food);
   S.settings.maxPoints             = clampInt(g('maxPointsInput'), 1, 50, D.settings.maxPoints);
   S.settings.eggsPerSearch         = clampFloat(g('eggsPerSearchInput'), 0, 20, D.settings.eggsPerSearch);
   S.settings.eggCap                = clampInt(g('eggCapInput'), 0, 500, D.settings.eggCap);
@@ -881,6 +1159,7 @@ function initGame(keepMap = false){
   S.settings.huntBaseChance        = clampFloat(g('huntBaseChanceInput'), 0, 90, D.settings.huntBaseChance*100) / 100;
   S.settings.huntRatioScale        = clampFloat(g('huntRatioScaleInput'), 0, 100, D.settings.huntRatioScale*100) / 100;
   S.settings.huntDeathRisk         = clampFloat(g('huntDeathRiskInput'), 0, 100, D.settings.huntDeathRisk*100) / 100;
+  S.settings.searchDeathRisk       = clampFloat(g('searchDeathRiskInput'), 0, 100, D.settings.searchDeathRisk*100) / 100;
   S.settings.scoutBiasPerFailedSearch = clampFloat(g('scoutBiasPerFailedSearchInput'), 0, 5, D.settings.scoutBiasPerFailedSearch);
   S.settings.fortLimit             = clampInt(g('fortLimitInput'), 1, 30, D.settings.fortLimit);
   S.settings.defaultFortDefense    = clampInt(g('defaultFortDefenseInput'), 1, 1000, D.settings.defaultFortDefense);
@@ -892,7 +1171,6 @@ function initGame(keepMap = false){
   S.settings.fortDistHigh          = clampFloat(g('fortDistHighInput'), 0, 150, D.settings.fortDistHigh);
   S.settings.fortPredatorThreshold = clampInt(g('fortPredatorThresholdInput'), 1, 500, D.settings.fortPredatorThreshold);
   S.settings.fortAttackThreshold   = clampFloat(g('fortAttackThresholdInput'), 0, 10, D.settings.fortAttackThreshold);
-  S.settings.fortConquerThreshold  = clampFloat(g('fortConquerThresholdInput'), 0, 1, D.settings.fortConquerThreshold);
   S.settings.scoutMarkChance       = clampFloat(g('scoutMarkChanceInput'), 0, 100, D.settings.scoutMarkChance*100) / 100;
   S.settings.fortMarkThreshold     = clampFloat(g('fortMarkThresholdInput'), 0, 10, D.settings.fortMarkThreshold);
   S.settings.costDistractScout     = clampInt(g('costDistractScoutInput'), 0, 50, D.settings.costDistractScout);
@@ -905,25 +1183,54 @@ function initGame(keepMap = false){
   S.settings.costIncreaseFortCapacity   = clampInt(g('costIncreaseFortCapacityInput'), 0, 50, D.settings.costIncreaseFortCapacity);
   S.settings.fortCapacityIncreaseAmount = clampInt(g('fortCapacityIncreaseAmountInput'), 0, 500, D.settings.fortCapacityIncreaseAmount);
   S.settings.queenFoodReserveCap        = clampInt(g('queenFoodReserveCapInput'), 0, 500, D.settings.queenFoodReserveCap);
+  S.settings.startQueenReserve          = clampInt(levelSettings && levelSettings.startQueenReserve, 0, S.settings.queenFoodReserveCap, S.settings.queenFoodReserveCap);
   S.settings.minPopulationThreshold = clampInt(g('minPopulationThresholdInput'), 0, 1000, D.settings.minPopulationThreshold);
   S.settings.fortReinforceCost          = clampInt(g('fortReinforceCostInput'), 0, 50, D.settings.fortReinforceCost);
   S.settings.fortReinforceDefenseBonus  = clampInt(g('fortReinforceDefenseBonusInput'), 0, 500, D.settings.fortReinforceDefenseBonus);
+  // Rival nest count - like fortLimit, configurable via an (optional)
+  // nestCountInput element; falls back to a level's own settings.nestCount,
+  // then to the default, if that input isn't present in the page.
+  S.settings.nestCount = clampInt(g('nestCountInput'), 1, 12, (levelSettings && levelSettings.nestCount) || D.settings.nestCount);
 
-  
-
-  if (keepMap && existingNest && existingForts && existingForts.length > 0) {
-    S.nest = existingNest;
+  if (keepMap && existingNests && existingNests.length > 0 && existingForts && existingForts.length > 0) {
+    S.nests = existingNests;
     S.forts = existingForts;
-  } else if (typeof CURRENT_LEVEL !== 'undefined' && CURRENT_LEVEL && CURRENT_LEVEL.nest) {
-    // Campaign level setup
+    S.locationIcon = existingLocationIcon || { x: 10, y: 10 };
+  } else if (typeof CURRENT_LEVEL !== 'undefined' && CURRENT_LEVEL && (CURRENT_LEVEL.nests || CURRENT_LEVEL.nest)) {
+    // Campaign level setup. Supports both the multi-nest `nests: [{x,y,...}]`
+    // format and the legacy single `nest: {x,y}` format (auto-wrapped into
+    // a single-entry nests array).
     currentGameMode = 'campaign';
-    S.nest = { x: CURRENT_LEVEL.nest.x, y: CURRENT_LEVEL.nest.y };
+    const levelNests = Array.isArray(CURRENT_LEVEL.nests) && CURRENT_LEVEL.nests.length > 0
+      ? CURRENT_LEVEL.nests
+      : [CURRENT_LEVEL.nest];
+    S.nests = levelNests.map((n, i) => makeNestState(n.id ?? (i + 1), n.x, n.y, S.settings));
+    const li = CURRENT_LEVEL.locationIcon || { x: 10, y: 10 };
+    S.locationIcon = { x: li.x, y: li.y };
     S.forts = CURRENT_LEVEL.forts.map(f => {
       const def = (f.defense != null) ? f.defense : S.settings.defaultFortDefense;
       const capacity = (f.capacity != null) ? f.capacity : 100;
       const population = (f.population != null) ? f.population : Math.round(50 + Math.random() * 50);
-      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population, marked: false };
+      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population, marks: {} };
     });
+
+    // Default starting food/reserve for every nest, then let per-nest
+    // population overrides win where a level specifies them explicitly.
+    S.nests.forEach((n, i) => {
+      S.activeNestIndex = i;
+      S.food = startFood;
+      S.queenReserve = S.settings.startQueenReserve;
+    });
+    // Per-nest population overrides (new format: level.nests[i].population),
+    // falling back to the legacy single-nest level.population field applied
+    // to the first nest only.
+    levelNests.forEach((n, i) => {
+      const pop = n.population || (i === 0 ? CURRENT_LEVEL.population : null);
+      if (!pop) return;
+      S.activeNestIndex = i;
+      applyPopulationOverrides(pop);
+    });
+    S.activeNestIndex = 0;
     setMapBackground(CURRENT_LEVEL.background || null);
   } else {
     // Sandbox setup
@@ -931,7 +1238,26 @@ function initGame(keepMap = false){
     CURRENT_LEVEL = null;
     setMapBackground(null);
     generateMapElements();
-    recordSandboxSnapshot(); // Save initial snapshot
+    S.nests.forEach((n, i) => {
+      S.activeNestIndex = i;
+      S.food = startFood;
+      S.queenReserve = S.settings.startQueenReserve;
+    });
+  }
+
+  if (keepMap) {
+    S.nests.forEach((n, i) => {
+      S.activeNestIndex = i;
+      S.food = startFood;
+      S.queenReserve = S.settings.startQueenReserve;
+    });
+  }
+
+  S.activeNestIndex = 0;
+  S.focusedNestIndex = 0;
+
+  if (currentGameMode === 'sandbox') {
+    recordSandboxSnapshot(); // Save initial snapshot (after nests/food are set)
   }
 
   if (currentGameMode === 'sandbox') {
@@ -950,8 +1276,8 @@ function initGame(keepMap = false){
     S.conditions = [];
   }
 
-  S.history.push({step:0, humans:S.humans, insects: totalInsects()});
-  log(t('log.nest_stirs', { insects: totalInsects(), humans: S.humans }));
+  S.history.push({step:0, humans:S.humans, insects: totalInsectsAll(), insectsByNest: insectsByNestSnapshot()});
+  log(t('log.nest_stirs', { insects: totalInsectsAll(), humans: S.humans }));
   document.getElementById('gameOverOverlay').classList.add('hidden');
   setSetupEnabled(currentGameMode === 'sandbox');
   ensureSandboxMode();
@@ -963,7 +1289,13 @@ let sandboxScriptLoading = false;
 
 function ensureSandboxMode() {
   const settingsBtnEl = document.getElementById('settingsBtn');
+  const locBtn = document.getElementById('locationBtn');
+  const sandboxControlsEl = document.getElementById('sandbox-controls');
   if (settingsBtnEl) settingsBtnEl.classList.toggle('hidden', currentGameMode !== 'sandbox');
+  if (locBtn) locBtn.classList.toggle('hidden', currentGameMode !== 'sandbox');
+  // Holds the sandbox-only add/remove nest + undo/redo buttons (built lazily
+  // by sandbox.js) - keep it out of the DOM flow entirely in campaign mode.
+  if (sandboxControlsEl) sandboxControlsEl.classList.toggle('hidden', currentGameMode !== 'sandbox');
 
   if (currentGameMode !== 'sandbox') {
     if (typeof window.sandboxSetUIVisible === 'function') window.sandboxSetUIVisible(false);
@@ -993,7 +1325,6 @@ function applyDefaultsToInputs(){
     groupSizeInput: d.settings.groupSize,
     foodPerHumanInput: d.settings.foodPerHuman,
     startHumansInput: d.humans,
-    startFoodInput: d.food,
     maxPointsInput: d.settings.maxPoints,
     eggsPerSearchInput: d.settings.eggsPerSearch,
     eggCapInput: d.settings.eggCap,
@@ -1003,6 +1334,7 @@ function applyDefaultsToInputs(){
     huntBaseChanceInput: Math.round(d.settings.huntBaseChance*100),
     huntRatioScaleInput: Math.round(d.settings.huntRatioScale*100),
     huntDeathRiskInput: Math.round(d.settings.huntDeathRisk*100),
+    searchDeathRiskInput: Math.round(d.settings.searchDeathRisk*100),
     scoutBiasPerFailedSearchInput: d.settings.scoutBiasPerFailedSearch,
     fortLimitInput: d.settings.fortLimit,
     defaultFortDefenseInput: d.settings.defaultFortDefense,
@@ -1014,7 +1346,6 @@ function applyDefaultsToInputs(){
     fortDistHighInput: d.settings.fortDistHigh,
     fortPredatorThresholdInput: d.settings.fortPredatorThreshold,
     fortAttackThresholdInput: d.settings.fortAttackThreshold,
-    fortConquerThresholdInput: d.settings.fortConquerThreshold,
     scoutMarkChanceInput: Math.round(d.settings.scoutMarkChance*100),
     fortMarkThresholdInput: d.settings.fortMarkThreshold,
     costDistractScoutInput: d.settings.costDistractScout,
@@ -1170,18 +1501,28 @@ function beginSimulation() {
   setSetupEnabled(false);
   S.phase = 'active';
 
-  const n = S.scoutsAvailable;
-  S.scoutsAvailable = 0;
-  for (let i = 0; i < n; i++) { 
-    const e = { id: nid(), type: 'search', status: 'pending', outcome: null }; 
-    assignEventCoords(e);
-    S.events.push(e); 
-  }
+  // Dispatch each alive nest's initial scouts separately (tagged with its
+  // own nestId) and give each nest a chance to open a fort assault, the
+  // same way advanceStepLogic() loops nest-by-nest for every later step.
+  let totalScouts = 0;
+  S.nests.forEach((nest, idx) => {
+    if (!nest.alive) return;
+    S.activeNestIndex = idx;
+    const n = S.scoutsAvailable;
+    S.scoutsAvailable = 0;
+    totalScouts += n;
+    for (let i = 0; i < n; i++) {
+      const e = { id: nid(), type: 'search', status: 'pending', outcome: null, nestId: nest.id };
+      assignEventCoords(e);
+      S.events.push(e);
+    }
+    maybeTriggerFort();
+  });
+  S.activeNestIndex = S.focusedNestIndex || 0;
 
-  maybeTriggerFort();
   S.step = 1;
   S.points = S.maxPoints;
-  log(t('log.step_begins', { step: S.step, scouts: n }));
+  log(t('log.step_begins', { step: S.step, scouts: totalScouts }));
   selectNextPendingEvent();
 
   const incoming = S.events.filter(
@@ -1274,10 +1615,16 @@ function stopSimulation() {
   S.phase = 'stopped';
   S.animating = false;
 
-  // Clear insect population
-  S.eggs = []; S.larva = []; S.cocoon = []; S.nymph = [];
-  S.scoutsAvailable = 0; S.scoutsCooldown = 0; S.scoutsHidden = 0;
-  S.predatorsAvailable = 0; S.predatorsCooldown = 0;
+  // Clear insect population for every nest, not just the currently active
+  // one - S.eggs/S.scoutsAvailable/... only reach the active nest via the
+  // accessor shim, so this loops S.activeNestIndex across all of them.
+  S.nests.forEach((nest, idx) => {
+    S.activeNestIndex = idx;
+    S.eggs = []; S.larva = []; S.cocoon = []; S.nymph = [];
+    S.scoutsAvailable = 0; S.scoutsCooldown = 0; S.scoutsHidden = 0;
+    S.predatorsAvailable = 0; S.predatorsCooldown = 0;
+  });
+  S.activeNestIndex = S.focusedNestIndex || 0;
 
   // Clear events, trails, and active selections
   S.events = [];
@@ -1321,9 +1668,22 @@ function advanceStep(){
 }
 
 function ratioHumansPerInsect(){
-  const insects = totalInsects();
+  // Uses the GLOBAL insect count (all nests), not just the active nest's -
+  // search/hunt success and fort-trigger scarcity depend on how many
+  // humans exist per insect across every competing nest, since insects
+  // from rival nests can reach prey too.
+  const insects = totalInsectsAll();
   if(insects<=0) return 0;
   return S.humans / insects;
+}
+
+// Number of nests still in play. Fort-trigger thresholds below were tuned
+// assuming a single nest could hoard the colony's whole predator/food
+// growth; with more rivals splitting the same humans/food over time, each
+// nest structurally ends up smaller, so those thresholds are scaled down
+// per alive nest so attacks remain reachable as nestCount grows.
+function aliveNestCount(){
+  return S.nests ? Math.max(1, S.nests.filter(n => n.alive).length) : 1;
 }
 
 function minHuntersForFeeding(){
@@ -1360,96 +1720,109 @@ function fortReadiness(targetFort){
       const scarcity = 1 - ratio; 
       
       // Starts at 1.0 and grows steeply up to 3.0 using a quadratic curve
-      humanPct = 1 + 2 * Math.pow(scarcity, 2); 
+      humanPct = 1 + 3 * Math.pow(scarcity, 2); 
     } else {
       humanPct = fortFactorPct(ratio, s.fortHumanLow, s.fortHumanHigh);
     }
   }
 
-  const predatorPct = s.fortPredatorThreshold > 0 ? (predatorsTotal() / s.fortPredatorThreshold) : 0;
+  const nestCount = aliveNestCount();
+  const effectivePredatorThreshold = s.fortPredatorThreshold / nestCount;
+  const predatorPct = effectivePredatorThreshold > 0 ? (predatorsTotal() / effectivePredatorThreshold) : 0;
   const d = targetFort ? dist(S.nest, targetFort) : 0;
   const distPct = targetFort ? fortFactorPct(d, s.fortDistLow, s.fortDistHigh) : 0;
-  const pendingHuntSlots = S.events.filter(e => e.type === 'hunt' && e.status === 'pending').length;
+  const pendingHuntSlots = S.events.filter(e => e.type === 'hunt' && e.status === 'pending' && e.nestId === S.nest.id).length;
   const idlePredators = Math.max(0, S.predatorsAvailable - pendingHuntSlots);
   const idlePct = Math.min(1, idlePredators / 30);
   
-  console.log(humanPct);
   return { foodPct, humanPct, predatorPct, distPct, idlePct, total: foodPct + humanPct + predatorPct + distPct + idlePct };
 }
 
 function maybeTriggerFort() {
-  if (S.events.some(e => e.type === 'fort' && e.status === 'pending')) return;
+  const nestId = S.nest.id;
+  if (S.events.some(e => e.type === 'fort' && e.status === 'pending' && e.nestId === nestId)) return;
   if (S.fortCooldown > 0) { S.fortCooldown -= 1; return; }
 
   const targetFort = pickTargetFort();
   if (!targetFort) return;
 
   const readiness = fortReadiness(targetFort);
-  const pool = S.predatorsAvailable + predatorsWorking();
-  if (pool <= 0) return;
+  const effectiveAttackThreshold = S.settings.fortAttackThreshold / aliveNestCount();
+  if (readiness.total < effectiveAttackThreshold) return;
 
-  // Let some predators skip a few hunt slots if humans are scarce relative to
-  // the colony size, or if food is already sufficient that a fort conquest is
-  // more valuable than a full hunt fill.
-  let idlePredators = S.predatorsAvailable;
-  const insects = totalInsects();
-  const humanToInsectRatio = insects > 0 ? S.humans / insects : 0;
-  const humanScarcity = Math.max(0, Math.min(1, 1 - Math.min(2, humanToInsectRatio) / 2));
-  const foodPressure = Math.max(0, Math.min(1, readiness.foodPct));
-  const huntFillShare = Math.max(0.1, Math.min(0.9, 0.4 + foodPressure * 0.35 - humanScarcity * 1.3));
-  const huntAllowance = Math.max(0, Math.min(idlePredators, Math.floor(idlePredators * huntFillShare)));
+  const idlePredators = S.predatorsAvailable;
+  if (idlePredators <= 0) return;
 
+  // 1. Calculate Scarcity Factors (0.0 to 1.0 scale)
+  const foodScarcity = Math.max(0, Math.min(1, readiness.foodPct));
+
+  const wildHumans = S.humans || 0;
+  const targetHumanThreshold = 10;
+  const humanScarcity = Math.max(0, Math.min(1, 1 - (wildHumans / targetHumanThreshold)));
+
+  // 2. Derive relative weights, scaled by CONQUEST_PRIORITY
+  const huntWeight = 0.1 + foodScarcity;
+  const conquestWeight = (0.1 + humanScarcity) * CONQUEST_PRIORITY;
+  const totalWeight = huntWeight + conquestWeight;
+
+  const huntShare = totalWeight > 0 ? huntWeight / totalWeight : 0.5;
+  const conquestShare = totalWeight > 0 ? conquestWeight / totalWeight : 0.5;
+
+  // 3. Allocate predator pools based on weighted shares
+  const huntPool = Math.floor(idlePredators * huntShare);
+  const conquestPool = Math.floor(idlePredators * conquestShare);
+
+  // 4. Fill pending hunt slots strictly within the allocated hunt pool
   let huntUsed = 0;
   for (const e of S.events) {
-    if (idlePredators <= 0 || huntUsed >= huntAllowance) break;
-    if (e.type !== 'hunt' || e.status !== 'pending') continue;
+    if (huntUsed >= huntPool) break;
+    if (e.type !== 'hunt' || e.status !== 'pending' || e.nestId !== nestId) continue;
+    
     const openSlots = Math.max(0, e.groupSize - e.neutralized - e.killed);
     if (openSlots <= 0) continue;
-    const fill = Math.min(openSlots, idlePredators, huntAllowance - huntUsed);
+    
+    const fill = Math.min(openSlots, huntPool - huntUsed);
     if (fill <= 0) continue;
+    
     e.groupSize += fill;
-    idlePredators -= fill;
     huntUsed += fill;
   }
 
-  const remaining = Math.max(0, idlePredators);
-  const conquestShare = Math.max(
-    0.8,
-    Math.min(1, (readiness.humanPct + (1 - readiness.distPct) + readiness.idlePct) / 2.5)
-  );
-  const attackers = Math.max(0, Math.min(remaining, Math.round(remaining * conquestShare)));
-  if (attackers <= 0) return;
+  // 5. Assign fort attackers up to the conquest pool limit
+  const remainingAfterHunts = idlePredators - huntUsed;
+  const attackers = Math.min(remainingAfterHunts, conquestPool);
 
-  S.predatorsAvailable = remaining - attackers;
+  if (attackers <= 0) {
+    S.predatorsAvailable -= huntUsed;
+    return;
+  }
 
-  targetFort.markedAttackDispatched = true;
+  S.predatorsAvailable -= (huntUsed + attackers);
+
+  fortMark(targetFort, nestId).markedAttackDispatched = true;
 
   S.events.push({ 
     id: nid(), 
     type: 'fort', 
     status: 'pending', 
     outcome: null, 
+    nestId,
     originalAttackers: attackers, 
     killed: 0, 
     targetFortId: targetFort.id 
   });
 
-  const leftoverHunting = predatorsWorking();
   const reasons = [];
-  if (readiness.foodPct >= 1) reasons.push(t('fort_trigger.food_low'));
-  if (readiness.humanPct >= 1) reasons.push(t('fort_trigger.humans_plentiful'));
-  if (readiness.distPct >= 1) reasons.push(t('fort_trigger.close_proximity'));
+  if (foodScarcity > 0.5) reasons.push(t('fort_trigger.food_low'));
+  if (humanScarcity > 0.5) reasons.push(t('fort_trigger.humans_trapped'));
   const reasonText = reasons.length ? reasons.join(' & ') : t('fort_trigger.default_reason');
-  
-  let msg = t('fort_trigger.msg', {
-    reason: reasonText.charAt(0).toUpperCase() + reasonText.slice(1),
+
+  log(t('fort_trigger.msg', {
+    reason: reasonText,
     readiness: Math.round(readiness.total * 100),
     attackers,
     id: targetFort.id
-  });
-
-  if (leftoverHunting > 0) msg += t('fort_trigger.leftover_hunt', { count: leftoverHunting });
-  log(msg);
+  }));
 }
 
 function removeProportionally(pools, totalToRemove){
@@ -1472,11 +1845,63 @@ function removeProportionally(pools, totalToRemove){
   return result;
 }
 
+// Runs one simulation step for every alive nest in turn (each drawing on the
+// same shared S.humans/S.forts pool - this is how nests "compete" for
+// humans), then does the shared end-of-step bookkeeping once.
 function advanceStepLogic(){
   if(S.gameOver) return;
   S.events = S.events.filter(e=>e.status==='pending');
   S.selectedEventId = null;
 
+  S.nests.forEach((nest, idx) => {
+    if (!nest.alive) return;
+    S.activeNestIndex = idx;
+    if (totalInsectsForNest(nest) <= 0) {
+      nest.alive = false;
+      log(t('log.rival_nest_collapsed', { id: nest.id }) !== 'log.rival_nest_collapsed'
+        ? t('log.rival_nest_collapsed', { id: nest.id })
+        : `Hniezdo ${nest.id} zaniklo.`);
+      return;
+    }
+    advanceNestStepLogic(nest);
+  });
+
+  S.activeNestIndex = S.focusedNestIndex || 0;
+
+  S.history.push({step:S.step, humans:S.humans, insects: totalInsectsAll(), insectsByNest: insectsByNestSnapshot()});
+
+  const allFortsConquered = S.forts.length === 0 || S.forts.every(f => !f.alive);
+  const allNestsGone = S.nests.every(n => !n.alive);
+
+  if (S.humans <= 0 && allFortsConquered) {
+    S.gameOver = true;
+    S.gameOverMsg = t('gameover.all_humans_dead');
+    S.lastTriggeredCondition = { outcome: 'defeat', type: 'humans_remaining_below', value: 0 };
+  } else if (allNestsGone) {
+    S.gameOver = true;
+    S.gameOverMsg = t('gameover.swarm_eliminated');
+    S.lastTriggeredCondition = { outcome: 'victory', type: 'nest_collapses', value: 0 };
+  }
+
+  if (!S.gameOver) {
+    maybeTriggerConditionGameOver();
+  }
+  if (S.gameOver) return;
+
+  S.step += 1;
+  S.points = S.maxPoints;
+  S.reinforcedForts = []; // a fort can be reinforced again once the new step begins
+
+  selectNextPendingEvent();
+}
+
+// Per-nest simulation step: search/hunt/fort-assault dispatch & resolution,
+// brood lifecycle, and starvation - all scoped to the currently active nest
+// (S.activeNestIndex, set by advanceStepLogic above) via the S.food/S.queen/
+// S.eggs/... accessor properties. S.humans and S.forts are shared across
+// every nest, which is what makes nests compete for the same humans.
+function advanceNestStepLogic(nest){
+  const nestId = nest.id;
   const oldScoutsAvailable = S.scoutsAvailable;
   const oldScoutsCooldown = S.scoutsCooldown;
   const oldPredatorsAvailable = S.predatorsAvailable;
@@ -1487,92 +1912,112 @@ function advanceStepLogic(){
   if (S.scoutsHidden > 0) {
     const revealedHidden = S.scoutsHidden;
     S.scoutsHidden = 0;
-    if (!humansAreGone) {
-      for (let i = 0; i < revealedHidden; i++) {
-        const e = { id: nid(), type: 'search', status: 'pending', outcome: null };
-        assignEventCoords(e);
-        S.events.push(e);
-      }
-      log(t('log.hidden_scouts_revealed', { count: revealedHidden }));
-    } else {
-      log('Ľudia sú 0: skauti automaticky zlyhávajú a nevyvolávajú hľadanie potravy.');
+    // Push events regardless of humansAreGone so they exist for fort marking
+    for (let i = 0; i < revealedHidden; i++) {
+      const e = { id: nid(), type: 'search', status: 'pending', outcome: null, nestId };
+      assignEventCoords(e);
+      S.events.push(e);
     }
+    log(t('log.hidden_scouts_revealed', { count: revealedHidden }));
   }
 
-// Resolve scout sent to mark a fort.
-// This scout can be killed, but cannot be distracted.
-S.events
-  .filter(e => e.type === 'search' && e.fortMarkScout && e.status === 'pending')
-  .forEach(e => {
-    const targetFort = S.forts.find(f => f.id === e.targetFortId);
+  // Resolve scout sent to mark a fort.
+  // This scout can be killed, but cannot be distracted.
+  S.events
+    .filter(e => e.type === 'search' && e.fortMarkScout && e.status === 'pending' && e.nestId === nestId)
+    .forEach(e => {
+      const targetFort = S.forts.find(f => f.id === e.targetFortId);
 
-    e.status = 'resolved';
+      e.status = 'resolved';
 
-    if (e.outcome === 'killed') {
+      // Free up this scout's slot in the fort's marking swarm/ring regardless
+      // of outcome - siblings from the same swarm may still be in flight.
       if (targetFort) {
-        targetFort.markingScoutPending = false;
+        const mark = fortMark(targetFort, nestId);
+        mark.markingScoutCount = Math.max(0, (mark.markingScoutCount || 0) - 1);
       }
 
-      // Killing the marking scout has no other effect.
-      return;
-    }
+      // Roll death risk (double the rate of standard search death risk)
+      if (!e.outcome) {
+        const markDeathRisk = Math.min(1, S.settings.searchDeathRisk * 1.2);
+        if (Math.random() < markDeathRisk) {
+          e.outcome = 'killed';
+        }
+      }
 
-    if (!targetFort || !targetFort.alive) return;
+      if (e.outcome === 'killed') {
+        // Killing the marking scout has no other effect.
+        return;
+      }
 
-    targetFort.markingScoutPending = false;
-    targetFort.marked = true;
+      if (!targetFort || !targetFort.alive) return;
 
-    // Visible during steps 2 and 3.
-    targetFort.markedUntilStep = S.step + 2;
-    targetFort.markedAttackDispatched = false;
+      const mark = fortMark(targetFort, nestId);
+      // Another scout from the same swarm may have already marked this fort -
+      // only log it the first time, but let every confirming scout refresh
+      // the visible timer.
+      if (!mark.marked) {
+        mark.marked = true;
+        log(`Hniezdo ${nestId}: skaut označil pevnosť ${targetFort.id} ako cieľ na dobytie.`);
+      }
 
-    e.outcome = 'fort_marked';
+      mark.markedUntilStep = S.step + 2;
+      mark.markedAttackDispatched = false;
 
-    log(`Skaut označil pevnosť ${targetFort.id} ako cieľ na dobytie.`);
-  });
+      e.outcome = 'fort_marked';
+    });
 
-let successfulSearches = 0, naturalFailures = 0, activeSearchers = 0;
+    let successfulSearches = 0, naturalFailures = 0, activeSearchers = 0;
 
-S.events
-  .filter(e =>
-    e.type === 'search' &&
-    !e.fortMarkScout &&
-    e.status === 'pending'
-  )
-  .forEach(e=>{
-    e.status = 'resolved';
-    if (humansAreGone) {
-      e.outcome = 'failed';
-      naturalFailures++;
-      return;
-    }
-    const searchChance = searchChanceWithDistance(e);
-    if (!e.outcome) { 
+    S.events
+      .filter(e =>
+        e.type === 'search' &&
+        !e.fortMarkScout &&
+        e.status === 'pending' &&
+        e.nestId === nestId
+      )
+      .forEach(e => {
+        e.status = 'resolved';
+        
+        // Count every scout as an active searcher for fort marking first
         activeSearchers++;
-        if(0.5 < searchChance){ e.outcome='succeeded'; successfulSearches++; }
-        else { e.outcome='failed'; naturalFailures++; }
-    } else if (e.outcome === 'distracted' || e.outcome === 'killed') {
-        naturalFailures++;
-    }
-  });
+
+        if (humansAreGone) {
+          e.outcome = 'failed';
+          naturalFailures++;
+          return; // Skip food search success, but keep activeSearchers count
+        }
+
+        const searchChance = searchChanceWithDistance(e);
+        if (!e.outcome) { 
+          if (0.5 < searchChance) { e.outcome = 'succeeded'; successfulSearches++; }
+          else { e.outcome = 'failed'; naturalFailures++; }
+        } else if (e.outcome === 'distracted' || e.outcome === 'killed') {
+          naturalFailures++;
+        }
+      });
 
   // There can be at most as many successful searches as humans currently alive;
   // this makes the zero-human edge case redundant while still guarding it.
   successfulSearches = Math.max(0, Math.min(successfulSearches, S.humans));
 
   const bonusEggs = Math.round(successfulSearches * S.settings.eggsPerSearch);
-  let scoutSurvivorsThisTick = S.events.filter(e=>e.type==='search' && e.outcome!=='killed').length;
+
+  const killedScouts = Math.round(Math.max(0, naturalFailures * S.settings.searchDeathRisk));
+  if(killedScouts>0) log(t('log.scouts_died_search', { count: killedScouts }));
+
+  let scoutSurvivorsThisTick = S.events.filter(e=>e.type==='search' && e.outcome!=='killed' && e.nestId===nestId).length;
   if(successfulSearches>0) log(t('log.searches_succeeded', { count: successfulSearches, eggs: bonusEggs }));
   if(naturalFailures>0) log(t('log.searches_failed', { count: naturalFailures }));
 
   const newlyMarkedForts = maybeMarkFortsFromSearch(activeSearchers);
   newlyMarkedForts.forEach(f => {
-    log(`Skaut označil pevnosť ${f.id} ako cieľ na dobytie.`);
+    log(`Hniezdo ${nestId}: skaut označil pevnosť ${f.id} ako cieľ na dobytie.`);
   });
 
   /* ---- 2. resolve hunts ---- */
   let totalHunted = 0, totalHuntDeaths = 0, predatorSurvivorsThisTick = 0;
-  const pendingHunts = S.events.filter(e=>e.type==='hunt' && e.status==='pending');
+  const pendingHunts = S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nestId);
   pendingHunts.forEach(e=>{
     const huntChance = huntChanceWithDistance(e);
     const activeHunters = e.groupSize - e.neutralized - e.killed;
@@ -1584,8 +2029,12 @@ S.events
         if(0.5 < huntChance) caught++;
       }
       totalHunted += caught;
+      // Nests compete for the same humans: hunting close to a rival, alive
+      // nest raises this batch of predators' death risk on top of the base
+      // huntDeathRisk setting.
+      const deathRisk = Math.min(0.95, S.settings.huntDeathRisk + enemyProximityDeathRisk(e, nestId));
       let huntDeaths = 0;
-      for(let i=0;i<activeHunters;i++){ if(huntChance<S.settings.huntDeathRisk) huntDeaths++; }
+      for(let i=0;i<activeHunters;i++){ if(huntChance<deathRisk) huntDeaths++; }
       if(huntDeaths>0){ totalHuntDeaths += huntDeaths; eventSurvivors = Math.max(0, activeHunters-huntDeaths); }
     }
     predatorSurvivorsThisTick += eventSurvivors + e.neutralized;
@@ -1604,7 +2053,7 @@ S.events
   if(totalHuntDeaths>0) log(t('log.predators_died_hunt', { count: totalHuntDeaths }));
 
   /* ---- 3. resolve fort assault ---- */
-  S.events.filter(e => e.type === 'fort' && e.status === 'pending').forEach(e => {
+  S.events.filter(e => e.type === 'fort' && e.status === 'pending' && e.nestId === nestId).forEach(e => {
     e.status = 'resolved';
     const remaining = Math.max(0, e.originalAttackers - e.killed);
     const targetFort = S.forts.find(f => f.id === e.targetFortId);
@@ -1632,7 +2081,7 @@ S.events
       if (targetFort.defense <= 0) {
         e.outcome = 'conquered';
         targetFort.alive = false;
-        targetFort.marked = false;
+        targetFort.marks = {}; // clear every nest's marking state on this fort
         const releasedHumans = targetFort.population || 0;
         S.humans += releasedHumans;
         targetFort.population = 0;
@@ -1661,9 +2110,9 @@ S.events
   });
 
   /* ---- 4. lifecycle ---- */
-  const scoutsAliveBefore = oldScoutsAvailable + oldScoutsCooldown + scoutSurvivorsThisTick;
+  const scoutsAliveBefore = oldScoutsAvailable + oldScoutsCooldown + scoutSurvivorsThisTick - killedScouts;
   const predatorsAliveBefore = oldPredatorsAvailable + oldPredatorsCooldown + predatorSurvivorsThisTick;
-  const lc = processLifecycle(bonusEggs, { scoutsAlive: scoutsAliveBefore, predatorsAlive: predatorsAliveBefore }, naturalFailures);
+  const lc = processLifecycle(bonusEggs, { scoutsAlive: scoutsAliveBefore, predatorsAlive: predatorsAliveBefore }, naturalFailures, successfulSearches);
 
   /* ---- 5. starvation deaths ---- */
   const scoutPools = { available: oldScoutsAvailable, cooldown: oldScoutsCooldown, survivors: scoutSurvivorsThisTick, newlyMatured: lc.newlyMaturedScouts };
@@ -1687,30 +2136,16 @@ S.events
   S.predatorsCooldown = predatorsAfter.survivors;
   S.predatorsAvailable = predatorsAfter.available + predatorsAfter.cooldown + predatorsAfter.newlyMatured;
 
-  S.history.push({step:S.step, humans:S.humans, insects: totalInsects()});
-  
-  const allFortsConquered = S.forts.length === 0 || S.forts.every(f => !f.alive);
-  
-  if (S.humans <= 0 && allFortsConquered) {
-    S.gameOver = true;
-    S.gameOverMsg = t('gameover.all_humans_dead');
-    S.lastTriggeredCondition = { outcome: 'defeat', type: 'humans_remaining_below', value: 0 };
-  } else if (totalInsects() <= 0) {
-    S.gameOver = true;
-    S.gameOverMsg = t('gameover.swarm_eliminated');
-    S.lastTriggeredCondition = { outcome: 'victory', type: 'nest_collapses', value: 0 };
+  if (totalInsectsForNest(nest) <= 0) {
+    nest.alive = false;
+    return;
   }
-
-  if (!S.gameOver) {
-    maybeTriggerConditionGameOver();
-  }
-  if(S.gameOver){ return; }
 
   /* ---- 7. dispatch NEXT step ---- */
   const scoutsToDispatch = humansAreGone ? 0 : S.scoutsAvailable;
   S.scoutsAvailable = 0;
   for(let i=0;i<scoutsToDispatch;i++){ 
-    const e = { id:nid(), type:'search', status:'pending', outcome:null }; 
+    const e = { id:nid(), type:'search', status:'pending', outcome:null, nestId }; 
     assignEventCoords(e);
     S.events.push(e); 
   }
@@ -1720,8 +2155,8 @@ S.events
   const dispatched = numGroups*groupSize;
   S.predatorsAvailable -= dispatched;
   for(let i=0;i<numGroups;i++){ 
-    const e = { id:nid(), type:'hunt', status:'pending', outcome:null, groupSize, neutralized:0, killed:0 }; 
-    const avail = S.trails.find(t => !t.claimedByHuntId && t.fadingOutSince == null && t.stepsLeft > 0);
+    const e = { id:nid(), type:'hunt', status:'pending', outcome:null, groupSize, neutralized:0, killed:0, nestId }; 
+    const avail = S.trails.find(t => !t.claimedByHuntId && t.stepsLeft > 0 && t.nestId === nestId);
     if (avail) {
       avail.claimedByHuntId = e.id;
       e._trailId = avail.id;
@@ -1734,30 +2169,23 @@ S.events
   }
   if(numGroups>0) log(t('log.hunts_dispatched', { count: numGroups }));
 
-
-  S.step += 1;
-
   S.forts.forEach(f => {
+    const mark = fortMark(f, nestId);
     if (
-      f.marked &&
-      f.markedUntilStep != null &&
-      S.step >= f.markedUntilStep
+      mark.marked &&
+      mark.markedUntilStep != null &&
+      S.step + 1 >= mark.markedUntilStep
     ) {
-      f.marked = false;
-      f.markedUntilStep = null;
-      f.markedAttackDispatched = false;
-      f.markingScoutPending = false;
+      mark.marked = false;
+      mark.markedUntilStep = null;
+      mark.markedAttackDispatched = false;
+      mark.markingScoutCount = 0;
     }
   });
-
-  S.points = S.maxPoints;
-  S.reinforcedForts = []; // a fort can be reinforced again once the new step begins
-
-  selectNextPendingEvent();
 }
 
 
-function processLifecycle(bonusEggs, pop, naturalFailures){
+function processLifecycle(bonusEggs, pop, naturalFailures, successfulSearches = 0){
   let scoutsAlive = pop.scoutsAlive;
   let predatorsAlive = pop.predatorsAlive;
   let newlyMaturedScouts = 0;
@@ -1848,16 +2276,32 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
       if(c.recovery){
 
+        // Same ratio cap as the normal-cohort path below - previously this
+        // branch created scouts with no ceiling at all, which is exactly
+        // why scouts could climb above predators: recovery cohorts fire
+        // during S.bounceback, i.e. right when predatorsAlive is at its
+        // lowest, so an uncapped recovery scout batch is the most likely
+        // way to breach the intended ratio.
+        const maxScoutsAllowedRecovery = predatorsAlive < 15 ? Math.round(predatorsAlive / 4) : Math.round(predatorsAlive / 5);
+
         const recoveryScoutsNeeded =
           Math.max(
             1,
             Math.ceil(c.count / S.settings.groupSize)
           );
 
+        const roomUnderCap = Math.max(0, maxScoutsAllowedRecovery - scoutsAlive);
+
+        // Viability floor: if this nest currently has zero scouts, allow at
+        // least 1 through even over the cap, so predators maturing out of
+        // recovery aren't left with no scout to lead a hunting group.
+        const viabilityFloor = scoutsAlive === 0 ? 1 : 0;
+
         const recoveryScoutsToCreate =
           Math.min(
             recoveryScoutsNeeded,
-            c.count
+            c.count,
+            Math.max(roomUnderCap, viabilityFloor)
           );
 
         const recoveryPredatorsToCreate =
@@ -1907,7 +2351,10 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
                 scoutBias
               );
 
-          if(scoutsAlive < desiredScouts){
+          // Hard cap scout creation at 2 scouts per 3 predators (2/3 ratio)
+          const maxScoutsAllowed = predatorsAlive < 15 ? Math.round(predatorsAlive / 4) : Math.round(predatorsAlive / 5);
+
+          if(scoutsAlive < desiredScouts && scoutsAlive < maxScoutsAllowed){
 
             scoutsAlive += 1;
             newlyMaturedScouts += 1;
@@ -2031,10 +2478,24 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
 
   // ---------------------------------------------------------------------------
-  // FEEDER COUNTS
+  // FEEDER COUNTS & CRITICAL RESERVE DUMP
   // ---------------------------------------------------------------------------
 
   const nymphCount = sumCohort(S.nymph);
+
+  const totalInsectsSum =
+    sumCohort(S.eggs) +
+    sumCohort(S.larva) +
+    sumCohort(S.cocoon) +
+    nymphCount +
+    scoutsAlive +
+    predatorsAlive;
+
+  if (totalInsectsSum < 5 && S.queenReserve > 0) {
+    S.food += S.queenReserve;
+    log(t('log.queen_dumped_reserve') || `Kráľovná presunula rezervu (${S.queenReserve}) do hlavných zásob potravy.`);
+    S.queenReserve = 0;
+  }
 
   const feederGroups = [
     {
@@ -2077,34 +2538,28 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
 
   // ---------------------------------------------------------------------------
-  // BOUNCEBACK START
+  // BOUNCEBACK START (STEP 1 BATCH)
   // ---------------------------------------------------------------------------
 
   let queenLaidBounceback = false;
+
+  const FOOD_PER_RECOVERY_INSECT = 6;
+  const totalBouncebackEggs = Math.floor(S.queenReserve / FOOD_PER_RECOVERY_INSECT);
 
   if(
     S.queen.alive &&
     (!S.bounceback || (!S.bounceback.active && !S.bounceback.controlledRecovery)) &&
     isLowPopulation &&
     bouncebackTriggerAllowed &&
-    (S.food + S.queenReserve) > 0 &&
-    S.settings.eggCap > 0
+    totalBouncebackEggs > 0
   ){
 
-    const totalAvailableFood =
-      S.food + S.queenReserve;
-
-    const emergencyReserve =
-      Math.min(10, totalAvailableFood);
-
-    S.queenReserve = emergencyReserve;
-
-    S.food =
-      totalAvailableFood - emergencyReserve;
+    const batch1 = Math.ceil(totalBouncebackEggs / 2);
+    const batch2 = totalBouncebackEggs - batch1;
 
     S.eggs.push({
       age: 0,
-      count: S.settings.eggCap,
+      count: batch1,
       recovery: true
     });
 
@@ -2114,14 +2569,41 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
       recoveryPredatorsMatured:
         recoveryPredatorsMaturedThisStep > 0,
       controlledRecovery: false,
-      recoveryTick: 0
+      recoveryTick: 0,
+      stepsElapsed: 0,
+      reserveDumped: false,
+      pendingBatch2: batch2
     };
 
     queenLaidBounceback = true;
 
     log(t('log.bounceback_started', {
-      count: S.settings.eggCap
+      count: batch1
     }));
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // BOUNCEBACK STEP 2 BATCH
+  // ---------------------------------------------------------------------------
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    S.bounceback.pendingBatch2 > 0 &&
+    !queenLaidBounceback
+  ){
+    S.eggs.push({
+      age: 0,
+      count: S.bounceback.pendingBatch2,
+      recovery: true
+    });
+
+    log(t('log.bounceback_started', {
+      count: S.bounceback.pendingBatch2
+    }));
+
+    S.bounceback.pendingBatch2 = 0;
   }
 
 
@@ -2140,12 +2622,6 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
   // ---------------------------------------------------------------------------
   // BOUNCEBACK CONTROLLED-RECOVERY LAYING UNLOCK
-  //
-  // Laying switches to the "1 food every other step" controlled pattern
-  // starting the step immediately after the bounceback batch itself -
-  // it does NOT wait for the recovery cohort to mature. `active` (and the
-  // reserve-funded feeding/scout protections tied to it) stays on until
-  // the cohort actually matures, handled separately below.
   // ---------------------------------------------------------------------------
 
   if(
@@ -2285,6 +2761,83 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
 
   // ---------------------------------------------------------------------------
+  // RECOVERY STEP COUNTER
+  // ---------------------------------------------------------------------------
+
+  const RESERVE_DUMP_DELAY_STEPS = 3;
+
+  if(
+    S.bounceback &&
+    S.bounceback.active &&
+    !queenLaidBounceback
+  ){
+    S.bounceback.stepsElapsed =
+      (S.bounceback.stepsElapsed || 0) + 1;
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // RECOVERY LARVA FEEDING / RESERVE DUMP
+  // ---------------------------------------------------------------------------
+
+  const reserveWindowOpen =
+    S.bounceback &&
+    S.bounceback.active &&
+    !S.bounceback.reserveDumped;
+
+  const recoveryLarvaCount =
+    S.larva.reduce(
+      (a, c) => a + (c.recovery ? c.count : 0),
+      0
+    );
+
+  let unfedRecoveryLarvae = 0;
+
+  if(recoveryLarvaCount > 0 && reserveWindowOpen){
+
+    let recoveryLarvaCost =
+      recoveryLarvaCount;
+
+    const paidFromFood =
+      Math.min(S.food, recoveryLarvaCost);
+
+    S.food -= paidFromFood;
+    recoveryLarvaCost -= paidFromFood;
+
+    const paidFromReserve =
+      Math.min(S.queenReserve, recoveryLarvaCost);
+
+    S.queenReserve -= paidFromReserve;
+    recoveryLarvaCost -= paidFromReserve;
+
+    if(recoveryLarvaCost > 0){
+
+      unfedRecoveryLarvae = recoveryLarvaCost;
+
+      removeFromRecoveryLarvaCohorts(unfedRecoveryLarvae);
+    }
+  }
+
+  let queenReserveDumped = 0;
+
+  if(
+    reserveWindowOpen &&
+    S.bounceback.stepsElapsed >= RESERVE_DUMP_DELAY_STEPS
+  ){
+
+    S.bounceback.reserveDumped = true;
+
+    if(S.queenReserve > 0){
+
+      queenReserveDumped = S.queenReserve;
+
+      S.food += S.queenReserve;
+      S.queenReserve = 0;
+    }
+  }
+
+
+  // ---------------------------------------------------------------------------
   // BOUNCEBACK COMPLETION
   // ---------------------------------------------------------------------------
 
@@ -2316,6 +2869,31 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
       log(t('log.bounceback_wave'));
     }
+  }
+
+
+  // ---------------------------------------------------------------------------
+  // QUEEN RESERVE REFILL
+  // ---------------------------------------------------------------------------
+
+  const QUEEN_RESERVE_REFILL_PER_STEP = 50;
+
+  if(
+    S.queen.alive &&
+    (!S.bounceback || !S.bounceback.active) &&
+    !isLowPopulation &&
+    S.queenReserve < queenReserveCap &&
+    S.food > 0
+  ){
+
+    const refillAmount = Math.min(
+      QUEEN_RESERVE_REFILL_PER_STEP,
+      S.food,
+      queenReserveCap - S.queenReserve
+    );
+
+    S.food -= refillAmount;
+    S.queenReserve += refillAmount;
   }
 
 
@@ -2381,21 +2959,14 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
     } else if(
       isLowPopulation &&
-      (S.food >= 1 || S.queenReserve >= 1)
+      S.food >= 1
     ){
 
-      if(S.food >= 1){
-
-        S.food -= 1;
-
-      } else {
-
-        S.queenReserve -= 1;
-      }
+      S.food -= 1;
 
       const countToLay = Math.min(
         S.settings.eggCap,
-        S.settings.eggsPerFood + bonusEggs
+        S.settings.eggsPerFood + bonusEggs 
       );
 
       if(countToLay > 0){
@@ -2430,19 +3001,22 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
           (foodRatio - 1) / 3
         );
       }
-
+      let minimalEggs = 0;
+      if (insectCount < 5) {
+        minimalEggs = 2;
+      }
+      const FreeNestCapacity = Math.max(0.1, Math.min(1, 1-(predatorsAlive + scoutsAlive) / 50));
       const desiredEggs =
-        baseEggs + bonusEggs;
+        Math.max(0,baseEggs) + bonusEggs + minimalEggs;
 
       const cappedEggs =
         Math.min(
           S.settings.eggCap,
-          desiredEggs
+          Math.round(desiredEggs * FreeNestCapacity)
         );
-
       eggsWereCapped =
         cappedEggs < desiredEggs;
-
+    
       const foodRemaining =
         S.food;
 
@@ -2577,6 +3151,82 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
         unfed
       );
 
+
+    // -------------------------------------------------------------------------
+    // QUEEN RESERVE BAILOUT (future-food protection)
+    // -------------------------------------------------------------------------
+    // distributeDeaths() above doesn't distinguish insects that are truly
+    // doomed from ones with a concrete shot at bringing food home very soon.
+    // If the queen still holds reserve food, she'll spend it to pull two
+    // groups out of the death toll:
+    //   - up to 1 scout per successful search THIS step - it just found
+    //     food; starving it the instant before delivery makes no sense.
+    //   - a full hunting group's worth of predators, but only if the nest
+    //     currently has at least groupSize predators alive (cooldown +
+    //     available) to form one - a partial group has no hunt to look
+    //     forward to, so it isn't protected.
+    // This only pulls FROM the death counts already assigned above, so it
+    // never protects more insects than distributeDeaths actually condemned.
+    let queenBailoutScouts = 0;
+    let queenBailoutPredators = 0;
+
+    // Queen's survival is an absolute priority over this bailout: her own
+    // feeding step above already runs first and is never touched here, but
+    // that only guarantees THIS step - if the bailout drained the reserve
+    // to 0, she could still starve next step should S.food happen to be
+    // empty then too. Reserve 1 unit (exactly what her own feeding costs
+    // per step) as an untouchable floor before the bailout may spend
+    // anything, so she's always covered one step ahead regardless.
+    const queenReserveFloor = S.queen.alive ? 1 : 0;
+    const availableForBailout = Math.max(0, S.queenReserve - queenReserveFloor);
+
+    if(availableForBailout > 0){
+
+      const groupSize = S.settings.groupSize;
+
+      queenBailoutScouts =
+        Math.min(
+          deaths.scouts,
+          successfulSearches,
+          availableForBailout
+        );
+
+      if(queenBailoutScouts > 0){
+        deaths.scouts -= queenBailoutScouts;
+        S.queenReserve -= queenBailoutScouts;
+      }
+
+      const stillAvailableForBailout = availableForBailout - queenBailoutScouts;
+
+      if(predatorsAlive >= groupSize && stillAvailableForBailout > 0){
+
+        queenBailoutPredators =
+          Math.min(
+            deaths.predators,
+            groupSize,
+            stillAvailableForBailout
+          );
+
+        if(queenBailoutPredators > 0){
+          deaths.predators -= queenBailoutPredators;
+          S.queenReserve -= queenBailoutPredators;
+        }
+      }
+
+      if(queenBailoutScouts > 0 || queenBailoutPredators > 0){
+        const bailoutMsg = t('log.queen_reserve_bailout', {
+          scouts: queenBailoutScouts,
+          predators: queenBailoutPredators
+        });
+        log(
+          bailoutMsg !== 'log.queen_reserve_bailout'
+            ? bailoutMsg
+            : `Kráľovná zachránila z rezervy ${queenBailoutScouts} skautov a ${queenBailoutPredators} predátorov pred hladom.`
+        );
+      }
+    }
+
+
     scoutsAlive -= deaths.scouts;
     predatorsAlive -= deaths.predators;
 
@@ -2668,47 +3318,6 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
 
   // ---------------------------------------------------------------------------
-  // QUEEN RESERVE REFILL
-  //
-  // IMPORTANT:
-  // The reserve is replenished ONLY when the population is ABOVE
-  // minPopulationThreshold.
-  //
-  // At or below the threshold, ALL surplus food remains in normal storage.
-  // This prevents the queen from rebuilding her reserve while the colony is
-  // still in a vulnerable state.
-  //
-  // Bounceback also keeps the reserve locked while active.
-  // ---------------------------------------------------------------------------
-
-  let queenReserveTopUp = 0;
-
-  const populationRecovered =
-    totalInsects() >
-    S.settings.minPopulationThreshold;
-
-  if(
-    S.queen.alive &&
-    populationRecovered &&
-    (!S.bounceback || !S.bounceback.active) &&
-    S.food > 0 &&
-    S.queenReserve < queenReserveCap
-  ){
-
-    queenReserveTopUp = Math.min(
-      S.food,
-      queenReserveCap - S.queenReserve
-    );
-
-    if(queenReserveTopUp > 0){
-
-      S.queenReserve += queenReserveTopUp;
-      S.food -= queenReserveTopUp;
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
   // RETURN
   // ---------------------------------------------------------------------------
 
@@ -2724,7 +3333,7 @@ function processLifecycle(bonusEggs, pop, naturalFailures){
 
 function eatFromCohorts(n){
   let remaining = n;
-  [S.eggs, S.larva, S.cocoon].forEach(arr=>{
+  [S.eggs].forEach(arr=>{
     for(let i=0;i<arr.length && remaining>0;i++){
       const take = Math.min(arr[i].count, remaining);
       arr[i].count -= take;
@@ -2743,6 +3352,17 @@ function removeFromNymphCohorts(n){
     remaining -= take;
   }
   for(let i=S.nymph.length-1;i>=0;i--){ if(S.nymph[i].count<=0) S.nymph.splice(i,1); }
+}
+
+function removeFromRecoveryLarvaCohorts(n){
+  let remaining = n;
+  for(let i=0;i<S.larva.length && remaining>0;i++){
+    if(!S.larva[i].recovery) continue;
+    const take = Math.min(S.larva[i].count, remaining);
+    S.larva[i].count -= take;
+    remaining -= take;
+  }
+  for(let i=S.larva.length-1;i>=0;i--){ if(S.larva[i].count<=0) S.larva.splice(i,1); }
 }
 
 function distributeDeaths(groups, unfed){
@@ -2822,6 +3442,108 @@ function killPredatorAction(eid){
   if(e.neutralized+e.killed >= e.groupSize){
     selectNextPendingEvent();
   }
+  render();
+}
+
+// Opens the nest analytics overlay for a nest the player clicked on the map.
+// Unlike the free selector buttons inside the overlay itself (which just
+// switch which already-open nest you're looking at), reaching the overlay
+// FROM the map costs an action point - it represents actually scouting the
+// rival nest, not idle bookkeeping.
+function openNestAnalyticsAction(idx){
+  if (S.gameOver) return;
+  const cost = S.settings.costNestAnalytics;
+  if (S.points < cost) return;
+  S.points -= cost;
+  openNestAnalyticsFor(idx);
+  render();
+}
+
+// Figures out what the next "Attack Nest" click will actually hit and what
+// it costs, following the priority order: predators (on cooldown, i.e.
+// physically resting at the nest rather than out on a hunt) first, then
+// nymphs (always at the nest - brood doesn't leave), then scouts (on
+// cooldown), and only once every insect is gone does the queen herself
+// become a target. Returns null once there's nothing left to attack.
+function nestAttackTargetInfo(nest){
+  if (!nest) return null;
+  if (nest.predatorsCooldown > 0) return { type: 'predator', cost: S.settings.costAttackNestPredator };
+  if (sumCohort(nest.nymph) > 0) return { type: 'nymph', cost: S.settings.costKillNymph };
+  if (nest.scoutsCooldown > 0) return { type: 'scout', cost: S.settings.costAttackNestScout };
+  if (nest.queen && nest.queen.alive) return { type: 'queen', cost: S.settings.costAttackQueen };
+  return null;
+}
+
+// Slovak accusative labels for the "Attack Nest" button tooltip, keyed by
+// nestAttackTargetInfo()'s target.type - "Zabiť <label>". Looked up via
+// t('actions.target_<type>') so it's actually localized; the object below
+// is only a fallback for while translations haven't loaded yet.
+const NEST_ATTACK_TARGET_FALLBACK_LABELS = {
+  predator: 'Predátorku',
+  nymph: 'Nymfu',
+  scout: 'Skautku',
+  queen: 'Kráľovnú'
+};
+function nestAttackTargetLabel(type){
+  const key = 'actions.target_' + type;
+  const label = t(key);
+  return label !== key ? label : (NEST_ATTACK_TARGET_FALLBACK_LABELS[type] || type);
+}
+
+// Strikes a single insect (or, as a last resort, the queen) directly at the
+// nest, following the priority in nestAttackTargetInfo(). One click = one
+// kill, same "pay AP, remove one target" pattern as killScout/
+// killPredatorAction, just aimed at the nest's resting population instead
+// of a pending field event.
+function attackNest(nestId){
+  if (S.gameOver) return;
+  const nest = S.nests.find(n => n.id === nestId);
+  if (!nest || !nest.alive) return;
+
+  const target = nestAttackTargetInfo(nest);
+  if (!target || S.points < target.cost) return;
+
+  S.points -= target.cost;
+
+  // Route through the S.food/S.queen/S.nymph/... accessor shim so the
+  // existing cohort helpers (removeFromNymphCohorts) act on THIS nest,
+  // regardless of which nest is currently "active" for the simulation.
+  const prevActiveIndex = S.activeNestIndex;
+  S.activeNestIndex = S.nests.indexOf(nest);
+
+  if (target.type === 'predator') {
+    nest.predatorsCooldown -= 1;
+    log(t('log.nest_predator_killed', { id: nest.id }) !== 'log.nest_predator_killed'
+      ? t('log.nest_predator_killed', { id: nest.id })
+      : `Predátor v hniezde ${nest.id} bol zabitý útokom na hniezdo.`);
+  } else if (target.type === 'nymph') {
+    removeFromNymphCohorts(1);
+    log(t('log.nest_nymph_killed', { id: nest.id }) !== 'log.nest_nymph_killed'
+      ? t('log.nest_nymph_killed', { id: nest.id })
+      : `Nymfa v hniezde ${nest.id} bola zabitá útokom na hniezdo.`);
+  } else if (target.type === 'scout') {
+    nest.scoutsCooldown -= 1;
+    log(t('log.nest_scout_killed', { id: nest.id }) !== 'log.nest_scout_killed'
+      ? t('log.nest_scout_killed', { id: nest.id })
+      : `Skaut v hniezde ${nest.id} bol zabitý útokom na hniezdo.`);
+  } else if (target.type === 'queen') {
+    nest.queen.alive = false;
+    log(t('log.nest_queen_killed', { id: nest.id }) !== 'log.nest_queen_killed'
+      ? t('log.nest_queen_killed', { id: nest.id })
+      : `Kráľovná hniezda ${nest.id} bola zabitá útokom na hniezdo!`);
+  }
+
+  // Mirrors the collapse check advanceStepLogic() runs at the start of every
+  // step, but applied immediately so a killing blow doesn't leave a visibly
+  // dead nest lingering on the map until the next step.
+  if (totalInsectsForNest(nest) <= 0) {
+    nest.alive = false;
+    log(t('log.rival_nest_collapsed', { id: nest.id }) !== 'log.rival_nest_collapsed'
+      ? t('log.rival_nest_collapsed', { id: nest.id })
+      : `Hniezdo ${nest.id} zaniklo.`);
+  }
+
+  S.activeNestIndex = prevActiveIndex;
   render();
 }
 
@@ -3022,7 +3744,7 @@ function render(){
   const killedEl = document.getElementById('humansKilledVal');
   if(killedEl) killedEl.textContent = S.humansKilled;
 
-  document.getElementById('insectsVal').textContent = totalInsects();
+  document.getElementById('insectsVal').textContent = totalInsectsAll();
   document.getElementById('pointsVal').textContent = S.points;
   document.getElementById('maxPointsVal').textContent = S.maxPoints;
 
@@ -3036,7 +3758,6 @@ function render(){
   renderPhaseBanner();
   renderGlobalActions();
   renderQueue();
-  renderStats();
   renderMap();
   renderLog();
   renderChart();
@@ -3297,74 +4018,6 @@ function outcomeLabel(e){
   return e.outcome || '—';
 }
 
-function renderStats(){
-  const row = document.getElementById('stageRow');
-  if(!row) return;
-  row.innerHTML = '';
-
-  const groups = [
-    {
-      title: t('stats.core'),
-      items: [
-        { label: t('stats.food_storage'), count: S.food, cls: 'food' },
-        { label: t('stats.queenReserve'), count: S.queenReserve, cls: 'food' },
-        { label: t('stats.queen'), count: S.queen.alive ? t('stats.active') : t('stats.dead'), cls: S.queen.alive ? 'good' : 'bad' }
-      ]
-    },
-    {
-      title: t('stats.scouts'),
-      items: [
-        { label: t('stats.total'), count: scoutsTotal(), cls: 'main' },
-        { label: t('stats.available'), count: S.scoutsAvailable },
-        { label: t('stats.working'), count: scoutsWorking() },
-        { label: t('stats.cooldown'), count: S.scoutsCooldown },
-        { label: t('stats.hidden'), count: S.scoutsHidden }
-      ]
-    },
-    {
-      title: t('stats.predators'),
-      items: [
-        { label: t('stats.total'), count: predatorsTotal(), cls: 'main' },
-        { label: t('stats.available'), count: S.predatorsAvailable },
-        { label: t('stats.working'), count: predatorsWorking() },
-        { label: t('stats.cooldown'), count: S.predatorsCooldown },
-        { label: t('stats.fort_duty'), count: predatorsFortDuty() }
-      ]
-    },
-    {
-      title: t('stats.immatures'),
-      items: [
-        { label: t('stats.eggs'), count: sumCohort(S.eggs) },
-        { label: t('stats.larvae'), count: sumCohort(S.larva) },
-        { label: t('stats.cocoons'), count: sumCohort(S.cocoon) },
-        { label: t('stats.nymphs'), count: sumCohort(S.nymph) }
-      ]
-    }
-  ];
-
-  groups.forEach(g => {
-    const groupEl = document.createElement('div');
-    groupEl.className = 'stat-group-row';
-
-    const titleEl = document.createElement('span');
-    titleEl.className = 'group-title';
-    titleEl.textContent = g.title + ':';
-    groupEl.appendChild(titleEl);
-
-    const chipsWrap = document.createElement('div');
-    chipsWrap.className = 'chips-wrap';
-
-    g.items.forEach(item => {
-      const chip = document.createElement('div');
-      chip.className = 'stage-chip ' + (item.cls || '');
-      chip.innerHTML = `<span class="chip-label">${item.label}</span> <span class="chip-val">${item.count}</span>`;
-      chipsWrap.appendChild(chip);
-    });
-
-    groupEl.appendChild(chipsWrap);
-    row.appendChild(groupEl);
-  });
-}
 
 /* ============================= STEP TRANSITION ANIMATION ============================= */
 function curveWaypoints(from, to, count, deviation){
@@ -3428,12 +4081,52 @@ function pointAtDistance(pts, d){
 }
 
 const TRAIL_DRAW_MS = 1200;
-const TRAIL_FADE_MS = 1400;
+const TRAIL_FORT_AVOID_RADIUS = 16; // world-space units a trail keeps clear of any alive fort's centre
+const TRAIL_STROKE_WIDTH = 6; // width of a pheromone trail line
+const TRAIL_BLUR_STD_DEVIATION = 0.9; // softness of the trail's blurred edge
 
-function buildTrailLayer(){
-  if (!S.trails || !S.trails.length) return null;
+// Clamps every interior point of a (dense) path onto a circle of
+// TRAIL_FORT_AVOID_RADIUS around any alive fort it comes too close to, so
+// pheromone trails curve around forts instead of cutting through them.
+// Endpoints (the scout's spot and the nest) are left untouched.
+function bendPathAroundForts(points, avoidRadius){
+  if (!S.forts || !S.forts.length || points.length < 3) return points;
+  const forts = S.forts.filter(f => f.alive);
+  if (!forts.length) return points;
 
-  const now = performance.now();
+  return points.map((p, idx) => {
+    if (idx === 0 || idx === points.length - 1) return p;
+
+    let x = p.x, y = p.y;
+
+    forts.forEach(f => {
+      const dxWorld = (x - f.x) * WORLD_ASPECT_RATIO;
+      const dyWorld = y - f.y;
+      const d = Math.hypot(dxWorld, dyWorld) || 0.0001;
+      if (d < avoidRadius) {
+        const ux = dxWorld / d, uy = dyWorld / d;
+        x = f.x + (ux * avoidRadius) / WORLD_ASPECT_RATIO;
+        y = f.y + uy * avoidRadius;
+      }
+    });
+
+    return {
+      x: Math.max(3, Math.min(97, x)),
+      y: Math.max(3, Math.min(97, y))
+    };
+  });
+}
+
+// Per-trail cached <line> pools. A trail's geometry (x1/y1/x2/y2) is fixed
+// for its whole life, so each segment's line element is created once and
+// reused - subsequent animation-frame updates only touch its stroke alpha
+// (for the draw-in reveal). This avoids rebuilding the SVG from scratch on
+// every rAF tick while a trail is drawing in.
+const _trailLineCache = new Map(); // trail.id -> SVGLineElement[]
+let _trailSvgEl = null;
+let _trailGEl = null;
+
+function createTrailSvgShell(){
   const svgNS = 'http://www.w3.org/2000/svg';
 
   const svg = document.createElementNS(svgNS, 'svg');
@@ -3441,142 +4134,188 @@ function buildTrailLayer(){
   svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
   svg.setAttribute('class', 'trail-layer');
 
+  const defs = document.createElementNS(svgNS, 'defs');
+  const blurFilter = document.createElementNS(svgNS, 'filter');
+  blurFilter.setAttribute('id', 'trailBlurFilter');
+  blurFilter.setAttribute('x', '-50%');
+  blurFilter.setAttribute('y', '-50%');
+  blurFilter.setAttribute('width', '200%');
+  blurFilter.setAttribute('height', '200%');
+  const blur = document.createElementNS(svgNS, 'feGaussianBlur');
+  blur.setAttribute('stdDeviation', String(TRAIL_BLUR_STD_DEVIATION));
+  blurFilter.appendChild(blur);
+  defs.appendChild(blurFilter);
+
   const scaleG = document.createElementNS(svgNS, 'g');
-  scaleG.setAttribute(
-    'transform',
-    `scale(${WORLD_ASPECT_RATIO}, 1)`
-  );
+  scaleG.setAttribute('transform', `scale(${WORLD_ASPECT_RATIO}, 1)`);
 
   const g = document.createElementNS(svgNS, 'g');
+  g.setAttribute('filter', 'url(#trailBlurFilter)');
 
-  S.trails.forEach(trail => {
-    const pts = trail.waypoints;
-    const n = pts.length;
-
-    if (n < 2) return;
-
-    const revealFrac = trail.bornAt != null
-      ? easeInOutQuad(
-          Math.max(
-            0,
-            Math.min(
-              1,
-              (now - trail.bornAt) / TRAIL_DRAW_MS
-            )
-          )
-        )
-      : 1;
-
-    const baseLifeFactor = trail.fadingOutSince != null
-      ? trail.retiredLifeFactor
-      : Math.max(
-          0,
-          Math.min(1, trail.stepsLeft / 2)
-        );
-
-    const fadeFactor = trail.fadingOutSince != null
-      ? Math.max(
-          0,
-          1 - (now - trail.fadingOutSince) / TRAIL_FADE_MS
-        )
-      : 1;
-
-    if (
-      revealFrac <= 0 ||
-      baseLifeFactor <= 0 ||
-      fadeFactor <= 0
-    ) {
-      return;
-    }
-
-    // Fewer segments = much less SVG work.
-    const segStep = Math.max(1, Math.floor(n / 14));
-
-    for (let i = 0; i < n - segStep; i += segStep) {
-      const r = i / (n - 1);
-
-      if (r > revealFrac) break;
-
-      const edgeFade = 0.65 + 0.35 * Math.min(1, r);
-
-      const alpha = Math.max(
-        0,
-        edgeFade *
-        0.68 *
-        baseLifeFactor *
-        fadeFactor
-      );
-
-      if (alpha <= 0.012) continue;
-
-      const p1 = pts[i];
-      const p2 = pts[Math.min(n - 1, i + segStep)];
-
-      const line = document.createElementNS(
-        svgNS,
-        'line'
-      );
-
-      line.setAttribute('x1', p1.x);
-      line.setAttribute('y1', p1.y);
-      line.setAttribute('x2', p2.x);
-      line.setAttribute('y2', p2.y);
-
-      line.setAttribute(
-        'stroke',
-        `rgba(168, 85, 247, ${alpha.toFixed(3)})`
-      );
-
-      line.setAttribute('stroke-width', '3');
-      line.setAttribute('stroke-linecap', 'round');
-      line.setAttribute(
-        'vector-effect',
-        'non-scaling-stroke'
-      );
-
-      g.appendChild(line);
-    }
-  });
-
+  svg.appendChild(defs);
   scaleG.appendChild(g);
   svg.appendChild(scaleG);
+
+  _trailSvgEl = svg;
+  _trailGEl = g;
+  _trailLineCache.clear();
 
   return svg;
 }
 
-function retireTrail(id, lifeFactorOverride){
-  const t = S.trails.find(tr => tr.id === id);
-  if (!t || t.fadingOutSince != null) return;
-  t.retiredLifeFactor = lifeFactorOverride != null ? lifeFactorOverride : Math.max(0, Math.min(1, t.stepsLeft / 2));
-  t.fadingOutSince = performance.now();
-  ensureTrailAnimationLoop();
+// Builds a fresh trail layer from scratch. Used right after a full
+// wrap.innerHTML wipe (renderMap()), where any previously cached <line>
+// elements are already gone with it.
+function buildTrailLayer(){
+  if (!S.trails || !S.trails.length) {
+    _trailSvgEl = null;
+    _trailGEl = null;
+    _trailLineCache.clear();
+    return null;
+  }
+
+  const svg = createTrailSvgShell();
+  updateTrailLines();
+  return svg;
+}
+
+// Updates the persistent trail <g> in place: reuses each trail's cached
+// <line> pool (geometry set only once) and just refreshes stroke alpha
+// every frame. A trail that's no longer in S.trails - i.e. no longer
+// usable by predators, whether expired or claimed for a hunt - has its
+// line pool torn down immediately here, with no fade: once it's unusable
+// it shouldn't leave any visual residue, and skipping the fade also means
+// one less thing keeping the animation loop alive.
+function updateTrailLines(){
+  if (!_trailGEl) return;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const now = performance.now();
+  const liveIds = new Set();
+
+  S.trails.forEach(trail => {
+    liveIds.add(trail.id);
+
+    const pts = trail.waypoints;
+    const n = pts.length;
+    if (n < 2) return;
+
+    const revealFrac = trail.bornAt != null
+      ? easeInOutQuad(
+          Math.max(0, Math.min(1, (now - trail.bornAt) / TRAIL_DRAW_MS))
+        )
+      : 1;
+
+    const baseLifeFactor = Math.max(0, Math.min(1, trail.stepsLeft / 2));
+
+    let lines = _trailLineCache.get(trail.id);
+
+    if (revealFrac <= 0 || baseLifeFactor <= 0) {
+      if (lines) lines.forEach(l => l.setAttribute('stroke', 'rgba(168, 85, 247, 0)'));
+      return;
+    }
+
+    if (!lines) {
+      lines = [];
+      _trailLineCache.set(trail.id, lines);
+    }
+
+    // Fewer segments = much less SVG work.
+    const segStep = Math.max(1, Math.floor(n / 14));
+    let segIdx = 0;
+
+    for (let i = 0; i < n - segStep; i += segStep) {
+      const r = i / (n - 1);
+      if (r > revealFrac) break;
+
+      const edgeFade = 0.65 + 0.35 * Math.min(1, r);
+      const alpha = Math.max(0, edgeFade * 0.68 * baseLifeFactor);
+
+      let line = lines[segIdx];
+      if (!line) {
+        const p1 = pts[i];
+        const p2 = pts[Math.min(n - 1, i + segStep)];
+
+        line = document.createElementNS(svgNS, 'line');
+        line.setAttribute('x1', p1.x);
+        line.setAttribute('y1', p1.y);
+        line.setAttribute('x2', p2.x);
+        line.setAttribute('y2', p2.y);
+        line.setAttribute('stroke-width', String(TRAIL_STROKE_WIDTH));
+        line.setAttribute('stroke-linecap', 'round');
+        line.setAttribute('vector-effect', 'non-scaling-stroke');
+        _trailGEl.appendChild(line);
+        lines[segIdx] = line;
+      }
+
+      line.setAttribute(
+        'stroke',
+        alpha <= 0.012 ? 'rgba(168, 85, 247, 0)' : `rgba(168, 85, 247, ${alpha.toFixed(3)})`
+      );
+
+      segIdx++;
+    }
+  });
+
+  // Instant, residue-free teardown of any cached pool whose trail is gone.
+  for (const [id, lines] of _trailLineCache) {
+    if (!liveIds.has(id)) {
+      lines.forEach(l => l.remove());
+      _trailLineCache.delete(id);
+    }
+  }
+}
+
+// A trail predators can no longer use (claim window expired, or just
+// consumed by a returning hunt) is removed immediately - no fade, no
+// lingering visual, and one less trail for the animation loop to track.
+function retireTrail(id){
+  const idx = S.trails.findIndex(tr => tr.id === id);
+  if (idx === -1) return;
+  S.trails.splice(idx, 1);
+
+  const lines = _trailLineCache.get(id);
+  if (lines) {
+    lines.forEach(l => l.remove());
+    _trailLineCache.delete(id);
+  }
 }
 
 function trailsNeedAnimationFrame(){
   const now = performance.now();
-  return S.trails.some(t => {
-    if (t.fadingOutSince != null) return true;
-    if (t.bornAt != null && (now - t.bornAt) < TRAIL_DRAW_MS) return true;
-    return false;
-  });
+  return S.trails.some(t => t.bornAt != null && (now - t.bornAt) < TRAIL_DRAW_MS);
 }
 
 function refreshTrailLayer(){
   const wrap = document.getElementById('mapWrap');
   if (!wrap) return;
-  const old = wrap.querySelector('svg.trail-layer');
-  const layer = buildTrailLayer();
-  if (old) {
-    if (layer) old.replaceWith(layer); else old.remove();
-  } else if (layer) {
-    wrap.appendChild(layer);
+
+  if (!S.trails || !S.trails.length) {
+    if (_trailSvgEl) _trailSvgEl.remove();
+    _trailSvgEl = null;
+    _trailGEl = null;
+    _trailLineCache.clear();
+    return;
   }
+
+  // Reuse the existing layer in place when it's still actually mounted -
+  // a coarse renderMap() call may have wiped wrap (and built its own fresh
+  // layer via buildTrailLayer()) since our last tick.
+  const stillMounted = _trailSvgEl && _trailSvgEl.isConnected && _trailSvgEl.parentNode === wrap;
+  if (stillMounted) {
+    updateTrailLines();
+    return;
+  }
+
+  const stale = wrap.querySelector('svg.trail-layer');
+  if (stale) stale.remove();
+
+  const layer = buildTrailLayer();
+  if (layer) wrap.appendChild(layer);
 }
 
 let _trailAnimHandle = null;
 function tickTrailAnimation(){
-  const now = performance.now();
-  S.trails = S.trails.filter(t => !(t.fadingOutSince != null && now - t.fadingOutSince >= TRAIL_FADE_MS));
   refreshTrailLayer();
   _trailAnimHandle = trailsNeedAnimationFrame() ? requestAnimationFrame(tickTrailAnimation) : null;
 }
@@ -3652,21 +4391,28 @@ function waitForAnimationAssets() {
   );
 }
 
+// Looks up the world position of the nest that owns a given event, so
+// animations always originate from/return to the correct nest instead of
+// whichever nest happens to be S.activeNestIndex at render time. Falls back
+// to S.nest for legacy events that predate nestId tagging.
+function nestPointFor(nestId) {
+  const n = S.nests.find(x => x.id === nestId);
+  return n ? { x: n.x, y: n.y } : { x: S.nest.x, y: S.nest.y };
+}
+
 function runStepAnimation(outgoing, incoming, onComplete){
   const wrap = document.getElementById('mapWrap');
   if (!wrap || !S.nest) { onComplete(); return; }
-  const nestPt = { x: S.nest.x, y: S.nest.y };
   const promises = [];
 
   S.trails.forEach(t => {
-    if (t.fadingOutSince != null) return;
-    if (t.claimedByHuntId != null) return; 
-    const preDecrementFactor = Math.max(0, Math.min(1, t.stepsLeft / 2));
+    if (t.claimedByHuntId != null) return;
     t.stepsLeft -= 1;
-    if (t.stepsLeft <= 0) retireTrail(t.id, preDecrementFactor);
+    if (t.stepsLeft <= 0) retireTrail(t.id);
   });
 
   outgoing.forEach(e => {
+    const nestPt = nestPointFor(e.nestId);
     if (e.type === 'search') {
       if (e.x === undefined || e.y === undefined) return;
 
@@ -3711,23 +4457,30 @@ function runStepAnimation(outgoing, incoming, onComplete){
         return;
       }
 
+      // Longer trails get a few more bends instead of one flat curve -
+      // roughly one extra control point per 20 world-units of distance.
+      const trailSpan = dist({ x: e.x, y: e.y }, nestPt);
+      const trailCurveCount = Math.max(1, Math.min(5, Math.round(trailSpan / 20)));
+
       const wp = curveWaypoints(
         { x: e.x, y: e.y },
         nestPt,
-        1,
+        trailCurveCount,
         6
       );
 
-      const dense = denseSmoothPath(wp);
+      const dense = bendPathAroundForts(
+        denseSmoothPath(wp),
+        TRAIL_FORT_AVOID_RADIUS
+      );
 
       S.trails.push({
         id: 'trail_' + e.id,
+        nestId: e.nestId,
         waypoints: dense,
         stepsLeft: 2,
         claimedByHuntId: null,
-        bornAt: performance.now(),
-        fadingOutSince: null,
-        retiredLifeFactor: null
+        bornAt: performance.now()
       });
 
       ensureTrailAnimationLoop();
@@ -3801,6 +4554,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
   });
 
   incoming.forEach(e => {
+    const nestPt = nestPointFor(e.nestId);
     if (e.type === 'search') {
       if (e.x === undefined || e.y === undefined) return;
       const dense = denseSmoothPath(curveWaypoints(nestPt, { x: e.x, y: e.y }, 3, 15));
@@ -3815,7 +4569,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
       let dense;
       const trail = e._trailId ? S.trails.find(t => t.id === e._trailId) : null;
       if (!trail) {
-        const avail = S.trails.find(t => !t.claimedByHuntId && t.fadingOutSince == null && t.stepsLeft > 0);
+        const avail = S.trails.find(t => !t.claimedByHuntId && t.stepsLeft > 0 && t.nestId === e.nestId);
         if (avail) {
           avail.claimedByHuntId = e.id;
           e._trailId = avail.id;
@@ -3956,11 +4710,158 @@ function toggleMapSelection(key, ev) {
   renderMap();
 }
 
+/* ============================= MAP FULLSCREEN ============================= */
+
+const MAP_FULLSCREEN_CLASS = 'map-fullscreen-active';
+let mapFullscreenActive = false;
+
+const MAP_FULLSCREEN_ENTER_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M8 3H5a2 2 0 0 0-2 2v3"/><path d="M16 3h3a2 2 0 0 1 2 2v3"/>' +
+  '<path d="M8 21H5a2 2 0 0 1-2-2v-3"/><path d="M16 21h3a2 2 0 0 0 2-2v-3"/></svg>';
+const MAP_FULLSCREEN_EXIT_ICON =
+  '<svg viewBox="0 0 24 24"><path d="M3 8V5a2 2 0 0 1 2-2h3"/><path d="M21 8V5a2 2 0 0 0-2-2h-3"/>' +
+  '<path d="M3 16v3a2 2 0 0 0 2 2h3"/><path d="M21 16v3a2 2 0 0 1-2 2h-3"/></svg>';
+
+function injectMapFullscreenStyles() {
+  if (document.getElementById('mapFullscreenStyles')) return;
+  const style = document.createElement('style');
+  style.id = 'mapFullscreenStyles';
+  // Note: #mapWrap's *normal* aspect-ratio still lives in style.css. In
+  // fullscreen we deliberately drop it and just fill the viewport - the
+  // existing getMapLetterbox()/worldToScreenPx() math already letterboxes
+  // the 2:1 world inside whatever box #mapWrap actually has, so this is
+  // safe without touching style.css.
+  style.textContent = `
+#mapWrap.${MAP_FULLSCREEN_CLASS} {
+  position: fixed !important;
+  inset: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  max-width: 100vw !important;
+  max-height: 100vh !important;
+  aspect-ratio: unset !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+  z-index: 10000;
+}
+body.map-fullscreen-lock {
+  overflow: hidden !important;
+}
+.map-fullscreen-btn {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  cursor: pointer;
+  z-index: 20;
+  transition: background 0.15s ease;
+}
+.map-fullscreen-btn:hover { background: rgba(0, 0, 0, 0.8); }
+.map-fullscreen-btn.map-fullscreen-pinned { position: fixed; z-index: 10001; }
+.map-fullscreen-btn svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+`;
+  document.head.appendChild(style);
+}
+
+function setMapFullscreen(active) {
+  const wrap = document.getElementById('mapWrap');
+  const btn = document.getElementById('mapFullscreenBtn');
+  if (!wrap) return;
+
+  mapFullscreenActive = active;
+  wrap.classList.toggle(MAP_FULLSCREEN_CLASS, active);
+  document.body.classList.toggle('map-fullscreen-lock', active);
+
+  if (btn) {
+    btn.classList.toggle('map-fullscreen-pinned', active);
+    btn.innerHTML = active ? MAP_FULLSCREEN_EXIT_ICON : MAP_FULLSCREEN_ENTER_ICON;
+    btn.title = active
+      ? (t('ui.exit_fullscreen_map') || 'Exit fullscreen')
+      : (t('ui.fullscreen_map') || 'Fullscreen map');
+  }
+
+  // Best-effort: also ask the browser for real fullscreen, so it hides its
+  // own chrome where that's allowed (e.g. not inside a sandboxed iframe
+  // without the "fullscreen" permission). The CSS above already makes the
+  // map fill the viewport either way, so this is a bonus, not a dependency.
+  try {
+    if (active && document.fullscreenEnabled && !document.fullscreenElement) {
+      const req = wrap.requestFullscreen && wrap.requestFullscreen();
+      if (req && req.catch) req.catch(() => {});
+    } else if (!active && document.fullscreenElement === wrap) {
+      const ext = document.exitFullscreen && document.exitFullscreen();
+      if (ext && ext.catch) ext.catch(() => {});
+    }
+  } catch (err) { /* Fullscreen API unavailable/blocked - CSS fallback still applies */ }
+
+  // #mapWrap's on-screen box just changed size without a window 'resize'
+  // event, so the px-positioned icons (see worldToScreenPx) need a redraw.
+  if (typeof renderMap === 'function') renderMap();
+}
+
+function toggleMapFullscreen() {
+  setMapFullscreen(!mapFullscreenActive);
+}
+
+function initMapFullscreenToggle() {
+  const wrap = document.getElementById('mapWrap');
+  const host = wrap && wrap.parentElement;
+  if (!wrap || !host || document.getElementById('mapFullscreenBtn')) return;
+
+  injectMapFullscreenStyles();
+  if (getComputedStyle(host).position === 'static') host.style.position = 'relative';
+
+  const btn = document.createElement('button');
+  btn.id = 'mapFullscreenBtn';
+  btn.type = 'button';
+  btn.className = 'map-fullscreen-btn';
+  btn.title = t('ui.fullscreen_map') || 'Fullscreen map';
+  btn.innerHTML = MAP_FULLSCREEN_ENTER_ICON;
+  btn.onclick = (ev) => {
+    ev.stopPropagation();
+    toggleMapFullscreen();
+  };
+  host.appendChild(btn);
+
+  document.addEventListener('keydown', (ev) => {
+    if (ev.key === 'Escape' && mapFullscreenActive) setMapFullscreen(false);
+  });
+
+  // Keep our state/button in sync if the user leaves real fullscreen via
+  // the browser's own UI (F11, the escape hint bar, etc.).
+  ['fullscreenchange', 'webkitfullscreenchange'].forEach(evt => {
+    document.addEventListener(evt, () => {
+      if (mapFullscreenActive && document.fullscreenElement !== wrap) {
+        setMapFullscreen(false);
+      }
+    });
+  });
+}
+
 function renderMap() {
   const wrap = document.getElementById('mapWrap');
   const fortsTag = document.getElementById('fortsTag');
   const controlsContainer = document.getElementById('controls-containter');
   if (!wrap) return;
+
+  initMapFullscreenToggle();
 
   wrap.classList.toggle('fort-placement-active', fortPlacementMode);
 
@@ -3975,19 +4876,92 @@ function renderMap() {
   const trailLayer = buildTrailLayer();
   if (trailLayer) wrap.appendChild(trailLayer);
 
-  const nestImg = document.createElement('img');
-  nestImg.src = '/nest/assets/nest_icon.png';
-  nestImg.className = 'map-icon nest-icon';
-  setWorldPosition(nestImg, wrap, S.nest.x, S.nest.y);
-  nestImg.title = t('map.nest_title');
-  nestImg.onclick = openNestAnalytics;
-  wrap.appendChild(nestImg);
+  // Render icons for alive nests only
+  S.nests.forEach((nest, idx) => {
+    if (!nest.alive) return; // Skip and remove collapsed nests from the map
+
+    const nestKey = 'nest_' + nest.id;
+    const nestContainer = document.createElement('div');
+    nestContainer.className = 'map-event nest-event' + (activeOpenMapKey === nestKey ? ' open' : '');
+    nestContainer.dataset.nestId = nest.id;
+    nestContainer.style.position = 'absolute';
+    setWorldPosition(nestContainer, wrap, nest.x, nest.y);
+    nestContainer.style.transform = 'translate(-50%, -50%)';
+    nestContainer.style.transform = 'scale(3)';
+    nestContainer.style.zIndex = '5';
+    nestContainer.style.cursor = 'pointer';
+
+    const nestImg = document.createElement('img');
+    nestImg.src = '/nest/assets/nest_icon.png';
+    nestImg.className = 'map-icon nest-icon';
+    nestImg.title = t('map.nest_title') + ' ' + nest.id;
+    nestContainer.appendChild(nestImg);
+
+    nestContainer.onclick = (ev) => {
+      toggleMapSelection(nestKey, ev);
+    };
+    wrap.appendChild(nestContainer);
+
+    if (activeOpenMapKey === nestKey && controlsContainer && S.phase === 'active') {
+      const analyticsBtn = document.createElement('button');
+      analyticsBtn.className = 'nest-btn control-btn map-action-btn';
+      const analyticsMain = document.createElement('span');
+      analyticsMain.className = 'btn-main';
+      analyticsMain.textContent = '📊';
+      analyticsBtn.appendChild(analyticsMain);
+      analyticsBtn.title = t('map.nest_analytics_btn', { cost: S.settings.costNestAnalytics }) !== 'map.nest_analytics_btn'
+        ? t('map.nest_analytics_btn', { cost: S.settings.costNestAnalytics })
+        : `Analytika hniezda (${S.settings.costNestAnalytics} AP)`;
+      analyticsBtn.disabled = S.gameOver || S.points < S.settings.costNestAnalytics;
+      analyticsBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        activeOpenMapKey = nestKey;
+        openNestAnalyticsAction(idx);
+      };
+
+      const target = nestAttackTargetInfo(nest);
+      const attackBtn = document.createElement('button');
+      attackBtn.className = 'nest-btn control-btn danger map-action-btn';
+      const attackMain = document.createElement('span');
+      attackMain.className = 'btn-main';
+      attackMain.textContent = '⚔️';
+      attackBtn.appendChild(attackMain);
+      const attackCost = target ? target.cost : 0;
+      if (target) {
+        const targetLabel = nestAttackTargetLabel(target.type);
+        attackBtn.title = t('map.attack_nest_btn', { target: targetLabel, cost: attackCost }) !== 'map.attack_nest_btn'
+          ? t('map.attack_nest_btn', { target: targetLabel, cost: attackCost })
+          : `Zabiť ${targetLabel} (${attackCost} AP)`;
+      } else {
+        attackBtn.title = t('map.attack_nest_empty') !== 'map.attack_nest_empty'
+          ? t('map.attack_nest_empty')
+          : 'Niet koho zabiť';
+      }
+      attackBtn.disabled = S.gameOver || !target || S.points < target.cost;
+      attackBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        activeOpenMapKey = nestKey;
+        attackNest(nest.id);
+      };
+
+      controlsContainer.appendChild(wrapButtonWithCostAbove(analyticsBtn, S.settings.costNestAnalytics));
+      controlsContainer.appendChild(wrapButtonWithCostAbove(attackBtn, attackCost));
+    }
+  });
+
+  const locationIcon = document.createElement('btn');
+  locationIcon.className = 'map-icon location-icon';
+  locationIcon.id = 'sandbox-location-icon';
+  setWorldPosition(locationIcon, wrap, S.locationIcon.x, S.locationIcon.y);
+  if (currentGameMode === 'sandbox') wrap.appendChild(locationIcon);
 
   if (DEBUG) debugRenderFortStrengthZones(wrap); // DEBUG - remove this line to disable fort-strength zone rings
 
-  const activeFortEvent = S.events.find(e => e.type === 'fort' && e.status === 'pending');
-  const activeTargetId = activeFortEvent ? activeFortEvent.targetFortId : null;
-
+  // Multiple nests can have a fort assault in flight at once, so collect
+  // every targeted fort id rather than just the first pending 'fort' event.
+  const activeTargetIds = new Set(
+    S.events.filter(e => e.type === 'fort' && e.status === 'pending').map(e => e.targetFortId)
+  );
 
   S.forts.forEach(f => {
     const fortKey = 'fort_' + f.id;
@@ -4006,7 +4980,7 @@ function renderMap() {
     fortImg.src = '/nest/assets/fort_icon.png';
     let cls = 'map-icon fort-icon';
 
-    const isUnderAssault = activeTargetId === f.id;
+    const isUnderAssault = activeTargetIds.has(f.id);
 
     if (!f.alive) {
       cls += ' fallen';
@@ -4074,11 +5048,6 @@ function renderMap() {
           controlsContainer.appendChild(wrapButtonWithCostAbove(evacuateBtn, S.settings.costSaveHumans));
         }
 
-        // Fort population - shown whenever a fort is selected, in every mode.
-        // Read-only here; sandbox.js re-enables it and wires editing when
-        // sandbox edit mode is active (see sandboxWireMapEventExtras).
-        // Displayed/edited as "current population", with the fort's capacity
-        // shown alongside as a fixed "/capacity" suffix.
         const fortCapacity = Math.max(0, f.capacity || 0);
         const popField = document.createElement('div');
         popField.className = 'btn-container';
@@ -4101,10 +5070,7 @@ function renderMap() {
         popInput.value = String(Math.max(0, Math.min(f.population || 0, fortCapacity)));
         popInput.readOnly = true;
         popInput.disabled = true;
-        // Capacity suffix - a plain "/N" label in campaign mode, but in
-        // sandbox mode it's an editable input alongside the slash. Read-only
-        // here; sandbox.js re-enables it and wires editing when sandbox
-        // edit mode is active (see sandboxWireMapEventExtras).
+
         const popCapacitySuffix = document.createElement('span');
         popCapacitySuffix.id = 'fortPopulationCapacity';
         popCapacitySuffix.className = 'sb-stat-capacity';
@@ -4130,9 +5096,6 @@ function renderMap() {
         popField.appendChild(popValueWrap);
         controlsContainer.appendChild(popField);
 
-        // Scout-marked indicator - shown whenever a fort is selected and a
-        // scout has flagged it as ripe for conquest (see
-        // maybeMarkFortsFromSearch). Purely informational, every mode.
         if (f.alive && f.marked) {
           const markNote = document.createElement('div');
           markNote.className = 'sb-fort-marked-note';
@@ -4143,10 +5106,6 @@ function renderMap() {
           controlsContainer.appendChild(markNote);
         }
 
-        // Fort defense - parallel to the population field above, but only
-        // ever shown in sandbox mode. Read-only here; sandbox.js re-enables
-        // it and wires editing when sandbox edit mode is active (see
-        // sandboxWireMapEventExtras).
         if (currentGameMode === 'sandbox') {
           const defField = document.createElement('div');
           defField.className = 'btn-container';
@@ -4204,9 +5163,7 @@ function renderMap() {
 
     if (f.alive && f.marked) {
       const glow = document.createElement('div');
-
       glow.className = 'fort-pheromone-glow';
-
       glow.style.position = 'absolute';
       glow.style.left = '-45%';
       glow.style.top = '-45%';
@@ -4215,14 +5172,12 @@ function renderMap() {
       glow.style.borderRadius = '50%';
       glow.style.pointerEvents = 'none';
       glow.style.zIndex = '0';
-
       glow.style.background =
         'radial-gradient(circle, ' +
         'rgba(180, 70, 255, 0.72) 0%, ' +
         'rgba(150, 40, 255, 0.42) 32%, ' +
         'rgba(120, 0, 255, 0.18) 52%, ' +
         'rgba(100, 0, 255, 0) 75%)';
-
       glow.style.filter = 'blur(5px)';
       glow.style.opacity = '0.9';
 
@@ -4258,127 +5213,127 @@ function renderMap() {
   activeMapEvents.forEach(e => {
     const eventKey = 'event_' + e.id;
 
+    if (e.type === 'search' && e.fortMarkScout) {
+      const targetFort = S.forts.find(f => f.id === e.targetFortId);
+      // Destroyed forts stay in S.forts (alive:false) rather than being
+      // removed, so a lookup by id alone still succeeds after the fort is
+      // gone - without the alive check, a marking scout keeps rendering as
+      // if it's still en route to a fort that's already been conquered,
+      // right up until its event actually resolves next step (which does
+      // correctly check .alive and simply drops the mark).
+      if (!targetFort || !targetFort.alive) return;
 
-  if (e.type === 'search' && e.fortMarkScout) {
-    const targetFort = S.forts.find(f => f.id === e.targetFortId);
-    if (!targetFort) return;
+      const container = document.createElement('div');
+      container.className =
+        'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
 
-    const container = document.createElement('div');
-    container.className =
-      'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
+      container.style.position = 'absolute';
+      container.dataset.eventId = e.id;
+      container.dataset.eventType = e.type;
+      setWorldPosition(container, wrap, e.x, e.y);
+      container.style.zIndex = '12';
 
-    container.style.position = 'absolute';
-    container.dataset.eventId = e.id;
-    container.dataset.eventType = e.type;
-    setWorldPosition(container, wrap, e.x, e.y);
-    container.style.zIndex = '12';
+      const iconImg = document.createElement('img');
+      iconImg.className = 'map-icon event-icon';
+      iconImg.src = '/nest/assets/scout.png';
+      iconImg.title = `Skaut označuje pevnosť ${targetFort.id}`;
 
-    const iconImg = document.createElement('img');
-    iconImg.className = 'map-icon event-icon';
-    iconImg.src = '/nest/assets/scout.png';
-    iconImg.title = `Skaut označuje pevnosť ${targetFort.id}`;
-
-    iconImg.onclick = (ev) => {
-      toggleMapSelection(eventKey, ev);
-    };
-
-    container.appendChild(iconImg);
-    wrap.appendChild(container);
-
-    // Controls for the fort-marking scout.
-    // It can be KILLED, but it cannot be DISTRACTED.
-    if (activeOpenMapKey === eventKey && controlsContainer) {
-      const infoBtn = document.createElement('button');
-      infoBtn.className = 'nest-btn control-btn map-action-btn';
-      infoBtn.textContent = 'ℹ';
-      infoBtn.title = t('ui.info_btn');
-
-      infoBtn.onclick = (ev) => {
-        ev.stopPropagation();
-        activeOpenMapKey = null;
-        openEventDetails(e.id);
+      iconImg.onclick = (ev) => {
+        toggleMapSelection(eventKey, ev);
       };
 
-      const killBtn = document.createElement('img');
-      killBtn.className = 'btn-icon';
-      killBtn.src = '../sim/assets/THREAT.png';
-      killBtn.title = t('actions.kill_scout_tooltip', {
-        cost: S.settings.costKillScout
-      });
+      container.appendChild(iconImg);
+      wrap.appendChild(container);
 
-      if (S.points < S.settings.costKillScout) {
-        killBtn.style.opacity = '0.5';
-        killBtn.style.pointerEvents = 'none';
-      } else {
-        killBtn.onclick = (ev) => {
+      if (activeOpenMapKey === eventKey && controlsContainer) {
+        const infoBtn = document.createElement('button');
+        infoBtn.className = 'nest-btn control-btn map-action-btn';
+        infoBtn.textContent = 'ℹ';
+        infoBtn.title = t('ui.info_btn');
+
+        infoBtn.onclick = (ev) => {
           ev.stopPropagation();
-          activeOpenMapKey = eventKey;
-          killScout(e.id);
+          activeOpenMapKey = null;
+          openEventDetails(e.id);
         };
+
+        const killBtn = document.createElement('img');
+        killBtn.className = 'btn-icon';
+        killBtn.src = '../sim/assets/THREAT.png';
+        killBtn.title = t('actions.kill_scout_tooltip', {
+          cost: S.settings.costKillScout
+        });
+
+        if (S.points < S.settings.costKillScout) {
+          killBtn.style.opacity = '0.5';
+          killBtn.style.pointerEvents = 'none';
+        } else {
+          killBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = eventKey;
+            killScout(e.id);
+          };
+        }
+
+        controlsContainer.appendChild(
+          wrapButtonWithCostAbove(
+            killBtn,
+            S.settings.costKillScout,
+            true
+          )
+        );
+
+        controlsContainer.appendChild(infoBtn);
       }
 
-      // Kill only — deliberately NO distract button.
-      controlsContainer.appendChild(
-        wrapButtonWithCostAbove(
-          killBtn,
-          S.settings.costKillScout,
-          true
-        )
-      );
-
-      // INFO LAST
-      controlsContainer.appendChild(infoBtn);
+      return;
     }
-
-    return;
-  }
-
 
     if (e.type === 'fort') {
       const targetFort = S.forts.find(f => f.id === e.targetFortId);
-      if (!targetFort) return;
+      // Same stale-lookup issue as the fortMarkScout case above: a fort
+      // conquered by a RIVAL nest's assault this step can still be found
+      // here (alive:false, but not removed from S.forts), so without this
+      // check an in-flight attack from this nest keeps rendering against a
+      // fort that no longer exists.
+      if (!targetFort || !targetFort.alive) return;
       const rem = Math.max(0, e.originalAttackers - e.killed);
       if (rem <= 0) return;
 
       const count = Math.max(1, Math.ceil(rem / 10));
 
-      // Remove only the icons that no longer exist.
-      // Leave the remaining positions untouched.
       if (e.iconPositions) {
-          while (e.iconPositions.length > count) {
-              e.iconPositions.pop();
-          }
+        while (e.iconPositions.length > count) {
+          e.iconPositions.pop();
+        }
       }
 
-      // Generate the positions only once.
       if (!e.iconPositions) {
-          const originalCount = count;
+        const originalCount = count;
+        e.iconPositions = [];
 
-          e.iconPositions = [];
+        for (let i = 0; i < originalCount; i++) {
+          const angle = (2 * Math.PI * i) / originalCount - Math.PI / 2;
 
-          for (let i = 0; i < originalCount; i++) {
-              const angle = (2 * Math.PI * i) / originalCount - Math.PI / 2;
-
-              e.iconPositions.push({
-                  x: Math.max(
-                      3,
-                      Math.min(
-                          97,
-                          targetFort.x + (DIST_FROM_FORT / WORLD_ASPECT_RATIO) * Math.cos(angle)
-                      )
-                  ),
-                  y: Math.max(
-                      3,
-                      Math.min(
-                          97,
-                          targetFort.y + DIST_FROM_FORT * Math.sin(angle)
-                      )
-                  )
-              });
-          }
+          e.iconPositions.push({
+            x: Math.max(
+              3,
+              Math.min(
+                97,
+                targetFort.x + (DIST_FROM_FORT / WORLD_ASPECT_RATIO) * Math.cos(angle)
+              )
+            ),
+            y: Math.max(
+              3,
+              Math.min(
+                97,
+                targetFort.y + DIST_FROM_FORT * Math.sin(angle)
+              )
+            )
+          });
+        }
       }
 
-      // Render each predator icon using its stored coordinate
       e.iconPositions.forEach((pos) => {
         const container = document.createElement('div');
         container.className = 'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
@@ -4470,29 +5425,29 @@ function renderMap() {
         openEventDetails(e.id);
       };
 
-      const leftBtn = document.createElement('img');
-      leftBtn.className = 'btn-icon';
-      leftBtn.id = 'distract-scout-icon';
-      leftBtn.src = '/nest/assets/distract-scout.png';
+      const leftBtn = document.createElement('button');
+      leftBtn.className = 'nest-btn control-btn map-action-btn';
 
       const rightBtn = document.createElement('img');
       rightBtn.className = 'btn-icon';
       rightBtn.src = '../sim/assets/THREAT.png';
 
       if (e.type === 'search') {
-        // SCOUT — distract
-        leftBtn.title = t('actions.distract_tooltip', {
+        const leftButton = document.createElement('img');
+        leftButton.title = t('actions.distract_tooltip', {
           cost: S.settings.costDistractScout
         });
-        leftBtn.disabled = S.points < S.settings.costDistractScout;
+        leftButton.disabled = S.points < S.settings.costDistractScout;
+        leftButton.className = 'btn-icon';
+        leftButton.id = 'distract-scout-icon';
+        leftButton.src = '/nest/assets/distract-scout.png';
 
-        leftBtn.onclick = (ev) => {
+        leftButton.onclick = (ev) => {
           ev.stopPropagation();
           activeOpenMapKey = eventKey;
           distractScout(e.id);
         };
 
-        // SCOUT — kill
         rightBtn.title = t('actions.kill_scout_tooltip', {
           cost: S.settings.costKillScout
         });
@@ -4508,21 +5463,19 @@ function renderMap() {
           };
         }
 
-        // Actions first
         controlsContainer.appendChild(
-          wrapButtonWithCostAbove(leftBtn, S.settings.costDistractScout, true)
+          wrapButtonWithCostAbove(leftButton, S.settings.costDistractScout, true)
         );
 
         controlsContainer.appendChild(
           wrapButtonWithCostAbove(rightBtn, S.settings.costKillScout, true)
         );
 
-        // INFO LAST
         controlsContainer.appendChild(infoBtn);
 
       } else {
-        // PREDATOR — help humans escape
         leftBtn.textContent = '🏃';
+        leftBtn.id = 'save-human-btn';
         leftBtn.title = t('actions.rescue_tooltip', {
           cost: S.settings.costEscapePredator
         });
@@ -4534,7 +5487,6 @@ function renderMap() {
           escapePredator(e.id);
         };
 
-        // PREDATOR — kill
         rightBtn.title = t('actions.kill_predator_tooltip', {
           cost: S.settings.costKillPredator
         });
@@ -4550,7 +5502,6 @@ function renderMap() {
           };
         }
 
-        // Actions first
         controlsContainer.appendChild(
           wrapButtonWithCostAbove(leftBtn, S.settings.costEscapePredator)
         );
@@ -4559,7 +5510,6 @@ function renderMap() {
           wrapButtonWithCostAbove(rightBtn, S.settings.costKillPredator, true)
         );
 
-        // INFO LAST
         controlsContainer.appendChild(infoBtn);
       }
     }
@@ -4604,7 +5554,7 @@ function renderLog(){
 }
 
 function simulateForecast(numSteps = 10) {
-  if (!S || S.gameOver) return { labels: [], humans: [], insects: [] };
+  if (!S || S.gameOver) return { labels: [], humans: [], insects: [], insectsByNest: [] };
 
   const realState = S;
   const realRender = render;
@@ -4614,6 +5564,9 @@ function simulateForecast(numSteps = 10) {
   const forecastHumans = [];
   const forecastInsects = [];
   const forecastLabels = [];
+  // Per-step snapshot of every nest's insect count, so the chart can plot a
+  // forecast line for each nest, not just whichever nest is selected.
+  const forecastInsectsByNest = [];
 
   try {
     S = simState;
@@ -4622,11 +5575,15 @@ function simulateForecast(numSteps = 10) {
     for (let i = 1; i <= numSteps; i++) {
       if (S.gameOver) break;
 
+      // advanceStepLogic() already advances every nest in S.nests per step
+      // (restoring S.activeNestIndex to focusedNestIndex afterwards), so a
+      // single forward pass gives us a valid forecast for all nests at once.
       advanceStepLogic();
 
       forecastLabels.push(`${t('chart.step')} ${S.step}`);
       forecastHumans.push(S.humans);
-      forecastInsects.push(totalInsects());
+      forecastInsects.push(totalInsectsAll());
+      forecastInsectsByNest.push(insectsByNestSnapshot());
     }
   } finally {
     S = realState;
@@ -4636,9 +5593,15 @@ function simulateForecast(numSteps = 10) {
   return {
     labels: forecastLabels,
     humans: forecastHumans,
-    insects: forecastInsects
+    insects: forecastInsects,
+    insectsByNest: forecastInsectsByNest
   };
 }
+
+// Color palette cycled across nests for the per-nest insect lines. Kept
+// short and high-contrast since MIN_NEST_DIST_FROM_OTHER_NEST-generated
+// sandboxes are usually just 2-4 nests; cycles if there are ever more.
+const NEST_CHART_COLORS = ['#c62828', '#6a1b9a', '#f57f17', '#00838f', '#ad1457', '#4527a0'];
 
 function renderChart() {
   const ctx = document.getElementById('popChart');
@@ -4648,88 +5611,167 @@ function renderChart() {
 
   const actualLabels = S.history.map(h => `${t('chart.step')} ${h.step}`);
   const combinedLabels = [...actualLabels, ...forecast.labels];
-
-  const actualHumans = [...S.history.map(h => h.humans), ...Array(forecast.labels.length).fill(null)];
-  const actualInsects = [...S.history.map(h => h.insects), ...Array(forecast.labels.length).fill(null)];
-
   const lastIndex = S.history.length - 1;
-  const forecastHumansData = Array(combinedLabels.length).fill(null);
-  const forecastInsectsData = Array(combinedLabels.length).fill(null);
 
+  // Humans are a shared pool across all nests (see MULTI-NEST SUPPORT notes
+  // above), so there's only ever one humans line - unlike insects below.
+  const actualHumans = [...S.history.map(h => h.humans), ...Array(forecast.labels.length).fill(null)];
+  const forecastHumansData = Array(combinedLabels.length).fill(null);
   if (lastIndex >= 0) {
     forecastHumansData[lastIndex] = S.humans;
-    forecastInsectsData[lastIndex] = typeof totalInsects === 'function' ? totalInsects() : 0;
-
     forecast.humans.forEach((val, i) => {
       forecastHumansData[lastIndex + 1 + i] = val;
     });
-
-    forecast.insects.forEach((val, i) => {
-      forecastInsectsData[lastIndex + 1 + i] = val;
-    });
   }
 
-  if (chart && chart.data.datasets.length < 4) {
+  // One actual+forecast dataset pair per nest (including fallen nests, so
+  // their line simply stops rather than vanishing from the legend), each
+  // continuing from that nest's own last known value - not the combined
+  // total across all nests.
+  const nestDatasets = [];
+  S.nests.forEach((nest, i) => {
+    const nestId = nest.id;
+    const color = NEST_CHART_COLORS[i % NEST_CHART_COLORS.length];
+    const nestLabel = t('analytics.nest_label') !== 'analytics.nest_label'
+      ? t('analytics.nest_label', { id: nestId })
+      : `Nest ${nestId}`;
+
+    const historyInsectsForNest = h =>
+      (h.insectsByNest && Object.prototype.hasOwnProperty.call(h.insectsByNest, nestId))
+        ? h.insectsByNest[nestId]
+        : (i === 0 ? h.insects : null); // pre-multi-nest history only had a combined total
+
+    const actualInsects = [...S.history.map(historyInsectsForNest), ...Array(forecast.labels.length).fill(null)];
+    const forecastInsectsData = Array(combinedLabels.length).fill(null);
+
+    if (lastIndex >= 0) {
+      forecastInsectsData[lastIndex] = nest.alive ? totalInsectsForNest(nest) : 0;
+      forecast.insectsByNest.forEach((snapshot, j) => {
+        forecastInsectsData[lastIndex + 1 + j] = Object.prototype.hasOwnProperty.call(snapshot, nestId)
+          ? snapshot[nestId]
+          : null;
+      });
+    }
+
+    nestDatasets.push({
+      label: `${t('chart.insects_actual')} - ${nestLabel}`,
+      pairId: 'nest_' + nestId,
+      pairLabel: nestLabel,
+      data: actualInsects,
+      borderColor: color,
+      backgroundColor: color,
+      borderWidth: 2,
+      tension: 0.2,
+      fill: false
+    });
+    nestDatasets.push({
+      label: `${t('chart.insects_forecast')} - ${nestLabel}`,
+      pairId: 'nest_' + nestId,
+      pairLabel: nestLabel,
+      data: forecastInsectsData,
+      borderColor: color,
+      backgroundColor: color,
+      borderDash: [5, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      borderWidth: 2,
+      tension: 0.2,
+      fill: false
+    });
+  });
+
+  const expectedDatasetCount = 2 + nestDatasets.length;
+  if (chart && chart.data.datasets.length !== expectedDatasetCount) {
     chart.destroy();
     chart = null;
   }
+
+  const humansPairLabel = t('chart.humans') !== 'chart.humans' ? t('chart.humans') : 'Ľudia';
+
+  const allDatasets = [
+    {
+      label: t('chart.humans_actual'),
+      pairId: 'humans',
+      pairLabel: humansPairLabel,
+      data: actualHumans,
+      borderColor: '#2e7d32',
+      backgroundColor: 'rgba(46, 125, 50, 0.1)',
+      borderWidth: 2,
+      tension: 0.2,
+      fill: false
+    },
+    {
+      label: t('chart.humans_forecast'),
+      pairId: 'humans',
+      pairLabel: humansPairLabel,
+      data: forecastHumansData,
+      borderColor: '#2e7d32',
+      backgroundColor: '#2e7d32',
+      borderDash: [5, 5],
+      pointRadius: 0,
+      pointHoverRadius: 0,
+      borderWidth: 2,
+      tension: 0.2,
+      fill: false
+    },
+    ...nestDatasets
+  ];
 
   if (!chart) {
     chart = new Chart(ctx, {
       type: 'line',
       data: {
         labels: combinedLabels,
-        datasets: [
-          {
-            label: t('chart.humans_actual'),
-            data: actualHumans,
-            borderColor: '#2e7d32',
-            backgroundColor: 'rgba(46, 125, 50, 0.1)',
-            borderWidth: 2,
-            tension: 0.2,
-            fill: false
-          },
-          {
-            label: t('chart.insects_actual'),
-            data: actualInsects,
-            borderColor: '#c62828',
-            backgroundColor: 'rgba(198, 40, 40, 0.1)',
-            borderWidth: 2,
-            tension: 0.2,
-            fill: false
-          },
-          {
-            label: t('chart.humans_forecast'),
-            data: forecastHumansData,
-            borderColor: '#2e7d32',
-            backgroundColor: '#2e7d32',
-            borderDash: [5, 5],
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderWidth: 2,
-            tension: 0.2,
-            fill: false
-          },
-          {
-            label: t('chart.insects_forecast'),
-            data: forecastInsectsData,
-            borderColor: '#a8402c',
-            backgroundColor: '#a8402c',
-            borderDash: [5, 5],
-            pointRadius: 0,
-            pointHoverRadius: 0,
-            borderWidth: 2,
-            tension: 0.2,
-            fill: false
-          }
-        ]
+        datasets: allDatasets
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         animation: { duration: 300 },
         plugins: {
-          legend: { display: false }
+          legend: {
+            display: true,
+            labels: {
+              boxWidth: 12,
+              font: { size: 9 },
+              // Collapse each entity's actual+forecast dataset pair into a
+              // single legend entry (one per pairId) instead of Chart.js's
+              // default one-entry-per-dataset behaviour, so the legend
+              // reads "Humans / Nest 1 / Nest 2 / ..." rather than
+              // "Humans (Actual) / Humans (Forecast) / Insects (Actual) -
+              // Nest 1 / ...".
+              generateLabels(chartInstance) {
+                const seen = new Map();
+                chartInstance.data.datasets.forEach((ds, idx) => {
+                  const pairId = ds.pairId || ds.label;
+                  if (!seen.has(pairId)) {
+                    seen.set(pairId, {
+                      text: ds.pairLabel || ds.label,
+                      fillStyle: ds.borderColor,
+                      strokeStyle: ds.borderColor,
+                      lineWidth: 2,
+                      hidden: !chartInstance.isDatasetVisible(idx),
+                      datasetIndexes: [idx]
+                    });
+                  } else {
+                    seen.get(pairId).datasetIndexes.push(idx);
+                  }
+                });
+                return Array.from(seen.values());
+              }
+            },
+            // Toggling a merged legend entry hides/shows every dataset in
+            // its pair together (both the solid actual line and its dashed
+            // forecast continuation), not just whichever one happened to
+            // generate the legend entry.
+            onClick(evt, legendItem, legend) {
+              const chartInstance = legend.chart;
+              const idxs = legendItem.datasetIndexes || [legendItem.datasetIndex];
+              const nowVisible = !chartInstance.isDatasetVisible(idxs[0]);
+              idxs.forEach(i => chartInstance.setDatasetVisibility(i, nowVisible));
+              chartInstance.update();
+            }
+          }
         },
         scales: {
           x: {
@@ -4746,10 +5788,12 @@ function renderChart() {
     });
   } else {
     chart.data.labels = combinedLabels;
-    chart.data.datasets[0].data = actualHumans;
-    chart.data.datasets[1].data = actualInsects;
-    chart.data.datasets[2].data = forecastHumansData;
-    chart.data.datasets[3].data = forecastInsectsData;
+    allDatasets.forEach((ds, i) => {
+      chart.data.datasets[i].data = ds.data;
+      chart.data.datasets[i].label = ds.label;
+      chart.data.datasets[i].pairId = ds.pairId;
+      chart.data.datasets[i].pairLabel = ds.pairLabel;
+    });
     chart.update();
   }
 }
@@ -4812,8 +5856,29 @@ function resolveAssetUrl(value) {
 
 function normalizeLevelData(rawLevel) {
   if (!rawLevel || typeof rawLevel !== 'object') return null;
+  const defLocIcon = {x: 10, y: 10};
 
-  const nest = rawLevel.nest || (rawLevel.map && rawLevel.map.nest) || null;
+  // Supports both the multi-nest `nests: [{x,y,id,population}, ...]` format
+  // and the legacy single `nest: {x,y}` format. Both are kept on the
+  // returned object: `nests` (array, used by initGame()'s campaign loader
+  // when present) and `nest` (first nest's {x,y}, kept for any older code
+  // that still only reads the singular field) so neither format silently
+  // loses nests.
+  const rawNests = rawLevel.nests || (rawLevel.map && rawLevel.map.nests) || null;
+  const rawNest = rawLevel.nest || (rawLevel.map && rawLevel.map.nest) || null;
+  const nests = Array.isArray(rawNests) && rawNests.length > 0
+    ? rawNests.map((n, index) => ({
+        id: n.id ?? index + 1,
+        x: Number(n.x),
+        y: Number(n.y),
+        ...(n.population != null ? { population: n.population } : {})
+      }))
+    : (rawNest ? [{ id: rawNest.id ?? 1, x: Number(rawNest.x), y: Number(rawNest.y) }] : null);
+  const nest = rawNest
+    ? { x: Number(rawNest.x), y: Number(rawNest.y) }
+    : (nests && nests[0] ? { x: nests[0].x, y: nests[0].y } : null);
+
+  const locationIcon = rawLevel.locationIcon || (rawLevel.map && rawLevel.map.locationIcon) || defLocIcon;
   const forts = rawLevel.forts || (rawLevel.map && rawLevel.map.forts) || [];
   const background = rawLevel.background || rawLevel.bg || rawLevel.image || rawLevel.map || null;
   const settings = rawLevel.settings || rawLevel;
@@ -4826,9 +5891,11 @@ function normalizeLevelData(rawLevel) {
     description: rawLevel.description || '',
     intro: rawLevel.intro || '',
     background: background ? resolveAssetUrl(background) : null,
-    nest: nest && {
-      x: Number(nest.x),
-      y: Number(nest.y)
+    nest,
+    nests,
+    locationIcon: locationIcon && {
+      x: Number(locationIcon.x),
+      y: Number(locationIcon.y)
     },
     forts: Array.isArray(forts)
       ? forts.map((f, index) => ({
@@ -4848,7 +5915,7 @@ function normalizeLevelData(rawLevel) {
 
 function loadCampaignLevelObject(obj) {
   const level = normalizeLevelData(obj);
-  if (!level || !level.nest) return null;
+  if (!level || (!level.nest && !level.nests)) return null;
 
   CURRENT_LEVEL = level;
   loadedLevelData = level;
@@ -4873,7 +5940,7 @@ async function fetchCampaignLevelData(filePath) {
     if (!res.ok) return null;
     const rawLevel = await res.json();
     const level = normalizeLevelData(rawLevel);
-    if (!level || !level.nest) return null;
+    if (!level || (!level.nest && !level.nests)) return null;
     return level;
   } catch (e) {
     console.warn(`Nepodarilo sa načítať JSON mapy zo súboru ${filePath}:`, e);
@@ -4958,18 +6025,23 @@ function loadCustomLevelFile(jsonFile) {
     try {
       const levelData = JSON.parse(e.target.result);
 
-      // Normalizácia dát levelu pre potreby initGame()
+      // Normalizácia dát levelu pre potreby initGame(). Podporuje formát
+      // viacerých hniezd `nests: [{x,y,...}]` aj starší formát jedného
+      // hniezda `nest: {x,y}` (initGame() vie spracovať oba).
       CURRENT_LEVEL = {
         nest: levelData.nest || (levelData.map && levelData.map.nest) || null,
+        nests: levelData.nests || (levelData.map && levelData.map.nests) || null,
+        locationIcon: levelData.locationIcon || (levelData.map && levelData.map.locationIcon) || { x: 10, y: 10 },
         forts: levelData.forts || (levelData.map && levelData.map.forts) || [],
         background: levelData.background || null,
         settings: levelData.settings || levelData,
         humans: levelData.humans ?? levelData.startHumans ?? 200,
-        food: levelData.food ?? levelData.startFood ?? 200
+        food: levelData.food ?? levelData.startFood ?? 200,
+        population: levelData.population || (levelData.map && levelData.map.population) || null
       };
 
-      if (!CURRENT_LEVEL.nest) {
-        alert('Chyba: JSON súbor neobsahuje platné súradnice hniezda (nest)!');
+      if (!CURRENT_LEVEL.nest && !CURRENT_LEVEL.nests) {
+        alert('Chyba: JSON súbor neobsahuje platné súradnice hniezda (nest/nests)!');
         return;
       }
 
@@ -5004,8 +6076,8 @@ function loadCustomLevelFile(jsonFile) {
  */
 
 function startCustomLevel() {
-  if (!CURRENT_LEVEL || !CURRENT_LEVEL.nest) {
-    console.error('Nemožno spustiť level: CURRENT_LEVEL nie je načítaný alebo chýbajú súradnice nest.');
+  if (!CURRENT_LEVEL || (!CURRENT_LEVEL.nest && !CURRENT_LEVEL.nests)) {
+    console.error('Nemožno spustiť level: CURRENT_LEVEL nie je načítaný alebo chýbajú súradnice nest/nests.');
     alert('Chyba: Level neobsahuje platné dáta hniezda.');
     return;
   }
@@ -5129,20 +6201,15 @@ function loadImage(src) {
 function applyLevelSettingsToInputs(settings) {
   if (!settings) return;
 
+  // Note: starting food and starting queen reserve are read directly from
+  // CURRENT_LEVEL.settings in initGame() rather than through an input
+  // element — those two values are no longer editable in the Settings
+  // overlay (they'd duplicate the Nest Analytics "Edit values" panel).
   const map = {
     startHumans: 'startHumansInput',
     humans: 'startHumansInput',
-    startFood: 'startFoodInput',
-    food: 'startFoodInput',
     lang: 'langSelect',
-    groupSize: 'groupSizeInput',
-    foodPerHuman: 'foodPerHumanInput',
-    maxPoints: 'maxPointsInput',
-    eggsPerSearch: 'eggsPerSearchInput',
-    eggCap: 'eggCapInput',
-    eggsPerFood: 'eggsPerFoodInput',
-    fortLimit: 'fortLimitInput',
-    defaultFortDefense: 'defaultFortDefenseInput'
+    ...LEVEL_SETTINGS_INPUT_MAP
   };
 
   Object.entries(map).forEach(([key, inputId]) => {
@@ -5246,17 +6313,16 @@ document.addEventListener('DOMContentLoaded', () => {
 // Same keys/units the Parametre overlay inputs use (percentages as 0-100, not fractions)
 const LEVEL_SETTINGS_INPUT_MAP = {
   groupSize:'groupSizeInput', foodPerHuman:'foodPerHumanInput', startHumans:'startHumansInput',
-  startFood:'startFoodInput', maxPoints:'maxPointsInput', eggsPerSearch:'eggsPerSearchInput',
+  maxPoints:'maxPointsInput', eggsPerSearch:'eggsPerSearchInput',
   eggCap:'eggCapInput', eggsPerFood:'eggsPerFoodInput',
   searchBaseChance:'searchBaseChanceInput', searchRatioScale:'searchRatioScaleInput',
   huntBaseChance:'huntBaseChanceInput', huntRatioScale:'huntRatioScaleInput',
-  huntDeathRisk:'huntDeathRiskInput', scoutBiasPerFailedSearch:'scoutBiasPerFailedSearchInput',
+  huntDeathRisk:'huntDeathRiskInput', searchDeathRisk:'searchDeathRiskInput', scoutBiasPerFailedSearch:'scoutBiasPerFailedSearchInput',
   fortLimit:'fortLimitInput', defaultFortDefense:'defaultFortDefenseInput',
   fortFoodLow:'fortFoodLowInput', fortFoodHigh:'fortFoodHighInput',
   fortHumanLow:'fortHumanLowInput', fortHumanHigh:'fortHumanHighInput',
   fortDistLow:'fortDistLowInput', fortDistHigh:'fortDistHighInput',
   fortPredatorThreshold:'fortPredatorThresholdInput', fortAttackThreshold:'fortAttackThresholdInput',
-  fortConquerThreshold:'fortConquerThresholdInput',
   scoutMarkChance:'scoutMarkChanceInput', fortMarkThreshold:'fortMarkThresholdInput',
   costDistractScout:'costDistractScoutInput',
   costKillScout:'costKillScoutInput', costEscapePredator:'costEscapePredatorInput',
@@ -5264,7 +6330,10 @@ const LEVEL_SETTINGS_INPUT_MAP = {
   saveHumansAmount:'saveHumansAmountInput', costScan:'costScanInput',
   costIncreaseFortCapacity:'costIncreaseFortCapacityInput',
   fortCapacityIncreaseAmount:'fortCapacityIncreaseAmountInput',
-  queenFoodReserveCap:'queenFoodReserveCapInput'
+  queenFoodReserveCap:'queenFoodReserveCapInput',
+  minPopulationThreshold:'minPopulationThresholdInput',
+  fortReinforceCost:'fortReinforceCostInput',
+  fortReinforceDefenseBonus:'fortReinforceDefenseBonusInput'
 };
 
 function applySettingsToInputs(overrides) {
@@ -5483,7 +6552,7 @@ async function startCampaignLevel(indexOrLevel = null) {
     selectedCampaignIndex = Math.max(0, Math.min(indexOrLevel, CAMPAIGN_INDEX.length - 1));
     levelInfo = CAMPAIGN_INDEX[selectedCampaignIndex] || {};
 
-    if (levelInfo.nest && levelInfo.forts) {
+    if ((levelInfo.nest || levelInfo.nests) && levelInfo.forts) {
       sourceLevel = levelInfo;
     } else {
       const filePath = levelInfo.file || levelInfo.mapPath || `campaign/${levelInfo.id}.json`;
@@ -5504,7 +6573,7 @@ async function startCampaignLevel(indexOrLevel = null) {
   }
 
   sourceLevel = loadCampaignLevelObject(sourceLevel);
-  if (!sourceLevel || !sourceLevel.nest) {
+  if (!sourceLevel || (!sourceLevel.nest && !sourceLevel.nests)) {
     const filePath = levelInfo.file || levelInfo.mapPath || 'neznámy súbor';
     alert(`Nepodarilo sa načítať dátový súbor pre úroveň: ${filePath}`);
     return;
@@ -5544,14 +6613,37 @@ function generateRandomLevel() {
   generateMapElements();
 
   // 3. Vrátenie kompletnej štruktúry levelu
+  //
+  // IMPORTANT: level.settings is consumed by applySettingsToInputs(), which
+  // writes values straight into the setup <input> fields (see the comment
+  // above LEVEL_SETTINGS_INPUT_MAP - those inputs hold percentages 0-100,
+  // not fractions). S.settings stores these same six keys as 0-1 fractions
+  // internally, so they must be converted back to percentage form here or
+  // they get silently divided by 100 a second time when settings are next
+  // read from the inputs (0.4 -> written as "0.4" -> read back -> 0.004).
+  const PERCENT_SETTINGS_KEYS = [
+    'searchBaseChance', 'searchRatioScale',
+    'huntBaseChance', 'huntRatioScale',
+    'huntDeathRisk', 'searchDeathRisk', 'scoutMarkChance'
+  ];
+  const exportedSettings = { ...S.settings };
+  PERCENT_SETTINGS_KEYS.forEach(key => {
+    if (typeof exportedSettings[key] === 'number') {
+      exportedSettings[key] = Math.round(exportedSettings[key] * 100);
+    }
+  });
+
   return {
     id: 'generated-' + Date.now(),
     title: 'Vygenerovaná úroveň',
-    description: 'Náhodne vygenerované hniezdo a pevnosti.',
+    description: 'Náhodne vygenerované hniezda a pevnosti.',
     background: 'poludniky.png',
-    nest: S.nest,
+    // Multi-nest export: initGame()'s campaign loader reads level.nests[]
+    // (falling back to a legacy single level.nest only if this is absent),
+    // so every generated nest's position/id is preserved on reload.
+    nests: S.nests.map(n => ({ id: n.id, x: n.x, y: n.y })),
     forts: S.forts,
-    settings: { ...S.settings }
+    settings: exportedSettings
   };
 }
 

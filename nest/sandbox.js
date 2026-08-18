@@ -4,8 +4,11 @@
 
 let sandboxSelectedFortId = null;
 let sandboxNextFortId = 1;
+let sandboxSelectedNestId = null;
+let sandboxNextNestId = 1;
 let sandboxEditEnabled = true;
 let sandboxWired = false;
+let sandboxLocationIconVisible = true;
 
 /* ============================= UNDO / REDO SYSTEM ============================= */
 
@@ -13,22 +16,36 @@ let sandboxUndoStack = [];
 let sandboxRedoStack = [];
 const SANDBOX_MAX_HISTORY = 50;
 
+// Snapshots the FULL S.nests array (every nest's position AND population -
+// food, brood cohorts, scouts/predators, everything makeNestState() sets up),
+// not just a single nest's x/y - sandbox now supports multiple, addable/
+// removable nests, so undo/redo needs to restore all of them, not just
+// whichever one happened to be "active" at snapshot time.
 function sandboxGetStateSnapshot() {
   return {
-    nest: { x: S.nest.x, y: S.nest.y },
+    nests: JSON.parse(JSON.stringify(S.nests)),
+    activeNestIndex: S.activeNestIndex,
+    focusedNestIndex: S.focusedNestIndex,
     forts: S.forts.map(f => ({ ...f })),
     selectedFortId: sandboxSelectedFortId,
-    nextFortId: sandboxNextFortId
+    selectedNestId: sandboxSelectedNestId,
+    nextFortId: sandboxNextFortId,
+    nextNestId: sandboxNextNestId
   };
 }
 
 function sandboxApplyStateSnapshot(snapshot) {
-  S.nest = { x: snapshot.nest.x, y: snapshot.nest.y };
+  S.nests = JSON.parse(JSON.stringify(snapshot.nests));
+  S.activeNestIndex = Math.min(snapshot.activeNestIndex || 0, S.nests.length - 1);
+  S.focusedNestIndex = Math.min(snapshot.focusedNestIndex || 0, S.nests.length - 1);
   S.forts = snapshot.forts.map(f => ({ ...f }));
   sandboxSelectedFortId = snapshot.selectedFortId;
+  sandboxSelectedNestId = snapshot.selectedNestId;
   sandboxNextFortId = snapshot.nextFortId;
+  sandboxNextNestId = snapshot.nextNestId;
   renderMap();
   sandboxSelectFort(sandboxSelectedFortId);
+  sandboxSelectNest(sandboxSelectedNestId);
   if (typeof recordSandboxSnapshot === 'function') {
     recordSandboxSnapshot();
   }
@@ -84,7 +101,9 @@ function sandboxWireUndoRedoControls() {
   let redoBtn = document.getElementById('sbRedoBtn');
 
   if (!undoBtn || !redoBtn) {
-    const parent = document.getElementById('sandboxFortControls') || document.getElementById('sandboxEditorPanel');
+    // Same container as the add/remove nest buttons, so undo/redo lands
+    // right next to them instead of in the (mostly hidden) editor panel.
+    const parent = document.getElementById('sandbox-controls') || document.getElementById('sandboxEditorPanel');
     if (parent) {
       const group = document.createElement('div');
       group.id = 'sbUndoRedoGroup';
@@ -162,6 +181,9 @@ function sandboxMakeDraggable(el, onDrag, onEnd, isEnabled = () => sandboxEditEn
   if (img) {
     img.draggable = false;
     img.ondragstart = (e) => e.preventDefault();
+  } else {
+    el.draggable = false;
+    el.ondragstart = (e) => e.preventDefault();
   }
 
   el.addEventListener('pointerdown', (ev) => {
@@ -208,21 +230,56 @@ function sandboxOnMapRendered() {
   sandboxWireInsectDrag();
   sandboxWireMapEventExtras();
 
-  // --- NEST DRAG ---
-  const nestImg = document.querySelector('#mapWrap .nest-icon');
-  if (nestImg) {
-    nestImg.classList.toggle('sandbox-draggable', sandboxEditEnabled);
-    sandboxMakeDraggable(nestImg, (x, y) => {
-      S.nest.x = x;
-      S.nest.y = y;
-      setWorldPosition(nestImg, document.getElementById('mapWrap'), x, y);
+  const locIcon = document.querySelector('#mapWrap #sandbox-location-icon')
+  if (locIcon) {
+    // The location icon is just a visual marker - it doesn't affect the
+    // simulation, so unlike nest/fort dragging it stays draggable even
+    // while the simulation is running (sandboxEditEnabled === false).
+    locIcon.classList.add('sandbox-draggable');
+    sandboxApplyLocationIconVisibility();
+    sandboxMakeDraggable(locIcon, (x, y) => {
+      S.locationIcon.x = x;
+      S.locationIcon.y = y;
+      setWorldPosition(locIcon, document.getElementById('mapWrap'), x, y);
     }, (hasMoved) => {
       if (hasMoved) {
         recordSandboxHistory();
         renderMap();
       }
-    });
+    }, () => currentGameMode === 'sandbox');
   }
+
+
+  // --- NEST DRAG (one per alive nest) ---
+  // script.js's renderMap() renders one .nest-event container per alive
+  // S.nests entry (dataset.nestId = nest.id), not a single shared
+  // '.nest-icon' - this used to grab only the FIRST nest icon on the page
+  // and write into the S.nest accessor (whichever nest happens to be
+  // "active", not necessarily the one under the cursor), which is why
+  // dragging silently did nothing useful once a second nest existed.
+  document.querySelectorAll('#mapWrap .nest-event').forEach(container => {
+    const nestId = Number(container.dataset.nestId);
+    const nest = S.nests.find(n => n.id === nestId);
+    if (!nest) return;
+
+    container.classList.toggle('sandbox-selected', sandboxSelectedNestId === nest.id);
+
+    const img = container.querySelector('.nest-icon');
+    if (img) img.classList.toggle('sandbox-draggable', sandboxEditEnabled);
+
+    sandboxMakeDraggable(container, (x, y) => {
+      nest.x = x;
+      nest.y = y;
+      setWorldPosition(container, document.getElementById('mapWrap'), x, y);
+    }, (hasMoved) => {
+      if (!hasMoved) {
+        if (sandboxEditEnabled) sandboxSelectNest(nest.id);
+      } else {
+        recordSandboxHistory();
+        renderMap();
+      }
+    });
+  });
 
   // --- FORT DRAG & SELECT ---
   document.querySelectorAll('#mapWrap .fort-event').forEach((container, i) => {
@@ -268,6 +325,113 @@ function sandboxSelectFort(id) {
   });
 }
 
+function sandboxSelectNest(id) {
+  sandboxSelectedNestId = id;
+  document.querySelectorAll('#mapWrap .nest-event').forEach(el => {
+    el.classList.toggle('sandbox-selected', el.dataset.nestId == String(sandboxSelectedNestId));
+  });
+  const removeBtn = document.getElementById('sbRemoveNestBtn');
+  if (removeBtn) removeBtn.disabled = !sandboxEditEnabled || sandboxSelectedNestId == null;
+}
+
+/* ============================= ADD / REMOVE NEST ============================= */
+
+function sandboxAddNest() {
+  if (!sandboxEditEnabled) return;
+  const jitter = () => (Math.random() * 16) - 8;
+  const id = sandboxNextNestId++;
+  const nest = makeNestState(
+    id,
+    sandboxClampPct(50 + jitter()),
+    sandboxClampPct(50 + jitter()),
+    S.settings
+  );
+  S.nests.push(nest);
+  recordSandboxHistory();
+  renderMap();
+  sandboxSelectNest(id);
+}
+
+// Shared removal logic (mirrors sandboxRemoveFortById). A colony needs at
+// least one nest to exist - the whole sim (S.food/S.queen/... accessors,
+// S.activeNestIndex/focusedNestIndex) assumes S.nests is never empty.
+function sandboxRemoveNestById(id) {
+  if (!sandboxEditEnabled || id == null) return;
+  if (S.nests.length <= 1) {
+    alert('Nemôžete odstrániť posledné hniezdo.');
+    return;
+  }
+  const idx = S.nests.findIndex(n => n.id === id);
+  if (idx === -1) return;
+
+  S.nests.splice(idx, 1);
+  if (sandboxSelectedNestId === id) sandboxSelectedNestId = null;
+
+  // Keep the active/focused pointers in range so the S.food/S.queen/...
+  // accessors and the Nest Analytics panel don't point past the end.
+  if (S.activeNestIndex >= S.nests.length) S.activeNestIndex = S.nests.length - 1;
+  if (S.focusedNestIndex >= S.nests.length) S.focusedNestIndex = S.nests.length - 1;
+
+  recordSandboxHistory();
+  renderMap();
+  if (typeof sandboxRefreshOpenNestAnalytics === 'function') sandboxRefreshOpenNestAnalytics();
+}
+
+function sandboxRemoveSelectedNest() {
+  if (!sandboxEditEnabled) return;
+  if (sandboxSelectedNestId == null) {
+    alert('Najprv vyberte hniezdo kliknutím na mape.');
+    return;
+  }
+  sandboxRemoveNestById(sandboxSelectedNestId);
+  sandboxSelectNest(null);
+}
+
+function sandboxWireNestControls() {
+  let addBtn = document.getElementById('sbAddNestBtn');
+  let removeBtn = document.getElementById('sbRemoveNestBtn');
+
+  // Same "create if the page doesn't already have one" fallback pattern as
+  // sandboxWireUndoRedoControls() below, since these buttons may not exist
+  // in every host page's HTML yet.
+  if (!addBtn || !removeBtn) {
+    const parent = document.getElementById('sandbox-controls') || document.getElementById('sandboxEditorPanel');
+    if (parent) {
+      const group = document.createElement('div');
+      group.id = 'sbNestControlsGroup';
+      group.style.display = 'inline-flex';
+      group.style.gap = '6px';
+      group.style.marginLeft = '8px';
+
+      if (!addBtn) {
+        addBtn = document.createElement('button');
+        addBtn.id = 'sbAddNestBtn';
+        addBtn.className = 'act-mini';
+        addBtn.setAttribute('data-i18n', 'sandbox.btn_add_nest');
+        const addLabel = t('sandbox.btn_add_nest');
+        addBtn.textContent = addLabel !== 'sandbox.btn_add_nest' ? addLabel : '+ Hniezdo';
+        group.appendChild(addBtn);
+      }
+      if (!removeBtn) {
+        removeBtn = document.createElement('button');
+        removeBtn.id = 'sbRemoveNestBtn';
+        removeBtn.className = 'act-mini danger';
+        removeBtn.setAttribute('data-i18n', 'sandbox.btn_remove_nest');
+        const removeLabel = t('sandbox.btn_remove_nest');
+        removeBtn.textContent = removeLabel !== 'sandbox.btn_remove_nest' ? removeLabel : '− Hniezdo';
+        group.appendChild(removeBtn);
+      }
+      parent.appendChild(group);
+    }
+  }
+
+  if (addBtn) addBtn.onclick = sandboxAddNest;
+  if (removeBtn) {
+    removeBtn.onclick = sandboxRemoveSelectedNest;
+    removeBtn.disabled = !sandboxEditEnabled || sandboxSelectedNestId == null;
+  }
+}
+
 /* ============================= ADD / REMOVE FORT ============================= */
 
 function sandboxAddFort() {
@@ -298,11 +462,18 @@ function sandboxRemoveSelectedFort() {
     alert('Najprv vyberte pevnosť kliknutím na mape.');
     return;
   }
-  S.forts = S.forts.filter(f => f.id !== sandboxSelectedFortId);
-  sandboxSelectedFortId = null;
+  sandboxRemoveFortById(sandboxSelectedFortId);
+  sandboxSelectFort(null);
+}
+
+// Shared removal logic used by both the (legacy) editor-panel remove button
+// and the per-fort "remove" button in the bottom action panel.
+function sandboxRemoveFortById(id) {
+  if (!sandboxEditEnabled || id == null) return;
+  S.forts = S.forts.filter(f => f.id !== id);
+  if (sandboxSelectedFortId === id) sandboxSelectedFortId = null;
   recordSandboxHistory();
   renderMap();
-  sandboxSelectFort(null);
 }
 
 function sandboxWireFortControls() {
@@ -546,7 +717,17 @@ function sandboxNewLevel() {
 }
 
 function sandboxLoadLevelObject(obj) {
-  S.nest = { x: (obj.nest && obj.nest.x != null) ? obj.nest.x : 50, y: (obj.nest && obj.nest.y != null) ? obj.nest.y : 50 };
+  // Supports both the current multi-nest `nests: [{id,x,y,population}]`
+  // format (matching what script.js's own initGame()/recordSandboxSnapshot()
+  // already read/write) and the legacy single `nest: {x,y}` format, which
+  // gets auto-wrapped into a single-entry array.
+  const levelNests = Array.isArray(obj.nests) && obj.nests.length > 0
+    ? obj.nests
+    : [obj.nest || { x: 50, y: 50 }];
+  S.nests = levelNests.map((n, i) => makeNestState(n.id ?? (i + 1), n.x, n.y, S.settings));
+  sandboxNextNestId = S.nests.reduce((max, n) => Math.max(max, n.id), 0) + 1;
+  sandboxSelectedNestId = null;
+
   S.forts = Array.isArray(obj.forts)
     ? obj.forts.map((f, i) => {
         const def = f.defense != null ? f.defense : 50;
@@ -575,6 +756,20 @@ function sandboxLoadLevelObject(obj) {
   applySettingsToInputs(obj.settings);
   setMapBackground(obj.background || null);
   initGame(true);
+
+  // Per-nest population overrides (new format: obj.nests[i].population),
+  // falling back to the legacy single-nest obj.population field applied to
+  // the first nest only - mirrors initGame()'s own campaign-loading logic.
+  levelNests.forEach((n, i) => {
+    const pop = n.population || (i === 0 ? obj.population : null);
+    if (!pop) return;
+    S.activeNestIndex = i;
+    applyPopulationOverrides(pop);
+  });
+  S.activeNestIndex = 0;
+  S.focusedNestIndex = 0;
+
+  render();
   recordSandboxSnapshot();
   
   sandboxUndoStack = [];
@@ -630,7 +825,7 @@ function sandboxReadSettingsFromInputs() {
 function sandboxBuildLevelObject(useCurrentState) {
   const name = (document.getElementById('sbLevelNameInput').value || '').trim() || 'Nová úroveň';
   const source = useCurrentState || !initialSandboxSnapshot
-    ? { nest: S.nest, forts: S.forts }
+    ? { nests: S.nests, forts: S.forts }
     : initialSandboxSnapshot;
 
   const conditions = Array.isArray(S.conditions) ? S.conditions : [];
@@ -640,7 +835,27 @@ function sandboxBuildLevelObject(useCurrentState) {
     description: document.getElementById('sbLevelDescInput').value.trim(),
     intro: document.getElementById('sbIntroInput').value,
     background: document.getElementById('sbBackgroundInput').value.trim() || null,
-    nest: { x: source.nest.x, y: source.nest.y },
+    // Every nest's position AND population (food, brood cohorts, scouts/
+    // predators) - matches the format script.js's initGame() already reads
+    // for campaign levels (CURRENT_LEVEL.nests[i].population).
+    nests: source.nests.map(n => ({
+      id: n.id,
+      x: n.x,
+      y: n.y,
+      population: {
+        food: n.food,
+        queenReserve: n.queenReserve,
+        scoutsAvailable: n.scoutsAvailable,
+        scoutsHidden: n.scoutsHidden,
+        scoutsCooldown: n.scoutsCooldown,
+        predatorsAvailable: n.predatorsAvailable,
+        predatorsCooldown: n.predatorsCooldown,
+        eggs: JSON.parse(JSON.stringify(n.eggs || [])),
+        larva: JSON.parse(JSON.stringify(n.larva || [])),
+        cocoon: JSON.parse(JSON.stringify(n.cocoon || [])),
+        nymph: JSON.parse(JSON.stringify(n.nymph || []))
+      }
+    })),
     forts: source.forts.map(f => ({
       id: f.id,
       x: f.x,
@@ -691,12 +906,15 @@ function sandboxSetEditEnabled(enabled) {
   sandboxEditEnabled = enabled;
   ['sbLevelNameInput', 'sbLevelDescInput', 'sbLevelFileInput', 'sbBackgroundInput',
    'sbIntroBtn', 'sbNewBtn', 'sbLoadBtn', 'sbExportCurrentBtn',
-   'sbAddFortBtn', 'sbRemoveFortBtn'].forEach(id => {
+   'sbAddFortBtn', 'sbRemoveFortBtn', 'sbLocationBtn',
+   'sbAddNestBtn', 'sbRemoveNestBtn'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.disabled = !enabled;
   });
   const defInput = document.getElementById('sbFortDefenseInput');
   if (defInput) defInput.disabled = !enabled || sandboxSelectedFortId == null;
+  const removeNestBtn = document.getElementById('sbRemoveNestBtn');
+  if (removeNestBtn) removeNestBtn.disabled = !enabled || sandboxSelectedNestId == null;
   sandboxUpdateUndoRedoUI();
   renderMap();
 }
@@ -707,11 +925,14 @@ function sandboxOnModeChanged() {
   sandboxSetUIVisible(currentGameMode === 'sandbox');
   if (currentGameMode === 'sandbox') {
     sandboxNextFortId = S.forts.reduce((max, f) => Math.max(max, f.id), 0) + 1;
+    sandboxNextNestId = (S.nests || []).reduce((max, n) => Math.max(max, n.id), 0) + 1;
     sandboxSelectedFortId = null;
-    if (sandboxUndoStack.length === 0 && S && S.nest) {
+    sandboxSelectedNestId = null;
+    if (sandboxUndoStack.length === 0 && S && S.nests && S.nests.length) {
       recordSandboxHistory();
     }
   }
+  sandboxEnhanceNestAnalytics(); // panel should appear/disappear immediately on mode switch, not wait for a render tick
 }
 
 function sandboxSetUIVisible(visible) {
@@ -795,6 +1016,10 @@ function sandboxSetPaused(paused) {
   sandboxWireInsectDrag();
 
   sandboxSetStatus(paused ? 'Pozastavené' : 'Beží');
+
+  // If the Nest Analytics overlay is open, flip its readouts between plain
+  // text and editable inputs right away rather than waiting for a reopen.
+  sandboxRefreshOpenNestAnalytics();
 }
 
 function sandboxTogglePaused() {
@@ -837,8 +1062,48 @@ function sandboxWrapRenderPhaseBanner() {
   window.renderPhaseBanner = function (...args) {
     const result = orig.apply(this, args);
     sandboxSyncPauseBtnVisibility();
+    // Covers stopSimulation() and any other phase change (e.g. 'stopped')
+    // that should flip the analytics overlay's edit state, not just pause.
+    sandboxRefreshOpenNestAnalytics();
     return result;
   };
+}
+
+/* ============================= LOCATION ICON SHOW/HIDE TOGGLE ============================= */
+// #locationBtn is a plain toggle: it doesn't move the icon (that's drag,
+// wired in sandboxOnMapRendered), it just lets the editor declutter the map
+// by hiding the marker without deleting/moving it. Purely an editor
+// convenience — not saved with the level.
+
+function sandboxApplyLocationIconVisibility() {
+  const locIcon = document.getElementById('sandbox-location-icon');
+  if (locIcon) locIcon.classList.toggle('hidden', !sandboxLocationIconVisible);
+
+  const btn = document.getElementById('locationBtn');
+  if (btn) {
+    btn.classList.add('sandbox-visibility-btn');
+    btn.classList.toggle('sandbox-state-visible', sandboxLocationIconVisible);
+    btn.classList.toggle('sandbox-state-hidden', !sandboxLocationIconVisible);
+    btn.title = sandboxLocationIconVisible
+      ? t('sandbox.title_hide_location')
+      : t('sandbox.title_show_location');
+  }
+}
+
+function sandboxSetLocationIconVisible(visible) {
+  sandboxLocationIconVisible = visible;
+  sandboxApplyLocationIconVisibility();
+}
+
+function sandboxToggleLocationIconVisible() {
+  sandboxSetLocationIconVisible(!sandboxLocationIconVisible);
+}
+
+function sandboxWireLocationToggle() {
+  const btn = document.getElementById('locationBtn');
+  if (!btn) return;
+  btn.onclick = sandboxToggleLocationIconVisible;
+  sandboxApplyLocationIconVisibility();
 }
 
 /* ============================= DRAG (insects: scouts / predators) ============================= */
@@ -1290,6 +1555,23 @@ function sandboxWireMapEventExtras() {
           renderMap();
         };
       }
+
+      // Remove-fort button - sandbox-only, appended to the bottom action
+      // panel right next to the defense/capacity fields above. Only usable
+      // while layout editing is unlocked, same as those fields.
+      const removeFortBtn = document.createElement('button');
+      removeFortBtn.className = 'nest-btn danger control-btn sandbox-remove-fort-btn';
+      removeFortBtn.type = 'button';
+      removeFortBtn.setAttribute('data-i18n', 'sandbox.btn_remove_fort');
+      removeFortBtn.textContent = t('sandbox.btn_remove_fort');
+      removeFortBtn.disabled = !sandboxEditEnabled;
+      removeFortBtn.onclick = (ev) => {
+        ev.stopPropagation();
+        sandboxRemoveFortById(fort.id);
+      };
+      controlsContainer.appendChild(removeFortBtn);
+
+
     }
   }
 
@@ -1317,12 +1599,150 @@ function sandboxWireMapEventExtras() {
   }
 }
 
+/* ============================= NEST ANALYTICS EDITING (sandbox only) ============================= */
+// renderStats() (script.js) populates #stageRow with one read-only chip per
+// stat (grouped stat-group-row / chips-wrap / stage-chip elements), tagged
+// with data-stat-key so this file can find them. In sandbox mode, for every
+// stat that has a directly-settable field (queen status, food storage,
+// queen reserve, the brood-lifecycle counts, and scout/predator
+// available/cooldown/hidden counts), we swap that chip's value into a live
+// input/select right in place — there is exactly one row per stat, editable
+// in sandbox and the plain read-only default everywhere else (campaign
+// mode, or derived-only stats like totals/working/fort-duty that have no
+// backing field to edit). Committing a field writes into S and re-runs
+// renderStats(), which rebuilds the chips and (via the wrap below) re-runs
+// this enhancement, keeping the swapped-in inputs fresh.
+
+function sandboxAnalyticsEditable() {
+  return currentGameMode === 'sandbox' && !!S;
+}
+
+const SANDBOX_ANALYTICS_FIELDS = [
+  { key: 'queenState', type: 'select',
+    get: () => (S.queen.alive ? 'alive' : 'dead'),
+    set: v => { S.queen.alive = (v === 'alive'); },
+    options: () => [
+      { value: 'alive', label: t('stats.active') },
+      { value: 'dead',  label: t('stats.dead') }
+    ] },
+  { key: 'food',              type: 'number',
+    get: () => S.food,              set: v => { S.food = v; } },
+  { key: 'queenReserve',      type: 'number',
+    get: () => S.queenReserve,      set: v => { S.queenReserve = Math.min(v, S.settings.queenFoodReserveCap); } },
+  { key: 'eggs',              type: 'number',
+    get: () => sumCohort(S.eggs),   set: v => { S.eggs = [{ age: 0, count: v }]; } },
+  { key: 'larva',             type: 'number',
+    get: () => sumCohort(S.larva),  set: v => { S.larva = [{ age: 0, count: v }]; } },
+  { key: 'cocoon',            type: 'number',
+    get: () => sumCohort(S.cocoon), set: v => { S.cocoon = [{ age: 0, count: v }]; } },
+  { key: 'nymph',             type: 'number',
+    get: () => sumCohort(S.nymph),  set: v => { S.nymph = [{ age: 0, count: v }]; } },
+  { key: 'scoutsAvailable',   type: 'number',
+    get: () => S.scoutsAvailable,    set: v => { S.scoutsAvailable = v; } },
+  { key: 'scoutsCooldown',    type: 'number',
+    get: () => S.scoutsCooldown,     set: v => { S.scoutsCooldown = v; } },
+  { key: 'scoutsHidden',      type: 'number',
+    get: () => S.scoutsHidden,       set: v => { S.scoutsHidden = v; } },
+  { key: 'predatorsAvailable',type: 'number',
+    get: () => S.predatorsAvailable, set: v => { S.predatorsAvailable = v; } },
+  { key: 'predatorsCooldown', type: 'number',
+    get: () => S.predatorsCooldown,  set: v => { S.predatorsCooldown = v; } }
+];
+
+function sandboxCommitAnalyticsField(field, rawValue) {
+  try {
+    if (field.type === 'select') {
+      field.set(rawValue);
+    } else {
+      let v = Math.round(Number(rawValue));
+      if (!Number.isFinite(v) || v < 0) v = 0;
+      field.set(v);
+    }
+  } catch (err) {
+    console.error('[sandbox analytics] failed to apply field', field.key, err);
+  }
+  if (typeof renderStats === 'function') renderStats();
+}
+
+function sandboxBuildAnalyticsEditControl(field) {
+  let control;
+  if (field.type === 'select') {
+    control = document.createElement('select');
+    const current = field.get();
+    field.options().forEach(opt => {
+      const optionEl = document.createElement('option');
+      optionEl.value = opt.value;
+      optionEl.textContent = opt.label;
+      if (opt.value === current) optionEl.selected = true;
+      control.appendChild(optionEl);
+    });
+    control.addEventListener('change', () => sandboxCommitAnalyticsField(field, control.value));
+  } else {
+    control = document.createElement('input');
+    control.type = 'number';
+    control.min = '0';
+    control.step = '1';
+    control.value = field.get();
+    control.addEventListener('keydown', ev => {
+      if (ev.key === 'Enter') control.blur();
+    });
+    control.addEventListener('change', () => sandboxCommitAnalyticsField(field, control.value));
+  }
+  control.className = 'analytics-edit-input';
+  control.addEventListener('keydown', ev => ev.stopPropagation());
+  control.addEventListener('click', ev => ev.stopPropagation());
+  return control;
+}
+
+function sandboxEnhanceNestAnalytics() {
+  const stageRow = document.getElementById('stageRow');
+  if (!stageRow) return;
+
+  // Not editable (campaign mode, or no sim yet) → leave every chip showing
+  // its plain default value, exactly as renderStats() rendered it.
+  if (!sandboxAnalyticsEditable()) return;
+
+  SANDBOX_ANALYTICS_FIELDS.forEach(field => {
+    const chip = stageRow.querySelector(`.stage-chip[data-stat-key="${field.key}"]`);
+    const valEl = chip && chip.querySelector('.chip-val');
+    if (!valEl) return;
+    try {
+      valEl.innerHTML = '';
+      valEl.appendChild(sandboxBuildAnalyticsEditControl(field));
+    } catch (err) {
+      console.error('[sandbox analytics] failed to build control', field.key, err);
+    }
+  });
+}
+
+let sandboxAnalyticsWrapped = false;
+function sandboxWrapRenderNestAnalytics() {
+  if (sandboxAnalyticsWrapped) return;
+  const orig = window.renderStats;
+  if (typeof orig !== 'function') return;
+  sandboxAnalyticsWrapped = true;
+  window.renderStats = function (...args) {
+    const result = orig.apply(this, args);
+    sandboxEnhanceNestAnalytics();
+    return result;
+  };
+}
+
+// Keep the overlay in sync if it's open while pause/resume is toggled.
+function sandboxRefreshOpenNestAnalytics() {
+  const overlay = document.getElementById('nestAnalyticsOverlay');
+  if (overlay && !overlay.classList.contains('hidden') && typeof renderStats === 'function') {
+    renderStats();
+  }
+}
+
 function sandboxInit() {
   sandboxSetUIVisible(currentGameMode === 'sandbox');
   if (sandboxWired) return;
   sandboxWired = true;
 
   sandboxWireFortControls();
+  sandboxWireNestControls();
   sandboxWireUndoRedoControls();
   sandboxWireKeyboardShortcuts();
   sandboxWireBackgroundInput();
@@ -1333,6 +1753,9 @@ function sandboxInit() {
   sandboxWireEditorToggle();
   sandboxWrapGuardedFunctions();
   sandboxWirePauseControl();
+  sandboxWireLocationToggle();
+  sandboxWrapRenderNestAnalytics();
+  sandboxEnhanceNestAnalytics(); // show the edit panel immediately, don't wait for the next renderStats() tick
 
   document.getElementById('sbNewBtn').onclick = sandboxNewLevel;
 
@@ -1354,6 +1777,7 @@ window.sandboxSetEditEnabled = sandboxSetEditEnabled;
 window.sandboxUndo = sandboxUndo;
 window.sandboxRedo = sandboxRedo;
 window.sandboxTogglePaused = sandboxTogglePaused;
+window.sandboxToggleLocationIconVisible = sandboxToggleLocationIconVisible;
 window.sandboxForceConquest = sandboxForceConquest;
 window.sandboxToggleScoutVisibility = sandboxToggleScoutVisibility;
 window.sandboxToggleAllHiddenScouts = sandboxToggleAllHiddenScouts;

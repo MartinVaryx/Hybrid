@@ -32,6 +32,7 @@
     .sandbox-fort-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-family:'IBM Plex Mono',monospace;font-size:.8rem;}
     .sb-defense-label{display:flex;align-items:center;gap:6px;font-family:'IBM Plex Mono',monospace;font-size:.8rem;justify-content:center;margin-bottom:4px;}
     .sandbox-fort-controls #sbFortDefenseInput{width:64px;padding:4px 6px;font-size:.85rem;}
+    .sandbox-remove-fort-btn{align-self:center;white-space:nowrap;}
     .sandbox-intro-textarea{width:100%;padding:8px 9px;font-family:'Roboto Condensed',sans-serif;font-size:.9rem;resize:vertical;}
     .map-icon.sandbox-draggable{cursor:grab;}
     .map-icon.sandbox-draggable.sandbox-dragging{cursor:grabbing;}
@@ -48,6 +49,7 @@
             <button class="nest-btn settings-btn" id="settingsBtn">
                 <span class="gear">⚙</span> <span data-i18n="settings.btn">Parametre</span>
             </button>
+            <button class="location-icon" id="locationBtn"></button>
         </div>
 
         <div class="head-readout">
@@ -92,7 +94,9 @@
                 <section class="panel map-panel">
                     <div class="panel-body">
                         <div class="map-stage">
-                            <div class="map-wrap" id="mapWrap"></div>
+                            <div class="map-wrap" id="mapWrap">
+                                <button id="sandbox-location-icon" style="position: absolute; left: 100px; top: 100px;"></button>
+                            </div>
                             <button class="nest-btn" id="sbToggleHiddenScoutsBtn"><strong>👁</strong></button>
                             <div class="map-info-wrap">
                                 <button class="nest-btn" id="map-info"><strong>i</strong></button>
@@ -109,15 +113,20 @@
                     </div>
                 </section>
 
+
                 <!-- FIELD LOG (FULL WIDTH) -->
-                <section class="panel log-panel">
-                    <div class="panel-head">
-                        <h2 data-i18n="log.title">Správy z terénu</h2>
-                    </div>
-                    <div class="panel-body" style="padding-top:6px;">
-                        <ul class="log-list" id="logList"></ul>
+                <section class="field-log-col">
+                    <div id="sandbox-controls"></div>
+                    <div class="panel log-panel">
+                        <div class="panel-head">
+                            <h2 data-i18n="log.title">Správy z terénu</h2>
+                        </div>
+                        <div class="panel-body" style="padding-top:6px;">
+                            <ul class="log-list" id="logList"></ul>
+                        </div>
                     </div>
                 </section>
+                
 
                 <!-- Hidden Event Queue panel (kept in DOM so script logic remains functional) -->
                 <section class="panel queue-panel" style="display:none;">
@@ -156,7 +165,7 @@
                 <button class="nest-btn control-btn" id="scan-btn" onclick="scanForHidden()"
                         data-i18n-title="map.scan_tooltip"
                         title="Odhaliť skryté Skautky - čím viac ich je, tým viac odhalíš.">
-                    <span class="btn-main">🔍 <span data-i18n="map.scan_btn">SKENOVAŤ</span></span>
+                    <span class="btn-main">🔍</span>
                 </button>
             </div>
 
@@ -212,8 +221,9 @@
                     <input type="number" id="startHumansInput" min="1" max="5000" value="200">
                 </div>
                 <div class="field">
-                    <label data-i18n="settings.lbl_start_food">Počiatočné zásoby potravy</label>
-                    <input type="number" id="startFoodInput" min="0" max="5000" value="200">
+                    <label data-i18n="settings.lbl_queen_food_reserve">Zásoba potravy kráľovnej</label>
+                    <input type="number" id="queenFoodReserveCapInput" min="0" max="500" value="10">
+                    <div class="hint" data-i18n="settings.hint_queen_food_reserve">Súkromná zásoba potravy vyhradená pre kráľovnú — ostatné Somory ju nikdy nespotrebujú, ani keď hladujú. Akákoľvek potrava navyše (po nakŕmení kolónie) sa najprv doplní sem, kým sa nezaplní, až potom sa použije inde.</div>
                 </div>
             </div>
             <div class="setup-row">
@@ -240,19 +250,12 @@
                     <div class="hint" data-i18n="settings.hint_eggs_per_food">Každých tieto-koľko znesených vajíčok stojí 1 extra potravu. Nastavte na 0 pre vypnutie nákladov.</div>
                 </div>
             </div>
-            <div class="setup-row">
-                <div class="field">
-                    <label data-i18n="settings.lbl_queen_food_reserve">Zásoba potravy kráľovnej</label>
-                    <input type="number" id="queenFoodReserveCapInput" min="0" max="500" value="10">
-                    <div class="hint" data-i18n="settings.hint_queen_food_reserve">Súkromná zásoba potravy vyhradená pre kráľovnú — ostatné Somory ju nikdy nespotrebujú, ani keď hladujú. Akákoľvek potrava navyše (po nakŕmení kolónie) sa najprv doplní sem, kým sa nezaplní, až potom sa použije inde.</div>
-                </div>
-            </div>
 
             <div class="settings-section" data-i18n="settings.sec_chances">Šance na úspech</div>
             <div class="setup-row">
                 <div class="field">
                     <label data-i18n="settings.lbl_search_base_chance">Základná šanca na prieskum (%)</label>
-                    <input type="number" id="searchBaseChanceInput" min="0" max="90" value="30">
+                    <input type="number" id="searchBaseChanceInput" min="0" max="90" value="40">
                     <div class="hint" data-i18n="settings.hint_search_base_chance">Minimálna šanca, že prieskumník nájde osídlenie, pred bonusom z pomeru ľudí a hmyzu.</div>
                 </div>
                 <div class="field">
@@ -405,7 +408,7 @@
         <div class="overlay-card wide">
             <button class="close-x" id="nestAnalyticsCloseX">✕</button>
             <div class="panel-head" style="margin-bottom:12px;">
-                <h2 data-i18n="analytics.title">Analytika hniezda</h2>
+                <h2 ><span data-i18n="analytics.title">Analytika hniezda</span><span id="AnalNestId"></span></h2>
             </div>
             <div class="panel-body">
                 <!-- Nest Status Chips -->

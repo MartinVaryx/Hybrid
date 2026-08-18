@@ -347,6 +347,19 @@ header.top {
     flex-direction: column;
 }
 
+/* Wraps #sandbox-controls + .log-panel so log-panel's own flex:1/min-height:0
+   actually has a flex parent to apply to (see main-grid height-chain notes). */
+.field-log-col {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    flex: 1;
+}
+
+#sandbox-controls{
+    margin-bottom: 5px;
+}
+
 .map-panel {
     flex: 3;
     min-height: 0;
@@ -568,7 +581,7 @@ header.top {
     border-radius: 4px;
     padding: 3px 8px;
     font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.72rem;
+    font-size: 0.92rem;
     font-weight: 700;
     cursor: pointer;
     text-transform: uppercase;
@@ -921,6 +934,19 @@ header.top {
     filter: drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
 }
 
+/* Keep the predator/scout color glow alive through the hover/open state
+   above instead of it being clobbered by that rule's plain shadow -
+   same specificity, later in the cascade, so these win the tie. */
+.map-event:hover .map-icon.predator-icon,
+.map-event.open .map-icon.predator-icon {
+    filter: drop-shadow(0 0 5px var(--hybrid-red)) drop-shadow(0 0 10px var(--hybrid-red)) drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
+}
+
+.map-event:hover .map-icon.scout-icon,
+.map-event.open .map-icon.scout-icon {
+    filter: drop-shadow(0 0 5px var(--hybrid-green)) drop-shadow(0 0 10px var(--hybrid-green)) drop-shadow(0 0 5px rgba(0,0,0,0.6)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
+}
+
 .map-icon.fort-icon.nearest {
     filter: drop-shadow(0 0 4px var(--hybrid-red)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
 }
@@ -939,6 +965,16 @@ header.top {
 
 .map-icon.fort-icon.under-attack:hover {
     transform: translate(-50%, -50%) scale(1.1);
+}
+
+/* Predator/scout map icons - a quick color cue for which is which at a
+   glance, independent of whatever hover/selection state they're also in. */
+.map-icon.predator-icon {
+    filter: drop-shadow(0 0 5px var(--hybrid-red)) drop-shadow(0 0 10px var(--hybrid-red)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
+}
+
+.map-icon.scout-icon {
+    filter: drop-shadow(0 0 5px var(--hybrid-green)) drop-shadow(0 0 10px var(--hybrid-green)) drop-shadow(1px 2px 1px rgba(0,0,0,0.5));
 }
 
 /* Fort capacity pill: shows occupied (red) vs free capacity */
@@ -1260,6 +1296,72 @@ iframe {
 .detail-meta b {
     display: block;
     font-size: 0.95rem;
+}
+
+/* Nest Analytics numbers become editable inputs while the sandbox is
+   paused or stopped (see sandbox.js: sandboxEnhanceNestAnalytics). */
+.analytics-edit-input {
+    width: 56px;
+    font: inherit;
+    font-weight: bold;
+    color: #000;
+    background: #fff;
+    border: 1px solid #000;
+    border-radius: 3px;
+    padding: 1px 4px;
+    text-align: center;
+    appearance: textfield;
+    -moz-appearance: textfield;
+}
+
+.analytics-edit-input::-webkit-inner-spin-button,
+.analytics-edit-input::-webkit-outer-spin-button {
+    opacity: 1;
+}
+
+.analytics-edit-select {
+    width: auto;
+    min-width: 72px;
+    text-align: left;
+    padding: 1px 6px;
+}
+
+.sandbox-analytics-edit-panel {
+    border: 2px dashed #000;
+    background: #fffbe6;
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 12px 0;
+}
+
+.sandbox-analytics-edit-panel h3 {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.sandbox-analytics-edit-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.analytics-edit-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    background: #f0f0f0;
+    border: 1px solid #000;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 0.8rem;
+}
+
+.analytics-edit-label {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .close-x {
@@ -1623,6 +1725,14 @@ iframe {
     color: #fff;
 }
 
+/* Fort/nest currently selected in the sandbox editor (for editing defense,
+   or for removal via "Remove Fort"/"Remove Nest") - previously had no
+   visual effect at all, so selection was invisible on the map. */
+.fort-event.sandbox-selected .map-icon.fort-icon,
+.nest-event.sandbox-selected .map-icon.nest-icon {
+    filter: drop-shadow(0 0 8px #2e7dff) drop-shadow(0 0 3px #ffffff);
+}
+
 #sbToggleHiddenScoutsBtn{
     font-size: 1.3rem;
     padding: 5px 10px 5px 10px;
@@ -1653,6 +1763,21 @@ iframe {
   transition: none !important;
 }
 
+.location-icon{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background-color: var(--hybrid-red);
+    z-index: 3;
+    pointer-events: auto;
+    cursor: pointer;
+    transform: translate(-5%, -5%);
+
+}
+
+.location-icon:hover {
+    transform: translate(-5%, -5%) scale(1.1) !important;
+}
 
 /* =========================================================
    MOBILE / SMALL SCREEN RULES
