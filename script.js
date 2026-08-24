@@ -1,0 +1,2180 @@
+const articles = [
+        {   id: 'schopnosti',
+            title: 'Nový systém schopností',
+            date: '23. 05. 2026',
+            summary: 'Prepracovali sme systém schopností, aby bol intuitívnejší.',
+            thumb: 'assets/articles/schopnosti.png',
+            file: 'schopnosti.html'},
+        {
+            id: 'zaciatok',
+            title: 'Ako to začalo',
+            date: '11. 05. 2026',
+            summary: 'O tom, čo viedlo ku vzniku Hybridu.',
+            thumb: 'assets/articles/zaciatok.jpg',
+            file: 'zaciatok.html'
+
+        }
+    ];
+    
+    let lastScrollTop = 0;
+    let isScrolling = false;
+    const headerRow = document.querySelector('.header-row');
+    let tooltipsInitialized = false;
+
+
+    window.addEventListener('scroll', () => {
+        let currentScroll = window.pageYOffset;
+        
+        if (currentScroll > lastScrollTop && currentScroll > 50) {
+            // Scrolling DOWN
+            headerRow.classList.add('hide');
+            headerRow.classList.remove('show');
+            isScrolling = true;
+        } else {
+            // Scrolling UP
+            headerRow.classList.remove('hide');
+            headerRow.classList.add('show');
+            isScrolling = false;
+        }
+        
+        lastScrollTop = currentScroll <= 0 ? 0 : currentScroll;
+    });
+
+    // Show header on hover
+    headerRow.addEventListener('mouseenter', () => {
+        headerRow.classList.remove('hide');
+        headerRow.classList.add('show');
+    });
+    
+    function updateGroupDropdown() {
+        const builderSelect = document.getElementById('builder-group-filter');
+        const editorSelect = document.getElementById('edit-group');
+        const relFilterSelect = document.getElementById('rel-group-filter'); // Nový filter v editore
+        
+        const groups = [...new Set(Object.values(skillsDB_new).map(s => s[1]))].sort();
+        const optionsHtml = groups.map(g => `<option value="${g}">${g}</option>`).join('');
+        
+        // Počas počiatočnej fázy sú v builderi dostupné iba DANOSTI - nemá zmysel ponúkať ostatné skupiny
+        const char = characters[activeCharIdx];
+        const prevBuilderValue = builderSelect.value;
+        if (char && char.isInitialPhase) {
+            builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option><option value="DANOSTI">DANOSTI</option>';
+        } else {
+            builderSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+        }
+        // Zachovaj predchádzajúci výber, ak medzi aktuálnymi možnosťami stále existuje
+        if ([...builderSelect.options].some(o => o.value === prevBuilderValue)) {
+            builderSelect.value = prevBuilderValue;
+        }
+
+        editorSelect.innerHTML = optionsHtml;
+        // Nový filter v editore má tiež možnosť "VŠETKY"
+        relFilterSelect.innerHTML = '<option value="">VŠETKY SKUPINY</option>' + optionsHtml;
+    }
+
+    function renderEditorList() {
+        const list = document.getElementById('editor-list');
+        const nameInput = document.getElementById('edit-name');
+        const search = nameInput.value.toUpperCase();
+        list.innerHTML = '';
+        
+        if (!skillsDB_new[search]) {
+            document.getElementById('edit-cat').value = '';
+            document.getElementById('edit-group').value = '';
+            
+            const descInput = document.getElementById('edit-desc');
+            if (descInput) descInput.value = '';
+            
+            editingRels = [];
+            renderRelTags();
+            filterRelSearch();
+        } else {
+            const data = skillsDB_new[search];
+            document.getElementById('edit-cat').value = data[0];
+            document.getElementById('edit-group').value = data[1];
+            
+            // PRIDANÉ: Automatické načítanie popisu pri presnej zhode
+            const descInput = document.getElementById('edit-desc');
+            if (descInput) descInput.value = data[3] || '';
+            
+            editingRels = [...data[2]];
+            renderRelTags();
+            filterRelSearch();
+        }
+
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => name.includes(search))
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            if (skillsDB_new[name][1].toUpperCase() !== curG) {
+                curG = skillsDB_new[name][1].toUpperCase();
+                const d = document.createElement('div'); 
+                d.className = 'group-divider'; 
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
+            div.onclick = () => loadToEditor(name);
+            list.appendChild(div);
+        });
+    }
+
+    // Aby ti fungovalo prepojenie, pridaj aj tento alias (ak ho tvoj kód vyžaduje)
+    function filterEditorList() {
+        renderEditorList();
+    }
+
+    function loadToEditor(name) {
+        const data = skillsDB_new[name];
+        document.getElementById('edit-name').value = name;
+        document.getElementById('edit-cat').value = data[0];
+        document.getElementById('edit-group').value = data[1];
+        editingRels = [...data[2]];
+        
+        // PRIDANÉ: Načítanie popisu do textového poľa (ak neexistuje, dáme prázdny text)
+        const descInput = document.getElementById('edit-desc');
+        if (descInput) {
+            descInput.value = data[3] || '';
+        }
+
+        renderRelTags();
+        filterRelSearch();
+    }
+
+    function renderRelTags() {
+        const container = document.getElementById('edit-rels-container');
+        container.innerHTML = '';
+        editingRels.forEach(rel => {
+            const span = document.createElement('span');
+            span.className = 'tag';
+            span.innerHTML = `<span class="tag-remove" onclick="removeRel('${rel}')">${rel}</span>`;
+            container.appendChild(span);
+        });
+    }
+
+    function filterRelSearch() {
+        const list = document.getElementById('rel-add-list');
+        const search = document.getElementById('rel-search').value.toUpperCase();
+        const groupFilter = document.getElementById('rel-group-filter').value;
+        list.innerHTML = '';
+        
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => {
+                const skillGroup = skillsDB_new[name][1];
+                const matchesSearch = name.includes(search);
+                const matchesGroup = !groupFilter || skillGroup === groupFilter;
+                const isNotAlreadyAdded = !editingRels.includes(name);
+                
+                return matchesSearch && matchesGroup && isNotAlreadyAdded;
+            })
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            const group = skillsDB_new[name][1].toUpperCase();
+            if (group !== curG) {
+                curG = group;
+                const d = document.createElement('div');
+                d.className = 'group-divider';
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu (pre zoznam príbuzných schopností)
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
+            div.onclick = () => { 
+                editingRels.push(name); 
+                renderRelTags(); 
+                document.getElementById('rel-search').value = ''; 
+                filterRelSearch(); 
+            };
+            list.appendChild(div);
+        });
+    }
+    function removeRel(name) { editingRels = editingRels.filter(r => r !== name); renderRelTags(); }
+
+    function saveSkill() {
+        const name = document.getElementById('edit-name').value.trim().toUpperCase();
+        const cat = parseInt(document.getElementById('edit-cat').value);
+        const descInput = document.getElementById('edit-desc');
+        const description = descInput ? descInput.value.trim() : '';
+        let group = document.getElementById('edit-group').value;
+        if (!name || !group) return showCustomAlert("VYPLŇTE NÁZOV A SKUPINU.");
+        skillsDB_new[name] = [cat, group, editingRels, description];
+        saveState();
+        renderEditorList();
+        updateGroupDropdown();
+        filterBuilder();
+        showStatus("SCHOPNOSŤ ULOŽENÁ.");
+    }
+
+    function exportSkills() {
+        // Príprava dát do formátu JSON (s odsadením 4 medzery pre lepšiu čitateľnosť)
+        const dataStr = JSON.stringify(skillsDB_new, null, 4);
+        
+        // Vytvorenie Blob objektu (súbor v pamäti)
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        
+        // Vytvorenie dočasného odkazu na stiahnutie
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        
+        link.setAttribute('href', url);
+        link.setAttribute('download', 'skillsDB_new.json');
+        link.style.visibility = 'hidden';
+        
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        
+        // Uvoľnenie pamäte
+        URL.revokeObjectURL(url);
+    }
+
+    function deleteSkill() {
+        const name = document.getElementById('edit-name').value.toUpperCase();
+        
+        // Najprv overíme, či schopnosť vôbec v databáze je
+        if (!skillsDB_new[name]) {
+            showCustomAlert("Schopnosť nebola nájdená.", "CHYBA");
+            return;
+        }
+
+        // Vyvoláme modálne okno s potvrdením
+        showCustomAlert(
+            `Naozaj chcete natrvalo ZMAZAŤ schopnosť ${name}?`, 
+            "POTVRDENIE ZMAZANIA", 
+            true, 
+            () => {
+                // Táto časť sa vykoná len po kliknutí na ÁNO
+                delete skillsDB_new[name];
+                
+                // Aktualizácia stavu a rozhrania
+                saveState();
+                renderEditorList();
+                updateGroupDropdown();
+                filterBuilder();
+                
+                // Vyčistíme políčka v editore po zmazaní
+                document.getElementById('edit-name').value = '';
+                document.getElementById('edit-cat').value = '';
+                editingRels = [];
+                renderRelTags();
+                
+                showCustomAlert(`Schopnosť ${name} bola odstránená.`, "ZMAZANÉ");
+            }
+        );
+    }
+
+    function selectSkill(name) {
+        selectedSkill = name;
+        document.querySelector('.control-box').classList.add('is-active');
+        const char = characters[activeCharIdx];
+        const data = skillsDB_new[name];
+        const targetLvl = (char.skills[name] || 0) + 1;
+        const isCategory1 = data[0] === 1; // Kategória 1: zľava sa nikdy neuplatňuje, cena = cieľová úroveň
+        const baseCost = targetLvl * data[0];
+        
+        let discount = 0;
+        let relDisplayStrings = [];
+
+        if (data[2] && data[2].length > 0) {
+            let relsWithLvls = data[2].map(r => ({ name: r, lvl: char.skills[r] || 0 }));
+
+            if (!isCategory1) {
+                let sortedForDiscount = [...relsWithLvls].sort((a,b) => b.lvl - a.lvl);
+                discount = sortedForDiscount.slice(0, 3).reduce((sum, r) => sum + r.lvl, 0);
+            }
+
+            relDisplayStrings = relsWithLvls.map(r => {
+                const label = r.lvl > 0 ? `${r.name} (${r.lvl})` : r.name;
+                const cls = r.lvl > 0 ? 'owned-rel' : '';
+                return `<span class="${cls}">${label}</span>`;
+            });
+        }
+
+        const finalCost = Math.max(targetLvl, baseCost - discount);
+        document.getElementById('sel-skill-name').innerText = `${name+":"} ${targetLvl - 1} \u2192 ${targetLvl}`;
+        document.getElementById('sel-skill-cat').innerText = `KATEGÓRIA: ${data[0]} | SKUPINA: ${data[1]}`;
+        
+        const relsBox = document.getElementById('sel-skill-rels');
+        relsBox.innerHTML = relDisplayStrings.length ? "PRÍBUZNÉ SCHOPNOSTI: " + relDisplayStrings.join(", ") : "";
+        
+        const costCont = document.getElementById('cost-container');
+        // Kategória 1 nemá zľavu, takže pôvodná cena sa nikdy nezobrazuje
+        if (!isCategory1 && discount > 0) {
+            costCont.style.display = 'inline-block';
+            document.getElementById('cost-orig').innerText = `${baseCost} BR`;
+        } else { costCont.style.display = 'none'; }
+        
+        document.getElementById('cost-disc').innerText = `${finalCost} BR`;
+        renderStats();
+    }
+
+    function upgradeSelected() {
+        if (!selectedSkill) return;
+        const char = characters[activeCharIdx];
+        const currentLvl = char.skills[selectedSkill] || 0;
+        
+        const data = skillsDB_new[selectedSkill]; 
+        if (!data) return;
+        const skillGroup = data[1]; 
+        const targetLvl = currentLvl + 1;
+
+        // BIOLOGICKÉ ZBRANE - binárne: hráč ich buď má, alebo nemá, nedajú sa vylepšovať nad úroveň 1
+        if (isBioWeaponSkill(selectedSkill) && currentLvl >= 1) {
+            showCustomAlert("Túto zbraň už máš. Biologické zbrane nie je možné vylepšiť.");
+            return;
+        }
+
+        // 1. KONTROLA LIMITOV SCHOPNOSTÍ (Spoločná pre obe fázy)
+        if (currentLvl === 0) {
+            const learnedSkills = Object.values(char.skills).filter(lvl => lvl > 0);
+            const learnedSkillsCount = learnedSkills.length;
+
+            if (learnedSkillsCount >= 16) {
+                showCustomAlert("Nie je možné pridať ďalšiu schopnosť.");
+                return;
+            }
+
+            if (char.isInitialPhase && learnedSkillsCount >= 6) {
+                showCustomAlert("V tejto fáze si nemôžeš pridať všetkých 7 daností.");
+                return;
+            }
+        }
+
+        // --- FÁZA 1: POČIATOČNÁ FÁZA (Základných 40 bodov) ---
+        if (char.isInitialPhase) {
+            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+            let discount = relLevels.reduce((a, b) => a + b, 0);
+            const cost = Math.max(targetLvl, (targetLvl * data[0]) - discount);
+            
+            if (char.humanity <= cost && skillGroup === "SOMORA") {
+                showCustomAlert("Máš príliš nízku ľudskosť.");
+                return;
+            }
+
+            if (char.sp < cost) {
+                showCustomAlert("NEDOSTATOK BODOV RASTU!");
+                return;
+            }
+                
+            // Špeciálny prípad: Uzavretie a prechod do druhej fázy
+            if ((char.sp - cost) === 0) {
+                showCustomAlert(
+                    "Týmto uzavrieš fázu DANOSTÍ. Želáš si pokračovať?", 
+                    "POTVRDENIE FÁZY", 
+                    true, 
+                    () => {
+                        char.skills[selectedSkill] = targetLvl; // Zapíšeme poslednú schopnosť
+                        char.initialSkillsSnapshot = { ...char.skills }; // Uložíme stav na konci 1. fázy
+                        
+                        char.isInitialPhase = false;
+                        char.sp = 20; // Nastavíme čistých 20 bodov pre 2. fázu
+                        
+                        if (skillGroup === "SOMORA") {
+                            char.humanity = (char.humanity || 10) - cost;
+                        }
+                        upgradeHistory = []; // Vyčistíme históriu prvej fázy
+                        finishUpgrade(); 
+                    }
+                );
+                return; 
+            }
+
+            // Bežný nákup vo Fáze 1
+            upgradeHistory.push({
+                skill: selectedSkill,
+                type: 'upgrade',
+                prevLvl: currentLvl,
+                prevSP: char.sp,
+                prevHumanity: char.humanity || 10,
+                wasInitialPhase: true
+            });
+
+            char.sp -= cost;
+            if (skillGroup === "SOMORA") {
+                char.humanity = (char.humanity || 10) - cost;
+            }
+
+            char.skills[selectedSkill] = targetLvl;
+            finishUpgrade();
+            return;
+        }
+
+        // --- FÁZA 2: POKROČILÁ FÁZA (20 bodov + Synergie, Stavový prístup) ---
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        // Nasimulujeme nový stav po nákupe
+        let simulatedSkills = { ...char.skills };
+        simulatedSkills[selectedSkill] = targetLvl;
+
+        const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
+        const totalSP = char.sp + beforeDetails.totalCost;
+        const simulatedSP = totalSP - afterDetails.totalCost;
+        
+        if (simulatedSP < 0) {
+            showCustomAlert("NEDOSTATOK BODOV RASTU!");
+            return;
+        }
+
+        // Kontrola humanity pre Somora schopnosti podľa reálneho nárastu ceny po optimalizácii
+        const addedSomoraCost = afterDetails.somoraCost - beforeDetails.somoraCost;
+        if (addedSomoraCost > 0 && (char.humanity || 10) <= addedSomoraCost) {
+            showCustomAlert("Máš príliš nízku ľudskosť pre túto úroveň schopnosti.", "BLOKOVANÉ");
+            return;
+        }
+
+        // Zápis akcie do histórie pre účely UNDO
+        upgradeHistory.push({
+            skill: selectedSkill,
+            type: 'upgrade',
+            prevLvl: currentLvl,
+            wasInitialPhase: false
+        });
+
+        // Uplatnenie vypočítaného optimálneho stavu
+        char.skills[selectedSkill] = targetLvl;
+        char.sp = simulatedSP;
+        char.humanity = (char.humanity || 10) - addedSomoraCost;
+
+        finishUpgrade();
+    }
+
+    function increaseSP(){
+        const char = characters[activeCharIdx];
+        if (char.isInitialPhase) {
+            showCustomAlert("Vo fáze DANOSTÍ nie je možné pridať body. Najskôr musíš minúť všetky BR, ktoré máš a uzavrieť fázu DANOSTÍ.");
+        }
+        char.sp += 1;
+        saveState();
+        renderStats();
+    }
+
+    // Zjednodušená pomocná funkcia bez volania neexistujúceho kódu
+    function finishUpgrade() {
+        saveState();
+        renderStats();
+        selectSkill(selectedSkill);
+        filterBuilder();
+    }
+
+    function getOptimalCostsForPhase2(char, skillsState) {
+        const snapshot = char.initialSkillsSnapshot || {};
+        let targetSkills = [];
+
+        for (const [name, lvl] of Object.entries(skillsState)) {
+            const baseLvl = snapshot[name] || 0;
+            if (lvl > baseLvl) targetSkills.push(name);
+        }
+
+        if (targetSkills.length === 0) {
+            return { totalCost: 0, somoraCost: 0 };
+        }
+
+        const n = targetSkills.length;
+        const skillIndex = new Map(targetSkills.map((name, i) => [name, i]));
+
+        // Cost to fully apply targetSkills[idx] (base -> target level), given which target skills
+        // (bitmask) are already fully applied. This is order-independent within the applied set:
+        // once a skill is picked it always jumps straight from its base level to its target level,
+        // so only the SET of already-applied skills affects the relation discount — not the order
+        // they were applied in. That lets us use bitmask DP instead of trying every permutation.
+        function costOfAdding(idx, appliedMask) {
+            const skill = targetSkills[idx];
+            const data = skillsDB_new[skill];
+            const targetLvl = skillsState[skill];
+            const baseLvl = snapshot[skill] || 0;
+            const isSomora = data && data[1] === "SOMORA";
+
+            const currentLevelOf = (name) => {
+                const i = skillIndex.get(name);
+                if (i !== undefined) return (appliedMask & (1 << i)) ? skillsState[name] : (snapshot[name] || 0);
+                return snapshot[name] || 0;
+            };
+
+            let cost = 0;
+            for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
+                const relLevels = (data[2] || [])
+                    .map(r => currentLevelOf(r))
+                    .sort((a, b) => b - a)
+                    .slice(0, 3);
+                const discount = relLevels.reduce((sum, l) => sum + l, 0);
+                cost += Math.max(lvl, (lvl * data[0]) - discount);
+            }
+            return { cost, isSomora };
+        }
+
+        const fullMask = (1 << n) - 1;
+        const memoTotal = new Int32Array(fullMask + 1).fill(-1);
+        const memoSomora = new Int32Array(fullMask + 1);
+        memoTotal[0] = 0;
+        memoSomora[0] = 0;
+
+        function solve(mask) {
+            if (memoTotal[mask] !== -1) return { totalCost: memoTotal[mask], somoraCost: memoSomora[mask] };
+
+            let bestTotal = -1, bestSomora = 0;
+            for (let i = 0; i < n; i++) {
+                if (!(mask & (1 << i))) continue;
+                const prevMask = mask & ~(1 << i);
+                const prev = solve(prevMask);
+                const { cost, isSomora } = costOfAdding(i, prevMask);
+                const totalCost = prev.totalCost + cost;
+                const somoraCost = prev.somoraCost + (isSomora ? cost : 0);
+                // Tie-break: among orderings with equal BR cost, prefer the one costing least humanity
+                if (bestTotal === -1 || totalCost < bestTotal || (totalCost === bestTotal && somoraCost < bestSomora)) {
+                    bestTotal = totalCost;
+                    bestSomora = somoraCost;
+                }
+            }
+            memoTotal[mask] = bestTotal;
+            memoSomora[mask] = bestSomora;
+            return { totalCost: bestTotal, somoraCost: bestSomora };
+        }
+
+        return solve(fullMask);
+    }
+
+
+    function downgradeSkill() {
+        if (!selectedSkill) return;
+        const char = characters[activeCharIdx];
+        if (!char || !char.skills) return;
+
+        const currentLvl = char.skills[selectedSkill] || 0;
+        if (currentLvl === 0) return;
+
+        const data = skillsDB_new[selectedSkill];
+        if (!data) return;
+
+        // FÁZA 1 (Základných 40 bodov)
+        if (char.isInitialPhase) {
+            let relLevels = data[2].map(r => char.skills[r] || 0).sort((a,b) => b-a).slice(0,3);
+            let discount = relLevels.reduce((a, b) => a + b, 0);
+            const cost = Math.max(currentLvl, (currentLvl * data[0]) - discount);
+
+            upgradeHistory.push({ skill: selectedSkill, type: 'downgrade', prevLvl: currentLvl, wasInitialPhase: true, prevSP: char.sp, prevHumanity: char.humanity });
+
+            char.skills[selectedSkill]--;
+            if (char.skills[selectedSkill] === 0) delete char.skills[selectedSkill];
+            
+            char.sp += cost;
+            if (data[1] === "SOMORA") char.humanity = (char.humanity || 10) + cost;
+
+            saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+            return;
+        }
+
+        // FÁZA 2 (20 bodov + Synergie)
+        const snapshot = char.initialSkillsSnapshot || {};
+        if (data[1] === "DANOSTI" && currentLvl <= (snapshot[selectedSkill] || 0)) {
+            showCustomAlert("Nie je možné znížiť schopnosť pod úroveň z počiatočnej fázy.", "BLOKOVANÉ");
+            return;
+        }
+
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        let simulatedSkills = { ...char.skills };
+        simulatedSkills[selectedSkill]--;
+        if (simulatedSkills[selectedSkill] === 0) delete simulatedSkills[selectedSkill];
+
+        const afterDetails = getOptimalCostsForPhase2(char, simulatedSkills);
+        const totalSP = char.sp + beforeDetails.totalCost;
+        const simulatedSP = totalSP - afterDetails.totalCost;
+
+        if (simulatedSP < 0) {
+            showCustomAlert("Zrušením schopnosti padnú zľavy. Build by prekročil 20 bodov.", "BLOKOVANÉ");
+            return;
+        }
+
+        // Uložíme úroveň PRED downgradom do histórie pre účely UNDO
+        upgradeHistory.push({
+            skill: selectedSkill,
+            type: 'downgrade',
+            prevLvl: currentLvl,
+            wasInitialPhase: false
+        });
+
+        char.skills[selectedSkill]--;
+        if (char.skills[selectedSkill] === 0) delete char.skills[selectedSkill];
+        
+        char.sp = simulatedSP;
+        char.humanity = (char.humanity || 10) - (afterDetails.somoraCost - beforeDetails.somoraCost);
+
+        saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+    }
+
+    function undoUpgrade() {
+        if (upgradeHistory.length === 0) return;
+
+        const lastAction = upgradeHistory.pop();
+        const char = characters[activeCharIdx];
+
+        // FÁZA 1: Cúvame klasicky lineárne
+        if (lastAction.wasInitialPhase) {
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+            if (char.skills[lastAction.skill] === 0) delete char.skills[lastAction.skill];
+            char.sp = lastAction.prevSP;
+            char.humanity = lastAction.prevHumanity;
+            char.isInitialPhase = true;
+
+            saveState(); renderStats(); filterBuilder(); if (selectedSkill) selectSkill(selectedSkill);
+            return;
+        }
+
+        // FÁZA 2: Stavový prístup riadený algoritmom
+        const beforeDetails = getOptimalCostsForPhase2(char, char.skills);
+
+        if (lastAction.type === 'upgrade') {
+            // Ak to bol nákup, vrátime nižšiu (pôvodnú) úroveň
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+        } else if (lastAction.type === 'downgrade') {
+            // Ak to bol downgrade, vrátime vyššiu (pôvodnú) úroveň
+            char.skills[lastAction.skill] = lastAction.prevLvl;
+        }
+
+        // Očistenie nulových hodnôt
+        if (char.skills[lastAction.skill] === 0) {
+            delete char.skills[lastAction.skill];
+        }
+
+        // Kompletný prepočet bodov pre nový stav
+        const afterDetails = getOptimalCostsForPhase2(char, char.skills);
+        const totalSP = char.sp + beforeDetails.totalCost;
+
+        char.sp = totalSP - afterDetails.totalCost;
+        char.humanity = (char.humanity || 10) - (afterDetails.somoraCost - beforeDetails.somoraCost);
+
+        saveState();
+        renderStats();
+        filterBuilder();
+        if (selectedSkill) selectSkill(selectedSkill);
+    }
+
+    function renderStats() {
+        const container = document.getElementById('character-stats');
+        const char = characters[activeCharIdx];
+        container.innerHTML = '';
+
+        const brLeftEl = document.getElementById('br-left');
+        if (brLeftEl) brLeftEl.innerHTML = `<strong>Zostáva ti: ${char.sp} BR</strong>`;
+
+        const infoPanelTextEl = document.getElementById('info-panel-text');
+        if (infoPanelTextEl) {
+            infoPanelTextEl.textContent = char.isInitialPhase
+                ? "Máš k dispozícii 40 bodov určených len na DANOSTI. Keď ich minieš, získaš ďalších 20 bodov a odomknú sa ti ostatné schopnosti."
+                : "Vyber si schopnosť a uprav jej úroveň alebo si pridaj novú.";
+        }
+
+        //MENO - pozícia na hárku
+        addSheetText(container, char.name, "13%", "17.5%", "1.2rem", "380px", "left", "name-field");
+
+        // Zistíme, či sme v mobilnom zobrazení (napr. šírka pod 768px)
+        const isMobile = window.innerWidth <= 768;
+        if (isMobile) {
+            // --- MOBILNÁ VERZIA ---
+            const headerRow = document.createElement('div');
+            headerRow.className = "mobile-header-row";
+            headerRow.style.cssText = "display: flex; flex-direction: column; gap: 10px; padding: 10px; background: #eee; border-bottom: 2px solid #000; margin-bottom: 10px;";
+
+            // Meno
+            const nameDiv = document.createElement('div');
+            nameDiv.className = "name-field";
+            nameDiv.style.fontSize = "1.4rem";
+            nameDiv.style.fontWeight = "bold";
+            headerRow.appendChild(nameDiv);
+
+            // Kontajner pre BR a Ľudskosť vedľa seba
+            const statsRow = document.createElement('div');
+            statsRow.style.cssText = "display: flex; justify-content: space-between; align-items: center;";
+
+            const humanityVal = char.humanity !== undefined ? char.humanity : 50;
+
+            statsRow.innerHTML = `
+                <div class="humanity-field" style="font-weight: bold;"> ${humanityVal}</div>
+                <div class="br-field" style="font-weight: bold;">${char.sp}</div>
+            `;
+            
+            headerRow.appendChild(statsRow);
+            container.appendChild(headerRow); // Pridáme hlavičku ako prvú
+
+        } else {
+            // PC VERZIA: Pôvodné absolútne umiestnenie na hárku
+            addSheetText(container, char.sp.toString(), "25%", "90%", "1.8rem", "60px", "center", "br-field");
+            
+            const humanityVal = char.humanity !== undefined ? char.humanity : 10;
+            addSheetText(container, humanityVal.toString(), "25%", "76.5%", "1.8rem", "60px", "center", "humanity-field");
+        }
+
+        //SCHOPNOSTI - Limit 6 na stĺpec (spolu 12)
+        // Biologické zbrane sú síce technicky schopnosti, ale zobrazujú sa v mriežke zbraní, nie schopností.
+        const learnedSkills = Object.entries(char.skills)
+            .filter(([name, lvl]) => lvl > 0 && !isBioWeaponSkill(name))
+            .sort();
+
+        const bioWeaponSkills = Object.entries(char.skills)
+            .filter(([name, lvl]) => lvl > 0 && isBioWeaponSkill(name))
+            .sort();
+
+        // Calculate available width and determine columns
+        const availableWidth = isMobile ? container.clientWidth : window.innerWidth;
+        const minWidthPerSkill = 200; // Minimum width needed to display skill name + level without wrapping
+        const columns = availableWidth >= minWidthPerSkill * 2 ? 2 : 1;
+        const maxRows = Math.ceil(learnedSkills.length / columns);
+        const totalSlots = 16;
+
+        const slots = [];
+        
+        if (isMobile) {
+            // Mobile layout: flexbox-based, dynamically split into columns
+            const skillsTitle = document.createElement('div');
+            skillsTitle.className = 'mobile-section-title';
+            skillsTitle.style.cssText = `
+                font-weight: bold;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                padding: 10px 10px 0 10px;
+            `;
+            skillsTitle.innerText = 'SCHOPNOSTI';
+            container.appendChild(skillsTitle);
+
+            const skillsContainer = document.createElement('div');
+            skillsContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(${columns}, 1fr);
+                gap: 10px;
+                padding: 10px;
+            `;
+
+            learnedSkills.forEach(([name, lvl]) => {
+                const data = skillsDB_new[name] || [0, ""];
+                const displayName = truncateString(name, 18);
+
+                const div = document.createElement('div');
+                div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
+                div.style.cssText = `
+                    padding: 8px;
+                    background: #f5f5f5;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    cursor: pointer;
+                    min-width: 0;
+                `;
+                
+                div.onclick = () => {
+                    selectSkill(name);
+                    toggleInfoOverlay(true);
+                };
+
+                div.innerHTML = `
+                    <div class="skill-name-text" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${displayName}</div>
+                    <div class="skill-lvl-box" style="font-weight: bold; flex-shrink: 0;">${lvl}</div>
+                `;
+                skillsContainer.appendChild(div);
+            });
+
+            if (learnedSkills.length < totalSlots) {
+                const placeholder = document.createElement('div');
+                placeholder.className = `skill-slot`;
+
+                placeholder.style.cssText = `
+                    padding: 8px;
+                    background: transparent;
+                    border: none;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    font-size: 1.5rem;
+                    color: #555;
+                    font-weight: bold;
+                    cursor: pointer;
+                `;
+                placeholder.innerText = '+';
+                placeholder.onclick = () => toggleInfoOverlay(true);
+                skillsContainer.appendChild(placeholder);
+            }
+
+            container.appendChild(skillsContainer);
+
+            // ZBRANE (mobilná verzia) - rovnaká logika ako na PC: spolu 6 pozícií,
+            // prvé zaberajú biologické zbrane (schopnosti), zvyšné sú manuálne
+            // zbrane vyberané cez dropdown (vrátane možnosti "VLASTNÁ...").
+            const totalWeaponSlots = 6;
+            if (!char.weapons) char.weapons = [];
+
+            const weaponsTitle = document.createElement('div');
+            weaponsTitle.className = 'mobile-section-title';
+            weaponsTitle.style.cssText = `
+                font-weight: bold;
+                font-size: 1.1rem;
+                text-transform: uppercase;
+                padding: 10px 10px 0 10px;
+            `;
+            weaponsTitle.innerText = 'ZBRANE';
+            container.appendChild(weaponsTitle);
+
+            const weaponsContainer = document.createElement('div');
+            weaponsContainer.style.cssText = `
+                display: grid;
+                grid-template-columns: repeat(${columns}, 1fr);
+                gap: 10px;
+                padding: 10px;
+            `;
+
+            for (let index = 0; index < totalWeaponSlots; index++) {
+                const div = document.createElement('div');
+                div.className = 'skill-slot weapon-slot';
+                div.style.cssText = `
+                    padding: 8px;
+                    background: #f5f5f5;
+                    border: 1px solid #ccc;
+                    border-radius: 4px;
+                    display: flex;
+                    justify-content: space-between;
+                    align-items: center;
+                    min-width: 0;
+                `;
+
+                if (index < bioWeaponSkills.length) {
+                    // --- BIOLOGICKÁ ZBRAŇ (Nahradí dropdown) ---
+                    const [bioName] = bioWeaponSkills[index];
+                    div.classList.add('bio-weapon-slot');
+                    if (selectedSkill === bioName) div.classList.add('selected');
+                    div.style.cursor = "pointer";
+
+                    div.innerHTML = `
+                        <div class="skill-name-text" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${truncateString(bioName, 18)}</div>
+                        <div class="weapon-value-box" style="font-weight: bold; flex-shrink: 0;">${findWeaponValue(bioName)}</div>
+                    `;
+
+                    div.onclick = () => {
+                        selectSkill(bioName);
+                        toggleInfoOverlay(true);
+                    };
+                } else {
+                    // --- MANUÁLNA ZBRAŇ (Dropdown) ---
+                    const manualIndex = index - bioWeaponSkills.length;
+                    const weaponKey = char.weapons[manualIndex] || "";
+
+                    const select = document.createElement('select');
+                    select.className = 'weapon-select';
+                    select.style.cssText = `
+                        flex: 1;
+                        min-width: 0;
+                        max-width: 100%;
+                        font: inherit;
+                        font-size: 0.85rem;
+                        border: 1px solid #000;
+                        background: transparent;
+                        padding: 2px 4px;
+                        box-sizing: border-box;
+                        height: 28px;
+                        line-height: normal;
+                    `;
+
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = "";
+                    emptyOpt.innerText = "-";
+                    select.appendChild(emptyOpt);
+
+                    Object.entries(getMergedWeaponList()).forEach(([category, weapons]) => {
+                        const group = document.createElement('optgroup');
+                        group.label = category;
+                        let hasOptions = false;
+                        Object.keys(weapons).forEach(name => {
+                            if (isBioWeaponSkill(name)) return;
+
+                            const val = `${category}::${name}`;
+                            const opt = document.createElement('option');
+                            opt.value = val;
+                            opt.innerText = `${name.toUpperCase()} (${weapons[name]})`;
+                            if (val === weaponKey) opt.selected = true;
+                            group.appendChild(opt);
+                            hasOptions = true;
+                        });
+                        if (hasOptions) select.appendChild(group);
+                    });
+
+                    const customOpt = document.createElement('option');
+                    customOpt.value = "__CUSTOM__";
+                    customOpt.innerText = "VLASTNÁ...";
+                    select.appendChild(customOpt);
+
+                    select.onchange = () => {
+                        if (select.value === "__CUSTOM__") {
+                            openCustomWeaponOverlay(manualIndex);
+                            return;
+                        }
+                        char.weapons[manualIndex] = select.value;
+                        saveState();
+                        renderStats();
+                    };
+
+                    div.appendChild(select);
+
+                    // Hodnota zbrane (dmg) pre vybranú zbraň z dropdownu
+                    let damage = "";
+                    if (weaponKey) {
+                        const [cat, name] = weaponKey.split("::");
+                        const mergedWeapons = getMergedWeaponList();
+                        if (mergedWeapons[cat] && mergedWeapons[cat][name] !== undefined) {
+                            damage = mergedWeapons[cat][name];
+                        }
+                    }
+
+                    const valBox = document.createElement('div');
+                    valBox.className = 'weapon-value-box';
+                    valBox.style.cssText = "font-weight: bold; flex-shrink: 0; margin-left: 8px;";
+                    valBox.innerText = damage;
+                    div.appendChild(valBox);
+                }
+
+                weaponsContainer.appendChild(div);
+            }
+
+            container.appendChild(weaponsContainer);
+        } else {
+            for (let col = 0; col < 2; col++) {
+                for (let row = 0; row < 8; row++) {
+                    slots.push({
+                        x: col === 0 ? 6.5 : 54,
+                        y: 40.5 + (row * 4.73) 
+                    });
+                }
+            }
+
+            learnedSkills.forEach(([name, lvl], index) => {
+                if (index < slots.length) {
+                    const slot = slots[index];
+                    const data = skillsDB_new[name] || [0, ""];
+                    const displayName = truncateString(name, 18);
+
+                    const div = document.createElement('div');
+                    div.className = `skill-slot ${selectedSkill === name ? 'selected' : ''}`;
+                    
+                    div.style.left = slot.x + "%";
+                    div.style.top = slot.y + "%";
+                    div.style.width = "42.5%"; 
+                    div.style.height = "4.4%"; 
+                    
+                    div.onclick = () => {
+                        selectSkill(name);
+                        toggleInfoOverlay(true);
+                    };
+
+                    div.innerHTML = `
+                        <div class="skill-cat-box" style="position:absolute; left:0%; width:9%; text-align:left; font-weight:bold;">${data[0]}</div>
+                        <div class="skill-name-text" style="position:absolute; left:15%; width:70%; white-space:nowrap; overflow:hidden;">${displayName}</div>
+                        <div class="skill-lvl-box" style="position:absolute; right:6%; width:9%; text-align:center; font-weight:bold;">${lvl}</div>
+                    `;
+                    container.appendChild(div);
+                }
+            });
+
+            if (learnedSkills.length < slots.length) {
+                const slot = slots[learnedSkills.length];
+                const placeholder = document.createElement('div');
+                placeholder.className = 'skill-slot empty-slot';
+                placeholder.style.left = slot.x + "%";
+                placeholder.style.top = slot.y + "%";
+                placeholder.style.width = "42.5%";
+                placeholder.style.height = "4.4%";
+                placeholder.style.display = "flex";
+                placeholder.style.alignItems = "center";
+                placeholder.style.justifyContent = "center";
+                placeholder.style.fontSize = "1.5rem";
+                placeholder.style.color = "#555";
+                placeholder.style.fontWeight = "bold";
+                placeholder.style.border = "none";
+                placeholder.style.background = "transparent";
+                placeholder.style.cursor = "pointer";
+                placeholder.innerText = "+";
+                placeholder.onclick = () => toggleInfoOverlay(true);
+                container.appendChild(placeholder);
+            }
+
+            // ZBRANE - 2 stĺpce, 3 riadky (spolu 6 pozícií na hárku)
+            const weaponSlots = [];
+            const weaponGridStartY = 39.5 + (8 * 4.73) + (1.5 * 4.73);
+            for (let col = 0; col < 2; col++) {
+                for (let row = 0; row < 3; row++) {
+                    weaponSlots.push({
+                        x: col === 0 ? 4.5 : 52,
+                        y: weaponGridStartY + (row * 4.73)
+                    });
+                }
+            }
+
+            if (!char.weapons) char.weapons = [];
+
+            weaponSlots.forEach((slot, index) => {
+                const div = document.createElement('div');
+                div.className = 'skill-slot weapon-slot';
+                div.style.left = slot.x + "%";
+                div.style.top = slot.y + "%";
+                div.style.width = "42%";
+                div.style.height = "4.4%";
+
+                if (index < bioWeaponSkills.length) {
+                    // --- BIOLOGICKÁ ZBRAŇ (Nahradí dropdown) ---
+                    const [bioName] = bioWeaponSkills[index];
+                    div.classList.add('bio-weapon-slot');
+                    if (selectedSkill === bioName) div.classList.add('selected');
+                    div.style.cursor = "pointer";
+
+                    // Názov biologickej zbrane namiesto dropdownu
+                    const nameBox = document.createElement('div');
+                    nameBox.className = 'skill-name-text';
+                    nameBox.style.position = "absolute";
+                    nameBox.style.left = "0%";
+                    nameBox.style.width = "84%";
+                    nameBox.style.height = "100%";
+                    nameBox.style.display = "flex";
+                    nameBox.style.alignItems = "center";
+                    nameBox.style.overflow = "hidden";
+                    nameBox.style.whiteSpace = "nowrap";
+                    nameBox.style.textOverflow = "ellipsis";
+                    nameBox.innerText = truncateString(bioName, 18);
+                    div.appendChild(nameBox);
+
+                    // Hodnota zbrane na pravej strane
+                    const valBox = document.createElement('div');
+                    valBox.className = 'weapon-value-box';
+                    valBox.style.position = "absolute";
+                    valBox.style.right = "3%";
+                    valBox.style.width = "12%";
+                    valBox.style.height = "100%";
+                    valBox.style.display = "flex";
+                    valBox.style.alignItems = "center";
+                    valBox.style.justifyContent = "center";
+                    valBox.style.fontWeight = "bold";
+                    valBox.innerText = findWeaponValue(bioName);
+                    div.appendChild(valBox);
+
+                    // Kliknutie otvorí detail schopnosti
+                    div.onclick = () => {
+                        selectSkill(bioName);
+                        toggleInfoOverlay(true);
+                    };
+                } else {
+                    // --- MANUÁLNA ZBRAŇ (Dropdown) ---
+                    const manualIndex = index - bioWeaponSkills.length;
+                    const weaponKey = char.weapons[manualIndex] || "";
+
+                    const select = document.createElement('select');
+                    select.className = 'weapon-select';
+                    select.style.position = "absolute";
+                    select.style.left = "0%";
+                    select.style.width = "84%";
+                    select.style.height = "88%";
+                    select.style.font = "inherit";
+                    select.style.border = "none";
+                    select.style.padding = "0 4px";
+                    select.style.boxSizing = "border-box";
+                    select.style.lineHeight = "normal";
+
+                    const emptyOpt = document.createElement('option');
+                    emptyOpt.value = "";
+                    emptyOpt.innerText = "-";
+                    select.appendChild(emptyOpt);
+
+                    Object.entries(getMergedWeaponList()).forEach(([category, weapons]) => {
+                        const group = document.createElement('optgroup');
+                        group.label = category;
+                        let hasOptions = false;
+                        Object.keys(weapons).forEach(name => {
+                            if (isBioWeaponSkill(name)) return;
+
+                            const val = `${category}::${name}`;
+                            const opt = document.createElement('option');
+                            opt.value = val;
+                            opt.innerText = `${name.toUpperCase()} (${weapons[name]})`;
+                            if (val === weaponKey) opt.selected = true;
+                            group.appendChild(opt);
+                            hasOptions = true;
+                        });
+                        if (hasOptions) select.appendChild(group);
+                    });
+
+                    const customOpt = document.createElement('option');
+                    customOpt.value = "__CUSTOM__";
+                    customOpt.innerText = "VLASTNÁ...";
+                    select.appendChild(customOpt);
+
+                    select.onchange = () => {
+                        if (select.value === "__CUSTOM__") {
+                            openCustomWeaponOverlay(manualIndex);
+                            return;
+                        }
+                        char.weapons[manualIndex] = select.value;
+                        saveState();
+                        renderStats();
+                    };
+
+                    div.appendChild(select);
+
+                    // Hodnota zbrane (dmg) pre vybranú zbraň z dropdownu
+                    let damage = "";
+                    if (weaponKey) {
+                        const [cat, name] = weaponKey.split("::");
+                        const mergedWeapons = getMergedWeaponList();
+                        if (mergedWeapons[cat] && mergedWeapons[cat][name] !== undefined) {
+                            damage = mergedWeapons[cat][name];
+                        }
+                    }
+
+                    const valBox = document.createElement('div');
+                    valBox.className = 'weapon-value-box';
+                    valBox.style.position = "absolute";
+                    valBox.style.right = "3%";
+                    valBox.style.width = "12%";
+                    valBox.style.height = "100%";
+                    valBox.style.display = "flex";
+                    valBox.style.alignItems = "center";
+                    valBox.style.justifyContent = "center";
+                    valBox.style.fontWeight = "bold";
+                    valBox.innerText = damage;
+                    div.appendChild(valBox);
+                }
+
+                container.appendChild(div);
+            });
+        }
+    }
+
+    function addSheetText(container, text, top, left, size, width, align, extraClass = "") {
+        const div = document.createElement('div');
+        // Spojíme základnú triedu s prípadnou extra triedou
+        div.className = 'sheet-field ' + extraClass;
+        
+        // Tieto štýly držia prvok na správnom mieste na papieri (PC)
+        div.style.position = "absolute";
+        div.style.top = top;
+        div.style.left = left;
+        div.style.width = width;
+        div.style.fontSize = size;
+        div.style.display = "flex";
+        div.style.alignItems = "center";
+        div.style.justifyContent = align === "left" ? "flex-start" : "center";
+        
+        div.innerText = text;
+        container.appendChild(div);
+    }
+
+    // Vlastné zbrane pridané hráčmi cez dropdown "VLASTNÁ..." - uložené v rovnakej štruktúre
+    // ako WEAPON_LIST (kategória -> {názov: hodnota}), pretrvávajú v localStorage.
+    let customWeapons = JSON.parse(localStorage.getItem('customWeapons')) || {};
+    let pendingWeaponSlotIndex = null;
+
+    // Spojí vstavaný WEAPON_LIST s vlastnými zbraňami pridanými hráčom, pre potreby dropdownu a hľadania hodnôt.
+    function getMergedWeaponList() {
+        const merged = {};
+        Object.entries(WEAPON_LIST).forEach(([cat, weapons]) => {
+            merged[cat] = { ...weapons };
+        });
+        Object.entries(customWeapons).forEach(([cat, weapons]) => {
+            merged[cat] = { ...(merged[cat] || {}), ...weapons };
+        });
+        return merged;
+    }
+
+    // Zistí, či je daná schopnosť "biologická zbraň" (je v zozname BIOLOGICAL_WEAPONS).
+    // Takéto schopnosti sa nezobrazujú v mriežke schopností, ale v mriežke zbraní.
+    function isBioWeaponSkill(name) {
+        return BIOLOGICAL_WEAPONS.includes((name || "").toUpperCase());
+    }
+
+    // Nájde hodnotu (silu) zbrane vo WEAPON_LIST + vlastných zbraniach podľa názvu (bez ohľadu na
+    // veľkosť písmen), prehľadá všetky kategórie zoznamu zbraní.
+    function findWeaponValue(name) {
+        const upper = (name || "").toUpperCase();
+        const list = getMergedWeaponList();
+        for (const weapons of Object.values(list)) {
+            for (const [wName, val] of Object.entries(weapons)) {
+                if (wName.toUpperCase() === upper) return val;
+            }
+        }
+        return "";
+    }
+
+    // Otvorí prekryvné okno na vytvorenie vlastnej zbrane pre daný slot v mriežke zbraní.
+    function openCustomWeaponOverlay(index) {
+        pendingWeaponSlotIndex = index;
+
+        const groupSelect = document.getElementById('custom-weapon-group');
+        groupSelect.innerHTML = Object.keys(WEAPON_LIST)
+            .map(cat => `<option value="${cat}">${cat}</option>`)
+            .join('');
+
+        document.getElementById('custom-weapon-name').value = '';
+        document.getElementById('custom-weapon-value').value = '';
+        document.getElementById('custom-weapon-input-container').style.display = 'flex';
+        document.getElementById('weapon-overlay-backdrop').style.display = 'block';
+        document.getElementById('custom-weapon-name').focus();
+    }
+
+    function cancelCustomWeapon() {
+        pendingWeaponSlotIndex = null;
+        document.getElementById('custom-weapon-input-container').style.display = 'none';
+        document.getElementById('weapon-overlay-backdrop').style.display = 'none';
+        renderStats(); // Vráti dropdown na skutočne uložený stav
+    }
+
+    function confirmCustomWeapon() {
+        const name = document.getElementById('custom-weapon-name').value.trim();
+        const group = document.getElementById('custom-weapon-group').value;
+        const value = parseFloat(document.getElementById('custom-weapon-value').value);
+
+        if (!name || !group) {
+            showCustomAlert("VYPLŇTE NÁZOV A SKUPINU ZBRANE.");
+            return;
+        }
+        if (isNaN(value)) {
+            showCustomAlert("ZADAJTE HODNOTU (SILU) ZBRANE.");
+            return;
+        }
+        if (isBioWeaponSkill(name)) {
+            showCustomAlert("Tento názov je vyhradený pre biologické zbrane, zvoľte iný.");
+            return;
+        }
+
+        if (!customWeapons[group]) customWeapons[group] = {};
+        customWeapons[group][name] = value;
+
+        const char = characters[activeCharIdx];
+        if (pendingWeaponSlotIndex !== null && char.weapons) {
+            char.weapons[pendingWeaponSlotIndex] = `${group}::${name}`;
+        }
+        pendingWeaponSlotIndex = null;
+
+        saveState();
+        document.getElementById('custom-weapon-input-container').style.display = 'none';
+        document.getElementById('weapon-overlay-backdrop').style.display = 'none';
+        renderStats();
+    }
+
+    function truncateString(str, maxLen) {
+        if (str.length > maxLen) {
+            // Odreže reťazec a namiesto posledného znaku, ktorý by sa zmestil, dá bodku
+            return str.substring(0, maxLen - 1) + "...";
+        }
+        return str;
+    }
+
+
+    function filterBuilder() {
+        updateGroupDropdown();
+        const list = document.getElementById('builder-list');
+        const search = document.getElementById('builder-search').value.toUpperCase();
+        const groupFilter = document.getElementById('builder-group-filter').value;
+        const char = characters[activeCharIdx];
+        list.innerHTML = '';
+        
+        const sortedKeys = Object.keys(skillsDB_new)
+            .filter(name => {
+                const skillGroup = skillsDB_new[name][1];
+                if (char.isInitialPhase && skillGroup !== "DANOSTI") {
+                    return false;
+                }
+                const matchesSearch = name.includes(search);
+                const matchesGroup = !groupFilter || skillGroup === groupFilter;
+                return matchesSearch && matchesGroup;
+            })
+            .sort((a, b) => {
+                const gA = skillsDB_new[a][1].toUpperCase();
+                const gB = skillsDB_new[b][1].toUpperCase();
+                return gA.localeCompare(gB) || a.localeCompare(b);
+            });
+
+        let curG = "";
+        sortedKeys.forEach(name => {
+            const group = skillsDB_new[name][1].toUpperCase();
+            if (group !== curG) {
+                curG = group;
+                const d = document.createElement('div');
+                d.className = 'group-divider';
+                d.innerText = curG;
+                list.appendChild(d);
+            }
+            const div = document.createElement('div');
+            div.className = 'skill-list-item';
+            div.innerText = name;
+            
+            // PRIDANÉ: Uloženie popisu (index 3) do data-atribútu
+            div.setAttribute('data-description', skillsDB_new[name][3] || '');
+            
+            div.onclick = () => selectSkill(name);
+            list.appendChild(div);
+        });
+    }
+
+    function saveState() {
+        localStorage.setItem('skillsDB_new', JSON.stringify(skillsDB_new));
+        localStorage.setItem('characters', JSON.stringify(characters));
+        localStorage.setItem('customWeapons', JSON.stringify(customWeapons));
+    }
+    
+    
+    function renderCharSelector() {
+        const s = document.getElementById('char-selector');
+        s.innerHTML = characters.map((c, i) => `<option value="${i}" ${i === activeCharIdx ? 'selected' : ''}>${c.name}</option>`).join('');
+    }
+
+    function deleteCharacter() {
+        if (characters.length <= 1) {
+            showCustomAlert("NEMÔŽETE ODSTRÁNIŤ POSLEDNÉHO HRDINU.");
+            return;
+        }
+        const charName = characters[activeCharIdx].name;
+        showCustomAlert("Naozaj chcete odstrániť hrdinu?", "POTVRDENIE", true, () => {
+            characters.splice(activeCharIdx, 1);
+            activeCharIdx = 0; 
+            saveState();
+            renderCharSelector();
+            switchCharacter();
+        });        }
+
+
+    function switchCharacter() { 
+        activeCharIdx = parseInt(document.getElementById('char-selector').value); 
+        selectedSkill = null; 
+        upgradeHistory = []; // <--- TOTO PRIDAJ: Vymaže históriu pri zmene postavy
+        
+        document.querySelector('.control-box').classList.remove('is-active');
+
+        document.getElementById('sel-skill-name').innerText = "VYBERTE SCHOPNOSŤ";
+        renderStats(); 
+        filterBuilder();
+    }
+
+    
+    function createNewCharacter() {
+        document.getElementById('new-char-input-container').style.display = 'flex';
+        document.getElementById('overlay-backdrop').style.display = 'block';
+        document.getElementById('new-char-name').focus();
+    }
+
+    function cancelNewCharacter() {
+        document.getElementById('new-char-input-container').style.display = 'none';
+        document.getElementById('overlay-backdrop').style.display = 'none';
+    }
+
+    function confirmNewCharacter() {
+        const input = document.getElementById('new-char-name');
+        const n = input.value.trim();
+        if(n) {
+            characters.push({
+                name: n.toUpperCase(), 
+                sp: 40,
+                skills: {}, 
+                weapons: {},
+                isInitialPhase: true,
+                humanity: 50 
+            }); 
+            activeCharIdx = characters.length - 1; 
+            saveState();
+            renderCharSelector(); 
+            switchCharacter();
+            input.value = '';
+            document.getElementById('new-char-input-container').style.display = 'none';
+            document.getElementById('overlay-backdrop').style.display = 'none';
+        }
+    }
+
+
+
+    // Pomocná funkcia na porovnanie dvoch objektov (či sú databázy identické)
+    function suSchopnostiIdenticke(obj1, obj2) {
+        return JSON.stringify(obj1) === JSON.stringify(obj2);
+    }
+
+
+        
+    async function zdielatVsetkoDiscord() {
+        const DISCORD_WEBHOOK_URL = "https://discord.com/api/webhooks/1501887111031164998/Si6ykPBshCLeWvpRQYlGEMFvbeJfd0biK7J9n25ObslmH2Hcid7JT8Zj2_dGEGNrlePx";
+        
+        if (DISCORD_WEBHOOK_URL.includes("TVOJA_WEBHOOK")) {
+            showCustomAlert("Chyba: Nie je nastavená URL adresa Webhooku.");
+            return;
+        }
+
+        // Pripravíme si FormData
+        const formData = new FormData();
+        const datum = new Date().toISOString().split('T')[0]; // Formát RRRR-MM-DD
+        
+        // 1. PRÍPRAVA VŠETKÝCH POSTÁV
+        // Zabalíme celé pole characters do jedného súboru
+        const allCharsData = JSON.stringify(characters, null, 4);
+        const allCharsBlob = new Blob([allCharsData], { type: 'application/json' });
+        
+        // Pridáme súbor do formulára
+        formData.append("file1", allCharsBlob, `kompletna_zaloha_postav_${datum}.json`);
+
+        let sprava = `🚀 **Hromadné zdieľanie dát**\n`;
+        sprava += `👥 **Počet postáv:** ${characters.length}\n`;
+        sprava += `✅ Priložený súbor so všetkými postavami.\n`;
+
+        // 2. FILTROVANIE LEN ZMENENÝCH SCHOPNOSTÍ (Globálne)
+        let zmeny = {};
+        let pocetZmien = 0;
+
+        for (let kľúč in skillsDB_new) {
+            if (!originalSkillsDB[kľúč] || JSON.stringify(skillsDB_new[kľúč]) !== JSON.stringify(originalSkillsDB[kľúč])) {
+                zmeny[kľúč] = skillsDB_new[kľúč];
+                pocetZmien++;
+            }
+        }
+
+        // 3. KONTROLA A PRÍPRAVA SÚBORU ZMIEN
+        if (pocetZmien > 0) {
+            const zmenyData = JSON.stringify(zmeny, null, 4);
+            const zmenyBlob = new Blob([zmenyData], { type: 'application/json' });
+            formData.append("file2", zmenyBlob, `ZMENY_SKILLS_${datum}.json`);
+            sprava += `⚠️ **ZISTENÉ ZMENY V DB (${pocetZmien}):** Priložený súbor s upravenými schopnosťami.`;
+        } else {
+            sprava += `ℹ️ Žiadne zmeny v globálnej databáze schopností.`;
+        }
+
+        formData.append("content", sprava);
+
+        try {
+            const response = await fetch(DISCORD_WEBHOOK_URL, {
+                method: "POST",
+                body: formData
+            });
+
+            if (response.ok) {
+                showCustomAlert("Odoslané! Vďaka, že nám pomáhaš vylepšiť Hybrid!");
+            } else {
+                showCustomAlert("Chyba pri komunikácii s Discordom (Status: " + response.status + ")");
+            }
+        } catch (error) {
+            console.error("Chyba:", error);
+            showCustomAlert("Nepodarilo sa nadviazať spojenie s Discordom.");
+        }
+    }
+
+    function toggleView() {
+        // Zistíme, ktorá tab je momentálne aktívna
+        const builderTab = document.getElementById('builder');
+        if (!builderTab.classList.contains('active')) {
+            openTab('builder');
+        } else {
+            openTab('uvod');
+        }
+    }
+
+    let currentView = 'intro'; 
+
+    function switchView(viewId) {
+        currentView = viewId;
+        openTab(viewId);
+    }
+
+
+
+    function handleRouting() {
+        const hash = window.location.hash.replace('#', '') || 'uvod';
+
+        const isArticle = hash.startsWith('novinky-');
+        const targetTab = isArticle ? 'novinky' : hash;
+
+        if (isArticle) {
+            const articleId = hash.replace('novinky-', '');
+            openTab('novinky', false); // false = neprepisuj hash, už tam je
+            openArticle(articleId);
+        } else {
+            openTab(targetTab, false); // false = neprepisuj hash
+        }
+    }
+
+    function toggleInfoOverlay(show) {
+        const overlay = document.getElementById('info-panel-container');
+        if (!overlay) return;
+
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+
+    function toggleEditorOverlay(show) {
+        const overlay = document.getElementById('editor-container');
+        if (!overlay) return;
+
+        if (show) {
+            overlay.classList.add('active');
+        } else {
+            overlay.classList.remove('active');
+        }
+    }
+
+    function openTab(id, shouldUpdateHash = true) {
+        // Ak už tab je aktívny, nič nerob (bráni preblikávaniu)
+        const target = document.getElementById(id);
+        if (!target) {
+            showCustomAlert("Tab data not found.");
+            return;
+        }
+
+        // Check if tab has any content
+        if (target.innerHTML.trim() === '') {
+            target.innerHTML = '<p style="margin-top: 15px; margin-left: 30px; margin-right: 30px; font-size: 1.4rem; line-height: 1.6;">PRÍKLAD TEXTU: Keďže ide o nebezpečný svet, hrdinovia sa často dostávajú do napínavých a nebezpečných situácií, ktoré sú opísané NÁROČNOSŤOU a HROZBOU. Úspechom sa priblížia k svojmu cieľu, pri zlyhaní takmer vždy hrozia nepríjemné následky. Prostredníctvom 4 kariet (OPATRNE, RÁZNE, SMELO, BEZHLAVO) sa rozhodujú, ako ich hrdina koná. Čím vyššiu má karta OPATRNOSŤ (pomáha vyhnúť sa HROZBE), tým má nižšiu MOTIVÁCIU (zvyšuje šancu na úspech). Hráč sa potrebuje rozhodnúť, čo je pre jeho hrdinu v danej chvíli podstatnejšie.</p>';
+        }
+
+        // Aktualizácia URL len ak je to žiadané (pri kliku, nie pri routingu)
+        if (shouldUpdateHash && window.location.hash !== '#' + id) {
+            window.location.hash = id;
+            window.scrollTo(0, 0);
+        }
+
+
+        // Klasické prepínanie tried
+        document.querySelectorAll('.tab-content').forEach(c => {
+            c.classList.remove('active');
+        });
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        document.querySelectorAll('.builder-btn').forEach(b => b.classList.remove('active'));
+
+        target.classList.add('active');
+        
+        // Keep builder tab active when clicking inner builder tabs
+        const isInnerBuilderTab = ['builder-journal', 'editor', 'navod'].includes(id);
+        if (isInnerBuilderTab) {
+            const builderTab = document.getElementById('builder');
+            if (builderTab) {
+                builderTab.classList.add('active');
+            }
+            // Highlight the clicked builder button
+            const clickedBtn = Array.from(document.querySelectorAll('.builder-btn')).find(b => 
+                b.getAttribute('onclick')?.includes(`'${id}'`)
+            );
+            if (clickedBtn) clickedBtn.classList.add('active');
+        }
+        
+        if (id === 'builder') {
+            const firstInnerTab = document.getElementById('builder-journal');
+            if (firstInnerTab) {
+                firstInnerTab.classList.add('active');
+                // Also highlight the first tab button in the .builder-container tabs section
+                const tabsContainer = document.querySelector('.builder-container .tabs');
+                if (tabsContainer) {
+                    const firstBtn = tabsContainer.querySelector('.builder-btn:first-of-type');
+                    if (firstBtn) firstBtn.classList.add('active');
+                }
+            }
+        }
+
+        // Zvýraznenie tlačidla
+        const btn = Array.from(document.querySelectorAll('.tab-btn')).find(b => 
+            b.getAttribute('onclick')?.includes(`'${id}'`)
+        );
+        if (btn) btn.classList.add('active');
+
+        // Špecifická logika pre taby
+        
+        if (id === 'novinky') {
+            ensureNewsStructure(); // Vždy priprav štruktúru
+            if (!window.location.hash.includes('novinky-')) {
+                renderNewsList(); // Zoznam vykresli len ak nie sme v článku
+            }
+        }
+        
+        if (id === 'editor') renderEditorList();
+        if (id === 'builder') {
+            renderStats();
+            setTimeout(() => filterBuilder(), 50);
+        }
+    }
+    
+    function showStatus(text) {
+        const msg = document.getElementById('status-message');
+        msg.innerText = text;
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    }
+
+
+    function showCustomAlert(message, title = "UPOZORNENIE", isConfirm = false, callback = null) {
+        document.getElementById('modal-title').innerText = title;
+        document.getElementById('modal-message').innerText = message;
+        
+        const btnContainer = document.getElementById('modal-buttons');
+        if (!btnContainer) return; // Bezpečnostná poistka
+        
+        btnContainer.innerHTML = ''; 
+
+        if (isConfirm) {
+            const yesBtn = document.createElement('button');
+            yesBtn.className = 'tab-btn';
+            yesBtn.style.cssText = 'clip-path:none; background:var(--hybrid-green); color:white; margin: 5px;';
+            yesBtn.innerText = 'ÁNO';
+            yesBtn.onclick = () => { if(callback) callback(); closeModal(); };
+            
+            const noBtn = document.createElement('button');
+            noBtn.className = 'tab-btn';
+            noBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white; margin: 5px;';
+            noBtn.innerText = 'NIE';
+            noBtn.onclick = closeModal;
+
+            btnContainer.appendChild(yesBtn);
+            btnContainer.appendChild(noBtn);
+        } else {
+            const okBtn = document.createElement('button');
+            okBtn.className = 'tab-btn';
+            okBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white;';
+            okBtn.innerText = 'OK';
+            okBtn.onclick = closeModal;
+            btnContainer.appendChild(okBtn);
+        }
+
+        document.getElementById('custom-modal').style.display = 'flex';
+    }
+
+    function closeModal() {
+        document.getElementById('custom-modal').style.display = 'none';
+    }
+
+    // Funkcia na načítanie obsahu konkrétneho tabu
+
+
+    function toggleRelOverlay(show) {
+        const container = document.getElementById('rel-add-container');
+        if (show) {
+            container.classList.add('active');
+            // Optional: Prevent body scroll when overlay is open
+            document.body.style.overflow = 'hidden';
+        } else {
+            container.classList.remove('active');
+            document.body.style.overflow = 'auto';
+        }
+    }
+
+    function ensureNewsStructure() {
+        const newsTab = document.getElementById('novinky');
+        if (!newsTab) return;
+
+        // Ak tam ešte nie je wrapper, vytvoríme ho (toto je ten chýbajúci kúsok)
+        if (!document.getElementById('news-wrapper')) {
+            newsTab.innerHTML = `
+                <div id="news-wrapper" class="news-container" style="width:100%">
+                    <div id="news-list-view">
+                        <h2 class="section-title">NAJNOVŠIE SPRÁVY</h2>
+                        <div id="news-feed"></div>
+                    </div>
+                    <div id="news-article-view" style="display: none; margin: 20px">
+                        <div style="display: flex; justify-content: flex-end; margin-bottom: 20px;">
+                            <button class="builder-btn" onclick="renderNewsList()">← Späť na zoznam</button>
+                        </div>
+                        <div id="article-content"></div>
+                    </div>
+                </div>`;        }
+    }
+
+    function renderNewsList() {
+        ensureNewsStructure(); // Najprv sa uistíme, že máme kontajnery
+
+        const listContainer = document.getElementById('news-list-view');
+        const articleContainer = document.getElementById('news-article-view');
+        const feed = document.getElementById('news-feed');
+
+        listContainer.style.display = 'block';
+        articleContainer.style.display = 'none';
+        window.location.hash = 'novinky';
+
+        feed.innerHTML = articles.map(a => `
+            <div class="news-card" onclick="openArticle('${a.id}')">
+                <img src="${a.thumb}" alt="${a.title}" onerror="this.src='assets/logo.png'">
+                <div class="news-card-info">
+                    <span class="news-date">${a.date}</span>
+                    <h3 class="news-h">${a.title}</h3>
+                    <p class="news-p">${a.summary}</p>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+        const track = document.querySelector(".carousel-track");
+        const prevBtn = document.querySelector(".prev-btn");
+        const nextBtn = document.querySelector(".next-btn");
+
+        if (!track || !prevBtn || !nextBtn) return;
+
+        // Get the exact width of one slide
+        const getSlideWidth = () => track.clientWidth;
+
+        nextBtn.addEventListener("click", () => {
+            // If we are at the end, loop back to the start
+            if (track.scrollLeft + getSlideWidth() >= track.scrollWidth - 5) {
+                track.scrollTo({ left: 0, behavior: "smooth" });
+            } else {
+                track.scrollBy({ left: getSlideWidth(), behavior: "smooth" });
+            }
+        });
+
+        prevBtn.addEventListener("click", () => {
+            // If we are at the beginning, loop to the end
+            if (track.scrollLeft <= 5) {
+                track.scrollTo({ left: track.scrollWidth, behavior: "smooth" });
+            } else {
+                track.scrollBy({ left: -getSlideWidth(), behavior: "smooth" });
+            }
+        });
+    });
+
+async function openArticle(articleId) {
+    ensureNewsStructure();
+    const article = articles.find(a => a.id === articleId);
+    if (!article) return;
+
+    const listContainer = document.getElementById('news-list-view');
+    const articleContainer = document.getElementById('news-article-view');
+    const content = document.getElementById('article-content');
+
+    // --- ZMENA: Najprv zobrazíme "načítavanie" ---
+    content.innerHTML = "<p style='color:white; text-align:center;'>Načítavam článok...</p>";
+    listContainer.style.display = 'none';
+    articleContainer.style.display = 'block';
+    
+    window.location.hash = `novinky-${articleId}`;
+    window.scrollTo(0, 0);
+
+    try {
+        // --- AKTUALIZÁCIA CESTY: tabs/articles/id_clanku/subor.html ---
+        const response = await fetch(`tabs/articles/${article.id}/${article.file}?t=${new Date().getTime()}`);
+        if (!response.ok) throw new Error("Súbor nenájdený");
+        
+        const html = await response.text();
+        // --- Vložíme obsah až keď je stiahnutý ---
+        content.innerHTML = html;
+    } catch (e) {
+        content.innerHTML = `<p style='color:var(--hybrid-red);'>Chyba: Článok sa nepodarilo načítať. (${e.message})</p>`;
+    }
+}
+
+// Pomocná funkcia na dynamické načítanie html2canvas z CDN (ak ešte nie je v projekte)
+function zaistiHtml2Canvas() {
+    return new Promise((resolve, reject) => {
+        if (window.html2canvas) {
+            resolve(window.html2canvas);
+            return;
+        }
+        const script = document.createElement('script');
+        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+        script.onload = () => resolve(window.html2canvas);
+        script.onerror = () => reject(new Error('Nepodarilo sa načítať externú knižnicu pre export.'));
+        document.head.appendChild(script);
+    });
+}
+
+// Bezpečná verzia statusu, ktorá nespadne, ak id="status-message" v HTML neexistuje
+function bezpečnyStatus(text) {
+    const msg = document.getElementById('status-message');
+    if (msg) {
+        msg.innerText = text;
+        msg.style.display = 'block';
+        setTimeout(() => { msg.style.display = 'none'; }, 3000);
+    } else {
+        console.log("STATUS:", text); // Záloha do konzoly, ak element chýba
+    }
+}
+
+
+async function exportpng() {
+    const container = document.getElementById('character-stats');
+    if (!container) {
+        alert("Chyba: Panel štatistík (#character-stats) nebol v HTML nájdený.");
+        return;
+    }
+
+    let menoHrdinu = "hrdina";
+    if (typeof characters !== 'undefined' && typeof activeCharIdx !== 'undefined' && characters[activeCharIdx]) {
+        menoHrdinu = characters[activeCharIdx].name.replace(/[^a-zA-Z0-9]/g, "_");
+    }
+
+    const logujStatus = (text) => {
+        if (typeof bezpečnyStatus === "function") bezpečnyStatus(text);
+        else if (typeof showStatus === "function") showStatus(text);
+    };
+
+    const origOverflow = document.body.style.overflow;
+    const origScrollTop = window.scrollY;
+
+    try {
+        logujStatus("Pripravujem čistú kartu na tlač...");
+        
+        const h2c = await zaistiHtml2Canvas();
+
+        // FIX: Add '.mobile-header-row' to the fields we hide during export!
+        const poliaNaSkrytie = container.querySelectorAll('.skill-lvl-box, .humanity-field, .br-field, .mobile-header-row, .empty-slot');
+        poliaNaSkrytie.forEach(pole => { pole.style.visibility = 'hidden'; });
+
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        let tempStyle = null;
+        
+        if (isMobile) {
+            window.scrollTo(0, 0);
+            document.body.style.overflow = 'hidden';
+
+            tempStyle = document.createElement('style');
+            tempStyle.id = 'html2canvas-mobile-fix';
+
+            tempStyle.innerHTML = `
+                #character-stats {
+                    width: 1050px !important;
+                    max-width: 1050px !important;
+                    min-width: 1050px !important;
+                    height: 1485px !important;
+                    min-height: 1485px !important;
+                    position: absolute !important; 
+                    top: 0 !important;
+                    left: 0 !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    display: block !important;
+                    overflow: visible !important;
+                    z-index: 99999 !important;
+                    
+                    background-position: top left !important;
+                    background-size: 100% 100% !important;
+                    background-origin: padding-box !important;
+                    background-attachment: scroll !important;
+                }
+
+                #character-stats * {
+                    box-sizing: border-box !important;
+                    overflow: visible !important;
+                }
+
+                #character-stats .name-field,
+                #character-stats .skill-slot,
+                #character-stats .sheet-field {
+                    position: absolute !important;
+                }
+
+                #character-stats .name-field {
+                    font-size: 40px !important;
+                    line-height: 0.9 !important; 
+                    margin-top: -12px !important; 
+                    display: block !important;
+                }
+
+                #character-stats .skill-name-text {
+                    font-size: 30px !important;
+                    line-height: 1.0 !important;
+                    display: block !important;
+                    padding: 0 !important;
+                    white-space: nowrap !important;
+                }
+
+                #character-stats .skill-cat-box {
+                    font-size: 30px !important;
+                    line-height: 1.0 !important;
+                    display: block !important;
+                    padding: 0 !important;
+                    white-space: nowrap !important;
+                }
+
+                #character-stats .skill-slot {
+                    display: block !important;
+                    overflow: visible !important;
+                }
+                
+                /* Completely eliminate any structural height impact from the hidden mobile row */
+                #character-stats .mobile-header-row {
+                    display: none !important;
+                }
+
+                /* FIX: Shift the second column slightly to the right. 
+                  Targets slots whose inline style left attribute begins with 5 (e.g. left: 54.5%)
+                */
+                #character-stats .skill-slot[style*="left: 5"],
+                #character-stats .skill-slot[style*="left:5"] {
+                    transform: translateX(10px) !important;
+                }
+            `;
+
+            document.head.appendChild(tempStyle);
+
+            await new Promise(resolve => setTimeout(resolve, 400));
+        }
+
+        const canvas = await h2c(container, {
+            scale: isMobile ? 2 : 2, 
+            useCORS: true,
+            allowTaint: false,
+            backgroundColor: null,
+            logging: false,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: 1050,
+            windowHeight: 1485
+        });
+
+        // Restore everything back to normal for live phone viewing
+        poliaNaSkrytie.forEach(pole => { pole.style.visibility = 'visible'; });
+        if (tempStyle) tempStyle.remove();
+        
+        document.body.style.overflow = origOverflow;
+        if (isMobile) {
+            window.scrollTo(0, origScrollTop);
+        }
+
+        const imgData = canvas.toDataURL('image/png');
+
+        // Trigger Download
+        const link = document.createElement('a');
+        link.href = imgData;
+        link.download = `${menoHrdinu}_dennik.png`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+
+        logujStatus("ČISTÁ KARTA STIAHNUTÁ!");
+    } catch (error) {
+        console.error("Export zlyhal:", error);
+        alert("Export zlyhal: " + error.message);
+        document.body.style.overflow = origOverflow;
+    }
+}
+
+// Pomocná funkcia, ktorá vráti živú stránku do pôvodného responzívneho stavu
+function cleanUpExport(originalStyles) {
+    const tempStyle = document.getElementById('html2canvas-desktop-override');
+    if (tempStyle) tempStyle.remove();
+
+    document.body.style.width = originalStyles.width;
+    document.body.style.maxWidth = originalStyles.maxWidth;
+    document.body.style.minWidth = originalStyles.minWidth;
+    document.body.style.padding = originalStyles.padding;
+    document.body.style.margin = originalStyles.margin;
+    document.body.style.overflowX = originalStyles.overflowX;
+    document.body.style.backgroundImage = originalStyles.backgroundImage;
+    document.body.style.backgroundSize = originalStyles.backgroundSize;
+    document.body.style.backgroundRepeat = originalStyles.backgroundRepeat;
+    document.body.style.backgroundColor = originalStyles.backgroundColor;
+}
+
+function initSkillTooltips() {
+    // Vytvoríme jeden globálny div pre tooltip v dokumente, ak ešte neexistuje
+    let tooltip = document.querySelector('.skill-tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'skill-tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    // Delegovanie udalosti na celý dokument (bude fungovať aj po premazaní a znovuvykreslení zoznamov)
+    document.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('.skill-list-item');
+        if (!target) return;
+
+        const description = target.getAttribute('data-description');
+        // Ak schopnosť nemá popis (index 3 je prázdny), tooltip nezobrazujeme
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    });
+
+    document.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        // Ošetrenie, aby rámček nevyliezol mimo obrazovku vpravo alebo dole
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    });
+
+    document.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('.skill-list-item');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+
+        
+    });
+}
+
+function showTooltip(event) {
+    console.log('showTooltip called', event.currentTarget);
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        console.log('Creating tooltip');
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+    const desc = event.currentTarget.getAttribute('data-tooltip');
+    console.log('Tooltip description:', desc);
+    if (desc && tooltip) {
+        tooltip.textContent = desc;
+        tooltip.classList.add('visible');
+        console.log('Tooltip visible, text:', desc);
+    }
+}
+
+function moveTooltip(event) {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        let posX = event.clientX + 15;
+        let posY = event.clientY - 15;
+        
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - 15;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - 15;
+        }
+        
+        tooltip.style.left = posX + 'px';
+        tooltip.style.top = posY + 'px';
+    }
+}
+
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function initTooltips() {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    document.body.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        const description = target.getAttribute('data-tooltip');
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+    }, true); // true = capture phase
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
+});
+
+    async function loadTabContent(tabId) {
+        try {
+            const response = await fetch(`tabs/${tabId}.html`);
+            if (!response.ok) throw new Error(`Nepodarilo sa načítať tab: ${tabId}`);
+            const html = await response.text();
+            document.getElementById(tabId).innerHTML = html;
+        } catch (error) {
+            console.error(error);
+        }
+    }
+
+    async function init() {
+        console.log("Inicializácia systému...");
+            
+        // 1. Načítaj dáta (Kritické)
+        await loadSkills(); 
+
+        // 2. Načítaj statické HTML súbory (Kritické pre zobrazenie tabov)
+        const staticTabs = ['uvod', 'o-projekte', 'demo', 'kontakt', 'doplnky', 'novinky'];
+        await Promise.all(staticTabs.map(tabId => loadTabContent(tabId)));
+
+        // 3. Inicializácia rozhrania (Príprava prvkov v DOM)
+        renderCharSelector();
+        updateGroupDropdown();
+        filterBuilder();
+        renderStats();
+        renderEditorList();
+        filterRelSearch();
+        initSkillTooltips(); 
+        handleRouting();
+        window.addEventListener('hashchange', handleRouting);
+    }
+
+    async function loadSkills() {
+        try {
+            const response = await fetch('skillsDB.json');
+            if (!response.ok) throw new Error("Súbor nenájdený");
+            
+            // Priradíme dáta do globálnej premennej (bez kľúčového slova 'let')
+            skillsDB_new = await response.json();
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
+            
+            console.log("Dáta úspešne načítané");
+        } catch (error) {
+            console.error("Chyba pri načítaní JSON:", error);
+            // Fallback: ak súbor chýba, skúsime localStorage alebo prázdny objekt
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+        }
+    }
