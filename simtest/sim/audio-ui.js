@@ -282,7 +282,9 @@
         btn_vratit_zmenu: "btn_vratit_zmenu",
 
         // Stav kariet
-        karty_neaktivne: "ui_karty_neaktivne"
+        karty_neaktivne: "ui_karty_neaktivne",
+        // Stav úniku (dostupný len počas sporu)
+        unik_neaktivne: "ui_unik_neaktivne"
     };
 
     function speak(key) {
@@ -540,6 +542,75 @@
     }
 
     // ---------------------------------------------------------------------------
+    // 6b. AUTOMATICKÝ PRESUN FOKUSU NA KARTY POČAS AKČNEJ FÁZY (is_action_phase)
+    //    Kým prebieha akčná fáza (script.js nastaví is_action_phase = true), pôvodné
+    //    Možnosti (voľby z choice-promptu) už nie sú na obrazovke - ak by audio UI
+    //    zostalo v Možnostiach, čítalo by staré/neaktuálne voľby (choicePrompt tam
+    //    už nie je taký, aký bol). Namiesto reagovania až na ďalšie stlačenie klávesu
+    //    (čo by hráč nemusel spraviť hneď) to sledujeme pravidelným pollingom - keďže
+    //    is_action_phase je obyčajná JS premenná v script.js, nie DOM atribút, nedá sa
+    //    na jej zmenu naviazať MutationObserver ako pri #terminal-screen vyššie.
+    //
+    //    Zásah je NEVTIERAVÝ: fokus presunieme len vtedy, ak bol hráč práve v
+    //    Možnostiach (inak ho nerušíme, napr. keď si práve prezerá SPRÁVY); a späť do
+    //    Možnostiach ho vrátime len vtedy, ak medzitým sám neodišiel z Kariet niekam
+    //    inam (napr. pozrieť si STRES) - v tom prípade rešpektujeme, kde práve je.
+    // ---------------------------------------------------------------------------
+    let lastKnownActionPhase = false;
+    let focusWasAutoMovedToKarty = false;
+
+    function isFocusOnMoznosti() {
+        if (state.layer === "element" && currentElement() && currentElement().id === "MOZNOSTI") return true;
+        if (state.layer === "sub" && state.subMode === "moznosti") return true;
+        return false;
+    }
+
+    function focusOnKartyForActionPhase() {
+        state.sectionIdx = SECTIONS.indexOf("OVLADACI_PANEL");
+        state.elementIdx = PANEL_ELEMENTS.findIndex(function (e) { return e.id === "KARTY"; });
+        state.layer = "sub";
+        state.subMode = "karty";
+        currentSelectedCardIdx = 0;
+        if (typeof updateCardKeyboardHighlight === "function") updateCardKeyboardHighlight();
+        kartyAnnounceCurrent();
+    }
+
+    function returnFocusToMoznostiAfterActionPhase() {
+        state.sectionIdx = SECTIONS.indexOf("OVLADACI_PANEL");
+        state.elementIdx = PANEL_ELEMENTS.findIndex(function (e) { return e.id === "MOZNOSTI"; });
+        state.layer = "element";
+        state.subMode = null;
+        speak("el_moznosti");
+    }
+
+    function checkActionPhaseTransition() {
+        if (typeof is_action_phase === "undefined") return;
+        if (!audioUIActive) { lastKnownActionPhase = is_action_phase; focusWasAutoMovedToKarty = false; return; }
+        if (is_action_phase === lastKnownActionPhase) return;
+
+        const turningOn = is_action_phase && !lastKnownActionPhase;
+        const turningOff = !is_action_phase && lastKnownActionPhase;
+        lastKnownActionPhase = is_action_phase;
+
+        if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
+
+        if (turningOn) {
+            if (isFocusOnMoznosti()) {
+                focusWasAutoMovedToKarty = true;
+                focusOnKartyForActionPhase();
+            }
+        } else if (turningOff) {
+            const stillOnKarty = state.layer === "sub" && state.subMode === "karty";
+            if (focusWasAutoMovedToKarty && stillOnKarty) {
+                returnFocusToMoznostiAfterActionPhase();
+            }
+            focusWasAutoMovedToKarty = false;
+        }
+    }
+
+    setInterval(checkActionPhaseTransition, 200);
+
+    // ---------------------------------------------------------------------------
     // 7. OVLÁDACÍ PANEL > Stres (jednoduchý readout)
     // ---------------------------------------------------------------------------
     function stresAnnounce() {
@@ -683,7 +754,24 @@
         // ohlásil jej názov, hoci hráč žiadnu zmenu sekcie nežiadal - len spustil kontrolu.
     }
 
+    // Únik (rovnako ako karty vyššie) má zmysel len počas sporu (is_conflict) - escape-btn
+    // je mimo sporu v DOM skrytý (display:none, viď script.js), takže mimo sporu ho
+    // nemá zmysel ani skúšať klikať (mohol by ísť tichý no-op alebo v horšom prípade
+    // spustiť logiku, ktorá počíta s tým, že spor prebieha).
+    function unikIsActive() {
+        return typeof is_conflict !== "undefined" && !!is_conflict;
+    }
+
+    // Na rozdiel od KARIET (ktoré aj mimo boja nesú informáciu a dá sa nimi listovať,
+    // viď cardsAreActive() vyššie - preto ostávajú v cykle vždy) ÚNIK mimo sporu
+    // neponúka vôbec nič - žiadne info, žiadnu akciu. Pri prechádzaní OVLÁDACÍM PANELOM
+    // šípkami ho preto v tomto stave úplne PRESKOČÍME, aby zbytočne nerozptyľoval.
+    function isElementSkippable(el) {
+        return el.id === "UNIK" && !unikIsActive();
+    }
+
     function unikSelect() {
+        if (!unikIsActive()) { speak("unik_neaktivne"); return; }
         const escapeBtn = document.getElementById("escape-btn");
         if (escapeBtn) escapeBtn.click();
         // Ostávame na prvku ÚNIK - viď poznámka vyššie pri prvaPomocSelect().
@@ -1534,7 +1622,7 @@ function handleHeroKeydown(e) {
         ELEMENT_ZBRANE: "Si na položke Zbrane. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať zbraňami, ktoré má hrdina k dispozícii.",
         ELEMENT_SCHOPNOSTI: "Si na položke Schopnosti. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať schopnosťami hrdinu.",
         ELEMENT_PRVA_POMOC: "Si na položke Prvá pomoc. Medzerníkom ju použiješ.",
-        ELEMENT_UNIK: "Si na položke Únik. Medzerníkom ho použiješ.",
+        ELEMENT_UNIK: "Si na položke Únik. Medzerníkom ho použiješ - dostupné len počas sporu.",
         ELEMENT_MENU_OPTION: "Si na položke menu. Medzerníkom ju potvrdíš.",
 
         // --- PODVRSTVY (vrstva "sub") - kľúč = "SUB_" + state.subMode ---
@@ -1799,7 +1887,11 @@ function handleHeroKeydown(e) {
                     state.elementIdx = (state.elementIdx - 1 + getMenuOptions().length) % getMenuOptions().length;
                     announceMenuOption(state.elementIdx);
                 } else {
-                    state.elementIdx = (state.elementIdx - 1 + PANEL_ELEMENTS.length) % PANEL_ELEMENTS.length;
+                    let steps = 0;
+                    do {
+                        state.elementIdx = (state.elementIdx - 1 + PANEL_ELEMENTS.length) % PANEL_ELEMENTS.length;
+                        steps++;
+                    } while (isElementSkippable(currentElement()) && steps < PANEL_ELEMENTS.length);
                     announceElement();
                 }
             } else if (state.layer === "sub") {
@@ -1822,7 +1914,11 @@ function handleHeroKeydown(e) {
                     state.elementIdx = (state.elementIdx + 1) % getMenuOptions().length;
                     announceMenuOption(state.elementIdx);
                 } else {
-                    state.elementIdx = (state.elementIdx + 1) % PANEL_ELEMENTS.length;
+                    let steps = 0;
+                    do {
+                        state.elementIdx = (state.elementIdx + 1) % PANEL_ELEMENTS.length;
+                        steps++;
+                    } while (isElementSkippable(currentElement()) && steps < PANEL_ELEMENTS.length);
                     announceElement();
                 }
             } else if (state.layer === "sub") {
@@ -1854,6 +1950,8 @@ function handleHeroKeydown(e) {
                 lastOverlay = null;
                 generalPromptWasAnnounced = false;
                 lastBuilderModalMsg = null;
+                lastKnownActionPhase = (typeof is_action_phase !== "undefined") ? is_action_phase : false;
+                focusWasAutoMovedToKarty = false;
                 speak("voice_mode_on");
             } else {
                 stopAllAudio();
