@@ -1,13 +1,19 @@
-        let test_mode = false;
-        const MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
+let test_mode = false;
+        let MODE = "NORMAL"; // "EASY" | "NORMAL" | "HARD"
         const DEBUG = false;
-        let debug_start = "START"
+        const LOG_ROLLS = true;
+        let debug_start = "FOREST_PATH";
 
+
+        // Assuming you already have a reference to your audio element
+        const audio = document.getElementById('bg-audio');
         let tooltipsInitialized = false;
-
         let current_challenge_key = "WELCOME";
         let back_to_game = "START";
         let keep_testing = false;
+        let is_tutorial = false;
+        let is_help = false;
+        let narrative_phase = false;
         let prev_challenge = null;
         let pre_encounter_challenge_key = null;
         let queued_difficulty_target = null;
@@ -15,6 +21,7 @@
         let CHALLENGES = {};
         let ENEMY_TYPES = {};
         let HEROES = [];
+        let builderOpen = false;
         let SKILLS_DB = {}; // <--- PRIDANÉ: Sem sa načítajú dáta zo skillsDB.json
         let activeCharIdx = 0;
         let hero_selected = false;
@@ -34,26 +41,125 @@
         const SYSTEM_COMMANDS = ["BACK_TO_GAME", "ABOUT"];
         let SETTINGS = {
             "tutorial": true,
+            "logRolls": false,
         };
 
+        function rollsVisible() {
+            return typeof SETTINGS !== 'undefined' && !!SETTINGS.logRolls;
+        }
 
-        const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT"];
+
+        const DEFENSE_SKILLS = ["OBRATNOSŤ", "ODOLNOSŤ", "ZMYSLY", "ŠPRINT", "KRÍDLA"];
         const ATTACK_SKILLS = ["SILA", "OBRATNOSŤ", "ZMYSLY"]
-        const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE"];
-        const SNEAK_SKILLS = ["PLÝŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
+        const CHASE_SKILLS = ["OBRATNOSŤ", "ZMYSLY", "ŠPRINT", "ŠPLHANIE", "KRÍDLA"];
+        const SNEAK_SKILLS = ["PLÍŽENIE", "ŠPEHOVANIE", "OBRATNOSŤ"]
 
         const CARDS = {
-            "O": [[3, [10]], [1, [10, 4]]],
-            "R": [[1, [12]], [2, [12]]],
-            "S": [[0, [10, 4]], [3, [10]]],
-            "B": [[-1, [10, 6]], [4, [8]]],
+            "O": [[2, [8]], [1, [10]]],
+            "S": [[1, [10]], [2, [8]]],
+            "B": [[0, [12]], [3, [6]]],
         };
+
+        // --- Card availability helpers ------------------------------------------------
+        // The game supports any subset of cards: just add/remove keys on CARDS above.
+        // Everything that used to assume "O", "R", "S", "B" always exist (the card tray
+        // UI and the enemy AI) should go through these helpers instead of hardcoded
+        // letters/arrays, so a removed card simply disappears from play everywhere.
+        const CARD_BG_COLORS = { "O": "#c62828", "R": "#2e7d32", "S": "#e65100", "B": "#1565c0" };
+
+        function getCardKeys() {
+            return Object.keys(CARDS);
+        }
+        function hasCard(code) {
+            return !!code && Object.prototype.hasOwnProperty.call(CARDS, code);
+        }
+        // Picks a uniformly random card among the ones that currently exist.
+        // Returns null if every card has been removed.
+        function pickRandomCard() {
+            const keys = getCardKeys();
+            if (keys.length === 0) return null;
+            return keys[Math.floor(Math.random() * keys.length)];
+        }
+        // Returns the first entry of `preferred` that still exists in CARDS,
+        // falling back to a random available card (never a removed one).
+        function pickAvailableCard(preferred) {
+            for (const c of preferred) {
+                if (hasCard(c)) return c;
+            }
+            return pickRandomCard();
+        }
+        // Builds the physical card elements in the tray from whatever keys are
+        // currently present in CARDS. Safe to call again later if CARDS changes
+        // at runtime (e.g. via a deck-builder / settings screen).
+        function buildCardTray() {
+            const tray = document.getElementById("card-tray-container");
+            if (!tray) return;
+
+            // Remove any previously generated cards, keep the flip/escape buttons.
+            tray.querySelectorAll(".card-container").forEach(el => el.remove());
+
+            const flipBtn = document.getElementById("flip-cards-btn");
+
+            getCardKeys().forEach(code => {
+                const bgColor = CARD_BG_COLORS[code] || "#333";
+
+                const card = document.createElement("div");
+                card.className = "card-container";
+                card.setAttribute("data-card", code);
+
+                const zoneTop = document.createElement("div");
+                zoneTop.className = "split-zone top";
+                zoneTop.setAttribute("data-action", "D");
+                zoneTop.textContent = "ČIN";
+
+                const zoneBottom = document.createElement("div");
+                zoneBottom.className = "split-zone bottom";
+                zoneBottom.setAttribute("data-action", "A");
+                zoneBottom.textContent = "ÚTOK";
+
+                const img = document.createElement("img");
+                img.src = "assets/" + code + ".png";
+                img.alt = "Card " + code;
+                img.className = "card-img";
+                // Fallback if the card image is missing: hide the broken image,
+                // paint the card in its theme color, and label it with the code.
+                img.addEventListener("error", () => {
+                    img.style.display = "none";
+                    card.style.background = bgColor;
+                    const label = document.createElement("div");
+                    label.style.position = "absolute";
+                    label.style.top = "40%";
+                    label.style.width = "100%";
+                    label.style.textAlign = "center";
+                    label.style.color = "white";
+                    label.style.fontFamily = "sans-serif";
+                    label.style.fontWeight = "bold";
+                    label.textContent = code + " CARD";
+                    card.appendChild(label);
+                });
+
+                card.appendChild(zoneTop);
+                card.appendChild(zoneBottom);
+                card.appendChild(img);
+
+                if (flipBtn) {
+                    tray.insertBefore(card, flipBtn);
+                } else {
+                    tray.appendChild(card);
+                }
+            });
+        }
+
+        // Build the tray immediately: the <script> tag runs at the end of <body>,
+        // so #card-tray-container already exists in the DOM at this point.
+        buildCardTray();
 
         const HERO = {
             "name": "Hrdina 1",
             "skills": {"STREĽBA":1, "VRHANIE":1},
             "stress_thresh": 8,
             "stress": 0,
+            "perm_stress": 0,
             "items": {},
             "weapons": [],
             "ammo":{},
@@ -84,10 +190,19 @@
             },
             "VRHACIE":{
                 "nôž":1,
+                "bomba":3
             }
         }
 
         const BIOLOGICAL_WEAPONS = ["OSTNE", "HRYZADLÁ", "KLEPETÁ", "KYSELINA", "ŽIHADLO"];
+        window.BIOLOGICAL_WEAPONS = BIOLOGICAL_WEAPONS;
+
+
+        const PASSIVE_SKILLS = ["PANCIER"];
+
+        function getPancierLevel() {
+            return (HERO && HERO.skills && HERO.skills["PANCIER"]) || 0;
+        }
 
 
         ITEM_LIST = {
@@ -126,11 +241,11 @@
             "FEROMÓNY": {
                 "description": "Dokážu ovplyvniť správanie Somôr."
             },
-            "BOMBA":{
-                "description": "Vďaka nej zmiznú veci, ktoré ti prekážajú."
-            },
             "FILTER":{
                 "description": "Palivový filter. Aby sa do motora nedostalo nejaké svinstvo."
+            },
+            "KĽÚČ":{
+                "description": "Ktovie, od čoho je?"
             }
         }
         window.ITEM_LIST = ITEM_LIST;
@@ -144,8 +259,8 @@
 
         const WEAPON_SKILLS = {
             "1":["STREĽBA","VRHANIE","ELIMINÁCIA Z DIAĽKY","ĽAHKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
-            "2":["ŤAŽKÉ STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŤAŽKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
-            "3":["ŠPECIÁLNE STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŠPECIÁLNE ZBRANE","MUČENIE","OMRÁČENIE","TICHÁ ELIMINÁCIA"],
+            "2":["ŤAŽKÉ PREDMETY","ŤAŽKÉ STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŤAŽKÉ ZBRANE","OMRÁČENIE","MUČENIE","TICHÁ ELIMINÁCIA"],
+            "3":["ŤAŽKÉ PREDMETY","ŠPECIÁLNE STRELNÉ ZBRANE","ELIMINÁCIA Z DIAĽKY","ŠPECIÁLNE ZBRANE","MUČENIE","OMRÁČENIE","TICHÁ ELIMINÁCIA"],
             "4":["BOJOVÉ STROJE","HROMADNÉ NIČENIE","ELIMINÁCIA Z DIAĽKY"]
         }
 
@@ -169,9 +284,8 @@
         let move = 0;
         let weapon = 0;
         let stress = 0;
-        let perm_stress = 0;
         const stress_thresh = 8;
-        const ADVANTAGE_CAP = 3;
+        const ADVANTAGE_CAP = 5;
         let skill = 0;
         let advantage = 0;
         let enemy_advantage = 0;
@@ -203,6 +317,9 @@
         let isProcessingQueue = false;
         let onTerminalFinishedCallback = null; 
         let activeLogTimeout = null; // NEW: Keeps track of the active waiting timer
+        let terminalPendingAnimationTimeout = null;
+        let terminalPendingAnimationIndex = 0;
+        const terminalPendingFrames = ["(   )", "(.  )", "(.. )", "(...)"];
         let is_collapse_check = false;
         let collapse_resume_callback = null;
         let collapse_failure_callback = null;
@@ -215,7 +332,7 @@
         let heal_attempts = 0;
         let is_elimination_check = false;
         let elimination_mode = "kill"; // "kill" | "sneak" — set by runElimination()
-
+        let transition_in_progress = false;
 
         function elimination(enemyKey) {
             inputs_frozen = true;
@@ -244,8 +361,9 @@
 
             // Rovnako ako v boji (KROK 4): zbraň s muníciou v INITIAL_AMMO ju musí mať k dispozícii
             let hasAmmo = true;
-            if (isRangedWeapon && typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                const currentAmmo = HERO["ammo"][selectedWeaponName];
+            if (isRangedWeapon) {
+                const ammoKey = getAmmoKey(selectedWeaponName);
+                const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][ammoKey] : undefined;
                 hasAmmo = currentAmmo !== undefined && currentAmmo > 0;
             }
 
@@ -290,7 +408,7 @@
             if (mode === "sneak") {
                 log("Nepriateľ je ešte mimo dosahu. Skús sa k nemu nepozorovane priblížiť.", "system-msg", true);
             } else {
-                log("Nepriateľ ťa ešte nevidí, chceš ho skúsiť eliminovať?", "system-msg", true);
+                log("Nepriateľ ťa ešte nevidí, chceš zaútočiť zo zálohy?", "system-msg", true);
             }
 
             inputs_frozen = false;
@@ -369,6 +487,7 @@
                         updateUI();
 
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve elim. check.")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
                             let activeChallenge = CHALLENGES[targetEnemyKey];
@@ -378,8 +497,18 @@
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                             player_action = null; enemy_action = null; is_conflict = false;
 
-                            proceed(pending_challenge_key ? pending_challenge_key : activeChallenge.case_success);
-                            pending_challenge_key = null;
+                            let nextChallenge = [];
+
+                            pushFlat(nextChallenge, activeChallenge?.on_death);
+
+                            if (pending_challenge_key) {
+                                pushFlat(nextChallenge, pending_challenge_key);
+                                pending_challenge_key = null;
+                            } else {
+                                pushFlat(nextChallenge, activeChallenge?.case_success);
+                            }
+
+                            proceed(nextChallenge);
                         };
                         return;
                     } else {
@@ -492,10 +621,64 @@
         }
 
 
+        function getTerminalPendingAnimationElement() {
+            let el = document.getElementById('terminal-pending-animation');
+            if (!el) {
+                el = document.createElement('div');
+                el.id = 'terminal-pending-animation';
+                el.className = 'terminal-pending-animation';
+                const container = document.querySelector('.terminal-border-box');
+                if (container) {
+                    container.appendChild(el);
+                }
+            }
+            return el;
+        }
+
+        function stopTerminalPendingAnimation() {
+            if (terminalPendingAnimationTimeout) {
+                clearTimeout(terminalPendingAnimationTimeout);
+                terminalPendingAnimationTimeout = null;
+            }
+            const el = document.getElementById('terminal-pending-animation');
+            if (el) {
+                el.style.display = 'none';
+            }
+        }
+
+        function scheduleTerminalPendingAnimationFrame() {
+            const el = getTerminalPendingAnimationElement();
+            if (!el) return;
+
+            const currentIndex = terminalPendingAnimationIndex;
+            el.textContent = terminalPendingFrames[currentIndex];
+            terminalPendingAnimationIndex = (currentIndex + 1) % terminalPendingFrames.length;
+
+            const delay = currentIndex === terminalPendingFrames.length - 1 ? 800 : 400;
+            terminalPendingAnimationTimeout = setTimeout(() => {
+                if (logs_pending.length === 0 && !isProcessingQueue) {
+                    stopTerminalPendingAnimation();
+                    return;
+                }
+                scheduleTerminalPendingAnimationFrame();
+            }, delay);
+        }
+
+        function startTerminalPendingAnimation() {
+            if (terminalPendingAnimationTimeout) return;
+            terminalPendingAnimationIndex = 0;
+            const el = getTerminalPendingAnimationElement();
+            if (!el) return;
+            el.style.display = 'block';
+            scheduleTerminalPendingAnimationFrame();
+        }
+
         function log(message, className = "", extraSpacing = true, extraSpacingB = false, isInline = false) {
+            let spacingSuppressed = false;
             if (/(danger|failure|error|success)/i.test(className)) {
                 extraSpacing = false;
                 extraSpacingB = false;
+                spacingSuppressed = true;
             }
             
             let needsSeparator = false;
@@ -513,10 +696,11 @@
             }
             
             // Pass the instruction safely inside ONE flat object layer
-            logs_pending.push({ message, className, extraSpacing, extraSpacingB, isInline, needsSeparator });
+            logs_pending.push({ message, className, extraSpacing, extraSpacingB, isInline, needsSeparator, spacingSuppressed });
             
             if (!isProcessingQueue) {
                 isProcessingQueue = true;
+                startTerminalPendingAnimation();
                 activeLogTimeout = setTimeout(processQueue, 0); 
             }
         }
@@ -525,6 +709,7 @@
             if (logs_pending.length === 0) {
                 isProcessingQueue = false;
                 activeLogTimeout = null;
+                stopTerminalPendingAnimation();
                 if (typeof onTerminalFinishedCallback === "function") {
                     const callback = onTerminalFinishedCallback;
                     onTerminalFinishedCallback = null;
@@ -536,6 +721,16 @@
             const currentLog = logs_pending.shift();
             const terminal = document.getElementById("terminal-screen");
             const scrollContainer = terminal.parentElement;
+
+            // Bottom spacing must reflect whichever segment was appended MOST RECENTLY,
+            // since inline segments get appended into an existing block's div rather
+            // than creating their own. Recomputed on every append, block or inline.
+            const computeBottomSpaceClass = (logItem) => {
+                if (logItem.spacingSuppressed) return '';
+                if (logItem.extraSpacingB || logItem.message.length < 150) return 'spacing-bottom';
+                if (logItem.message.length >= 150 && logItem.message.length < 220) return 'spacing-bottom-medium';
+                return '';
+            };
 
             if (currentLog.message !== "") {
                 if (currentLog.isInline && terminal.lastElementChild) {
@@ -553,17 +748,18 @@
                     span.className = `terminal-inline-segment ${currentLog.className}`.trim();
                     span.innerText = currentLog.message;
                     terminal.lastElementChild.appendChild(span);
+
+                    // 3. Re-evaluate the wrapper div's bottom spacing based on THIS segment,
+                    // since it's now the last thing in the block.
+                    terminal.lastElementChild.classList.remove('spacing-bottom', 'spacing-bottom-medium');
+                    const inlineBottomClass = computeBottomSpaceClass(currentLog);
+                    if (inlineBottomClass) terminal.lastElementChild.classList.add(inlineBottomClass);
                     
                 } else {
                     // Standard new block line behavior
                     const line = document.createElement("div");
 
-                    let bottomSpaceClass = '';
-                    if (currentLog.extraSpacingB || currentLog.message.length < 90) {
-                        bottomSpaceClass = 'spacing-bottom';
-                    } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
-                        bottomSpaceClass = 'spacing-bottom-medium';
-                    }
+                    const bottomSpaceClass = computeBottomSpaceClass(currentLog);
 
                     line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
                     line.innerText = currentLog.message;
@@ -591,6 +787,7 @@
             } else {
                 isProcessingQueue = false;
                 activeLogTimeout = null;
+                stopTerminalPendingAnimation();
                 if (typeof onTerminalFinishedCallback === "function") {
                     const callback = onTerminalFinishedCallback;
                     onTerminalFinishedCallback = null;
@@ -632,13 +829,28 @@
                         span.className = `terminal-inline-segment ${currentLog.className}`.trim();
                         span.innerText = currentLog.message;
                         terminal.lastElementChild.appendChild(span);
+
+                        // Re-evaluate the wrapper div's bottom spacing based on THIS segment,
+                        // since it's now the last thing in the block.
+                        terminal.lastElementChild.classList.remove('spacing-bottom', 'spacing-bottom-medium');
+                        if (!currentLog.spacingSuppressed) {
+                            let inlineBottomClass = '';
+                            if (currentLog.extraSpacingB || currentLog.message.length < 90) {
+                                inlineBottomClass = 'spacing-bottom';
+                            } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
+                                inlineBottomClass = 'spacing-bottom-medium';
+                            }
+                            if (inlineBottomClass) terminal.lastElementChild.classList.add(inlineBottomClass);
+                        }
                     } else {
                         const line = document.createElement("div");
                         let bottomSpaceClass = '';
-                        if (currentLog.extraSpacingB || currentLog.message.length < 90) {
-                            bottomSpaceClass = 'spacing-bottom';
-                        } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
-                            bottomSpaceClass = 'spacing-bottom-medium';
+                        if (!currentLog.spacingSuppressed) {
+                            if (currentLog.extraSpacingB || currentLog.message.length < 90) {
+                                bottomSpaceClass = 'spacing-bottom';
+                            } else if (currentLog.message.length >= 80 && currentLog.message.length < 240) {
+                                bottomSpaceClass = 'spacing-bottom-medium';
+                            }
                         }
                         line.className = `terminal-line ${currentLog.className} ${currentLog.extraSpacing ? 'spacing-top' : ''} ${bottomSpaceClass}`.trim();
                         line.innerText = currentLog.message;
@@ -652,6 +864,7 @@
                     activeLogTimeout = setTimeout(flushNext, delay);
                 } else {
                     activeLogTimeout = null;
+                    stopTerminalPendingAnimation();
                     if (typeof onTerminalFinishedCallback === "function") {
                         const callback = onTerminalFinishedCallback;
                         onTerminalFinishedCallback = null;
@@ -665,7 +878,7 @@
 
         document.getElementById("proceed-btn").addEventListener("click", function () {
             console.log("PROCEED_HANDLER: click detected");
-            if (!gameOn && !welcome) {
+            if (!gameOn && !welcome && !is_tutorial) {
                 console.log("PROCEED_HANDLER: gameOn is false, returning");
                 return;
             }
@@ -703,7 +916,7 @@
 
         // --- UNIFIED KEYBOARD CONTROLLER ---
         window.addEventListener('keydown', (e) => {
-            if (!gameOn && !welcome) return;
+            if (!gameOn && !welcome && !is_tutorial) return;
 
             // Check visibility states for all elements
             const generalPrompt = document.getElementById('general-prompt');
@@ -716,14 +929,17 @@
             const isReadyVisible = readyPrompt && window.getComputedStyle(readyPrompt).display !== "none";
 
             const choicePrompt = document.getElementById("choice-prompt");
-            const isChoiceVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none";
+            // Počas akčnej fázy sa v #choice-prompt vykresľuje LEN tlačidlo späť (žiadne skutočné
+            // narrative choices), takže sa nesmie počítať ako "choice prompt viditeľný" - inak by to
+            // zablokovalo šípkové ovládanie kariet nižšie.
+            const isChoiceVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none" && choicePrompt.dataset.actionBack !== "true";
 
             const adrenalineKeys = ['1', '2', '3', '4'];
 
             const cards = document.querySelectorAll("#card-tray-container .card-container");
             const trayContainer = document.getElementById("card-tray-container");
 
-            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check || is_elimination_check)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
+            if (!inputs_frozen && ((!isChoiceVisible && !narrative_phase) || is_heal_check || is_elimination_check || is_tutorial)  && !isReadyVisible && !isProceedVisible && !isGeneralVisible){
                 if (cards.length === 0) return;
 
                 // =========================================================================
@@ -742,7 +958,7 @@
 
                 if (e.key === "ArrowRight") {
                     e.preventDefault();
-                    
+
                     // KLÁVESNICA PREBERÁ KONTROLU: Rušíme myšovú dominanciu
                     if (trayContainer) trayContainer.classList.remove("mouse-active");
                     
@@ -915,6 +1131,19 @@
                     cycleDropdown("player-skill-dropdown", 1);   // Down / Forward
                     return;
                 }
+
+                // --- SPÄŤ: klávesa B - funguje pri choice uzloch aj počas akčnej fázy ---
+                if (!inputs_frozen && (e.key === 'b' || e.key === 'B')) {
+                    const backHost = document.getElementById("choice-prompt");
+                    if (backHost && window.getComputedStyle(backHost).display !== "none") {
+                        const backBtn = backHost.querySelector(".back-btn");
+                        if (backBtn) {
+                            e.preventDefault();
+                            backBtn.click();
+                            return;
+                        }
+                    }
+                }
             }
 
             // =========================================================================
@@ -925,7 +1154,7 @@
                 // flush them instead of cycling/selecting choices.
                 const hasPendingLogs = logs_pending.length > 0 || isProcessingQueue || activeLogTimeout;
 
-                if (hasPendingLogs && (e.code === 'ArrowRight' || e.code === 'Space')) {
+                if (hasPendingLogs && (e.code === 'ArrowDown' || e.code === 'Space')) {
                     e.preventDefault();
                     flushLogQueue();
                     return;
@@ -1056,14 +1285,207 @@
                 showGeneralPrompt(
                     'Chceš začať odznova? \n \n Zvýšené úrovne schopností ti zostanú, ale tvoj pokrok ani predmety nebudú uložené.',
                     () => {            
-
-                            updateUI();
-                            // Okamžité vyčistenie a znovunačítanie pôvodného stavu hry
-                            window.location.reload();
+                            resetCurrentHeroAndRestart();
                         }
 
                 );
             },delay);
+        }
+
+        // Resets every run-scoped global back to what it would be at a fresh page
+        // load: cancels in-flight timers, reloads CHALLENGES.json from disk (undoing
+        // any in-place mutation made during play — .alerted, .distance, .saved_stress,
+        // difficulty overrides, the ACTIVE dict), clears FLAGS, and zeroes every
+        // combat/turn/collapse/UI-tracking variable the game mutates while running.
+        // Shared by both the "restart" and "change hero" flows so neither path can
+        // leak state from the run that just ended into the next one.
+        async function resetRunState() {
+            // Cancel any in-flight timers from the run that just ended so their
+            // callbacks can't fire mid-reset and reintroduce stale state.
+            clearTimeout(combatLoopTimeout);
+            clearTimeout(readyPromptTimeout);
+            clearTimeout(activeLogTimeout);
+            clearTimeout(terminalPendingAnimationTimeout);
+            combatLoopTimeout = null;
+            readyPromptTimeout = null;
+            activeLogTimeout = null;
+            terminalPendingAnimationTimeout = null;
+            terminalPendingAnimationIndex = 0;
+
+            // Reload CHALLENGES fresh from disk, exactly like a page refresh would,
+            // so every in-place mutation made during the run is undone.
+            try {
+                const response = await fetch('./CHALLENGES.json');
+                if (!response.ok) throw new Error('Nepodarilo sa načítať súbor CHALLENGES.json');
+                CHALLENGES = await response.json();
+            } catch (e) {
+                console.error('Chyba pri znovunačítaní CHALLENGES.json, ponechávam aspoň ACTIVE dict vyprázdnený:', e);
+            }
+            if (!CHALLENGES["ACTIVE"]) CHALLENGES["ACTIVE"] = {};
+
+            FLAGS = {};
+
+            // Collapse/heal/elimination/conflict/action-phase flags, then inputs_frozen
+            // (resetStateFlags leaves inputs_frozen = true, matching a mid-transition
+            // page load, so we explicitly unfreeze after).
+            resetStateFlags();
+            inputs_frozen = false;
+
+            // Combat / turn-tracking state
+            pending_challenge_key = null;
+            pending_enemy_key = null;
+            player_escaping = false;
+            player_escape_counter = 0;
+            player_zero_counter = 0;
+            proceed_target = null;
+            enemy = null;
+            enemy_id = null;
+            enemy_stress = 0;
+            enemy_escaping = false;
+            enemy_escape_counter = 0;
+            enemy_zero_counter = 0;
+            turn = "p";
+            round = 0;
+            move = 0;
+            weapon = 0;
+            stress = 0;
+            skill = 0;
+            advantage = 0;
+            enemy_advantage = 0;
+            cards_are_flipped = false;
+            player_action = null;
+            enemy_action = null;
+            chase_mode = false;
+            distance_combat_active = false;
+            conflict_distance = 0;
+            current_challenge = { difficulty: 7, threat: 2 };
+            combat_starter = null;
+            challenge_history = [];
+
+            // Collapse-check bookkeeping
+            collapse_resume_callback = null;
+            collapse_failure_callback = null;
+            collapse_pending_proceed_target = null;
+            collapse_pending_target = null;
+            collapse_conflict_mode = false;
+            collapse_savedActionType = "D";
+            collapse_action_done = false;
+            heal_attempts = 0;
+            elimination_mode = "kill";
+            transition_in_progress = false;
+
+            // Card / UI selection tracking
+            currentSelectedCardIdx = 0;
+            currentSelectedActionType = "D";
+            touchHoverActive = false;
+            touchPendingCardIdx = null;
+            touchClickSuppressed = false;
+            activeChoiceIndex = 0;
+
+            // Terminal / log queue
+            logs_pending = [];
+            isProcessingQueue = false;
+            onTerminalFinishedCallback = null;
+
+            // Misc run-scoped bookkeeping
+            keep_testing = false;
+            narrative_phase = false;
+            prev_challenge = null;
+            pre_encounter_challenge_key = null;
+            queued_difficulty_target = null;
+            stuck_counter = 0;
+            sequential_msgs_done = false;
+            hero_created = true;
+            builderOpen = false;
+            back_to_game = "START";
+        }
+
+        // Soft-reset the current run without a full page reload: reloads the active
+        // hero fresh from localStorage (so stress/items/weapons/ammo snap back to
+        // their saved defaults while sp/skills/humanity/perm_stress progression is
+        // kept), resets every other run-scoped global via resetRunState(), then
+        // jumps straight back to the START node — basically an in-place hero autoselect.
+        async function resetCurrentHeroAndRestart() {
+            const heroName = HERO.name;
+            const saved = JSON.parse(localStorage.getItem('characters')) || [];
+            const savedChar = saved.find(c => c.name && heroName && c.name.toUpperCase() === heroName.toUpperCase());
+
+            if (savedChar) {
+                const freshHero = {
+                    name: savedChar.name.toUpperCase(),
+                    sp: savedChar.sp !== undefined ? savedChar.sp : 40,
+                    perm_stress: savedChar.perm_stress !== undefined ? savedChar.perm_stress : 0,
+                    skills: savedChar.skills || {},
+                    weapons: savedChar.defaultWeapons ? [...savedChar.defaultWeapons] : [],
+                    ammo:    savedChar.defaultAmmo    ? {...savedChar.defaultAmmo}    : {},
+                    items:   savedChar.defaultItems   ? {...savedChar.defaultItems}   : {},
+                    stress_thresh: savedChar.stress_thresh || 8,
+                    stress: 0,
+                    weapon: 0,
+                    defaultWeapons: savedChar.defaultWeapons || [],
+                    defaultAmmo:    savedChar.defaultAmmo    || {},
+                    defaultItems:   savedChar.defaultItems   || {},
+                    humanity: savedChar.humanity || 50,
+                    initialSkillsSnapshot: savedChar.initialSkillsSnapshot || {},
+                    isInitialPhase: savedChar.isInitialPhase !== undefined ? savedChar.isInitialPhase : false
+                };
+
+                for (let key in HERO) delete HERO[key];
+                Object.assign(HERO, freshHero);
+
+                if (Array.isArray(HEROES) && typeof activeCharIdx === 'number' && HEROES[activeCharIdx]) {
+                    HEROES[activeCharIdx] = freshHero;
+                }
+            }
+
+            await resetRunState();
+
+            // Skip hero selection entirely — the hero above was just re-loaded in place.
+            gameOn = true;
+            current_challenge_key = "START";
+            updateUI();
+            handleChallengeTransition("START");
+        }
+
+        function changeHero(){
+            showGeneralPrompt(
+                'Prídeš o aktuálny postup. Želáš si pokračovať?',
+                () => {
+                    if (typeof runChangeHero === 'function') {
+                        runChangeHero();
+                    }
+                }
+            );
+        }
+
+        // Opens the hero-selection screen directly, bypassing the welcome screen and
+        // any in-progress tutorial. Used by the menu's "ZMENIŤ HRDINU" button.
+        async function runChangeHero() {
+            const enemyCardContainer = document.getElementById("enemy-card-container");
+            const playerCardDisplay = document.getElementById("player-card-display");
+            const prompt = document.getElementById("proceed-prompt");
+            const closeBtn = document.getElementById('close-btn');
+            const backButton = document.getElementById('back-button');
+            const choicePrompt = document.getElementById("choice-prompt");
+
+
+            if(choicePrompt) choicePrompt.style.display = "none";
+            if (enemyCardContainer) enemyCardContainer.classList.remove("show");
+            if (playerCardDisplay) playerCardDisplay.classList.remove("show");
+            if (prompt) prompt.style.display = "none";
+            if (closeBtn) closeBtn.style.display = "none";
+            if (backButton) backButton.style.display = "none";
+
+            await resetRunState();
+
+            // Skip welcome screen / tutorial entirely — go straight to hero pick,
+            // starting fresh at START once a hero is confirmed.
+            welcome = false;
+            is_tutorial = false;
+            current_challenge_key = "START";
+
+            hideMenu();
+            selectHero();
         }
 
         function showMenu() {
@@ -1083,21 +1505,58 @@
                 settings.style.display = "flex";
             }
             hideMenu();
-
             syncUIWithSettings();
+        }
+
+        function showCredits() {
+            const credits = document.getElementById("credits");
+            if (credits) {
+                credits.style.display = "flex";
+            }
+            hideMenu();
+        }
+
+        function hideCredits() {
+            document.getElementById('credits').style.display = 'none';
         }
 
         function syncUIWithSettings() {
             if (typeof SETTINGS === 'undefined') return;
 
             const tutorialCheckbox = document.getElementById('tutorial-checkbox');
+            const audioCheckbox = document.getElementById('audio-checkbox');
+            const modeDropdown = document.getElementById('mode-dropdown');
+            const logRollsCheckbox = document.getElementById('log-rolls-checkbox');
             if (tutorialCheckbox) {
                 tutorialCheckbox.checked = !!SETTINGS.tutorial;
+            }
+            if (audioCheckbox) {
+                audioCheckbox.checked = !!SETTINGS.audio;
+            }
+            if (modeDropdown) {
+                modeDropdown.value = SETTINGS.MODE || 'NORMAL';
+            }
+            if (logRollsCheckbox) {
+                logRollsCheckbox.checked = !!SETTINGS.logRolls;
             }
         }
 
         function hideSettings() {
+            MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
+            SETTINGS.MODE = MODE;
+            saveSettings();
+            if(DEBUG) log("Nastavenia boli uložené.");
             document.getElementById('settings').style.display = 'none';
+        }
+
+        function backToMenu() {
+            MODE = document.getElementById('mode-dropdown').value || 'NORMAL';
+            SETTINGS.MODE = MODE;
+            saveSettings();
+            if(DEBUG) log("Nastavenia boli uložené. Aktuálna obtiažnosť.");
+            document.getElementById('settings').style.display = 'none';
+            document.getElementById('credits').style.display = 'none';
+            showMenu()
         }
 
         function saveSettings() {
@@ -1129,15 +1588,62 @@
             }
         }
 
-        function updateTutorialVisual() {
-            const checkbox = document.getElementById('tutorial-checkbox');
+        function toggleAudio() {
+            const checkbox = document.getElementById('audio-checkbox');
             if (!checkbox) return;
+
+            if (typeof SETTINGS === 'undefined') {
+                window.SETTINGS = {};
+            }
+
+            // Set the setting explicitly to match the checkbox state
+            SETTINGS.audio = checkbox.checked;
+            if (typeof updateUI === 'function') {
+                updateUI();
+            }
+            if (typeof saveSettings === 'function') {
+                saveSettings();
+            }
+        }
+
+        function toggleLogRolls() {
+            const checkbox = document.getElementById('log-rolls-checkbox');
+            if (!checkbox) return;
+
+            if (typeof SETTINGS === 'undefined') {
+                window.SETTINGS = {};
+            }
+
+            // Set the setting explicitly to match the checkbox state
+            SETTINGS.logRolls = checkbox.checked;
+
+            if (typeof saveSettings === 'function') {
+                saveSettings();
+            }
+        }
+
+        function updateSettingsVisual() {
+            const tutorial_checkbox = document.getElementById('tutorial-checkbox');
+            const audio_checkbox = document.getElementById('audio-checkbox');
+            const log_rolls_checkbox = document.getElementById('log-rolls-checkbox');
+
+            if (!tutorial_checkbox || !audio_checkbox) return;
 
             // Force the checkbox UI to match the current data structure state
             if (typeof SETTINGS !== 'undefined' && SETTINGS.tutorial) {
-                checkbox.checked = true;
+                tutorial_checkbox.checked = true;
             } else {
-                checkbox.checked = false;
+                tutorial_checkbox.checked = false;
+            }
+
+            if (typeof SETTINGS !== 'undefined' && SETTINGS.audio) {
+                audio_checkbox.checked = true;
+            } else {
+                audio_checkbox.checked = false;
+            }
+
+            if (log_rolls_checkbox) {
+                log_rolls_checkbox.checked = !!(typeof SETTINGS !== 'undefined' && SETTINGS.logRolls);
             }
         }
 
@@ -1167,6 +1673,7 @@
                 if (
                     lowerFinal.startsWith("set_") || 
                     lowerFinal.startsWith("flag_") || 
+                    lowerFinal.includes(":") ||
                     lowerFinal.includes("=") || 
                     lowerFinal.includes("+") || 
                     lowerFinal.includes("-")
@@ -1203,8 +1710,9 @@
                 return caseTarget;
             }
             const parts = caseTarget.split('_else_');
-            const ifPart = parts[0].substring(3); // Odstráni "if_"
-            const falseTarget = parts[1] || null;
+            const elseIdx = caseTarget.indexOf('_else_');
+            const ifPart = elseIdx === -1 ? caseTarget.substring(3) : caseTarget.substring(3, elseIdx);
+            const falseTarget = elseIdx === -1 ? null : caseTarget.substring(elseIdx + 6);
 
             let flagKey, operator, rawValue, trueTarget;
 
@@ -1215,14 +1723,40 @@
                 operator = match[2];
                 rawValue = match[3].trim();
                 trueTarget = match[4];
-            } else {
+} else {
                 // 2. BACKUP: Skrátený zápis bez operátora (napr. door-open_TARGET) -> predvolíme == true
+                // Keďže flagKey aj target môžu obsahovať podčiarniky (napr. "WORKS_0_WORKS_0"),
+                // samotná greedy regex nevie spoľahlivo určiť hranicu medzi nimi. Preto
+                // vyskúšame kandidátov od najdlhšieho flagKey po najkratší a uprednostníme
+                // ten, ktorý reálne existuje vo FLAGS / CHALLENGES.ACTIVE.
                 const shortMatch = ifPart.match(/^([a-zA-Z0-9_-]+)_(.+)$/);
                 if (shortMatch) {
-                    flagKey = shortMatch[1];
+                    const underscorePositions = [];
+                    for (let i = 0; i < ifPart.length; i++) {
+                        if (ifPart[i] === '_') underscorePositions.push(i);
+                    }
+                    let resolved = false;
+                    for (let i = underscorePositions.length - 1; i >= 0; i--) {
+                        const pos = underscorePositions[i];
+                        const candidateKey = ifPart.substring(0, pos);
+                        const candidateTarget = ifPart.substring(pos + 1);
+                        if (!candidateKey || !candidateTarget) continue;
+                        const existsInFlags = typeof FLAGS !== 'undefined' && candidateKey in FLAGS;
+                        const existsInActive = typeof CHALLENGES !== 'undefined' && CHALLENGES["ACTIVE"] && candidateKey in CHALLENGES["ACTIVE"];
+                        if (existsInFlags || existsInActive) {
+                            flagKey = candidateKey;
+                            trueTarget = candidateTarget;
+                            resolved = true;
+                            break;
+                        }
+                    }
+                    if (!resolved) {
+                        // Fallback na pôvodné (greedy) správanie, ak žiadny kandidát nezodpovedá existujúcemu flagu
+                        flagKey = shortMatch[1];
+                        trueTarget = shortMatch[2];
+                    }
                     operator = '==';
                     rawValue = 'true';
-                    trueTarget = shortMatch[2];
                 }
             }
 
@@ -1246,11 +1780,33 @@
             else if (rawValue.toLowerCase() === 'false') processedTarget = false;
             else if (!isNaN(Number(rawValue))) processedTarget = Number(rawValue);
         
-            if (flagKey.toLowerCase().startsWith('item')) {
-                const itemKey = flagKey.substring(5).replace(/_/g, ' ').toUpperCase();
-                processedCurrent = (typeof HERO !== 'undefined' && HERO.items && HERO.items[itemKey] !== undefined)
-                    ? HERO.items[itemKey]
-                    : 0;
+            const normalizedFlagKey = flagKey.toLowerCase();
+            const normalizeLookupKey = (rawKey) => rawKey.replace(/_/g, ' ').trim();
+            const lookupObjectKey = (obj, rawKey) => {
+                if (!obj || typeof obj !== 'object') return undefined;
+                if (rawKey in obj) return obj[rawKey];
+                const lowerKey = rawKey.toLowerCase();
+                const matchedKey = Object.keys(obj).find(k => k.toLowerCase() === lowerKey);
+                return matchedKey !== undefined ? obj[matchedKey] : undefined;
+            };
+
+            if (normalizedFlagKey.startsWith('item')) {
+                const itemKey = normalizeLookupKey(flagKey.substring(5));
+                const value = (typeof HERO !== 'undefined') ? lookupObjectKey(HERO.items, itemKey) : undefined;
+                processedCurrent = value !== undefined ? value : 0;
+
+                // FEROMÓNY: postava so schopnosťou FEROMÓNY si ich vie vytvoriť sama,
+                // takže vlastníctvo tejto schopnosti sa počíta ako vlastníctvo položky FEROMÓNY.
+                if (itemKey.toUpperCase() === 'FEROMÓNY') {
+                    const skillLvl = (typeof HERO !== 'undefined' && HERO.skills) ? (HERO.skills['FEROMÓNY'] || 0) : 0;
+                    if (skillLvl > 0) {
+                        processedCurrent = Math.max(processedCurrent, skillLvl);
+                    }
+                }
+            } else if (normalizedFlagKey.startsWith('ammo')) {
+                const ammoKey = normalizeLookupKey(flagKey.substring(5));
+                const value = (typeof HERO !== 'undefined') ? lookupObjectKey(HERO.ammo, ammoKey) : undefined;
+                processedCurrent = value !== undefined ? value : 0;
             } else if (!isNaN(Number(currentFlagValue)) && typeof currentFlagValue !== 'boolean') {
                 processedCurrent = Number(currentFlagValue);
             }
@@ -1268,7 +1824,15 @@
                 case '<=':  conditionPassed = (processedCurrent <= processedTarget); break;
             }
 
-            return conditionPassed ? trueTarget : falseTarget;
+            const resolvedResult = conditionPassed ? trueTarget : falseTarget;
+
+            // Ak je výsledná vetva sama o sebe vnorenou podmienkou (napr. "if_flagB:true_X_else_Y"),
+            // vyhodnoťme ju rekurzívne namiesto toho, aby sme ju vrátili ako nevyriešený reťazec.
+            if (typeof resolvedResult === 'string' && resolvedResult.startsWith('if_')) {
+                return evaluateIfCondition(resolvedResult);
+            }
+
+            return resolvedResult;
         }
 
         function resetStateFlags(){
@@ -1291,7 +1855,8 @@
                 showGeneralPrompt(
                 `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
                 () => {
-                    runAbout()})
+                    runAbout()},() => {
+                    showMenu()})
             } else {
                 runAbout()
             }
@@ -1308,12 +1873,84 @@
             handleChallengeTransition(target)
         }
 
+        function help(){
+            if (is_collapse_check){
+                showGeneralPrompt("Teraz to nie je možné.")
+            }
+            const choicePrompt = document.getElementById("choice-prompt");
+            const isChoicePromptVisible = choicePrompt && window.getComputedStyle(choicePrompt).display !== "none";
+            hideMenu();
+            if (!isChoicePromptVisible){
+                showGeneralPrompt(
+                `POZOR! \n Prídeš o pokrok v súboji alebo výzve! \n Naozaj chceš zobraziť informácie o hre teraz?'`,
+                () => {
+                    runHelp()},() => {
+                    showMenu()})
+            } else {
+                runHelp()
+            }
+        }
+        
+        function runHelp(){
+            resetStateFlags(); 
+            const proceedPrompt = document.getElementById("proceed-prompt");
+            if (proceedPrompt) {
+                proceedPrompt.style.display = "none";
+            };
+            target = "HELP";
+            back_to_game = current_challenge_key;
+            handleChallengeTransition(target)
+        }
+
         function handleChallengeTransition(caseTarget) {
+            MODE = SETTINGS.MODE || 'NORMAL';
+            if(MODE != "HARD") 
+                {HERO.perm_stress = 0} 
+            else if (HERO.stress < HERO.perm_stress) 
+                {HERO.stress = HERO.perm_stress};
+            if (caseTarget == "WELCOME"){
+                const proceedBtn = document.getElementById('proceed-btn');
+                proceedBtn.innerText = "ZAČAŤ"
+            } else {
+                const proceedBtn = document.getElementById('proceed-btn');
+                proceedBtn.innerText = "ĎALEJ"
+            }
+
+            if (DEBUG){
+                executeMods("stress-1")
+            }
+
+            const closeBtn = document.getElementById('close-btn');
+            const backButton = document.getElementById('back-button');
+            const proceedPrompt = document.getElementById('proceed-prompt');
+
+            if (caseTarget.includes("TUTORIAL") || caseTarget.includes("DUMMY")){
+                closeBtn.innerText = "UKONČIŤ";
+                closeBtn.style.display = "block";
+                backButton.innerText = "SPÄŤ";
+                backButton.style.display = "block";
+                proceedPrompt.style.justifyContent = "space-between";
+                is_tutorial = true
+            } else {
+                backButton.style.display = "none";
+            }
+
+            if (caseTarget.includes("HELP")){
+                closeBtn.innerText = "UKONČIŤ";
+                closeBtn.style.display = "block"
+                proceedPrompt.style.justifyContent = "space-between";
+                is_help = true
+            }
+
             if (caseTarget == "BACK_TO_GAME"){
                 let final_target = [];
                 stress_reset = "stress-10";
                 if (back_to_game.includes("START")) final_target.push(stress_reset);
                 final_target.push(back_to_game);
+                is_tutorial = false;
+                is_help = false;
+                proceedPrompt.style.justifyContent = "end";
+                closeBtn.style.display = "none";
                 updateUI;
                 handleChallengeTransition(final_target);
 
@@ -1326,7 +1963,7 @@
                 mod = Math.min(0,Math.floor(Math.random() * 14 - 1))
                 HERO.stress = Math.max(0, HERO.stress + mod);
             }
-            if (!caseTarget || (!gameOn && !welcome)) return;
+            if (!caseTarget || (!gameOn && !welcome && !is_tutorial)) return;
             if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
                 return; // Early return to completely freeze challenge transitions
             }
@@ -1449,7 +2086,9 @@
                             target.toLowerCase().includes('item_') ||   // PRIDANÉ: Bezpečné zachytenie predmetov
                             target.toLowerCase().startsWith('set_') ||
                             target.toLowerCase().startsWith('flag_') ||
-                            target.toLowerCase().startsWith('alerted_') // PRIDANÉ: Ostražitosť nepriateľov
+                            target.toLowerCase().startsWith('alerted_') ||
+                            target.toLowerCase().startsWith('distance_') ||
+                            target.toLowerCase().startsWith('delayed_') // PRIDANÉ: Ostražitosť nepriateľov
                         );
 
                         // 3. Špeciálna izolovaná kontrola pre podmienky (if_)
@@ -1539,6 +2178,7 @@
                         ? CHALLENGES[instanceKey].distance
                         : 0;
                     distance_combat_active = conflict_distance > 0 && playerHasRangedWeapon() && !enemyHasRangedWeapon();
+                    if (DEBUG) log(`Distance: ${conflict_distance} distance combat: Distance: ${distance_combat_active}`, "system-msg");
                     if (elimMode) {
                         const enemyContainer = document.getElementById("enemy-sprite-container");
                         const enemyImg = document.getElementById("enemy-sprite");
@@ -1782,10 +2422,10 @@
         function executeMods(caseTarget){
             let modificationExecuted = false;
 
-            // 1. KONTROLA PRE ALERTED MODS (Case Sensitive pre challengekey)
-            if (caseTarget.startsWith("alerted_") && caseTarget.includes(":")) {
-                // Odrežeme "alerted_" (8 znakov) z pôvodného reťazca
-                const alertPart = caseTarget.substring(8); 
+            // 1. KONTROLA PRE ALERTED MODS (prijímame both alerted_ and alerted: prefixes)
+            if ((caseTarget.startsWith("alerted_") || caseTarget.startsWith("alerted:")) && caseTarget.includes(":")) {
+                // Odrežeme prefix ('alerted_' alebo 'alerted:') z pôvodného reťazca
+                const alertPart = caseTarget.replace(/^alerted[_:]/, "");
                 const parts = alertPart.split(":");
                 
                 // challengeKey si zachová presný tvar (napr. "Predátorka_2")
@@ -1808,10 +2448,70 @@
                 modificationExecuted = true;
             }
 
-            // Vytvoríme lowercase verziu PRE OSTATNÉ VETVY
+            if ((caseTarget.startsWith("distance_") || caseTarget.startsWith("distance:")) && caseTarget.includes(":")) {
+                // Odrežeme prefix ('distance_' alebo 'distance:') z pôvodného reťazca
+                const distPart = caseTarget.replace(/^distance[_:]/, "");
+                const parts = distPart.split(":");
+                
+                // challengeKey si zachová presný tvar (napr. "Predátorka_2")
+                const challengeKey = parts[0].trim(); 
+                const rawVal = parts[1].trim().toLowerCase();
+                const distVal = rawVal;
+
+                // Poistka pre existenciu objektu CHALLENGES a jeho uzla
+                if (typeof CHALLENGES !== 'undefined' && CHALLENGES[challengeKey]) {
+                    CHALLENGES[challengeKey].distance = distVal;
+                    
+                    if (DEBUG === true) {
+                        log(`[distance] Vzdialenosť nepriateľa '${challengeKey}' bola nastavená na: ${distVal}`);
+                        return true
+                    }
+                } else if (DEBUG === true) {
+                    log(`[executeMods] Výzva '${challengeKey}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                    return false
+                }
+                modificationExecuted = true;
+            }
+
+            if (caseTarget.startsWith("delayed_")) {
+                const lastUnderscore = caseTarget.lastIndexOf('_');
+                
+                if (lastUnderscore !== -1) {
+                    const stateStr = caseTarget.substring(lastUnderscore + 1).toLowerCase().trim();
+                    // Vyrežeme názov výzvy (od indexu 4, čo preskočí "set_")
+                    const challengeName = caseTarget.substring(8, lastUnderscore).toUpperCase().trim();
+                   
+                    if (typeof CHALLENGES !== 'undefined' && CHALLENGES[challengeName]) {
+                        if(stateStr == "add"){
+                            DELAYED.push(challengeName);
+                            
+                            if (DEBUG === true) {
+                                log(`[delayed] Výzva '${challengeName}' bola pridaná do DELAYED. DELAYED: '${DELAYED}'`);
+                                return true
+                            }
+                        } else if (stateStr == "remove"){
+                            const idx = DELAYED.indexOf(challengeName);
+                            if (idx !== -1) {
+                                DELAYED.splice(idx, 1);
+
+                                if (DEBUG === true) {
+                                    log(`[delayed] Výzva '${challengeName}' bola odstránená z DELAYED. DELAYED: '${DELAYED}'`);
+                                    return true
+                                }
+                            } else if (DEBUG === true) {
+                                log(`[delayed] Výzva '${challengeName}' sa v DELAYED nenachádza, netreba ju odstrániť.`);
+                            }
+                        }
+                    } else if (DEBUG === true) {
+                        log(`[executeMods] Výzva '${challengeName}' nebola nájdená v databáze CHALLENGES.`, "danger-msg");
+                        return false
+                    }
+                    modificationExecuted = true;
+                }
+            }
+
             const lowerTarget = caseTarget.toLowerCase();
 
-            // Zmenené na ELSE IF, aby sa po úspešnom spracovaní alerted_ tieto vetvy preskočili
             if (!modificationExecuted && lowerTarget.startsWith("flag_")) {
                 const flagPart = caseTarget.substring(5); // Odstráni "flag_"
                 
@@ -1926,7 +2626,7 @@
                     
                     // --- UPRAVENÉ PRAVIDLO PRE PERM_STRESS ---
                     // Ak hrdina nemá perm_stress, dno je 0
-                    const currentPermStress = perm_stress || 0;
+                    const currentPermStress = HERO.perm_stress || 0;
 
                     if (modifier < 0 && HERO.stress < currentPermStress) {
                         // Ak stres klesal a padol pod permanentný stres, zarovnáme ho presne naň
@@ -2056,7 +2756,7 @@
 
                         if (targetChallenge && !isNaN(explicitModifier) && CHALLENGES[targetChallenge]) {
                             const baseDifficulty = CHALLENGES[targetChallenge].difficulty ?? 0;
-                            const newDifficulty = Math.max(0, baseDifficulty + explicitModifier);
+                            const newDifficulty = Math.max(5, baseDifficulty + explicitModifier);
                             CHALLENGES[targetChallenge].difficulty = newDifficulty;
 
                             if (DEBUG === true) {
@@ -2071,7 +2771,7 @@
                 else if (lowerTarget.includes("difficulty")) {
                     if (queued_difficulty_target && CHALLENGES[queued_difficulty_target]) {
                         const baseDifficulty = CHALLENGES[queued_difficulty_target].difficulty ?? 0;
-                        const newDifficulty = Math.max(0, baseDifficulty + modifier);
+                        const newDifficulty = Math.max(5, baseDifficulty + modifier);
                         CHALLENGES[queued_difficulty_target].difficulty = newDifficulty;
 
                         if (modifier > 0) {
@@ -2149,6 +2849,23 @@
                         if (DEBUG === true) {
                             log(`Predmet ${itemName} neexistuje v ITEM_LIST.`, "danger-msg");
                         }
+                    }
+                    modificationExecuted = true;
+                }
+                else if (lowerTarget.startsWith("ammo_")) {
+                    const ammoName = parts[0].split("ammo_")[1].trim().toLowerCase();
+                    if (!HERO.ammo || typeof HERO.ammo !== 'object') {
+                        HERO.ammo = {};
+                    }
+
+                    const currentAmmo = HERO.ammo[ammoName] || 0;
+                    const newAmmoValue = Math.max(0, currentAmmo + modifier);
+                    HERO.ammo[ammoName] = newAmmoValue;
+
+                    if (modifier > 0) {
+                        log(`Získavaš muníciu pre ${ammoName.toUpperCase()}: +${amount} ks. (Celkovo: ${newAmmoValue})`, "success-msg");
+                    } else {
+                        log(`Strácaš muníciu pre ${ammoName.toUpperCase()}: -${amount} ks. (Celkovo: ${newAmmoValue})`, "danger-msg");
                     }
                     modificationExecuted = true;
                 }
@@ -2238,6 +2955,12 @@
             log(`Použitý predmet ${itemName}. (zostatok: ${HERO.items[itemName]}x)`, "system-msg");
             
             updateUI();
+            // updateUI() -> syncHeroToStorage() is skipped while the builder overlay is open,
+            // so force the write here — this call was itself triggered by the builder
+            // (window.parent.useItem), and its refresh loop expects the change to already
+            // be in localStorage.
+            syncHeroToStorage(true);
+            
             if (ITEM_LIST[itemName].message) {
                 const message = ITEM_LIST[itemName].message;
                 showGeneralPrompt(message)
@@ -2343,6 +3066,7 @@
                 }
 
                 choicePrompt.innerHTML = "";
+                delete choicePrompt.dataset.actionBack;
                 activeChoiceIndex = 0; 
                 choicePrompt.userData = { validChoices: validChoices };
 
@@ -2515,10 +3239,30 @@
                 const enemyPool = tableFloor.querySelector('.dice-animation-pool.enemy-pool');
                 if (enemyPool) enemyPool.remove();
             }
+            let diff_mod = 0;
+            let threat_mod = 0;
+
+            if(MODE === "EASY") {
+                diff_mod = -2;
+                threat_mod = -2;
+            } else if(MODE === "HARD") {
+                diff_mod = -1;
+                threat_mod = -1;
+            } else {
+                diff_mod = -2;
+                threat_mod = -1;
+            }
+
+            if(DEBUG === true) {
+                log(`DEBUG: diff_mod = ${diff_mod}, threat_mod = ${threat_mod}`);
+            }
 
             const activeChallenge = CHALLENGES[current_challenge_key];
-            current_challenge.difficulty = activeChallenge.difficulty;
-            current_challenge.threat = activeChallenge.threat;
+            current_challenge.difficulty = Math.max(4, activeChallenge.difficulty + diff_mod);
+            current_challenge.threat = Math.max(1, activeChallenge.threat + threat_mod);
+            if (rollsVisible() && current_challenge.difficulty > 0 && current_challenge.threat > 0) {
+                log(` \n NÁROČNOSŤ: ${current_challenge.difficulty} - HROZBA: ${current_challenge.threat}`, "error-msg", true, true, true);
+            }
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
@@ -2670,7 +3414,6 @@
                         tableFloor.style.setProperty('--bg-image', `url('${newUrl}')`);
                         tableFloor.classList.add('fade-in');
                         tableFloor.classList.toggle('safari-repaint-trigger');
-
                         proceedWithPhase(); // Now proceed with narrative UI layout or action checks
                     };
                     tempImg.onerror = () => {
@@ -2688,8 +3431,23 @@
 
         function pushDelayed(effect) {
             if (!effect) return;
-            if (!DELAYED.includes(effect)) {
-                DELAYED.push(effect);
+
+            // Podporíme aj pole efektov naraz (napr. case_success_delayed: [...])
+            if (Array.isArray(effect)) {
+                effect.forEach(pushDelayed);
+                return;
+            }
+
+            // KRITICKÁ OPRAVA: ak je efekt zapísaný ako podmienka (napr. "if_flag:true_TARGET_else_TARGET2"),
+            // musíme ju najprv vyhodnotiť - inak by sme do DELAYED pridali surový, nikdy sa nezhodujúci reťazec.
+            let resolvedEffect = effect;
+            if (typeof effect === 'string' && effect.startsWith('if_') && typeof evaluateIfCondition === 'function') {
+                resolvedEffect = evaluateIfCondition(effect);
+            }
+            if (!resolvedEffect) return;
+
+            if (!DELAYED.includes(resolvedEffect)) {
+                DELAYED.push(resolvedEffect);
             }
         }
 
@@ -2710,7 +3468,25 @@
                 if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
                     log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
                     return;
+                };
+                return
+            }
+            // --- REŽIM ELIMINÁCIE (PRIBLÍŽENIE K BOJU) ---
+            // Toto nastane PRED tým, ako sa 'enemy' nastaví, takže by sme inak nesprávne
+            // spadli do REŽIMU VÝZVY a validovali proti schopnostiam pôvodnej (zlyhanej)
+            // výzvy namiesto schopností relevantných pre elimináciu/boj.
+            if (is_elimination_check) {
+                const skillData = SKILLS_DB[selectedSkillName];
+                const upperSkill = selectedSkillName.toUpperCase();
+                const isSneakSkill = SNEAK_SKILLS.includes(upperSkill);
+                const isCombatSkill = ATTACK_SKILLS.includes(upperSkill) ||
+                        (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));
+                const isEliminationSkill = upperSkill.includes("ELIMIN");
+
+                if (!isSneakSkill && !isCombatSkill && !isEliminationSkill && !isPlaceholder) {
+                    log(`⚠️ "${selectedSkillName}" ti pri priblížení nepomôže.`, "error-msg");
                 }
+                return;
             }
             // --- REŽIM VÝZVY (CHALLENGE) ---
             const activeChallenge = CHALLENGES[current_challenge_key];
@@ -2828,15 +3604,14 @@
 
                 // --- 4. KROK: KONTROLA MUNÍCIE ---
                 if (actionType === "A" && !isPlaceholderWeapon) {
-                    if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[weaponVal] !== undefined) {
-                        const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
-                        const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
-                        const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                    const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][weaponVal] !== undefined;
+                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][weaponVal] !== undefined;
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
 
-                        if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                            const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][weaponVal] : undefined;
-                            if (currentAmmo === undefined || currentAmmo <= 0) return false;
-                        }
+                    if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                        const ammoKey = getAmmoKey(weaponVal);
+                        const currentAmmo = (HERO && HERO["ammo"]) ? HERO["ammo"][ammoKey] : undefined;
+                        if (currentAmmo === undefined || currentAmmo <= 0) return false;
                     }
                 }
 
@@ -2925,7 +3700,95 @@
         }
 
 
+        // Späť tlačidlo pre AKČNÚ FÁZU (výzvy s kartami/kockami) - obdoba back-btn z choice-prompt uzlov.
+        // Zavolané z updateUI() pri každom prekreslení. Zámerne recykluje ten istý #choice-prompt
+        // kontajner a rovnaké CSS triedy ako back tlačidlo v narrative choice uzloch, aby vyzeralo
+        // a bolo umiestnené identicky.
+        function updateActionBackButton() {
+            const activeChallenge = CHALLENGES[current_challenge_key];
+            const activeDict = CHALLENGES?.["ACTIVE"] || {};
+
+            let shouldShow = false;
+            let backDest = null;
+
+            // Tlačidlo späť patrí len do čistej akčnej fázy (karty/kocky) - nie do boja
+            // a nie do fázy priblíženia/eliminácie (is_elimination_check), keďže odtiaľ
+            // sa nedá "vrátiť" bez zrušenia celého priblíženia k nepriateľovi.
+            // Zmizne aj hneď ako hráč zvolí kartu (inputs_frozen sa nastaví na true
+            // na začiatku resolveActionPhase(), ešte pred zavolaním updateUI()).
+            if (
+                is_action_phase &&
+                !is_conflict &&
+                !is_elimination_check &&
+                !inputs_frozen &&
+                activeChallenge &&
+                activeChallenge.back === true &&
+                challenge_history.length > 0
+            ) {
+                backDest = challenge_history[challenge_history.length - 1];
+                if (activeDict[backDest] === true) {
+                    shouldShow = true;
+                }
+            }
+
+            let choicePrompt = document.getElementById("choice-prompt");
+
+            if (!shouldShow) {
+                if (choicePrompt && choicePrompt.dataset.actionBack === "true") {
+                    choicePrompt.style.display = "none";
+                    choicePrompt.innerHTML = "";
+                    delete choicePrompt.dataset.actionBack;
+                }
+                return;
+            }
+
+            // Ak je choice-prompt už vykreslený ako naše tlačidlo späť, netreba ho znova stavať.
+            if (choicePrompt && choicePrompt.dataset.actionBack === "true" && choicePrompt.style.display !== "none") {
+                return;
+            }
+
+            if (!choicePrompt) {
+                choicePrompt = document.createElement("div");
+                choicePrompt.id = "choice-prompt";
+                document.querySelector(".gaming-table-floor").appendChild(choicePrompt);
+            }
+
+            choicePrompt.innerHTML = "";
+
+            const btn = document.createElement("button");
+            btn.className = "adrenaline-select choice-btn back-btn";
+            btn.innerText = "⬅";
+
+            btn.onclick = () => {
+                if (typeof is_collapse_check !== 'undefined' && is_collapse_check === true) {
+                    return;
+                }
+                if (inputs_frozen) return;
+                choicePrompt.style.display = "none";
+                delete choicePrompt.dataset.actionBack;
+                handleChallengeTransition("BACK_ACTION_1");
+            };
+
+            choicePrompt.appendChild(btn);
+            choicePrompt.dataset.actionBack = "true";
+            choicePrompt.style.display = "flex";
+        }
+
         function updateUI() {
+
+            const isPlaying = !audio.paused && !audio.ended && audio.readyState > 2;
+
+            // 3. Sync the audio state with your global flag
+            if (SETTINGS.audio && !isPlaying) {
+                // The flag is TRUE, but audio is NOT playing -> Turn it on
+                audio.play().catch(error => {
+                    console.log("Playback blocked or failed:", error);
+                });
+            } else if (!SETTINGS.audio && isPlaying) {
+                // The flag is FALSE, but audio IS playing -> Turn it off
+                audio.pause();
+            }
+            
             document.getElementById("player-advantage").innerText = advantage;
             syncHeroToStorage();
             const spElement = document.getElementById("sp");
@@ -2980,6 +3843,8 @@
                     escapeBtn.style.background = "#000";
                 }
             }
+
+            updateActionBackButton();
 
             // --- 1. SEKCIA ZBRANÍ (Tvoj pôvodný kód) ---
             const weaponDropdown = document.getElementById("player-weapon-dropdown");
@@ -3092,8 +3957,8 @@
                 // Resetujeme všetky stavové triedy pred novým vyhodnotením
                 cell.classList.remove("active-perm", "filled-perm", "active-stress", "filled-stress");
                 
-                // Zabezpečíme načítanie globálnej premennej perm_stress (ak neexistuje, použijeme 0)
-                const currentPerm = typeof perm_stress !== 'undefined' ? perm_stress : 0;
+                // Zabezpečíme načítanie perm_stress z hernej postavy (ak neexistuje, použijeme 0)
+                const currentPerm = HERO.perm_stress !== undefined ? HERO.perm_stress : 0;
 
                 // 1. VRSTVA: Permanentný stres (čierne pozadie)
                 if (val <= currentPerm) {
@@ -3135,6 +4000,8 @@
                 });
             }
             
+            const cardImages = tray.querySelectorAll(".card-img");
+
             if (enemy === null) {
                 is_conflict = false;
                 document.getElementById("enemy-panel").style.display = "none";
@@ -3147,9 +4014,15 @@
                         tray.className = "card-tray conflict-mode";
                     }
                     const activeChallenge = CHALLENGES[current_challenge_key];
+                    const displayChallengeData = (
+                        current_challenge &&
+                        current_challenge.difficulty !== undefined &&
+                        current_challenge.threat !== undefined
+                    ) ? current_challenge : activeChallenge;
+
                     if (activeChallenge && activeChallenge.difficulty !== undefined && activeChallenge.threat !== undefined) {
                         // Slide down and update content
-                        toggleChallengeDisplay(true, activeChallenge);
+                        toggleChallengeDisplay(true, displayChallengeData);
                         is_action_phase = true;
                     } else if (is_collapse_check || is_heal_check || is_elimination_check) {
                         // Slide down without wiping out content
@@ -3159,11 +4032,15 @@
                         // Slide smoothly back up out of view
                         toggleChallengeDisplay(false);
                     }
+                    if (is_action_phase || is_collapse_check || is_heal_check || is_elimination_check) {
+                        cardImages.forEach(img => img.style.filter = "saturate(100%)");
+                    }
                 }
                 
                 if (enemyHeading) enemyHeading.innerText = "ENEMY";
             } else {
                 is_conflict = true;
+                cardImages.forEach(img => img.style.filter = "saturate(100%)");
                 document.getElementById("enemy-panel").style.display = "block";
                 document.getElementById("enemy-stress").innerText = `${enemy_stress} / ${ENEMY_TYPES[enemy].stress_thresh}`;
                 document.getElementById("enemy-advantage").innerText = enemy_advantage;
@@ -3177,7 +4054,13 @@
                 if (enemyHeading) enemyHeading.innerText = enemy;
             }
 
+            cardImages.forEach(img => {
+                if (inputs_frozen) {
+                    img.style.filter = "saturate(10%) brightness(140%) contrast(60%)";
+                }
+            });
         }
+        
 
         function resolveActionPhase(card) {
             inputs_frozen = true;
@@ -3189,31 +4072,15 @@
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let roll_result = rollDice(card, false, skill);
             
-            log(`VÝSLEDOK: ${roll_result} (+${adrenaline})`, "error-msg", true);
-
+            roll_result_raw = roll_result
             roll_result += adrenaline; 
 
             let success = roll_result >= current_challenge.difficulty;
-            let is_failure = roll_result < current_challenge.difficulty;
-            let is_tie = roll_result == current_challenge.difficulty;
 
             let threat_realized = false;
 
-            if (is_tie){
-                log("Vyhodnocujem hrozbu...", "error-msg",false, false, true);
-            } else if (is_failure) {
-                log("Vyhodnocujem hrozbu...", "error-msg",false, false, true);
-            }
-
-            // 1. Log baseline success or failure text
-            if (success) {
-                log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
-            } else {
-                log(activeChallenge.failure_msg || "ZLYHANIE!", "failure-msg", false, false, true);
-            }
-
-
-
+            log("\n Vyhodnocujem hrozbu...", "error-msg",false, false, true);
+            
 
             // Bezpečne posielame hráča na výslednú lokáciu až po dobehnutí všetkých logov
             const doTransition = () => {
@@ -3222,30 +4089,18 @@
                     HERO.sp = Math.max(0, (HERO.sp || 0) + 1);
                     log(" (+1 BR!)", "success-msg", false, false, true);
                     if (activeChallenge.case_success_delayed) {
-                        if (Array.isArray(activeChallenge.case_success_delayed)) {
-                            DELAYED.push(...activeChallenge.case_success_delayed);
-                        } else {
-                            DELAYED.push(activeChallenge.case_success_delayed);
-                        }
+                        pushDelayed(activeChallenge.case_success_delayed);
                     }
                     followupTarget = activeChallenge.case_success;
                 } else {
                     if (activeChallenge.case_failure_delayed) {
-                        if (Array.isArray(activeChallenge.case_failure_delayed)) {
-                            DELAYED.push(...activeChallenge.case_failure_delayed);
-                        } else {
-                            DELAYED.push(activeChallenge.case_failure_delayed);
-                        }
+                        pushDelayed(activeChallenge.case_failure_delayed);
                     }
                     followupTarget = activeChallenge.case_failure;
                 }
 
                 if (threat_realized && activeChallenge.case_threat_delayed) {
-                    if (Array.isArray(activeChallenge.case_threat_delayed)) {
-                        DELAYED.push(...activeChallenge.case_threat_delayed);
-                    } else {
-                        DELAYED.push(activeChallenge.case_threat_delayed);
-                    }
+                    pushDelayed(activeChallenge.case_threat_delayed);
                 }
 
                 if (threat_realized && activeChallenge.case_threat) {
@@ -3277,8 +4132,8 @@
                 }
             };
 
-            // 2. Core Fix: Threat Evaluation Logic
-            if (is_tie || is_failure) {
+            // 2. Core Fix: Threat Evaluation Logic (now always resolves — success, tie, or failure)
+            {
                 // Define what happens exactly when "Vyhodnocujem hrozbu..." finishes printing
                 const evaluateThreatRoll = () => {
                     let threat_roll = 0;
@@ -3295,10 +4150,23 @@
 
                     let caution_threshold = CARDS[card][0][0];
                     if (threat_roll > caution_threshold) {
-                        log(`${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"} - (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg",false, false, true);
+                        const prefix = rollsVisible() ? `(HROZBA: ${threat_roll} -  OPATRNOSŤ: ${caution_threshold})  \n ` : '';
+                        log(`${prefix}${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"}`, "failure-msg",false, false, true);
                         threat_realized = true;
                     } else {
-                        log(`${activeChallenge.threat_avoided_msg || "Vyhneš sa hrozbe."} - (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg", false, false, true);
+                        const prefix = rollsVisible() ? `(HROZBA: ${threat_roll} - OPATRNOSŤ: ${caution_threshold}) \n ` : '';
+                        log(`${prefix}${activeChallenge.threat_avoided_msg || "Vyhneš sa hrozbe."}`, "success-msg", false, false, true);
+                    }
+
+                    if (rollsVisible()) {
+                        log(`VÝSLEDOK: ${roll_result_raw} (+${adrenaline})`, "error-msg", false, false, true);
+                    }
+
+                    // Log baseline success or failure text (after threat resolution)
+                    if (success) {
+                        log(activeChallenge.success_msg || "ÚSPECH!", "success-msg", false, false, true);
+                    } else {
+                        log(activeChallenge.failure_msg || "ZLYHANIE!", "failure-msg", false, false, true);
                     }
 
                     // Continue executing modifications and transition setups
@@ -3311,20 +4179,9 @@
                 } else {
                     evaluateThreatRoll();
                 }
-
-            } else {
-                // If there is no threat evaluation required, proceed immediately
-                resetAdrenalineSelection();
-                const scrollRow = document.querySelector('.card-scroll-row');
-                if (scrollRow) scrollRow.classList.add('enable-interaction');
-
-                if (logs_pending.length > 0 || isProcessingQueue) {
-                    onTerminalFinishedCallback = doTransition;
-                } else {
-                    doTransition();
-                }
             }
         }
+
 
         function gameloop(success = true) {
             let delay = 0;
@@ -3343,6 +4200,11 @@
             }
         }
 
+        function pushFlat(arr, value) {
+            if (!value) return;
+            if (Array.isArray(value)) arr.push(...value);
+            else arr.push(value);
+        }
 
         function resolveConflict() {
             if (!is_conflict || !enemy || !player_action || !enemy_action) {
@@ -3376,10 +4238,12 @@
 
             let p_mods = (p_adv_mod > 0 || p_ad_mod > 0) ? ` [${[p_adv_text, p_ad_text].filter(Boolean).join(" ")}]` : "";
             let e_mods = e_adv_mod > 0 ? ` [${e_adv_text}]` : "";
-            const enemyType = CHALLENGES[current_challenge_key]?.type || current_challenge_key;
+            const enemyType = CHALLENGES[enemy_id]?.type || current_challenge_key;
 
 
-            log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
+            if (rollsVisible()) {
+                log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
+            }
 
             enemy_roll += enemy_advantage;
             player_roll += (advantage + adrenaline); 
@@ -3387,7 +4251,7 @@
             resetAdrenalineSelection();
 
             // === DISTANCE / RANGED COMBAT: closing the gap ===
-            if (distance_combat_active) {
+            if (conflict_distance>0) {
                 if (enemy_action[0] === "D" && enemy_roll > player_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
                     log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "error-msg");
@@ -3429,13 +4293,14 @@
                 updateUI();
                 
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback resolve conflict")
                     const enemyContainer = document.getElementById("enemy-sprite-container");
                     const enemyImg = document.getElementById("enemy-sprite");
 
                     if (enemyContainer) enemyContainer.style.display = "none";
                     if (enemyImg) enemyImg.src = "";
                     
-                    let activeChallenge = CHALLENGES[current_challenge_key];
+                    let activeChallenge = CHALLENGES[enemy_id];                    
                     
                     if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                         if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
@@ -3454,15 +4319,18 @@
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
-                    if (activeChallenge && activeChallenge.enemy_escape) {
-                        proceed(activeChallenge.enemy_escape);
-                    } else if (pending_challenge_key) {
-                        let nextChallenge = pending_challenge_key; 
-                        pending_challenge_key = null; 
-                        proceed(nextChallenge);
+                    let nextChallenge = [];
+
+                    pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
+                    if (pending_challenge_key) {
+                        pushFlat(nextChallenge, pending_challenge_key);
+                        pending_challenge_key = null;
                     } else {
-                        proceed(activeChallenge.case_success);
+                        pushFlat(nextChallenge, activeChallenge?.case_success);
                     }
+
+                    proceed(nextChallenge);
                 };
 
                 if (!isProcessingQueue) {
@@ -3520,6 +4388,7 @@
                         updateUI();
                         
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve conflict")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             const enemyImg = document.getElementById("enemy-sprite");
                             if (enemyImg) enemyImg.src = "";
@@ -3539,13 +4408,18 @@
 
                             if (bothEscaping) {
                                 pre_encounter_challenge_key = null;
+                                let nextChallenge = [];
+
+                                pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
                                 if (pending_challenge_key) {
-                                    let nextChallenge = pending_challenge_key; 
-                                    pending_challenge_key = null; 
-                                    proceed(nextChallenge);
-                                } else if (activeChallenge && activeChallenge.case_success) {
-                                    proceed(activeChallenge.case_success);
+                                    pushFlat(nextChallenge, pending_challenge_key);
+                                    pending_challenge_key = null;
+                                } else {
+                                    pushFlat(nextChallenge, activeChallenge?.case_success);
                                 }
+
+                                proceed(nextChallenge);
                             } 
                             else if (pre_encounter_challenge_key) {
                                 let stepsToRetreat = 0; 
@@ -3645,12 +4519,13 @@
 
                         updateUI();
                         onTerminalFinishedCallback = () => {
+                            console.log("onterminalfinishedcallback resolve conflict")
                             const enemyContainer = document.getElementById("enemy-sprite-container");
                             if (enemyContainer) enemyContainer.style.display = "none";
                             const enemyImg = document.getElementById("enemy-sprite");
                             if (enemyImg) enemyImg.src = "";
 
-                            let activeChallenge = CHALLENGES[current_challenge_key];                            
+                            let activeChallenge = CHALLENGES[enemy_id];                            
                             if (activeChallenge && activeChallenge.enemy_escape_delayed) {
                                 if (Array.isArray(activeChallenge.enemy_escape_delayed)) {
                                     activeChallenge.enemy_escape_delayed.forEach(pushDelayed);
@@ -3668,15 +4543,18 @@
                             enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                             player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
-                            if (activeChallenge && activeChallenge.enemy_escape) {
-                                proceed(activeChallenge.enemy_escape);
-                            } else if (pending_challenge_key) {
-                                let nextChallenge = pending_challenge_key; 
-                                pending_challenge_key = null; 
-                                proceed(nextChallenge);
+                            let nextChallenge = [];
+
+                            pushFlat(nextChallenge, activeChallenge?.enemy_escape);
+
+                            if (pending_challenge_key) {
+                                pushFlat(nextChallenge, pending_challenge_key);
+                                pending_challenge_key = null;
                             } else {
-                                proceed(activeChallenge.case_success);
+                                pushFlat(nextChallenge, activeChallenge?.case_success);
                             }
+
+                            proceed(nextChallenge);
                         };
 
                         if (!isProcessingQueue) {
@@ -3691,6 +4569,7 @@
 
             let potential_player_damage = 0;
             let potential_enemy_damage = 0;
+            let pancier_absorbed = 0;
 
             if (player_roll >= enemy_roll && player_action[0] === "A") {
                 let enemy_caution = enemy_action[0] === "D" ? CARDS[enemy_action[1]][0][0] : 0;
@@ -3698,13 +4577,24 @@
             }
 
             if (player_roll <= enemy_roll && enemy_action[0] === "A") {
-                let player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
-                potential_player_damage = Math.max(0, CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"] - player_caution);
+                let base_player_caution = player_action[0] === "D" ? CARDS[player_action[1]][0][0] : 0;
+                let pancier_level = getPancierLevel();
+                let player_caution = base_player_caution + pancier_level;
+                let incoming_hit = CARDS[enemy_action[1]][1][0] + ENEMY_TYPES[enemy]["weapon"];
+
+                potential_player_damage = Math.max(0, incoming_hit - player_caution);
+
+                // Did PANCIER actually change the outcome? Compare against what
+                // would have happened with only the card's caution, no armor.
+                if (pancier_level > 0) {
+                    let damage_without_pancier = Math.max(0, incoming_hit - base_player_caution);
+                    pancier_absorbed = damage_without_pancier - potential_player_damage;
+                }
             }
 
             if (potential_enemy_damage > 0) {
                 enemy_stress += potential_enemy_damage;
-                log(`${enemy.toUpperCase()}: STRESS +${potential_enemy_damage}.`, "success-msg", false,false,true);
+                log(`\n ${enemy.toUpperCase()}: STRESS +${potential_enemy_damage}.`, "success-msg", false,false,true);
                 const enemyContainer = document.getElementById("enemy-sprite-container");
                 if (enemyContainer) {
                     enemyContainer.classList.remove("enemy-hit");
@@ -3719,6 +4609,10 @@
                 flashRed();
                 stress_increased = true;
                 log(`TVOJ STRESS: +${potential_player_damage}.`, "failure-msg", false, false, true);
+            }
+
+            if (pancier_absorbed > 0) {
+                log(`🛡️ Tvoj pancier absorboval zvýšenie stresu o ${pancier_absorbed}.`, "success-msg", false, false, true);
             }
 
             let player_collapse = HERO.stress > stress_thresh;
@@ -3747,26 +4641,23 @@
                         if (enemyContainer) enemyContainer.style.display = "none";
 
                         let activeChallenge = CHALLENGES[enemy_id];
-                        if (enemy_id) { 
-                            CHALLENGES["ACTIVE"][enemy_id] = false; 
-                            if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
-                                handleChallengeTransition(activeChallenge.on_death);
-                            }
-                        }
 
                         enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                         enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                         player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
+                        let nextChallenge = [];
+
+                        pushFlat(nextChallenge, activeChallenge?.on_death);
+
                         if (pending_challenge_key) {
-                            let nextChallenge = pending_challenge_key; 
-                            pending_challenge_key = null; 
-                            is_collapse_check = false;
-                            proceed(nextChallenge); 
+                            pushFlat(nextChallenge, pending_challenge_key);
+                            pending_challenge_key = null;
                         } else {
-                            is_collapse_check = false;
-                            proceed(activeChallenge.case_success); 
+                            pushFlat(nextChallenge, activeChallenge?.case_success);
                         }
+
+                        proceed(nextChallenge);
                     };
 
                     if (!isProcessingQueue) { 
@@ -3849,34 +4740,33 @@
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
-
                 updateUI();
-
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback resolve conflict")
                     const enemyContainer = document.getElementById("enemy-sprite-container");
                     if (enemyContainer) enemyContainer.style.display = "none";
                     const enemyImg = document.getElementById("enemy-sprite");
                     if (enemyImg) enemyImg.src = "";
 
                     let activeChallenge = CHALLENGES[enemy_id];
-                    if (enemy_id) {
-                        CHALLENGES["ACTIVE"][enemy_id] = false; 
-                        if (activeChallenge && activeChallenge.on_death && !(activeChallenge.on_death = null) && !(activeChallenge.on_death = "")) {
-                            handleChallengeTransition(activeChallenge.on_death);
-                        }
-                    }
-                    
+                    if (enemy_id && CHALLENGES["ACTIVE"]) CHALLENGES["ACTIVE"][enemy_id] = false;
+
                     enemy = null; enemy_stress = 0; enemy_escaping = false; player_escaping = false; chase_mode = false;
                     enemy_advantage = 0; advantage = 0; move = 0; round += 1;
                     player_action = null; enemy_action = null; is_conflict = false; distance_combat_active = false; conflict_distance = 0;
 
+                    let nextChallenge = [];
+
+                    pushFlat(nextChallenge, activeChallenge?.on_death);
+
                     if (pending_challenge_key) {
-                        let nextChallenge = pending_challenge_key;
-                        pending_challenge_key = null; 
-                        proceed(nextChallenge); 
+                        pushFlat(nextChallenge, pending_challenge_key);
+                        pending_challenge_key = null;
                     } else {
-                        proceed(activeChallenge.case_success); 
+                        pushFlat(nextChallenge, activeChallenge?.case_success);
                     }
+
+                    proceed(nextChallenge);
                 };
 
                 if (!isProcessingQueue) {
@@ -3965,20 +4855,21 @@
             triggerDiceVisualAnimation(threatRollsData, isEnemy);
 
             if (threat_roll > caution) {
+                const threatPrefix = rollsVisible() ? `(HROZBA: ${threat_roll} -  OPATRNOSŤ: ${caution}) ` : '';
                 if (isEnemy) {
                     if(chase_mode){
                         enemy_stress += 1;
                         if(enemy_escaping){
                             enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}⚠️ Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg",false,false,true);
                         } else {
                             player_escape_counter += 1 ;
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
                         let adv_before = advantage;
                         advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
-                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) ⚠️ Nepriateľ sa dostal do horšej pozície.`, "danger-msg",false,false,true);
+                        log(`${threatPrefix}⚠️ Nepriateľ sa dostal do horšej pozície.`, "danger-msg",false,false,true);
                         if (advantage>adv_before) log("Získavaš výhodu +1","",false,false,true)
                     }
                 } else {
@@ -3988,15 +4879,15 @@
                         heal_attempts = 0;
                         if(player_escaping){
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}\n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg",false,false,true);
                         } else {
                             enemy_escape_counter += 1;
-                            log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}\n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
                         let adv_before = enemy_advantage;
                         enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-                        log(`(HROZBA: ${threat_roll} > OPATRNOSŤ: ${caution}) \⚠️ Dostaneš sa do horšej pozície.`, "danger-msg",false,false,true);
+                        log(`${threatPrefix}⚠️ Dostaneš sa do horšej pozície.`, "danger-msg",false,false,true);
                         if(enemy_advantage>adv_before) log(`🛡️ Nepriateľ získava výhodu +1.`,"", false,false,true);
                     }
                     
@@ -4023,7 +4914,8 @@
                 }
             } else {
                 const who = isEnemy ? "Nepriateľ sa vyhol hrozbe." : "Vyhneš sa hrozbe.";
-                log(`${who} (HROZBA: ${threat_roll} <= OPATRNOSŤ: ${caution})`, "success-msg");
+                const suffix = rollsVisible() ? ` (HROZBA: ${threat_roll} -   OPATRNOSŤ: ${caution})` : '';
+                log(`${who}${suffix}`, "success-msg");
             }
 
             updateUI();
@@ -4040,8 +4932,17 @@
                 return
             }
 
+            if (heal_attempts > 2) {
+                log(`Teraz ti pomôže len čas. Nedá sa nič robiť.`, "system-msg");      
+                return         
+            }
+
             const skillDropdown = document.getElementById("player-skill-dropdown");
             const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
+            if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && selectedSkillName == "RÝCHLA REGENERÁCIA") {
+                proceedHealCheck();
+            }
+
             if (selectedSkillName && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && selectedSkillName !== "PRVÁ POMOC") {
                 log("Môžeš použiť len schopnosť PRVÁ POMOC.", "danger-msg");
                 return
@@ -4052,12 +4953,12 @@
                 return         
             }
 
-            if (heal_attempts > 2) {
-                log(`Teraz ti pomôže len čas. Nedá sa nič robiť.`, "system-msg");      
-                return         
-            }
+            proceedHealCheck();
 
-            heal_attempts += 1;
+        }
+
+        function proceedHealCheck(){
+                        heal_attempts += 1;
             // Flag the engine that card clicks belong to this sub-system now
             is_heal_check = true;
             inputs_frozen = true;
@@ -4069,7 +4970,7 @@
 
 
             // Challenge difficulty equals the player's current stress. Threat is hardcoded to 2.
-            current_challenge.difficulty = 9; 
+            current_challenge.difficulty = 7; 
             current_challenge.threat = 2;
 
             const challengeDisplay = document.getElementById("challenge-stats-display");
@@ -4097,7 +4998,6 @@
             log(`Výsledok pokusu o prvú pomoc: ${roll_result}`, "error-msg");
 
             let success = roll_result >= current_challenge.difficulty;
-            let is_tie_or_failure = roll_result <= current_challenge.difficulty;
 
             if (success) {
                 adjustHeroStress(-1);
@@ -4106,7 +5006,9 @@
                 log("Prvá pomoc nepomohla. Robíš, čo vieš, ale stále ti je rovnako blbo.", "failure-msg");
             }
 
-            if (is_tie_or_failure) {
+            // Hrozba sa vyhodnocuje vždy - bez ohľadu na úspech/nerozhodné/zlyhanie -
+            // rovnako ako v štandardnej akčnej fáze (runActionPhase).
+            {
                 let threat_roll = 0;
                 let threatRollsData = [];
                 
@@ -4119,12 +5021,23 @@
                 // Display threat visual dice pool explicitly tracked away from player pool
                 triggerDiceVisualAnimation(threatRollsData, true); 
 
-                let caution_threshold = CARDS[card][0][0]; 
-                if (threat_roll > caution_threshold) {
-                    log(`Pri ošetrovaní zničíš časť zdravotných pomôcok. \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
-                    executeMods("item_ZDRAVOTNÉ POMÔCKY-1");
+                let caution_threshold = CARDS[card][0][0];
+                if(HERO.items["ZDRAVOTNÉ POMÔCKY"] > 0){    
+                    if (threat_roll > caution_threshold) {
+                        executeMods("item_ZDRAVOTNÉ POMÔCKY-1");
+                    } else {
+                        const suffix = rollsVisible() ? ` \n (KOCKY HROZBY: ${threat_roll}    TVOJA OPATRNOSŤ: ${caution_threshold})` : '';
+                        log(`Počínaš si šetrne a pomôcky ti zostanú aj pre budúce pokusy.${suffix}`, "success-msg");
+                    }
                 } else {
-                    log(`Počínaš si šetrne a pomôcky ti zostanú aj pre budúce pokusy. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                    if (threat_roll > caution_threshold) {
+                        const suffix = rollsVisible() ? ` \n (KOCKY HROZBY: ${threat_roll}   TVOJA OPATRNOSŤ: ${caution_threshold})` : '';
+                        log(`Snaha zregenerovať ťa ešte viac vyčerpá.${suffix}`, "danger-msg");
+                        executeMods("stress+1")
+                    } else {
+                        const suffix = rollsVisible() ? ` \n (KOCKY HROZBY: ${threat_roll}    TVOJA OPATRNOSŤ: ${caution_threshold})` : '';
+                        log(`Je lepšie netlačiť na pílu a nevystresovať sa z toho, že máš stres.${suffix}`, "success-msg");
+                    }
                 }
             }
 
@@ -4200,10 +5113,19 @@
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
             updateUI();
-            let roll_result = rollDice(card, false, 0, false);
+            let skill = 0;
+            const heroSkillValue = HERO.skills?.["ODOLNOSŤ"] ?? 0;
+            if (heroSkillValue > 0) {
+                skill = heroSkillValue;
+                const skillDropdown = document.getElementById("player-skill-dropdown");
+                if (skillDropdown && Array.from(skillDropdown.options).some(opt => opt.value === "ODOLNOSŤ")) {
+                    skillDropdown.value = "ODOLNOSŤ";
+                }
+            }
+
+            let roll_result = rollDice(card, false, skill, false);
 
             let success = roll_result > current_challenge.difficulty;
-            let is_tie_or_failure = roll_result <= current_challenge.difficulty;
             let threat_realized = false;
 
             if (success) {
@@ -4211,7 +5133,9 @@
             } else {
                 log("❌ Zlyhanie! Skolabuješ pod extrémnym tlakom.", "failure-msg");
             }
-            if (is_tie_or_failure) {
+            // Hrozba sa vyhodnocuje vždy - bez ohľadu na úspech/nerozhodné/zlyhanie -
+            // rovnako ako v štandardnej akčnej fáze (runActionPhase).
+            {
                 let threat_roll = 0;
                 let threatRollsData = [];
                 
@@ -4226,53 +5150,73 @@
 
                 let caution_threshold = CARDS[card][0][0]; 
                 if (threat_roll > caution_threshold) {
-                    log(`⚠️ Permanentný stres narastá! \n (KOCKY HROZBY: ${threat_roll} > TVOJA OPATRNOSŤ: ${caution_threshold})`, "danger-msg");
                     threat_realized = true;
                 } else {
-                    log(`Vyhneš sa trvalým následkom. (KOCKY HROZBY: ${threat_roll} <= TVOJA OPATRNOSŤ: ${caution_threshold})`, "success-msg");
+                    const suffix = rollsVisible() ? ` \n (KOCKY HROZBY: ${threat_roll}   TVOJA OPATRNOSŤ: ${caution_threshold})` : '';
+                    log(`Vyhneš sa trvalým následkom.${suffix}`, "success-msg");
                 }
             }
 
             resetAdrenalineSelection();
+            if (DEBUG) log(`(MODE  ${MODE})`, "danger-msg");
 
-            // --- OPRAVA CHYBY: Zvýšenie globálneho perm_stress o 1 (predtým bolo "= + 1", čo natvrdo priradilo 1) ---
             if (threat_realized) {
-                if (typeof perm_stress === 'undefined') perm_stress = 0;
-                perm_stress += 1;
-                log(`Tvoj permanentný stres sa zvýšil o 1! (na ${perm_stress})`, "danger-msg");
+                HERO.sp = Math.max(0, Math.floor(HERO.sp / 2));
+                if(MODE === "HARD") {
+                    log(`Tvoj permanentný stres sa zvýšil o 1! (na ${HERO.perm_stress})`, "danger-msg");
+                    HERO.perm_stress = (HERO.perm_stress || 0) + 1;
+                    updateUI();
+                }
                 updateUI();
+                log("Strácaš polovicu svojich BR. (zaokrúhlené nadol)", "danger-msg");
             }
 
             // Handle Resolution routing paths
             if (success) {
-                const challengeDisplay = document.getElementById("challenge-stats-display");
-                if (challengeDisplay) {
-                    // Slides smoothly back up out of view
-                    toggleChallengeDisplay(false);
-                }                
-                is_collapse_check = false;
+                const doCollapseSuccess = () => {
+                    const challengeDisplay = document.getElementById("challenge-stats-display");
+                    if (challengeDisplay) {
+                        // Slides smoothly back up out of view
+                        toggleChallengeDisplay(false);
+                    }                
+                    is_collapse_check = false;
 
-                log("Zotavuješ sa z krízy and pokračuješ presne tam, kde si prestal.");
-                
-                if (typeof collapse_resume_callback === "function") {
-                    const resume = collapse_resume_callback;
-                    collapse_resume_callback = null;
-                    collapse_failure_callback = null; // Vyčistíme aj druhý callback
-                    resume(); 
-                }
+                    log("Zotavuješ sa z krízy and pokračuješ presne tam, kde si prestal.");
+                    
+                    if (typeof collapse_resume_callback === "function") {
+                        const resume = collapse_resume_callback;
+                        collapse_resume_callback = null;
+                        collapse_failure_callback = null; // Vyčistíme aj druhý callback
+                        resume(); 
+                    }
 
-                if (is_conflict) {
-                    exitCollapseConflictMode();
-                }
+                    if (is_conflict) {
+                        exitCollapseConflictMode();
+                    }
 
-                if (collapse_pending_proceed_target !== null) {
-                    const pendingTarget = collapse_pending_proceed_target;
+                    if (collapse_pending_proceed_target !== null) {
+                        const pendingTarget = collapse_pending_proceed_target;
+                        collapse_pending_proceed_target = null;
+                        proceed(pendingTarget);
+                    } else if (collapse_pending_target !== null) {
+                        const pendingTarget = collapse_pending_target;
+                        collapse_pending_target = null;
+                        handleChallengeTransition(pendingTarget);
+                    }
+
+                    // Reset collapse action flag so test() can resume normal behaviour
+                    collapse_action_done = false;
                     collapse_pending_proceed_target = null;
-                    proceed(pendingTarget);
-                } else if (collapse_pending_target !== null) {
-                    const pendingTarget = collapse_pending_target;
-                    collapse_pending_target = null;
-                    handleChallengeTransition(pendingTarget);
+                };
+
+                // Wait for the pending log queue to finish printing (same pattern as the
+                // failure branch below) before transitioning away. Without this, the
+                // transition below fires instantly and whatever renders next removes the
+                // freshly-created dice pool before the slide animation gets a chance to play.
+                if (logs_pending.length > 0 || isProcessingQueue) {
+                    onTerminalFinishedCallback = doCollapseSuccess;
+                } else {
+                    doCollapseSuccess();
                 }
             } else {
                 // --- AK HOD ZLYHAL ---
@@ -4293,6 +5237,7 @@
                         log("💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.", "failure-msg", true);
                     }
 
+                    is_collapse_check = false;
                     inputs_frozen = true;
                     const scrollRow = document.querySelector('.card-scroll-row');
                     if (scrollRow) scrollRow.classList.remove('enable-interaction');
@@ -4300,6 +5245,7 @@
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
+                        console.log("onterminalfinishedcallback resolve collapse check")
                         restartGame();
                     };
 
@@ -4310,9 +5256,6 @@
                     }
                 }
             }
-            // Reset collapse action flag so test() can resume normal behaviour
-            collapse_action_done = false;
-            collapse_pending_proceed_target = null;
         }
 
         function ready() {
@@ -4326,6 +5269,7 @@
             
             // Bind unfreezing and enemy execution directly to terminal output completion
             onTerminalFinishedCallback = () => {
+                console.log("onterminalfinishedcallback ready")
                 inputs_frozen = false;
                 const scrollRow = document.querySelector('.card-scroll-row');
                 if (scrollRow) scrollRow.classList.add('enable-interaction');
@@ -4377,11 +5321,16 @@
 
         // Dedicated transition executor
         function executeProceedTransition() {
+            if (transition_in_progress) {
+                if (test_mode) log("EXEC_TRANSITION: already in progress, ignoring re-entrant call", "danger-msg");
+                return;
+            }
             if(test_mode){
                 if (is_collapse_check) {
                     return;
                 }
             }
+
             const enemyCardContainer = document.getElementById("enemy-card-container");
             const playerCardDisplay = document.getElementById("player-card-display");
             const prompt = document.getElementById("proceed-prompt");
@@ -4404,30 +5353,30 @@
             if (is_conflict){delay = 500} else {delay=200}
             if (proceed_target) {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target exists, executing after " + delay + "ms", "system-msg");
+                transition_in_progress = true;
+                const targetToRun = proceed_target;
+                proceed_target = null;
                 document.querySelectorAll('.dice-animation-pool').forEach(pool => pool.remove());
-                // Trigger visual slide outs
                 if (enemyCardContainer) enemyCardContainer.classList.remove("show");
                 if (playerCardDisplay) playerCardDisplay.classList.remove("show");
 
-                // Delay the DOM destruction and actual target execution by 500ms
                 setTimeout(() => {
                     if (enemyCardContainer) enemyCardContainer.innerHTML = "";
                     if (playerCardDisplay) playerCardDisplay.innerHTML = "";
-
-                    if (typeof proceed_target === 'function') {
+                    if (prompt) prompt.style.display = "none";
+                    transition_in_progress = false;
+                    if (typeof targetToRun === 'function') {
                         if (test_mode) log("EXEC_TRANSITION: calling proceed_target function", "system-msg");
-                        proceed_target();
+                        targetToRun();
                     } else {
-                        if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + proceed_target + ")", "system-msg");
-                        handleChallengeTransition(proceed_target);
+                        if (test_mode) log("EXEC_TRANSITION: calling handleChallengeTransition(" + targetToRun + ")", "system-msg");
+                        handleChallengeTransition(targetToRun);
                     }
-
-                }, delay); // Matches your CSS 0.5s transition
-                if (prompt) prompt.style.display = "none";
-
+                }, delay);
             } else {
                 if (test_mode) log("EXEC_TRANSITION: proceed_target is NOT set, returning", "danger-msg");
             }
+
         }
 
 
@@ -4500,6 +5449,7 @@
                     updateUI();
 
                     onTerminalFinishedCallback = () => {
+                        console.log("onterminalfinishedcallback run conflict turn")
                         inputs_frozen = false;
                         const scrollRow = document.querySelector('.card-scroll-row');
                         if (scrollRow) scrollRow.classList.add('enable-interaction');
@@ -4596,6 +5546,13 @@
             return !!(HERO && Array.isArray(HERO.weapons) && HERO.weapons.some(w => rangedCapable.includes(w)));
         }
 
+        function getAmmoKey(weaponName) {
+            if (!weaponName || !HERO || !HERO.ammo || typeof HERO.ammo !== 'object') return weaponName;
+            if (HERO.ammo[weaponName] !== undefined) return weaponName;
+            const lowerName = weaponName.toLowerCase();
+            return Object.keys(HERO.ammo).find(k => k.toLowerCase() === lowerName) || weaponName;
+        }
+
         function enemyHasRangedWeapon() {
             const enemyData = ENEMY_TYPES[enemy];
             return !!(enemyData && enemyData["ranged"] === true);
@@ -4616,6 +5573,7 @@
                 log("", "", false, false); 
                 
                 onTerminalFinishedCallback = () => {
+                    console.log("onterminalfinishedcallback enemy choice")
                     proceedWithEnemyChoice();
                 };
                 
@@ -4644,15 +5602,24 @@
             const currentEnemyAdvantage = typeof enemy_advantage !== 'undefined' ? enemy_advantage : 0;
 
             // Helper baseline functions
+            // NOTE: all of these read available cards from CARDS (via the helpers
+            // defined next to it) rather than assuming "O"/"R"/"S"/"B" exist, so
+            // removing a card from CARDS makes the AI stop picking it automatically.
             function easyAction(forcedType = null) {
-                const cards   = ["O", "R", "S", "B"];
-                const card    = cards[Math.floor(Math.random() * cards.length)];
-                const type    = forcedType ?? (Math.random() < 0.5 ? "A" : "D");
+                const card = pickRandomCard();
+                const type = forcedType ?? (Math.random() < 0.5 ? "A" : "D");
                 return [type, card];
             }
 
             function normalAction(options) {
-                const pick = options[Math.floor(Math.random() * options.length)];
+                // Only consider options whose card still exists. If none of the
+                // requested options are available, fall back to a random valid
+                // card while keeping the requested action type where possible.
+                const valid = options.filter(opt => hasCard(opt.split("-")[1]));
+                const pool = valid.length > 0
+                    ? valid
+                    : options.map(opt => `${opt.split("-")[0]}-${pickRandomCard()}`);
+                const pick = pool[Math.floor(Math.random() * pool.length)];
                 const [type, card] = pick.split("-");
                 return [type, card];
             }
@@ -4660,23 +5627,29 @@
             function hardAction(scenario, playerCard = null) {
                 const counterMap = { "O": "B", "R": "R", "S": "S", "B": "R" };
                 switch (scenario) {
-                    case "attack_counter":
-                        return ["A", playerCard ? (counterMap[playerCard] ?? "R") : "R"];
-                    case "defend":
-                        return Math.random() < 0.5 ? ["D", "S"] : ["D", "B"];
+                    case "attack_counter": {
+                        const preferred = playerCard ? counterMap[playerCard] : null;
+                        return ["A", pickAvailableCard([preferred, "R", "S", "O", "B"])];
+                    }
+                    case "defend": {
+                        const options = ["S", "B"].filter(hasCard);
+                        if (options.length > 0) {
+                            return ["D", options[Math.floor(Math.random() * options.length)]];
+                        }
+                        return ["D", pickAvailableCard(["S", "B", "O", "R"])];
+                    }
                     case "escape":
-                        return ["D", "O"];
+                        return ["D", pickAvailableCard(["O", "S", "B", "R"])];
                     case "blind":
-                        return ["A", "R"];
+                        return ["A", pickAvailableCard(["R", "S", "O", "B"])];
                     default:
-                        return ["A", "R"];
+                        return ["A", pickAvailableCard(["R", "S", "O", "B"])];
                 }
             }
 
             // 2. Main AI Decision Matrix
             if (chase_mode) {
-                const cards      = ["O", "R", "S", "B"];
-                const randomCard = cards[Math.floor(Math.random() * cards.length)];
+                const randomCard = pickRandomCard();
 
                 if (enemy_escaping) {
                     if (MODE === "EASY") {
@@ -4783,7 +5756,7 @@
                         if (MODE === "EASY") {
                             enemy_action = easyAction("A");
                         } else if (MODE === "NORMAL") {
-                            const cards = ["O", "R", "S", "B"];
+                            const cards = getCardKeys();
                             let picked  = null;
                             const structuralThreshold = playerSkill > 2 ? 1 : 0; 
 
@@ -4795,17 +5768,18 @@
                                     }
                                 }
                             }
-                            enemy_action = ["A", picked ?? "O"];
+                            enemy_action = ["A", pickAvailableCard([picked, "O"])];
 
                         } else { // HARD
-                            enemy_action = ["A", "O"];
-                            const cards = ["O", "R", "S", "B"];
+                            let picked = null;
+                            const cards = getCardKeys();
                             for (const c of cards) {
                                 if (CARDS[c][1][0] + ENEMY_TYPES[enemy]["weapon"] > CARDS[pa[1]][0][0]) {
-                                    enemy_action = ["A", c];
+                                    picked = c;
                                     break;
                                 }
                             }
+                            enemy_action = ["A", pickAvailableCard([picked, "O"])];
                         }
                     }
 
@@ -4850,7 +5824,14 @@
                 }
             }
 
-            if (distance_combat_active && enemy_action && enemy_action[0] === "A") {
+            // Safety net: whatever branch above fired, make sure the enemy never
+            // ends up "choosing" a card that has been removed from CARDS. If it
+            // did, swap in a random card that's actually still available.
+            if (enemy_action && !hasCard(enemy_action[1])) {
+                enemy_action = [enemy_action[0], pickRandomCard()];
+            }
+
+            if (conflict_distance > 0 && !enemyHasRangedWeapon() && enemy_action && enemy_action[0] === "A") {
                 enemy_action = ["D", enemy_action[1]];
             }
 
@@ -4876,10 +5857,7 @@
                 updateUI();
 
                 onTerminalFinishedCallback = () => {
-                    inputs_frozen = false;
-                    const scrollRow = document.querySelector('.card-scroll-row');
-                    if (scrollRow) scrollRow.classList.add('enable-interaction');
-
+                    console.log("onterminalfinishedcallback proceed with en. ch.")
                     displayEnemyCard(enemy_action[0], enemy_action[1]);
                     runGameloopCycle();
                 };
@@ -4998,6 +5976,10 @@
                 for (const [skillName, val] of Object.entries(HERO.skills)) {
                     const upperSkillName = skillName.toUpperCase();
 
+                    if (PASSIVE_SKILLS.includes(upperSkillName)) {
+                        continue;
+                    }
+
                     // KONTROLA: Ak ide o bio-zbraň, nepridávame ju do dropdownu skillov!
                     if (BIOLOGICAL_WEAPONS.includes(upperSkillName)) {
                         const lowerSkillName = skillName.toLowerCase();
@@ -5047,6 +6029,7 @@
                             HEROES = savedCharacters.map(char => ({
                                 name: char.name.toUpperCase(),
                                 sp: char.sp || 0,
+                                perm_stress: char.perm_stress || 0,
                                 skills: char.skills || {},
                                 weapons: char.defaultWeapons ? [...char.defaultWeapons] : [],
                                 ammo:    char.defaultAmmo    ? {...char.defaultAmmo}    : {},
@@ -5177,6 +6160,7 @@
             function confirmHeroSelection() {
                 switchCharacterGlobally(activeCharIdx);
                 hero_selected = true;
+                MODE = SETTINGS.MODE || 'NORMAL';
                 gameOn = true;
                 overlay.remove();
                 document.removeEventListener("keydown", heroKeyHandler);
@@ -5195,11 +6179,18 @@
                         activeCharIdx = (activeCharIdx + 1) % HEROES.length;
                         updateHeroDisplay();
                     } else if (e.key === " " || e.key === "Enter") {
+                        const gp = document.getElementById('general-prompt');
+
+                        // Let space type into the name field instead of confirming.
+                        if (e.key === " " && gp && gp.style.display !== 'none') {
+                            const gp_input = document.getElementById('general-prompt-input');
+                            if (gp_input && document.activeElement === gp_input) return;
+                        }
+
                         e.preventDefault();
                         e.stopImmediatePropagation(); // FIX: Kills the event instantly so the global listener can't intercept it
 
                         // If general prompt is visible, click its confirm button instead
-                        const gp = document.getElementById('general-prompt');
                         if (gp && gp.style.display !== 'none') {
                             document.getElementById('gp-confirm-btn')?.click();
                             return;
@@ -5447,6 +6438,7 @@
                     let dmgValue = 0;
                     if (typeof WEAPON_LIST === "object") {
                         for (const category in WEAPON_LIST) {
+                            
                             if (WEAPON_LIST[category] && WEAPON_LIST[category][weaponName] !== undefined) {
                                 dmgValue = WEAPON_LIST[category][weaponName];
                                 break; // Zbraň sme našli, ukončíme hľadanie v kategóriách
@@ -5509,6 +6501,7 @@
             
             if (overlay && iframe) {
                 if (show) {
+                    builderOpen = true;
                     overlay.style.display = 'block';
                     
                     // 1. Zadefinujeme onload handler IBA pre prípad, že otvárame builder
@@ -5550,6 +6543,7 @@
                                 }
                                 updateHeroDisplay();
                                 // Close directly — don't call toggleBuilder(false) recursively here
+                                builderOpen = false;
                                 const overlay = document.getElementById('builder-overlay');
                                 const iframe = document.getElementById('builder-iframe');
                                 if (overlay) overlay.style.display = 'none';
@@ -5573,6 +6567,7 @@
                     
                     updateHeroDisplay();
                     hero_created = true;
+                    builderOpen = false;
 
                     // Normal close logic
                     iframe.onload = null;
@@ -5585,17 +6580,18 @@
                                 HEROES = parsedCharacters.map(char => ({
                                     name: char.name.toUpperCase(),
                                     sp: char.sp || 0,
+                                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
                                     skills: char.skills || {},
-                                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),                                            
+                                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
                                     ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
                                     items: char.items !== undefined ? {...char.items} : (char.defaultItems ? {...char.defaultItems} : {}),
                                     stress_thresh: 8,
                                     stress: char.stress !== undefined ? char.stress : 0,
                                     weapon: 0,
                                     isInitialPhase: char.isInitialPhase !== undefined ? char.isInitialPhase : false,
-                                    defaultWeapons: char.defaultWeapons || [...activeWeapons],
-                                    defaultAmmo:    char.defaultAmmo    || {...activeAmmo},
-                                    defaultItems:   char.defaultItems   || {...activeItems}
+                                    defaultWeapons: char.defaultWeapons || [],
+                                    defaultAmmo: char.defaultAmmo || {},
+                                    defaultItems: char.defaultItems || {}
                                 }));
 
                                 if (typeof activeCharIdx !== 'undefined' && HEROES[activeCharIdx]) {
@@ -5620,7 +6616,59 @@
         }
         
         
-        function syncHeroToStorage() {
+        function syncBuilderCharacterStateFromStorage() {
+            try {
+                const savedCharacters = JSON.parse(localStorage.getItem('characters')) || [];
+                if (!Array.isArray(savedCharacters) || savedCharacters.length === 0) {
+                    return;
+                }
+
+                HEROES = savedCharacters.map(char => ({
+                    name: (char.name || '').toUpperCase(),
+                    sp: char.sp || 0,
+                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
+                    skills: char.skills || {},
+                    weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
+                    ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
+                    items: char.items !== undefined ? {...char.items} : (char.defaultItems ? {...char.defaultItems} : {}),
+                    stress_thresh: 8,
+                    stress: char.stress !== undefined ? char.stress : 0,
+                    weapon: 0,
+                    isInitialPhase: char.isInitialPhase !== undefined ? char.isInitialPhase : false,
+                    defaultWeapons: char.defaultWeapons || [],
+                    defaultAmmo: char.defaultAmmo || {},
+                    defaultItems: char.defaultItems || {},
+                    humanity: char.humanity || 50,
+                    initialSkillsSnapshot: char.initialSkillsSnapshot || {}
+                }));
+
+                const activeHero = HEROES[activeCharIdx] || HEROES[0];
+                if (activeHero) {
+                    for (let key in HERO) delete HERO[key];
+                    Object.assign(HERO, activeHero);
+                    if (HERO.name && typeof HERO.name === 'string') {
+                        HERO.name = HERO.name.toUpperCase();
+                    }
+                }
+
+                if (typeof updateUI === 'function') {
+                    try { updateUI(); } catch (e) { console.warn('updateUI zlyhalo pri synchronizácii buildera:', e); }
+                }
+                if (typeof populatePlayerSkillsDropdown === 'function') {
+                    try { populatePlayerSkillsDropdown(); } catch (e) { console.warn('populatePlayerSkillsDropdown zlyhalo pri synchronizácii buildera:', e); }
+                }
+            } catch (e) {
+                console.error('Chyba pri synchronizácii buildera s hlavným skriptom:', e);
+            }
+        }
+
+        function syncHeroToStorage(force) {
+            // While the builder is open it owns localStorage['characters'] — writing the
+            // parent's stale HERO object here would clobber edits the builder just saved.
+            // Exception: `force` is used when the parent itself just made the authoritative
+            // change (e.g. useItem() called by the builder via window.parent.useItem) and
+            // that change needs to reach storage even though the builder is open.
+            if (builderOpen && !force) return;
             const saved = JSON.parse(localStorage.getItem('characters')) || [];
             const idx = saved.findIndex(c => c.name.toUpperCase() === HERO.name.toUpperCase());
             if (idx !== -1) {
@@ -5667,6 +6715,7 @@
                 initialSkillsSnapshot: h.initialSkillsSnapshot || {},
                 humanity: h.humanity || 50,
                 stress: h.stress !== undefined ? h.stress : 0,
+                perm_stress: h.perm_stress !== undefined ? h.perm_stress : 0,
                 items: h.items !== undefined ? h.items : {},
                 weapons: h.weapons !== undefined ? h.weapons : [],
                 ammo: h.ammo !== undefined ? h.ammo : {},      
@@ -5771,6 +6820,7 @@
                 
                 if (HERO.stress_thresh === undefined) HERO.stress_thresh = 8;
                 if (HERO.weapon === undefined) HERO.weapon = 0;
+                if (HERO.perm_stress === undefined) HERO.perm_stress = 0;
             }
 
             // Aktualizujeme herné UI hlavného okna, ak existuje
@@ -5808,6 +6858,7 @@
                 ammo: {},
                 stress_thresh: 8,
                 stress: 0,
+                perm_stress: 0,
                 items: {},
                 weapon: 0,
                 // Zachováme aj builder premenné, ak by ich neskôr potreboval
@@ -6061,7 +7112,7 @@
             }
 
             // --- C. KONTROLY KOMBINÁCIÍ (SPOLOČNÉ PRE BOJ AJ ELIMINÁCIU) ---
-            if ((is_conflict  || isEliminationAttack) && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
+            if ((is_conflict  || isEliminationAttack) && selectedSkillName !== "placeholder" && selectedSkillName !== "none" && actionType === "A") {
                 const skillData = SKILLS_DB[selectedSkillName];
 
                 // Overenie Vrhania
@@ -6093,22 +7144,33 @@
                     }
                 }
 
-                // Dynamické overenie kategórií zbraní a skillov (Blízko vs Diaľka)
-                let weaponCategory = "";
+                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+
+                // Zbraň môže patriť do viacerých kategórií naraz (napr. NÔŽ je zároveň
+                // BOJ ZBLÍZKA aj VRHACIE). Zoznam všetkých kategórií, do ktorých zbraň patrí:
+                const weaponCategories = [];
                 for (const category in WEAPON_LIST) {
                     if (WEAPON_LIST[category] && WEAPON_LIST[category][selectedWeaponName] !== undefined) {
-                        weaponCategory = category.toUpperCase();
-                        break;
+                        weaponCategories.push(category.toUpperCase());
                     }
+                }
+
+                // Kategóriu, podľa ktorej validujeme schopnosť, vyberáme podľa zámeru hráča
+                // (zvolenej schopnosti) namiesto poradia kľúčov v WEAPON_LIST — inak by sa
+                // vrhacia zbraň so schopnosťou VRHANIE/ŤAŽKÉ PREDMETY omylom posúdila ako
+                // útok zblízka len preto, že "BOJ ZBLÍZKA" je v objekte skôr než "VRHACIE".
+                let weaponCategory = "";
+                if (isThrownSkill && weaponCategories.includes("VRHACIE")) {
+                    weaponCategory = "VRHACIE";
+                } else if (weaponCategories.length > 0) {
+                    const skillCategoryUpper = (skillData && skillData[1]) ? skillData[1].toUpperCase() : "";
+                    weaponCategory = weaponCategories.find(cat => skillCategoryUpper.includes(cat)) || weaponCategories[0];
                 }
 
                 // Pomocné premenné pre kontrolu vzdialenosti
                 const isRanged = weaponCategory === "BOJ Z DIAĽKY";
-                const isThrownWeapon = weaponCategory === "VRHACIE";
-                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                const isThrownWeapon = weaponCategories.includes("VRHACIE");
                 const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
-
-
                 if (skillData && skillData[1]) {
                     const skillCategory = skillData[1].toUpperCase();
                     
@@ -6120,7 +7182,7 @@
                     }
                     
                     if (weaponCategory === "BOJ ZBLÍZKA") {
-                        if (!skillCategory.includes("BOJ ZBLÍZKA")) {
+                        if (!skillCategory.includes("BOJ ZBLÍZKA") && !upperSkill.includes("SILA")) {
                             log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
                             return;
                         }
@@ -6130,14 +7192,14 @@
 
             // --- D. SKUTOČNÁ KONTROLA A SPOTREBA MUNÍCIE ---
             
-            if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof distance_combat_active !== 'undefined' && distance_combat_active) {
+            if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof conflict_distance !== 'undefined' && conflict_distance > 0) {                
                 if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
                     log(`⚠️ Na útok holými rukami je nepriateľ príliš ďaleko.`, "error-msg");
                     return;
                 } else {
                     const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
                     const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY" || upperSkill === "PLACEHOLDER");
                     const canAttackAtDistance = isRanged || (isThrownWeapon && isThrownSkill);
 
                     if (!canAttackAtDistance) {
@@ -6153,23 +7215,23 @@
 
 
             if (((is_conflict && actionType === "A") || isEliminationAttack) && selectedWeaponName !== "placeholder") {
-                if (typeof INITIAL_AMMO !== "undefined" && INITIAL_AMMO[selectedWeaponName] !== undefined) {
-                    const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
-                    const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
-                    const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
+                const isRangedWeapon = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
+                const isThrownWeapon = WEAPON_LIST["VRHACIE"] && WEAPON_LIST["VRHACIE"][selectedWeaponName] !== undefined;
+                const isThrownSkill = (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY");
 
-                    if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
-                        const currentAmmo = HERO["ammo"][selectedWeaponName];
+                if (isRangedWeapon || (isThrownWeapon && isThrownSkill)) {
+                    const ammoKey = getAmmoKey(selectedWeaponName);
+                    const currentAmmo = HERO["ammo"] ? HERO["ammo"][ammoKey] : undefined;
 
-                        if (currentAmmo === undefined || currentAmmo <= 0) {
-                            log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
-                            return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
-                        }
-
-                        // Bezpečné odčítanie - všetky podmienky úspešne prešli!
-                        HERO["ammo"][selectedWeaponName] = Math.max(0, currentAmmo - 1);
-                        log(`Munícia pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][selectedWeaponName]} ks.`, "info-msg");
+                    if (currentAmmo === undefined || currentAmmo <= 0) {
+                        log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
+                        return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
                     }
+
+                    // Bezpečné odčítanie - všetky podmienky úspešne prešli!
+                    HERO["ammo"][ammoKey] = Math.max(0, currentAmmo - 1);
+                    log(`Munícia pre zbraň ${selectedWeaponName.toUpperCase()}: ${HERO["ammo"][ammoKey]} ks.`, "info-msg");
+                    if (typeof updateUI === "function") updateUI();
                 }
             }
 
@@ -6373,7 +7435,7 @@
                 adrenalineSelectEl.value = targetAdrenalineVal;
             }
 
-            log(`⚡ Adrenalín použitý! Stres sa ti zvyšuje na ${HERO.stress} a získavaš +${targetAdrenalineVal} k ďalšiemu hodu.`, "success-msg");
+            log(`Adrenalín použitý! Stres sa ti zvyšuje na ${HERO.stress} a získavaš +${targetAdrenalineVal} k ďalšiemu hodu.`, "success-msg");
 
             // 4. Prekreslenie UI (posun červeného 'S' indikátora)
             updateUI();
@@ -6470,14 +7532,32 @@
             }
             
             parsedLogs.push(newRunEntry);
-            
-            try {
-                localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
-            } catch (storageError) {
-                console.error("LocalStorage full! Clean your logs.", storageError);
+
+            // Cap stored runs so terminalOutput blobs can't silently blow past the
+            // localStorage quota. Oldest entries drop first.
+            const MAX_STORED_RUNS = 20;
+            if (parsedLogs.length > MAX_STORED_RUNS) {
+                parsedLogs = parsedLogs.slice(-MAX_STORED_RUNS);
             }
 
-            // Restart the window/session immediately without trigger-blocking delays
+            let saveOk = false;
+            try {
+                localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
+                saveOk = true;
+            } catch (storageError) {
+                console.error("LocalStorage full! Trimming oldest runs and retrying.", storageError);
+                while (parsedLogs.length > 1 && !saveOk) {
+                    parsedLogs = parsedLogs.slice(Math.ceil(parsedLogs.length / 2));
+                    try {
+                        localStorage.setItem("test_runs_json_log", JSON.stringify(parsedLogs));
+                        saveOk = true;
+                    } catch (retryError) { /* keep shrinking */ }
+                }
+                if (!saveOk) {
+                    console.error("Could not save test run log even after trimming — quota still exceeded.");
+                }
+            }
+
             window.location.reload();
         }
 
@@ -6553,6 +7633,7 @@
             }
             if (stuck_counter > 20) {
                 setTimeout(() => exportNreload("STUCK"), 700);
+                return
             }
 
 
@@ -6738,6 +7819,7 @@
                         const builderHeroes = savedCharacters.map(char => ({
                             name: char.name.toUpperCase(),
                             sp: char.sp || 0,
+                            perm_stress: char.perm_stress || 0,
                             skills: char.skills || {},
                             weapons: char.weapons !== undefined ? [...char.weapons] : (char.defaultWeapons ? [...char.defaultWeapons] : []),
                             ammo: char.ammo !== undefined ? {...char.ammo} : (char.defaultAmmo ? {...char.defaultAmmo} : {}),
@@ -6762,6 +7844,7 @@
                             if (updatedCurrentHero) {
                                 HERO.skills = updatedCurrentHero.skills || {};
                                 HERO.sp = updatedCurrentHero.sp || 0;
+                                HERO.perm_stress = updatedCurrentHero.perm_stress || 0;
                                 HERO.isInitialPhase = updatedCurrentHero.isInitialPhase !== undefined ? updatedCurrentHero.isInitialPhase : false;
                                 
                                 // SAFE MUTATION PATCH: Ensure active equipment data syncs forward safely too!
@@ -6794,41 +7877,7 @@
         const root = document.documentElement;
         root.style.setProperty('--real-vw', window.innerWidth + 'px');
         root.style.setProperty('--real-vh', window.innerHeight + 'px');
-    }
- 
-    function fitMobilePage() {
-        const isMobilePortrait = window.matchMedia('(max-width: 768px) and (orientation: portrait)').matches;
-        const root = document.documentElement;
- 
-        if (!isMobilePortrait) {
-            root.style.setProperty('--mobile-fit-scale', 1);
-            return;
-        }
- 
-        root.style.setProperty('--mobile-fit-scale', 1); // reset before measuring real size
-        const naturalHeight = document.body.scrollHeight;
-        const availableHeight = window.innerWidth;
-        const heightScale = availableHeight / naturalHeight;
-        const naturalWidth = document.body.scrollWidth;
-        const availableWidth = window.innerHeight;
-        const widthScale = availableWidth / naturalWidth;
- 
-        const scale = Math.min(1, heightScale, widthScale);
-        root.style.setProperty('--mobile-fit-scale', scale);
-    }
- 
-    function updateMobileLayout() {
-        setRealViewportVars(); // size the rotated box correctly FIRST
-        fitMobilePage();       // THEN measure/scale content against that box
-    }
- 
-    window.addEventListener('load', updateMobileLayout);
-    window.addEventListener('resize', updateMobileLayout);
-    window.addEventListener('orientationchange', updateMobileLayout);
- 
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(updateMobileLayout);
-    }
+    } 
 
         Promise.all([
             fetch('./CHALLENGES.json').then(response => {
@@ -6876,6 +7925,27 @@
 
 
             const savedCharacters = JSON.parse(localStorage.getItem('characters')) || [];
+
+            function normalizeSkillTypo(skillsObj) {
+                if (!skillsObj || typeof skillsObj !== 'object') return false;
+                if (!Object.prototype.hasOwnProperty.call(skillsObj, "PLÝŽENIE")) return false;
+                const typoVal = skillsObj["PLÝŽENIE"];
+                const correctVal = skillsObj["PLÍŽENIE"];
+                skillsObj["PLÍŽENIE"] = (correctVal !== undefined) ? Math.max(correctVal, typoVal) : typoVal;
+                delete skillsObj["PLÝŽENIE"];
+                return true;
+            }
+
+            let typoFixApplied = false;
+            savedCharacters.forEach(char => {
+                if (normalizeSkillTypo(char.skills)) typoFixApplied = true;
+                if (normalizeSkillTypo(char.initialSkillsSnapshot)) typoFixApplied = true;
+            });
+            if (typoFixApplied) {
+                localStorage.setItem('characters', JSON.stringify(savedCharacters));
+                console.log("Opravený preklep zručnosti: PLÝŽENIE → PLÍŽENIE v localStorage.");
+            }
+            
             const savedNames = new Set(savedCharacters.map(c => c.name.toUpperCase()));
 
             // Only add stock heroes whose names aren't already in localStorage
@@ -6923,6 +7993,7 @@
                 HEROES = savedCharacters.map(char => ({
                     name: char.name.toUpperCase(),
                     sp: char.sp !== undefined ? char.sp : 40,
+                    perm_stress: char.perm_stress !== undefined ? char.perm_stress : 0,
                     skills: char.skills || {},
                     weapons: char.defaultWeapons ? [...char.defaultWeapons] : [],
                     ammo:    char.defaultAmmo    ? {...char.defaultAmmo}    : {},
@@ -7043,4 +8114,16 @@ function initTooltips() {
 
 document.addEventListener('DOMContentLoaded', () => {
     initTooltips();
+
+    const terminalBox = document.querySelector('.terminal-border-box');
+    if (terminalBox) {
+        terminalBox.addEventListener('pointerdown', (event) => {
+            if (event.pointerType !== 'touch') return;
+            const hasPendingLogs = logs_pending.length > 0 || isProcessingQueue || activeLogTimeout;
+            if (hasPendingLogs) {
+                event.preventDefault();
+                flushLogQueue();
+            }
+        });
+    }
 });

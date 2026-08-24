@@ -1,8 +1,8 @@
  {
             "Skautka": {
                 "skill": 2,
-                "stress_thresh": 5,
-                "weapon": 1,
+                "stress_thresh": 4,
+                "weapon": 0,
                 "ranged":false,
                 "image": "assets/SCOUT.png"
             },

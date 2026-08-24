@@ -101,9 +101,7 @@
             justify-content: flex-end;
             align-items: flex-start;
             z-index: 1; 
-        }
-
-        
+        }        
 
         /* Base state: Clean background image display without the dark tint */
         .gaming-table-floor::before {
@@ -328,16 +326,27 @@
         }
 
         /* Ready Box - Now anchored to the top-left */
-        .next-prompt {
+        #proceed-prompt {
             position: absolute;
             bottom: 10px;
             right: 10px;
             padding: 10px;
             display: none; 
-            flex-direction: column;
             align-items: center;
+            justify-content: end;
             gap: 5px;
             z-index: 200;
+            width: 100%;
+        }
+
+        #close-btn {
+            max-width: 15%;
+            margin-left: 20px;
+
+        }
+
+        #proceed-btn {
+            max-width: 15%;
         }
 
         /* LAYER 1: The Outer Frame */
@@ -350,6 +359,7 @@
             border-radius: 13px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
             overflow: hidden; 
+            position: relative;
             
             /* NEW: This centers the inner scroll box vertically so the top and bottom gaps match */
             display: flex;
@@ -374,6 +384,19 @@
             font-family: 'Rubik', sans-serif;
             font-size: 1.29rem;
             padding: 5px 10px 10px 10px; 
+        }
+
+        .terminal-pending-animation {
+            position: absolute;
+            bottom: 15px;
+            right: 25px;
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 1.2rem;
+            color: rgba(0, 0, 0, 0.65);
+            pointer-events: none;
+            z-index: 3;
+            user-select: none;
+            white-space: nowrap;
         }
 
         /* CLEAN, SYMMETRICAL SCROLLBAR STYLING */
@@ -502,13 +525,69 @@
             box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
         }
 
+        #main-menu > div::-webkit-scrollbar,
+        #settings > div::-webkit-scrollbar,
+        #credits > div::-webkit-scrollbar {
+            width: 8px;
+        }
+        #main-menu > div::-webkit-scrollbar-track,
+        #settings > div::-webkit-scrollbar-track,
+        #credits > div::-webkit-scrollbar-track {
+            background: #111;
+            border-radius: 8px;
+        }
+        #main-menu > div::-webkit-scrollbar-thumb,
+        #settings > div::-webkit-scrollbar-thumb,
+        #credits > div::-webkit-scrollbar-thumb {
+            background: var(--hybrid-red);
+            border-radius: 8px;
+        }
+        #main-menu > div,
+        #settings > div,
+        #credits > div  {
+            scrollbar-width: thin;
+            scrollbar-color: var(--hybrid-red) #111;
+        }
+
+        .menu-btn {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 6px 12px;
+            border: var(--border-heavy);
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+        }
+        .menu-btn:hover {
+            transform: scale(1.05);
+        }
+
+        /* Visual highlight to make keyboard selection obvious to the player */
+        .menu-btn.choice-hover-highlight {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
+        }
+
+
+
+        .card-scroll-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
         /* Localized Card Tray Containment (Left-Bounded) */
         .card-tray-wrapper {
-            background: rgba(0, 0, 0, 0.85);
+            background: rgb(36, 36, 36);
             border: 4px solid var(--hybrid-black);
             border-radius: 6px;
             box-shadow: 4px 4px 0px var(--hybrid-black);
             width: 100%;
+            padding: 5px
         }
 
         .card-tray {
@@ -529,7 +608,7 @@
             overflow: visible;        
             transition: transform 0.2s ease, box-shadow 0.2s ease;
             cursor: pointer;
-            box-shadow: 0 0 1px 1px rgba(64, 64, 64, 0);
+            box-shadow: 0 0 2px 2px rgba(70, 70, 70, 0.655);
         }
 
         .card-tray .card-container:hover {
@@ -798,7 +877,7 @@
         /* Player-Specific Track Layout (Bottom-Left Side) */
         .dice-animation-pool.player-pool {
             bottom: 20px;
-            left: 20px;
+            left: 25%;
             align-content: end;      /* Stacks grid rows upward from bottom */
             z-index: 5;
         }
@@ -806,7 +885,7 @@
         /* Enemy-Specific Track Layout (Top-Right Side Over Panel) */
         .dice-animation-pool.enemy-pool {
             top: 20px;
-            right: 15px;             /* Perfectly maps over the 300px enemy panel */
+            right: 1%;             /* Perfectly maps over the 300px enemy panel */
             width: 270px;            /* Centers the columns within the panel column width */
             justify-content: center; 
             align-content: start;    /* Stacks grid rows downward from top */
@@ -903,29 +982,6 @@
             width: 50px; height: 50px;
         }
 
-        .challenge-display {
-            position: absolute;
-            height: 140px;
-            background: rgba(227, 227, 214, 0.984);
-            border-radius: 58px;
-            border: 5px solid var(--hybrid-black);
-            top: -155px; /* Keeps its natural container placement */
-            left: 215px;
-            display: flex; 
-            gap: 70px;
-            padding: 15px 30px;
-            z-index: 50;
-            pointer-events: none; 
-            align-items: flex-end;
-
-            /* --- THE FIX --- */
-            /* Start hidden and raised just slightly out of frame relative to its top placement */
-            opacity: 0;
-            transform: translateY(-40px); 
-            
-            /* Smooth transition for when the .show class is added/removed */
-            transition: transform 0.3s ease-out, opacity 0.3s ease-out;
-        }
 
         /* When the .show class is added via JS */
         .challenge-display {
@@ -938,7 +994,7 @@
             left: 215px;
             gap: 70px;
             padding: 15px 30px;
-            z-index: 50;
+            z-index: 60;
             pointer-events: none; 
             align-items: flex-end;
 
@@ -985,79 +1041,79 @@
             font-size: 1.1rem;
         }
 
-/* Base styles (Place outside media queries) */
-#choice-prompt {
-    position: absolute;
-    bottom: 2%;
-    left: 0;
-    right: 0;
-    margin: 0 auto;
-    padding: 20px 20px 20px 90px;
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    z-index: 200;
-    max-width: 100%;
-}
+    /* Base styles (Place outside media queries) */
+    #choice-prompt {
+        position: absolute;
+        bottom: 2%;
+        left: 0;
+        right: 0;
+        margin: 0 auto;
+        padding: 20px 20px 20px 90px;
+        display: flex;
+        flex-wrap: wrap;
+        justify-content: center;
+        gap: 10px;
+        z-index: 200;
+        max-width: 100%;
+    }
 
-.choice-btn {
-    height: 46px;
-    white-space: nowrap;
-    padding: 0 16px;
-    border-radius: 9px;
-    background: rgb(231, 231, 231);
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-    border: 3px solid rgba(25, 25, 25, 0.96);
-    color: rgb(0, 0, 0);
-    font-size: 1.1em;
-    cursor: pointer;
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
-}
+    .choice-btn {
+        height: 46px;
+        white-space: nowrap;
+        padding: 0 16px;
+        border-radius: 9px;
+        background: rgb(231, 231, 231);
+        backdrop-filter: blur(6px);
+        -webkit-backdrop-filter: blur(6px);
+        border: 3px solid rgba(25, 25, 25, 0.96);
+        color: rgb(0, 0, 0);
+        font-size: 1.1em;
+        cursor: pointer;
+        transition: transform 0.15s ease, box-shadow 0.15s ease;
+    }
 
-.choice-btn.back-btn {
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    width: 60px;
-    height: 46px;
-    margin-left: 10px;
-    border-radius: 9px;
-    background: rgb(0, 0, 0);
-    border: 3px solid rgba(201, 201, 201, 0.96);
-    color: rgb(224, 224, 224);
-    font-size: 1.2em;
-}
+    .choice-btn.back-btn {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        width: 60px;
+        height: 46px;
+        margin-left: 10px;
+        border-radius: 9px;
+        background: rgb(0, 0, 0);
+        border: 3px solid rgba(201, 201, 201, 0.96);
+        color: rgb(224, 224, 224);
+        font-size: 1.2em;
+    }
 
 
 
 
 @keyframes slideUpRoll {
     0% {
-        transform: translateY(50%) rotate(-45deg); /* Use percentage */
+        /* Fixed px, not %: % is relative to each die's OWN size, so the smaller
+           skill die (die-dh, 50px) would travel a different absolute distance
+           than the bigger base dice (55-62px) and rows would drift out of sync. */
+        transform: translateY(29px) rotate(-45deg);
         opacity: 0;
     }
     100% {
-        transform: translateY(-50%) rotate(360deg); /* Relative to parent */
+        transform: translateY(-180px) rotate(360deg);
         opacity: 1;
     }
 }
 
 @keyframes slideDownRoll {
     0% {
-        transform: translateY(-50%) rotate(45deg);
+        transform: translateY(-29px) rotate(45deg);
         opacity: 0;
     }
     100% {
-        transform: translateY(50%) rotate(-360deg); /* Relative to parent */
+        transform: translateY(249px) rotate(-360deg);
         opacity: 1;
     }
 }
 
-/* =============================================================
-   CLEANED MOBILE VIEW: FLUID FLEX OVERRIDES (NO HORIZONTAL SCROLL)
-   ============================================================= */
 @media (max-width: 968px) {
 
 
@@ -1152,6 +1208,19 @@
         height: 108px !important; 
     }
 
+    .terminal-pending-animation {
+        position: absolute;
+        bottom: 15px;
+        right: 25px;
+        font-family: 'Roboto Condensed', sans-serif;
+        font-size: 1rem;
+        color: rgba(0, 0, 0, 0.65);
+        pointer-events: none;
+        z-index: 3;
+        user-select: none;
+        white-space: nowrap;
+    }
+
     /* --- FIX: RESTORED LOCALIZED CONTROL PANEL HORIZONTAL SCROLLING --- */
     .controls-panel {
         padding: 4px 6px !important;       
@@ -1183,10 +1252,8 @@
         font-size: 0.72rem !important;
     }
 
-    /* --- COMPACT BUTTONS THAT FIT INSIDE THE MODIFIED FLEX COLUMN --- */
     .adrenaline-select, 
     select, 
-    button,
     #player-skill-dropdown,
     #player-weapon-dropdown {
         width: 100% !important;          /* Sets width boundaries back inside columns */
@@ -1341,6 +1408,8 @@
         width: 100% !important;
         display: flex !important;
         -webkit-overflow-scrolling: touch;
+        justify-content: flex-start !important;  /* ← add this line */
+
     }    
 
     .card-img,
@@ -1703,28 +1772,43 @@
         margin-bottom: 0 !important;
     }
 
+        #close-btn {
+            max-width: 15% !important;
+            margin-left: 20px !important;
+
+        }
+
+        #proceed-btn {
+            max-width: 15% !important;
+        }
+
+
+
 }
 
-/* --- Keep your JS-backed Orientation Logic cleanly segregated below --- */
 @media (max-width: 968px) and (orientation: portrait) {
     html {
-        transform: rotate(-90deg) translate(-100%, 0); 
+        transform: rotate(-90deg) translate(-100%, 0);
         transform-origin: top left;
         position: fixed;
         top: 0;
         left: 0;
-        width: var(--real-vh, 100vh);  
-        height: var(--real-vw, 100vw);
-        overflow: hidden; 
+        width: var(--real-vh, 100vh) !important;
+        height: var(--real-vw, 100vw) !important;
+        overflow: hidden;
     }
 
     body {
-        width: var(--real-vh, 100vh);
-        height: var(--real-vw, 100vw);
-        overflow: hidden; 
-        transform: scale(var(--mobile-fit-scale, 1)); 
-        transform-origin: top center; 
+        width: var(--real-vh, 100vh) !important;
+        height: var(--real-vw, 100vw) !important;
+        overflow: hidden;
+        transform: scale(var(--mobile-fit-scale, 1));
+        transform-origin: top center;
     }
 
-
+    .game-container {
+        min-height: 0 !important;   /* cancel the 100dvh from the generic mobile block */
+        height: 100%;
+        overflow-y: auto;           /* let it scroll internally instead of pushing content off-screen */
+    }
 }

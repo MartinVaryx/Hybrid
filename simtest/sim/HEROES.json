@@ -15,8 +15,8 @@
         "isInitialPhase": false,
         "initialSkillsSnapshot": {},
         "humanity": 50,
-        "defaultWeapons": ["mačeta"],
-        "defaultAmmo": {},
+        "defaultWeapons": ["mačeta", "bomba"],
+        "defaultAmmo": {"bomba": 2},
         "defaultItems": {"SLIVOVICA":1},
         "stress_thresh": 8,
         "weapon": 0
