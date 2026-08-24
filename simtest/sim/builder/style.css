@@ -36,59 +36,26 @@
             overflow-x: visible;
         }
 
-
-        .main-menu {
-            position: absolute;
-            top: 20px;
-            right: 20px;
-            z-index: 1000;
-            font-family: 'Archivo Black', sans-serif;
-        }
-        .responsive-img {
-            max-width: 100%;  /* Obrázok nikdy nebude širší ako text */
-            height: auto;     /* Zachová pomer strán */
-            display: block;   /* Odstráni medzeru pod obrázkom */
-            margin: 10px auto; /* Vycentruje obrázok a pridá odstup od textu */
-        }
-        .menu-dropdown {
-            position: relative;
-            display: inline-block;
-        }
-
-        .menu-trigger {
-            color: white;
-            padding: 10px 20px;
-            border: 2px solid white;
+        #close-builder{
+            border-radius: 8px;
+            display: flex;
+            align-self: flex-end !important;
+            z-index: 1000; 
+            background: var(--hybrid-red); 
+            color: white; 
+            border: none; 
+            padding: 10px 20px; 
+            font-weight: bold; 
             cursor: pointer;
-            text-transform: uppercase;
         }
 
-        .menu-items {
-            display: none;
+        #close-builder:hover{
+            transform: scale(1.1);
+        }
+
+        .info-panel-container{
             position: absolute;
-            right: 0;
-            min-width: 200px;
-            box-shadow: 0px 8px 16px rgba(0,0,0,0.2);
-            border: 1px solid #333;
             z-index: 2000;
-        }
-
-        .menu-items a {
-            color: #bbb;
-            padding: 12px 16px;
-            text-decoration: none;
-            display: block;
-            font-size: 0.9rem;
-            transition: 0.2s;
-            white-space: nowrap;
-        }
-
-        .menu-items a:hover {
-            color: white;
-        }
-
-        .menu-dropdown:hover .menu-items {
-            display: block;
         }
 
         /* Globálny štýl pre tooltip rámček */
@@ -102,7 +69,7 @@
             font-size: 0.85rem;
             max-width: 280px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-            z-index: 9999;
+            z-index: 99999;
             pointer-events: none;
             opacity: 0;
             visibility: hidden;  /* ← Use visibility instead of display: none */
@@ -115,9 +82,53 @@
             visibility: visible; /* ← Pair with visible class */
         }
 
+                .tooltip {
+            position: fixed;
+            background-color: rgba(20, 20, 20, 0.95);
+            color: #ffffff;
+            padding: 8px 12px;
+            border-radius: 6px;
+            border: 1px solid #444;
+            font-size: 0.85rem;
+            max-width: 280px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+            z-index: 99999;
+            pointer-events: none;
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.15s ease-in-out, visibility 0.15s ease-in-out;
+            line-height: 1.4;
+        }
+
+        .tooltip.visible {
+            opacity: 1;
+            visibility: visible;
+        }
+
         /* Skrytie sekcií */
         .view-section { display: none; }
         .view-section.active-view { display: block; }
+
+        .adrenaline-select {
+            font-family: 'Roboto Condensed', sans-serif;
+            font-size: 1.1rem;
+            font-weight: bold;
+            padding: 6px 12px;
+            border: var(--border-heavy);
+            border-radius: 8px;
+            background: #fff;
+            cursor: pointer;
+            outline: none;
+        }
+        .adrenaline-select:hover {
+            transform: scale(1.05);
+        }
+
+        /* Visual highlight to make keyboard selection obvious to the player */
+        .adrenaline-select.choice-hover-highlight {
+            transform: scale(1.04);
+            box-shadow: 0 0 10px rgba(255, 235, 59, 0.6);
+        }
 
         .char-header {
             width: 1100px;
@@ -132,9 +143,9 @@
             border-bottom: none;    
         }
 
-        .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; min-height: 200px; z-index: 10;}
-        .control-box { width: 300px;background: #000; color: white; padding: 20px; border-radius: 10px; }
-        #builder-list{height: 260px; border-radius: 8px;}
+        .info-panel { flex: 1.8; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 100%; z-index: 10;}
+        .control-box { border: 2px solid #444;flex: 2;background: #000; color: white; padding: 20px; border-radius: 10px; }
+        #builder-list{max-height: 240px; flex: 1; border-radius: 8px;}
         #filter-container-container{
             gap: 10px;
         }
@@ -171,11 +182,12 @@
 
         /* The visual modal box inside the overlay backdrop */
         .info-panel-box {
-            background-color: #ffffff;
+            background-color: #000000b5;
+            color: white;
             border: 3px solid #000000;
             border-radius: 12px;
-            padding: 30px;
-            max-width: 750px;
+            padding: 20px;
+            max-width: 900px;
             max-height: 450px;
             width: 90%;
             box-sizing: border-box;
@@ -185,6 +197,27 @@
             /* Starting animation position (slight pop-up bounce) */
             transform: scale(0.9);
             transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        /* Global custom modal overlay (ensure it sits above info-panel) */
+        #custom-modal {
+            position: fixed !important;
+            top: 0 !important;
+            left: 0 !important;
+            width: 100vw !important;
+            height: 100vh !important;
+            display: none; /* shown by JS */
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.75) !important;
+            z-index: 300000 !important; /* well above #info-panel-container */
+            pointer-events: auto !important;
+        }
+
+        #custom-modal .modal-box {
+            position: relative;
+            z-index: 300001 !important;
+            box-sizing: border-box;
         }
 
         /* Animates the box content scale outwards when parent opens */
@@ -224,6 +257,8 @@
 
         .tabs { 
             display: flex; 
+            align-items: flex-end;
+            justify-content: flex-end;
             padding: 10px 30px; 
             gap: 5px;
         }
@@ -252,6 +287,10 @@
             font-family: 'Archivo Black', sans-serif;
             text-transform: uppercase;
             transition: 0.3s;
+        }
+
+        .tab-btn:hover{
+            transform: scale(1.03);
         }
 
         .basic-btn {
@@ -398,7 +437,7 @@
 
         .info-panel { flex: 2.2; display: flex; flex-direction: row; gap: 15px; position: sticky; top: 0px; align-self: flex-start; height: 300px; z-index: 100000;}
         
-        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px;}
+        .selection-list { border: 2px solid #000; overflow-y: auto; background: #fff; flex-grow: 1; padding: 5px; margin-right: 5px; margin-bottom: 10px; color: #000;}
         .skill-list-item { padding: 10px; border-bottom: 1px solid #eee; cursor: pointer; font-weight: bold; font-size: 0.85em; text-transform: uppercase; }
         .skill-list-item:hover { background: #f4f4f4; }
         .group-divider { background: #eee; padding: 5px 10px; font-size: 0.7rem; font-weight: bold; color: #666; }
@@ -651,6 +690,17 @@
         margin-left: 0 !important;
         margin-right: 0 !important;
         box-sizing: border-box !important;
+    }
+
+    .info-panel-box {
+        width: 120% !important;
+        max-width: none;
+        transform: scale(0.85) !important;
+        padding: 15px !important;
+    }
+
+    .tab-btn{
+        font-size: 0.8rem !important;
     }
 
     /* Tame the heavy box-shadow offset that pushes beyond viewport width boundaries */

@@ -11,6 +11,12 @@
         const overlay = document.getElementById('info-panel-container');
         if (!overlay) return;
 
+        const char = characters[activeCharIdx];
+        const sp = char.sp || 0;
+        
+        document.getElementById('br-label').innerText = `BR: ${sp}`;
+
+
         if (show) {
             overlay.classList.add('active');
         } else {
@@ -77,6 +83,7 @@
         const data = skillsDB_new[name];
         const targetLvl = (char.skills[name] || 0) + 1;
         const baseCost = targetLvl * data[0];
+        const sp = char.sp || 0;
         
         let discount = 0;
         let relDisplayStrings = [];
@@ -107,6 +114,7 @@
         } else { costCont.style.display = 'none'; }
         
         document.getElementById('cost-disc').innerText = `${finalCost} BR`;
+        document.getElementById('br-label').innerText = `BR: ${sp}`;
         renderStats();
     }
 
@@ -226,12 +234,22 @@
     }
 
     function upgradeSelected() {
-        if (!selectedSkill) return;
+        if (!selectedSkill) {
+            console.log("No skill selected.");
+            return};
         const char = characters[activeCharIdx];
         const currentLvl = char.skills[selectedSkill] || 0;
         
         const data = skillsDB_new[selectedSkill]; 
-        if (!data) return;
+        if (!data) {
+            console.log("Skill data not found for:", selectedSkill);
+            return};
+
+        if (window.parent.BIOLOGICAL_WEAPONS && window.parent.BIOLOGICAL_WEAPONS.includes(selectedSkill) && currentLvl > 0) {
+            showCustomAlert("Túto zbraň už máš. Úroveň somorích zbraní sa nezvyšuje.");
+            return;
+        }
+
         const skillGroup = data[1]; 
         const targetLvl = currentLvl + 1;
 
@@ -378,11 +396,13 @@
                 const data = skillsDB_new[skill];
                 const isSomora = data && data[1] === "SOMORA";
                 const baseLvl = snapshot[skill] || 0;
+                const skillCost = Number(data?.[0]) || 1;
+                const relations = Array.isArray(data?.[2]) ? data[2] : [];
 
                 for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const relLevels = relations.map(r => currentSkills[r] || 0).sort((a, b) => b - a).slice(0, 3);
                     const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    const cost = Math.max(lvl, (lvl * data[0]) - discount);
+                    const cost = Math.max(lvl, (lvl * skillCost) - discount);
                     
                     totalCost += cost;
                     if (isSomora) somoraCost += cost;
@@ -413,12 +433,14 @@
             }
 
             let candidates = [...remainingSkills].sort((a, b) => {
-                const aHelpsB = skillsDB_new[b][2]?.includes(a);
-                const bHelpsA = skillsDB_new[a][2]?.includes(b);
+                const aData = skillsDB_new[a];
+                const bData = skillsDB_new[b];
+                const aHelpsB = Array.isArray(aData?.[2]) && aData[2].includes(b);
+                const bHelpsA = Array.isArray(bData?.[2]) && bData[2].includes(a);
                 if (aHelpsB && !bHelpsA) return -1;
                 if (bHelpsA && !aHelpsB) return 1;
-                const catA = skillsDB_new[a][0];
-                const catB = skillsDB_new[b][0];
+                const catA = Number(aData?.[0]) || 0;
+                const catB = Number(bData?.[0]) || 0;
                 if (catA !== catB) return catA - catB;
                 return a.localeCompare(b);
             });
@@ -433,10 +455,13 @@
                 const data = skillsDB_new[skill];
                 const baseLvl = snapshot[skill] || 0;
 
+                const skillCost = Number(data?.[0]) || 1;
+                const relations = Array.isArray(data?.[2]) ? data[2] : [];
+
                 for (let lvl = baseLvl + 1; lvl <= targetLvl; lvl++) {
-                    const relLevels = data[2].map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
+                    const relLevels = relations.map(r => nextSkillsState[r] || 0).sort((a, b) => b - a).slice(0, 3);
                     const discount = relLevels.reduce((sum, l) => sum + l, 0);
-                    costAdded += Math.max(lvl, (lvl * data[0]) - discount);
+                    costAdded += Math.max(lvl, (lvl * skillCost) - discount);
                     nextSkillsState[skill] = lvl;
                 }
 
@@ -528,6 +553,7 @@
                     nameButton.setAttribute('data-description', data[3] || '');
                     nameButton.onclick = (e) => {
                         e.stopPropagation();
+                        document.querySelector('.skill-tooltip')?.classList.remove('visible');
                         selectSkill(name);
                         toggleInfoOverlay(true);
                     };
@@ -588,14 +614,17 @@
         // --- ITEMS DATA PREPARATION ---
         const saved = JSON.parse(localStorage.getItem('characters')) || [];
         const savedChar = saved.find(c => c.name.toUpperCase() === char.name.toUpperCase());
-        const items = savedChar ? (savedChar.items || {}) : {};
-        const weapons = savedChar ? (savedChar.weapons || []) : {};
-    
+        const items = char.items !== undefined ? char.items : (savedChar ? savedChar.items || {} : {});
+        const weapons = char.weapons !== undefined ? char.weapons : (savedChar ? savedChar.weapons || [] : []);
+        const ammo = char.ammo !== undefined ? char.ammo : (savedChar ? savedChar.ammo || {} : {});
+
+        const weaponsToShow = weapons.filter(w => !(w in ammo));
+        const ammoItems = Object.entries(ammo).filter(([_, qty]) => qty > 0);
+
         let allItems = Object.entries(items)
             .filter(([_, qty]) => qty > 0)
-            .concat(weapons.map(w => [w, 1]))
-            .sort((a, b) => a[0].localeCompare(b[0]));
-    
+            .concat(ammoItems)
+            .concat(weaponsToShow.map(w => [w, 1]));
         const ITEM_LIST = window.parent && window.parent.ITEM_LIST;
 
             // --- PC VERZIA: VYBAVENIE ---
@@ -696,6 +725,7 @@
                         nameButton.setAttribute('data-description', itemData && itemData.description ? itemData.description : '');  
                         nameButton.onclick = (e) => {
                             e.stopPropagation();
+                            document.querySelector('.skill-tooltip')?.classList.remove('visible');
                             selectItem(name);
                         };
                         
@@ -802,13 +832,57 @@
         });
         localStorage.setItem('skillsDB_new', JSON.stringify(skillsDB_new));
         localStorage.setItem('characters', JSON.stringify(saved));
+
+        if (window.parent && typeof window.parent.syncBuilderCharacterStateFromStorage === 'function') {
+            window.parent.syncBuilderCharacterStateFromStorage();
+        }
+    }
+
+    function refreshCharactersFromStorage() {
+        const saved = JSON.parse(localStorage.getItem('characters')) || [];
+        const refreshed = [...characters];
+
+        saved.forEach(savedChar => {
+            const idx = refreshed.findIndex(c => c.name.toUpperCase() === savedChar.name.toUpperCase());
+            if (idx !== -1) {
+                refreshed[idx] = {
+                    ...refreshed[idx],
+                    ...savedChar,
+                    skills: savedChar.skills || refreshed[idx].skills || {},
+                    items: savedChar.items || refreshed[idx].items || {},
+                    weapons: savedChar.weapons !== undefined ? [...savedChar.weapons] : (refreshed[idx].weapons || []),
+                    ammo: savedChar.ammo !== undefined ? { ...savedChar.ammo } : (refreshed[idx].ammo || {}),
+                    defaultWeapons: savedChar.defaultWeapons || refreshed[idx].defaultWeapons || [],
+                    defaultAmmo: savedChar.defaultAmmo || refreshed[idx].defaultAmmo || {},
+                    defaultItems: savedChar.defaultItems || refreshed[idx].defaultItems || {},
+                    isInitialPhase: savedChar.isInitialPhase !== undefined ? savedChar.isInitialPhase : refreshed[idx].isInitialPhase
+                };
+            } else {
+                refreshed.push({
+                    ...savedChar,
+                    isInitialPhase: savedChar.isInitialPhase !== undefined ? savedChar.isInitialPhase : true
+                });
+            }
+        });
+
+        characters = refreshed;
+        if (activeCharIdx >= characters.length) {
+            activeCharIdx = Math.max(0, characters.length - 1);
+        }
+        return characters[activeCharIdx];
     }
 
     function useItemBuilder(name){
-        window.parent.useItem(name);
+        if (window.parent && typeof window.parent.useItem === 'function') {
+            window.parent.useItem(name);
+        }
         setTimeout(() => {
-            renderStats()
-        }, 500);
+            refreshCharactersFromStorage();
+            renderStats();
+            if (document.querySelector('#inventar table')) {
+                renderInventar();
+            }
+        }, 250);
     }
 
     function renderInventar() {
@@ -875,11 +949,9 @@
     // 2. Spoločná logika, ktorá vyčistí stav buildera a prekreslí tabuľky
     function applyCharacterChange() {
         // 🛡️ HLAVNÁ POISTKA PROTI RACE CONDITION:
-        // Ak je lokálna skillsDB_new prázdna, skúsime ju ihneď naplniť z hlavného okna (rodiča)
+        // Ak je lokálna skillsDB_new prázdna, načítame ju z lokálneho storage alebo z explicitne určeného súboru sim/skillsDB.json.
         if (!skillsDB_new || Object.keys(skillsDB_new).length === 0) {
-            if (window.parent && window.parent.SKILLS_DB && Object.keys(window.parent.SKILLS_DB).length > 0) {
-                skillsDB_new = window.parent.SKILLS_DB;
-            }
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || JSON.parse(localStorage.getItem('skillsDB')) || {};
         }
 
         selectedSkill = null; 
@@ -1054,39 +1126,43 @@
 
 
     function showCustomAlert(message, title = "UPOZORNENIE", isConfirm = false, callback = null) {
-        document.getElementById('modal-title').innerText = title;
-        document.getElementById('modal-message').innerText = message;
-        
-        const btnContainer = document.getElementById('modal-buttons');
-        if (!btnContainer) return; // Bezpečnostná poistka
-        
-        btnContainer.innerHTML = ''; 
+        const modal = document.getElementById('custom-modal');
+        if (!modal) return; // safety
+
+        // Build modal content matching the requested visual style
+        modal.innerHTML = `
+            <div style="position: relative; background: #1a1a1a; border: 2px solid var(--hybrid-red); padding: 25px; border-radius: 8px; width: 500px; text-align: center; box-shadow: 0 0 20px rgba(215,0,0,0.4);">
+                <button id="custom-modal-close" style="position: absolute; top: 10px; right: 10px; background-color: var(--hybrid-red); color: white; width: 35px; height: 35px; padding: 0; margin: 0; cursor: pointer; font-weight: bold; border-radius: 4px;">X</button>
+                <div id="modal-title" style="font-family: 'Archivo Black', sans-serif; font-size: 1.2rem; color: #fff; margin-bottom: 25px;">${title}</div>
+                <div id="modal-message" style="font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; color: #fff; margin-bottom: 15px;">${message}</div>
+                <input id="modal-input" type="text" placeholder="" style="display: none; width: 80%; margin-bottom: 20px; padding: 8px 12px; font-family: 'Roboto Condensed', sans-serif; font-size: 1rem; background: #2a2a2a; color: #fff; border: 2px solid #555; border-radius: 4px; outline: none;">
+                <div style="display: flex; flex-direction: row; gap: 10px; justify-content: center; width: 100%;">
+                    <button id="modal-confirm" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-green);">Áno.</button>
+                    <button id="modal-cancel" class="adrenaline-select" style="width: 80px; color: #ffffff; background: var(--hybrid-red);">Nie.</button>
+                </div>
+            </div>
+        `;
+
+        // Wire up actions
+        const closeBtn = document.getElementById('custom-modal-close');
+        if (closeBtn) closeBtn.onclick = closeModal;
+
+        const confirmBtn = document.getElementById('modal-confirm');
+        const cancelBtn = document.getElementById('modal-cancel');
 
         if (isConfirm) {
-            const yesBtn = document.createElement('button');
-            yesBtn.className = 'tab-btn';
-            yesBtn.style.cssText = 'clip-path:none; background:var(--hybrid-green); color:white; margin: 5px;';
-            yesBtn.innerText = 'ÁNO';
-            yesBtn.onclick = () => { if(callback) callback(); closeModal(); };
-            
-            const noBtn = document.createElement('button');
-            noBtn.className = 'tab-btn';
-            noBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white; margin: 5px;';
-            noBtn.innerText = 'NIE';
-            noBtn.onclick = closeModal;
-
-            btnContainer.appendChild(yesBtn);
-            btnContainer.appendChild(noBtn);
+            if (confirmBtn) confirmBtn.onclick = () => { if (callback) callback(); closeModal(); };
+            if (cancelBtn) cancelBtn.onclick = closeModal;
         } else {
-            const okBtn = document.createElement('button');
-            okBtn.className = 'tab-btn';
-            okBtn.style.cssText = 'clip-path:none; background:var(--hybrid-red); color:white;';
-            okBtn.innerText = 'OK';
-            okBtn.onclick = closeModal;
-            btnContainer.appendChild(okBtn);
+            // Non-confirm: show single OK (use confirm button as OK)
+            if (cancelBtn) cancelBtn.style.display = 'none';
+            if (confirmBtn) {
+                confirmBtn.innerText = 'OK';
+                confirmBtn.onclick = closeModal;
+            }
         }
 
-        document.getElementById('custom-modal').style.display = 'flex';
+        modal.style.display = 'flex';
     }
 
     function closeModal() {
@@ -1110,24 +1186,16 @@
     }
 
     async function loadSkills() {
-        // ✅ Fast path: parent already has the DB loaded (avoids duplicate fetch)
-        if (window.parent && window.parent.SKILLS_DB && Object.keys(window.parent.SKILLS_DB).length > 0) {
-            skillsDB_new = window.parent.SKILLS_DB;
-            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            console.log("Dáta načítané z rodiča (parent.SKILLS_DB)");
-            return;
-        }
-
-        // Fallback: load independently if running standalone or parent not ready yet
         try {
-            const response = await fetch('skillsDB.json');
+            const response = await fetch('../skillsDB.json', { cache: 'no-store' });
             if (!response.ok) throw new Error("Súbor nenájdený");
             skillsDB_new = await response.json();
             originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
-            console.log("Dáta úspešne načítané zo súboru");
+            console.log("Dáta načítané z sim/skillsDB.json");
         } catch (error) {
-            console.error("Chyba pri načítaní JSON:", error);
-            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB')) || {};
+            console.warn("Nepodarilo sa načítať sim/skillsDB.json, používam fallback z localStorage:", error);
+            skillsDB_new = JSON.parse(localStorage.getItem('skillsDB_new')) || JSON.parse(localStorage.getItem('skillsDB')) || {};
+            originalSkillsDB = JSON.parse(JSON.stringify(skillsDB_new));
         }
     }
 
@@ -1225,7 +1293,7 @@ async function exportpng() {
                     padding: 0 !important;
                     display: block !important;
                     overflow: visible !important;
-                    z-index: 99999 !important;
+                    z-index: 999999 !important;
                     
                     background-position: top left !important;
                     background-size: 100% 100% !important;
@@ -1393,6 +1461,10 @@ function initSkillTooltips() {
 
         tooltip.classList.remove('visible');
     });
+
+    document.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+    });
 }
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -1401,4 +1473,102 @@ document.addEventListener('DOMContentLoaded', () => {
     }
     initSkillTooltips();
 
+});
+
+function showTooltip(event) {
+    console.log('showTooltip called', event.currentTarget);
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        console.log('Creating tooltip');
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+    const desc = event.currentTarget.getAttribute('data-tooltip');
+    console.log('Tooltip description:', desc);
+    if (desc && tooltip) {
+        tooltip.textContent = desc;
+        tooltip.classList.add('visible');
+        console.log('Tooltip visible, text:', desc);
+    }
+}
+
+function moveTooltip(event) {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip && tooltip.classList.contains('visible')) {
+        let posX = event.clientX + 15;
+        let posY = event.clientY - 15;
+        
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - 15;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - 15;
+        }
+        
+        tooltip.style.left = posX + 'px';
+        tooltip.style.top = posY + 'px';
+    }
+}
+
+function hideTooltip() {
+    const tooltip = document.querySelector('.tooltip');
+    if (tooltip) {
+        tooltip.classList.remove('visible');
+    }
+}
+
+function initTooltips() {
+    let tooltip = document.querySelector('.tooltip');
+    if (!tooltip) {
+        tooltip = document.createElement('div');
+        tooltip.className = 'tooltip';
+        document.body.appendChild(tooltip);
+    }
+
+    document.body.addEventListener('mouseover', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        const description = target.getAttribute('data-tooltip');
+        if (!description || description.trim() === "") return;
+
+        tooltip.textContent = description;
+        tooltip.classList.add('visible');
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mousemove', (event) => {
+        if (!tooltip.classList.contains('visible')) return;
+
+        const offsetX = 15;
+        const offsetY = -15;
+
+        let posX = event.clientX + offsetX;
+        let posY = event.clientY + offsetY;
+
+        if (posX + tooltip.offsetWidth > window.innerWidth) {
+            posX = event.clientX - tooltip.offsetWidth - offsetX;
+        }
+        if (posY + tooltip.offsetHeight > window.innerHeight) {
+            posY = event.clientY - tooltip.offsetHeight - offsetY;
+        }
+
+        tooltip.style.left = `${posX}px`;
+        tooltip.style.top = `${posY}px`;
+    }, true); // true = capture phase
+
+    document.body.addEventListener('mouseout', (event) => {
+        const target = event.target.closest('[data-tooltip]');
+        if (!target) return;
+
+        tooltip.classList.remove('visible');
+    }, true); // true = capture phase
+
+    document.addEventListener('click', () => {
+        tooltip.classList.remove('visible');
+    });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    initTooltips();
 });
