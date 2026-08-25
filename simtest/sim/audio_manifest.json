@@ -2,9 +2,10 @@
   "_readme": "Všetky súbory patria do priečinka audio/. Ak niektorý súbor chýba, script prehrá no_audio.WAV ako fallback (alebo pre dynamický obsah rovno prečíta text nahlas cez Web Speech API - viď playAudioOrSpeak v audio-ui.js). Kľúče 'msg_*' a 'menu_*' a 'choice_*' sú DYNAMICKÉ - presný zoznam závisí od obsahu hry/menu a nedá sa vopred vymenovať; vzniknú za behu podľa vzoru v poznámke pri danej sekcii. HLAS: nahrávky sú namrbytnuté hlasom Slovak ViktoriaNeural (Microsoft/Edge TTS) - audio-ui.js pri Web Speech fallbacku hľadá medzi hlasmi prehliadača rovnaký ('viktoria' v mene, jazyk sk), aby živé čítanie znelo rovnako ako nahrávky a nemiešali sa dva rôzne hlasy.",
   "system": {
     "no_audio.WAV": "Chýba audiosúbor.'",
-    "ui_voice_mode_on.WAV": "Hlasové ovládanie zapnuté.",
-    "ui_voice_mode_off.WAV": "Hlasové ovládanie vypnuté.",
-    "ui_back.WAV": "Späť."
+    "ui_voice_mode_on.WAV": "Audioverzia zapnutá. Pre viac informácií stlač klávesu 'I'.",
+    "ui_voice_mode_off.WAV": "Audioverzia vypnutá.",
+    "ui_back.WAV": "Späť.",
+    "ui_ready_priprav_sa.WAV": "Priprav sa."
   },
   "ovladaci_panel_state": {
     "_note": "Prehrá sa pri vstupe do prvku KARTY vo chvíli, keď sú karty v hre vizuálne neaktívne/sivé (rovnaká podmienka, aká v script.js blokuje ich klávesové/myšové ovládanie - mimo boja/akčnej fázy, počas rozhovoru a pod.). Karty ostávajú aj vtedy listovateľné/preskúmateľné, len sa nimi nedá nič vykonať.",
@@ -15,10 +16,11 @@
   },
   "state_tooltips": {
     "_note": "Klávesa 'I' (viď audio-ui.js, sekcia 'STATE_TOOLTIPS'/speakStateTooltip) prečíta, KDE hráč práve je a ČO tam môže urobiť, vždy keď vybraný prvok nemá vlastný data-tooltip/data-description v DOM (napr. sekcie, prvky ovládacieho panela ako KARTY/STRES/ZBRANE, podvrstvy pri listovaní, aj prekryvy výberu hrdinu/zbrane/builderu/#general-prompt). Kľúč súboru je vždy 'state_' + názov konštanty z STATE_TOOLTIPS malými písmenami (napr. STATE_TOOLTIPS.SECTION_MENU -> 'state_section_menu.WAV'). Ak nahraný súbor chýba, text sa prečíta cez Web Speech API rovnako ako inde (playAudioOrSpeak).",
-    "state_section_menu.WAV": "Si v sekcii Menu. Šípkami vľavo a vpravo prepínaš medzi sekciami Menu, Ovládací panel, Správy a Denník. Medzerníkom vstúpiš do vybranej sekcie.",
+    "state_section_menu.WAV": "Si v sekcii Menu. Šípkami vľavo a vpravo prepínaš medzi jednotlivými sekciami. Medzerníkom vstúpiš do vybranej sekcie.",
     "state_section_ovladaci_panel.WAV": "Si v sekcii Ovládací panel. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať jednotlivými prvkami: Možnosti, Karty, Stres, Adrenalín, Zbrane, Schopnosti, Prvá pomoc a Únik.",
     "state_section_spravy.WAV": "Si v sekcii Správy. Medzerníkom vstúpiš do zoznamu hlásení a šípkami budeš listovať staršími a novšími správami.",
     "state_section_dennik.WAV": "Si v sekcii Denník.",
+    "state_section_zacat.WAV": "Si na položke Začať. Medzerníkom spustíš hru.",
     "state_element_moznosti.WAV": "Si na položke Možnosti. Medzerníkom vstúpiš do zoznamu aktuálne dostupných možností a šípkami medzi nimi budeš listovať.",
     "state_element_karty.WAV": "Si na položke Karty. Medzerníkom vstúpiš k listovaniu kartami, šípkami vľavo a vpravo meníš kartu a šípkami hore a dole, počas sporu, meníš stranu karty.",
     "state_element_stres.WAV": "Si na položke Stres. Hodnota sa prečítala automaticky, medzerník tu nič nevyvolá.",
@@ -28,6 +30,8 @@
     "state_element_prva_pomoc.WAV": "Si na položke Prvá pomoc. Medzerníkom ju použiješ.",
     "state_element_unik.WAV": "Si na položke Únik. Medzerníkom ho použiješ - dostupné len počas sporu.",
     "state_element_menu_option.WAV": "Si na položke menu. Medzerníkom ju potvrdíš.",
+    "state_element_vyzva.WAV": "Si na položke Výzva. Medzerníkom si znova vypočuješ náročnosť a hrozbu aktuálnej výzvy.",
+    "state_element_nepriatel.WAV": "Si na položke Nepriateľ. Medzerníkom si znova vypočuješ stav súpera - typ, stres, výhodu, schopnosť a zbraň.",
     "state_sub_moznosti.WAV": "Listuješ možnosťami. Šípkami vľavo a vpravo meníš možnosť, medzerníkom ju potvrdíš, klávesou Escape sa vrátiš späť.",
     "state_sub_karty.WAV": "Listuješ kartami. Šípkami vľavo a vpravo meníš kartu, počas sporu šípkami hore a dole meníš jej stranu, medzerníkom kartu vyberieš, klávesou Escape sa vrátiš späť.",
     "state_sub_adrenalin.WAV": "Nastavuješ adrenalín. Šípkami vľavo a vpravo meníš hodnotu, medzerníkom ju potvrdíš, klávesou Escape sa vrátiš späť.",
@@ -37,18 +41,23 @@
     "state_overlay_hero_browse.WAV": "Si vo výbere hrdinu. Šípkami vľavo a vpravo prechádzaš medzi uloženými hrdinami, medzerníkom hrdinu označíš a prejdeš k jeho schopnostiam.",
     "state_overlay_hero_skills.WAV": "Prezeráš schopnosti hrdinu. Šípkami vľavo a vpravo prechádzaš medzi jeho schopnosťami, medzerníkom ho potvrdíš a začneš hru, klávesou Escape sa vrátiš k výberu hrdinu.",
     "state_overlay_weapon.WAV": "Si vo výbere počiatočnej zbrane. Šípkami vľavo a vpravo prechádzaš medzi dostupnými zbraňami, medzerníkom zbraň potvrdíš.",
-    "state_overlay_builder_grid.WAV": "Si v builderi, v prehľade naučených schopností. Šípkami prechádzaš medzi políčkami, medzerníkom políčko otvoríš, klávesou Escape builder zavrieš.",
-    "state_overlay_builder_editor.WAV": "Si v builderi, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
-    "state_overlay_builder_actions.WAV": "Si v builderi, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi možnosťami zvýšiť úroveň, znížiť úroveň a vrátiť zmenu, medzerníkom akciu potvrdíš.",
+    "state_overlay_builder_overview.WAV": "Máš otvorený denník, na Hlavičke - meno, body rastu a ľudskosť. Šípkami prejdeš na Schopnosti a Zbrane, klávesou Escape denník zavrieš.",
+    "state_overlay_builder_grid_sections.WAV": "Máš otvorený denník, medzi časťami Hlavička, Schopnosti a Zbrane. Šípkami medzi nimi prechádzaš, medzerníkom vstúpiš dovnútra, klávesou Escape denník zavrieš.",
+    "state_overlay_builder_grid.WAV": "Máš otvorený denník, medzi políčkami v tejto časti. Šípkami prechádzaš medzi nimi, medzerníkom políčko otvoríš, klávesou Escape sa vrátiš na Hlavičku/Schopnosti/Zbrane.",
+    "state_overlay_builder_item_selected.WAV": "Predmet je vybraný a má použiteľný efekt. Medzerníkom ho použiješ, klávesou Escape výber zrušíš bez použitia.",
+    "state_overlay_builder_editor.WAV": "Máš otvorený denník, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (cena, zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
+    "state_overlay_builder_actions.WAV": "Máš otvorený denník, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi cenou, zvýšením úrovne, znížením úrovne a vrátením zmeny, medzerníkom akciu potvrdíš (cena sa len prečíta znova).",
     "state_general_prompt.WAV": "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš."
   },
   "sections": {
     "ui_section_menu.WAV": "Menu.",
     "ui_section_ovladaci_panel.WAV": "Ovládací panel.",
     "ui_section_spravy.WAV": "Správy.",
-    "ui_section_dennik.WAV": "Denník."
+    "ui_section_dennik.WAV": "Denník.",
+    "ui_section_zacat.WAV": "Začať."
   },
   "ovladaci_panel_elements": {
+    "_note": "VÝZVA (ui_element_vyzva.WAV) je DOČASNÁ položka - v zozname prvkov ovládacieho panela sa objaví len počas akčnej fázy (is_action_phase), viď getPanelElements() v audio-ui.js. Toto je len jej NÁZOV (rovnaký vzor ako Karty/Stres/...), samotný obsah (Náročnosť/Hrozba) je dynamický, viď 'vyzva_dynamic' nižšie.",
     "ui_element_moznosti.WAV": "Možnosti.",
     "ui_element_karty.WAV": "Karty.",
     "ui_element_stres.WAV": "Stres.",
@@ -56,12 +65,33 @@
     "ui_element_zbrane.WAV": "Zbrane.",
     "ui_element_schopnosti.WAV": "Schopnosti.",
     "ui_element_prva_pomoc.WAV": "Prvá pomoc.",
-    "ui_element_unik.WAV": "Únik."
+    "ui_element_unik.WAV": "Únik.",
+    "ui_element_vyzva.WAV": "Výzva.",
+    "narocnost.WAV":"Náročnosť",
+    "hrozba.WAV":"Hrozba",
+    "ui_element_nepriatel.WAV": "Nepriateľ.",
+    "vyhoda.WAV": "Výhoda",
+    "schopnost.WAV": "Schopnosť",
+    "zbran.WAV": "Zbraň",
+    "kolaps.WAV": "Kolaps"
+  },
+  "nepriatel_typ": {
+    "_note": "Statické mená typov nepriateľov, čítané ako 'typ_' + slugifySk(enemy-heading-type text) v announceEnemyStats() (audio-ui.js) - viď 'nepriatel_dynamic' nižšie. Presný zoznam ku dnešnému dňu: Skautka, Skautka_dummy, Predátorka, Puritán. Ak pribudne ďalší typ nepriateľa, jeho hláška bez nahraného súboru padne späť na Web Speech fallback rovnako ako ostatné dynamické hodnoty.",
+    "typ_skautka.WAV": "Skautka",
+    "typ_skautka_dummy.WAV": "Skautka",
+    "typ_predatorka.WAV": "Predátorka",
+    "typ_puritan.WAV": "Puritán"
+  },
+  "vyzva_dynamic": {
+    "_note": "Prehráva sa (a) AUTOMATICKY, hneď ako začne akčná fáza (is_action_phase sa zmení na true, viď checkActionPhaseTransition() v audio-ui.js), a (b) NA POŽIADANIE - vstupom na dočasnú položku VÝZVA v ovládacom paneli (medzerník) alebo klávesou 'I' nad ňou. Text 'Výzva. Náročnosť <X>. Hrozba <Y>.' sa VŽDY skladá NAŽIVO z #challenge-stats-display (.stat-item span, spans[0] = Náročnosť, spans[1] = Hrozba - presne tak, ako ich vypĺňa toggleChallengeDisplay() v script.js), nikdy z current_challenge.difficulty/.threat priamo. Keďže hodnoty Náročnosti/Hrozby sa menia pri každej výzve, kľúč 'vyzva_' + slug(text) sa nedá vopred vymenovať - vždy sa prečíta cez Web Speech API (playAudioOrSpeak), rovnaký vzor ako napr. hodnoty zbraní/schopností."
+  },
+  "nepriatel_dynamic": {
+    "_note": "Rovnaký vzor ako 'vyzva_dynamic' vyššie, ale pre SPOR (is_conflict). Prehráva sa (a) AUTOMATICKY, hneď ako sa spor začne (is_conflict sa zmení na true, viď checkConflictTransition() v audio-ui.js), a (b) NA POŽIADANIE - vstupom na dočasnú položku NEPRIATEL v ovládacom paneli (medzerník) alebo klávesou 'I' nad ňou. Text 'Nepriateľ. <typ>. Stres <X>. Kolaps <Y>. Výhoda <A>. Schopnosť <B>. Zbraň <C>.' sa VŽDY skladá NAŽIVO z #enemy-panel (enemy-heading-type/enemy-stress/enemy-advantage/enemy-skill/enemy-weapon - presne tie polia, ktoré vypĺňa updateUI() v script.js), nikdy z ENEMY_TYPES/enemy_stress/enemy_advantage priamo. Hodnota enemy-stress je v DOM-e v tvare 'X / Y' - lomka sa nečíta, druhé číslo (hranica kolapsu nepriateľa) sa namiesto nej uvádza slovom 'Kolaps' (rovnaký účel ako STRES_THRESH). Typ nepriateľa (napr. 'Skautka') sa hlási cez statické súbory 'typ_' + slug(text), viď 'nepriatel_typ' vyššie - ak by pribudol nový typ bez nahraného súboru, hláška padne na Web Speech fallback. Číselné hodnoty (Stres/Kolaps/Výhoda/Schopnosť/Zbraň) idú cez existujúce stres_0..stres_15 súbory (enqueueNumberAudio), rovnako ako pri VÝZVE."
   },
   "moznosti_dynamic": {
     "_note": "Pre každú možnosť, ktorú hra ponúkne v choice-prompte, sa hľadá súbor 'choice_<slug>.WAV', kde <slug> vznikne zo znenia možnosti (malé písmená, diakritika odstránená, medzery nahradené podčiarkovníkom). Príklady nižšie pokrývajú najčastejšie hlášky, ale kompletný zoznam závisí od textov v CHALLENGES.",
     "choice_spat.WAV": "Späť.",
-    "_note_proceed_prompt": "Do 'Možnosti' patria aj tlačidlá z #proceed-prompt (proceed-btn / back-button / close-btn) - na obrazovke sa totiž ponúkajú ako tá istá skupina volieb. Script ich zaradí do cyklu iba vtedy, keď sú práve viditeľné, inak sa preskočia. proceed-btn mení text ZAČAŤ <-> ĎALEJ, preto má 2 súbory; back-button a close-btn majú pevný audio kľúč bez ohľadu na (v HTML nesprávny) zobrazený text.",
+    "_note_proceed_prompt": "Do 'Možnosti' patria tlačidlá z #proceed-prompt (back-button / close-btn) - na obrazovke sa totiž ponúkajú ako tá istá skupina volieb. Script ich zaradí do cyklu iba vtedy, keď sú práve viditeľné, inak sa preskočia. proceed-btn (ZAČAŤ <-> ĎALEJ) je VÝNIMKA: kým zobrazuje 'ZAČAŤ' (pred prvým stlačením, WELCOME obrazovka), NIE JE súčasťou Možností - má vlastnú samostatnú sekciu ZACAT (viď audio-ui.js, getSections()/enterSection()), ktorá dovtedy nahrádza sekcie OVLÁDACÍ PANEL a DENNÍK (tie ešte nedávajú zmysel, kým sa hra nerozbehla). Len keď je proceed-btn viditeľný s textom 'ĎALEJ' (ostatné fázy hry), zostáva ako predtým súčasťou Možností. back-button a close-btn majú pevný audio kľúč bez ohľadu na (v HTML nesprávny) zobrazený text.",
     "btn_zacat.WAV": "Začať.",
     "btn_dalej.WAV": "Ďalej.",
     "btn_spat.WAV": "Späť.",
@@ -229,11 +259,13 @@
     }
   },
   "karty": {
-    "_note_tooltip": "Karty samy o sebe nemajú v DOM žiadny data-tooltip/data-description (obrázok karty nič také nenesie), preto majú - na rozdiel od bežných tooltipov nižšie - VLASTNÉ PEVNÉ kľúče. Namiesto samotného mena karty (predtým 'opatrne.'/'smelo.'/'bezhlavo.') sa teraz pri KAŽDEJ zmene karty/strany šípkami AUTOMATICKY hlási rovno tooltip s hodnotami danej strany - viď kartyAnnounceCurrent() v audio-ui.js. Klávesa 'I' prehráva ten istý zvuk na požiadanie (viď audio-ui.js, sekcia 15/16).",
+    "_note_tooltip": "Karty samy o sebe nemajú v DOM žiadny data-tooltip/data-description (obrázok karty nič také nenesie), preto majú - na rozdiel od bežných tooltipov nižšie - VLASTNÉ PEVNÉ kľúče. Pri KAŽDEJ zmene karty/strany šípkami sa AUTOMATICKY prehrá MENO karty (card_o/s/b), a pokiaľ je karta práve ROZDELENÁ na strany (spor/eliminačná kontrola), hneď za ním aj to, ktorá strana (ČIN/ÚTOK - viď cin.WAV/utok.WAV nižšie) je práve zvolená - viď kartyAnnounceCurrent() v audio-ui.js. Podrobný obsah danej strany (Opatrnosť/Intenzita + Motivácia) sa prečíta až na požiadanie klávesou 'I' (card_*_d_tooltip / card_*_a_tooltip nižšie).",
     "_note_side_tooltip": "Karta má vždy len JEDNU aktuálne relevantnú stranu, ktorá sa ohlasuje - nikdy sa neprehráva 'Horná strana... Dolná strana...' naraz. Mimo sporu/eliminačnej kontroly sa vždy hlási HORNÁ strana ('d' - Opatrnosť), keďže tá je pri bežnom (nebojovom) použití karty relevantná. Počas SPORU/KONFLIKTU (is_conflict) alebo eliminačnej kontroly (is_elimination_check) sa namiesto toho hlási podľa aktuálne zvolenej zóny ÚTOK/'A' (dolná strana, Intenzita) alebo ČIN/'D' (horná strana, Opatrnosť) - viď currentSelectedActionType v script.js. Kľúč = 'card_' + kód karty ('o'/'s'/'b') + '_' + kód strany ('a' pre ÚTOK/dolnú, 'd' pre ČIN/hornú) + '_tooltip'.",
     "card_o.WAV": "opatrne",
     "card_s.WAV": "smelo",
     "card_b.WAV": "bezhlavo",
+    "cin.WAV": "Čin.",
+    "utok.WAV": "Útok.",
     "card_o_d_tooltip.WAV": "Opatrnosť 2 a Motivácia 8 (osemstenná kocka).",
     "card_o_a_tooltip.WAV": "Intenzita 1 a motivácia 10 (desaťstenná kocka).",
     "card_s_d_tooltip.WAV": "Opatrnosť 1 a Motivácia 10 (desaťstenná kocka).",
@@ -696,7 +728,7 @@
       "msg_na_zemi_najdes_sklenenu_flasu_hadzes_ju_co_najdalej_snad_t.WAV": "Na zemi nájdeš sklenenú fľašu. Hádžeš ju čo najďalej. Snáď to Skautku odláka.",
       "msg_na_zemi_najdes_sklenenu_flasu_potries_ju_feromonmi_a_hadzes.WAV": "Na zemi nájdeš sklenenú fľašu. Potrieš ju feromónmi a hádžeš ju čo najďalej. Snáď to Skautku odláka.",
       "msg_nachadzas_nejake_pouzitelne_zasoby_flasticku_dezinfekcie_h.WAV": "Nachádzaš nejaké použiteľné zásoby. Fľaštičku dezinfekcie, hadicu a dokonca palivový filter - zabalený a zdá sa, že nepoškodený.",
-      "msg_nachadzas_sa_na_sidlisku_je_mrtvolne_ticho_potom_si_ale_za.WAV": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom si ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
+      "msg_nachadzas_sa_na_sidlisku_je_mrtvolne_ticho_potom_si_ale_za.WAV": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
       "msg_nachadzas_sa_v_starej_garazi_kedysi_sa_tu_niekto_ukryval_a.WAV": "Nachádzaš sa v starej garáži. Kedysi sa tu niekto ukrýval, ale už tu dlho nebol. Môžeš to tu skúsiť prehľadať.",
       "msg_nachvilu_sa_na_teba_podozrievavo_zahladi_ale_potom_akoby_si.WAV": "Nachvíľu sa na teba podozrievavo zahľadí, ale potom akoby si povedal: \"Nie, to sa mi len zdá.\"",
       "msg_naciahnes_sa_po_flasu_do_drgnes_do_skrine_flasa_spadne_al.WAV": "Načiahneš sa po fľašu, do drgneš do skrine, fľaša spadne, ale v poslednej sekunde ju chytíš. Otvoríš ju - hej, je to slivovica.",
@@ -992,6 +1024,7 @@
     "_note_nested": "Položky NASTAVENIA a O HRE otvoria ďalšie, vnorené obrazovky (#settings s prepínačmi tutoriál/audio/logovanie hodov/náročnosť, #credits so zoznamom autorov), ktoré aktuálna audio-ui.js vrstva zatiaľ nenavigovala - nebola súčasťou pôvodného stromu sekcií. Ak ich treba tiež ozvučiť, dá sa pridať ako ďalšia 'sub' vrstva analogicky k Možnostiam."
   },
   "dennik": {
+    "_note": "DENNÍK teraz OTVÁRA editor postavy (viď sekcia 'builder' vyššie) namiesto vlastnej samostatnej obrazovky - 'ui_dennik_prazdny.WAV' ostáva len ako obranná záloha pre nepravdepodobný prípad, že by funkcia toggleBuilder v hre chýbala.",
     "ui_dennik_prazdny.WAV": "Denník je zatiaľ prázdny."
   },
   "common_overlay_buttons": {
@@ -1009,13 +1042,38 @@
     "ui_zbran_vyber.WAV": "Výber počiatočnej zbrane."
   },
   "builder": {
-    "_note": "Editor postavy (schopnosti), otvára sa v iframe #builder-iframe (builder/index.html) nad hrou. Názvy schopností používajú rovnaký vzor 'skill_<slug>.WAV' ako sekcia SCHOPNOSTI vyššie - kompletný zoznam závisí od skillsDB.json a nedá sa vopred vymenovať.",
-    "ui_builder_otvoreny.WAV": "Editor postavy.",
+    "_note": "DENNÍK = tento istý editor postavy/predmetov (#builder-overlay/#builder-iframe, index.html+script_builder.js) - vstup do sekcie DENNÍK v audio-ui.js zavolá priamo toggleBuilder(true) (top-level funkcia v script.js). Ak je zablokovaný (spor/akčná fáza/kontroly prebiehajú, alebo ešte nie je vybraný hrdina), script.js to sám zaloguje/otvorí #general-prompt - obe už automaticky obslúžia existujúce mechanizmy (live čítanie logu, #general-prompt), netreba nič naviac. Mriežka #character-stats obsahuje DVE odlišné veci pod tou istou CSS triedou .skill-slot: naučené SCHOPNOSTI (majú .skill-cat-box - kategória, čítajú sa 'skill_<slug>.WAV' ako v sekcii SCHOPNOSTI) a PREDMETY VO VÝBAVE (bez .skill-cat-box - zbrane/munícia medzi nimi znovupoužívajú 'weapon_<slug>.WAV', ostatné predmety z ITEM_LIST majú vlastný vzor 'item_<slug>.WAV', viď nižšie). Pred týmito slotmi je pri listovaní vždy virtuálna prvá položka - PREHĽAD POSTAVY (meno cez 'hero_<slug>.WAV'/TTS, 'label_body_rastu.WAV'+číslo z 'hodnoty', 'label_ludskost.WAV'+číslo).",
+    "ui_builder_otvoreny.WAV": "Denník.",
+    "ui_prehlad_postavy.WAV": "Nemáš zatiaľ vybraného hrdinu.",
+    "label_body_rastu.WAV": "Body rastu:",
+    "label_ludskost.WAV": "Ľudskosť:",
     "ui_grid_schopnosti.WAV": "Tvoje schopnosti.",
+    "ui_grid_zbrane_prazdne.WAV": "Nemáš žiadne predmety ani zbrane.",
     "pridat_schopnost.WAV": "Pridať schopnosť.",
+    "_note_editor": "EDITOR (výber schopnosti zo SCHOPNOSTI): browse-vrstva listuje CELÝ zoznam schopností (#builder-list, aj ešte nenaučené) a výberom ('skill_<slug>.WAV') sa prejde do actions-vrstvy - tam sa najprv prehrá 'label_aktualna_uroven.WAV' + číslo (parsované z '#sel-skill-name', tvar 'NÁZOV: A → B' - A je aktuálna úroveň), potom prvá akcia CENA. Akcie (šípky vľavo/vpravo): CENA ('label_cena.WAV'+číslo z '#cost-disc', len informačná, medzerník ju len znova prečíta) → ZVÝŠIŤ ÚROVEŇ → ZNÍŽIŤ ÚROVEŇ → VRÁTIŤ. Po vykonaní ktorejkoľvek z posledných troch akcií sa prehrá spätná väzba: 'level_zvysena_na.WAV'/'level_znizena_na.WAV'/'level_vratena_na.WAV' + NOVÁ úroveň, potom 'label_aktualne_body_rastu.WAV' + CELKOVÉ body rastu postavy (parsované z '#br-label', tvar 'BR: X') - toto je iný údaj než cena vyššie (cena = za KOĽKO sa dá zvýšiť, toto = KOĽKO bodov postave ešte celkovo ostáva).",
+    "label_aktualna_uroven.WAV": "Aktuálna úroveň:",
+    "label_cena.WAV": "Cena:",
+    "level_zvysena_na.WAV": "Úroveň zvýšená na",
+    "level_znizena_na.WAV": "Úroveň znížená na",
+    "level_vratena_na.WAV": "Úroveň vrátená na",
+    "label_aktualne_body_rastu.WAV": "Aktuálne body rastu:",
     "btn_zvysit_uroven.WAV": "Zvýšiť úroveň.",
     "btn_znizit_uroven.WAV": "Znížiť úroveň.",
     "btn_vratit_zmenu.WAV": "Vrátiť zmenu.",
+    "_note_items": "'item_<slug>.WAV' pokrýva predmety z ITEM_LIST v script.js (nižšie - kompletný zoznam, keďže ich je málo, na rozdiel od schopností/správ). 'btn_pouzit.WAV' sa prehrá keď má vybraný predmet použiteľný efekt (druhé stlačenie medzerníka ho použije) - výsledok použitia hlási samotná hra do logu, prečíta ho automatické čítanie nových záznamov (sekcia 11b), netreba naň samostatný súbor.",
+    "btn_pouzit.WAV": "Použiť.",
+    "item_slivovica.WAV": "Slivovica.",
+    "item_trava.WAV": "Tráva.",
+    "item_lyzicka.WAV": "Lyžička.",
+    "item_hadica.WAV": "Hadica.",
+    "item_bandaska.WAV": "Bandaska.",
+    "item_lano.WAV": "Lano.",
+    "item_dezinfekcia.WAV": "Dezinfekcia.",
+    "item_zdravotne_pomocky.WAV": "Zdravotné pomôcky.",
+    "item_zlaza_somory.WAV": "Žľaza somory.",
+    "item_feromony.WAV": "Feromóny.",
+    "item_filter.WAV": "Filter.",
+    "item_kluc.WAV": "Kľúč.",
     "_note_alert": "Potvrdzovacie/upozorňovacie okno v builderi (#custom-modal, napr. hlášky BLOKOVANÉ pri znižovaní úrovne) je DYNAMICKÉ rovnako ako SPRÁVY: kľúč 'alert_<slug>.WAV' vzniká z prvých cca 60 znakov textu hlášky. Rovnaký 'alert_<slug>.WAV' vzor sa používa aj pre #general-prompt v hlavnej hre (napr. pri mazaní postavy, pri zadávaní mena hrdinu). Text tlačidiel (Áno./OK/Potvrdiť/Nie./Zrušiť) sa nehlási samostatne - po ohlásení hlášky Medzerník/Enter rovno potvrdí a Escape/Backspace zruší (ak zrušenie existuje)."
   },
   "hodnoty": {

@@ -37,7 +37,26 @@
     // Overené podľa index.html: #main-menu obsahuje NASTAVENIA / POMOC / O HRE / ZMENIŤ HRDINU
     // + zatváracie tlačidlo "X" (onclick="hideMenu()"), ktoré do zoznamu položiek nechceme.
     const MENU_SELECTOR = '#main-menu button:not([onclick*="hideMenu"])';
-    const audioCache = new Map();
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    const bufferCache = new Map(); // Stores decoded AudioBuffers: key -> AudioBuffer
+    let currentSourceNode = null;
+
+    // Helper to fetch and decode audio files into AudioBuffers
+    async function getAudioBuffer(name) {
+        if (bufferCache.has(name)) return bufferCache.get(name);
+
+        const path = AUDIO_BASE_PATH + name + AUDIO_EXT;
+        try {
+            const response = await fetch(path);
+            if (!response.ok) throw new Error(`HTTP ${response.status}`);
+            const arrayBuffer = await response.arrayBuffer();
+            const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+            bufferCache.set(name, audioBuffer);
+            return audioBuffer;
+        } catch (e) {
+            return null;
+        }
+    }
     let isAudioReady = false;
     let audioUIActive = false;
 
@@ -65,7 +84,6 @@
     // ---------------------------------------------------------------------------
     let audioQueue = [];
     let audioQueuePlaying = false;
-    let currentAudioEl = null;
     let playToken = 0;
 
     // Nahraté súbory sú namrbytnuté hlasom "Slovak ViktoriaNeural" (Microsoft/Edge TTS).
@@ -100,12 +118,45 @@
     }
 
     function stopCurrentPlayback() {
-        playToken++; // znehodnotí callbacky prehrávania, ktoré práve zastavujeme
-        if (currentAudioEl) {
-            try { currentAudioEl.pause(); currentAudioEl.currentTime = 0; } catch (e) {}
-            currentAudioEl = null;
+        playToken++; // Znehodnotí callbacky prehrávania
+        if (currentSourceNode) {
+            try {
+                currentSourceNode.onended = null; // Zruší callback aby nesposobil advance()
+                currentSourceNode.stop();
+            } catch (e) {}
+            currentSourceNode = null;
         }
         if (window.speechSynthesis) speechSynthesis.cancel();
+    }
+
+    function ttsFallback(item, token, advance) {
+        if (!item || !item.text || !window.speechSynthesis) {
+            advance();
+            return;
+        }
+
+        const utterance = new SpeechSynthesisUtterance(item.text);
+        const voice = getSkVoice();
+        if (voice) utterance.voice = voice;
+        utterance.lang = "sk-SK";
+
+        utterance.onend = function () {
+            if (token === playToken) advance();
+        };
+        utterance.onerror = function () {
+            if (token === playToken) advance();
+        };
+
+        speechSynthesis.speak(utterance);
+    }
+
+    // Warm up the cache for all items currently waiting in line
+    function preloadQueue(queue) {
+        queue.forEach(item => {
+            if (item.name && !bufferCache.has(item.name)) {
+                getAudioBuffer(item.name); // Fire-and-forget fetch/decode
+            }
+        });
     }
 
     function playQueueNext() {
@@ -116,54 +167,59 @@
         playQueueItem(item, myToken);
     }
 
-    function playQueueItem(item, token) {
-        const name = item.name || "no_audio";
-        // `el.play()` môže na tom istom zlyhaní súboru (napr. chýbajúci/nenačítateľný .WAV)
-        // vyvolať ZÁROVEŇ udalosť "error" na elemente AJ zamietnutie promisu z play().catch().
-        // Bez tejto poistky by sa ttsFallback() spustil DVAKRÁT - raz z el.onerror, raz z
-        // .catch() - čím by sa naraz rozbehli dve prehrávania (napr. nahrávka z druhého
-        // pokusu cez frontu + živé čítanie), presne ten hlásený "hrajú cez seba" konflikt.
-        let fallbackStarted = false;
+function playQueueItem(item, token) {
+    const name = item.name || "no_audio";
+    const OVERLAP_SEC = 0.8; // 400ms early start
+    let advanced = false;
 
-        function advance() {
-            if (token !== playToken) return; // zastarané volanie - medzičasom prišlo prerušenie
-            currentAudioEl = null;
-            playQueueNext();
-        }
-
-        function ttsFallback() {
-            if (token !== playToken) return;
-            if (fallbackStarted) return; // už spustené (pozri poznámku vyššie) - nespúšťaj druhý raz
-            fallbackStarted = true;
-            if (!item.text || !window.speechSynthesis) {
-                if (name !== "no_audio") {
-                    const fb = new Audio(AUDIO_BASE_PATH + "no_audio" + AUDIO_EXT);
-                    currentAudioEl = fb;
-                    fb.onended = advance;
-                    fb.onerror = advance;
-                    fb.play().catch(advance);
-                } else {
-                    advance();
-                }
-                return;
-            }
-            const utter = new SpeechSynthesisUtterance(item.text);
-            utter.lang = "sk-SK";
-            const voice = getSkVoice();
-            if (voice) utter.voice = voice;
-            utter.onend = advance;
-            utter.onerror = advance;
-            speechSynthesis.speak(utter);
-        }
-
-        const pathKey = AUDIO_BASE_PATH + name + AUDIO_EXT;
-        const audioSrc = audioCache.get(name) || audioCache.get(pathKey) || pathKey;
-        const el = new Audio(audioSrc);
-        currentAudioEl = el;
-        el.onended = advance;
-        el.onerror = ttsFallback;
-        el.play().catch(ttsFallback);
+    function advance() {
+        if (token !== playToken || advanced) return;
+        advanced = true;
+        playQueueNext();
     }
+
+    // Helper to start the AudioBufferSourceNode immediately
+    function startNode(buffer) {
+        try {
+            const source = audioCtx.createBufferSource();
+            source.buffer = buffer;
+            source.connect(audioCtx.destination);
+            
+            // Fallback in case the buffer ends earlier than expected
+            source.onended = advance;
+            currentSourceNode = source;
+            source.start(0);
+
+            // Trigger the next queued file 400ms before this one ends
+            const advanceDelayMs = Math.max(0, (buffer.duration - OVERLAP_SEC) * 1000);
+            setTimeout(advance, advanceDelayMs);
+
+        } catch (e) {
+            advance();
+        }
+    }
+
+    // Ensure AudioContext is running
+    if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+    }
+
+    // FAST PATH: Play instantly without async micro-task delays if cached
+    if (bufferCache.has(name)) {
+        startNode(bufferCache.get(name));
+        return;
+    }
+
+    // SLOW PATH: Fetch/decode if not cached, then trigger
+    getAudioBuffer(name).then(buffer => {
+        if (token !== playToken) return;
+        if (buffer) {
+            startNode(buffer);
+        } else {
+            ttsFallback(item, token, advance);
+        }
+    });
+}
 
     function enqueueAudio(fileNameNoExt, fallbackText, interrupt) {
         const name = fileNameNoExt || "no_audio";
@@ -240,6 +296,7 @@
         section_ovladaci_panel: "ui_section_ovladaci_panel",
         section_spravy: "ui_section_spravy",
         section_dennik: "ui_section_dennik",
+        section_zacat: "ui_section_zacat",
 
         // Prvky ovládacieho panelu
         el_moznosti: "ui_element_moznosti",
@@ -250,6 +307,8 @@
         el_schopnosti: "ui_element_schopnosti",
         el_prva_pomoc: "ui_element_prva_pomoc",
         el_unik: "ui_element_unik",
+        el_vyzva: "ui_element_vyzva",
+        el_nepriatel: "ui_element_nepriatel",
 
         // Systémové
         back: "ui_back",
@@ -273,33 +332,78 @@
         btn_novy_hrdina: "btn_novy_hrdina",
         btn_vymazat: "btn_vymazat",
 
-        // Builder (editor postavy - #builder-overlay/#builder-iframe)
+        // Builder (editor postavy - #builder-overlay/#builder-iframe) = obsah sekcie DENNÍK
         builder_otvoreny: "ui_builder_otvoreny",
         grid_schopnosti: "ui_grid_schopnosti",
+        grid_zbrane_prazdne: "ui_grid_zbrane_prazdne",
         pridat_schopnost: "pridat_schopnost",
         btn_zvysit_uroven: "btn_zvysit_uroven",
         btn_znizit_uroven: "btn_znizit_uroven",
         btn_vratit_zmenu: "btn_vratit_zmenu",
+        // Prehľad postavy (sekcia HLAVIČKA v DENNÍKU)
+        prehlad_postavy: "ui_prehlad_postavy",
+        label_body_rastu: "label_body_rastu",
+        label_ludskost: "label_ludskost",
+        // Predmety vo výbave (sekcia ZBRANE v DENNÍKU)
+        btn_pouzit: "btn_pouzit",
+        // Editor schopnosti - aktuálna úroveň, cena a spätná väzba po zmene
+        label_aktualna_uroven: "label_aktualna_uroven",
+        label_cena: "label_cena",
+        level_zvysena_na: "level_zvysena_na",
+        level_znizena_na: "level_znizena_na",
+        level_vratena_na: "level_vratena_na",
+        label_aktualne_body_rastu: "label_aktualne_body_rastu",
 
         // Stav kariet
-        karty_neaktivne: "ui_karty_neaktivne",
-        // Stav úniku (dostupný len počas sporu)
-        unik_neaktivne: "ui_unik_neaktivne"
+        karty_neaktivne: "ui_karty_neaktivne"
     };
 
     function speak(key) {
         playAudio(AUDIO_MAP[key] || key);
     }
 
+    // Ako speak(), ale NEPRERUŠÍ práve prehrávanú frontu - použité keď má hláška nadväzovať
+    // na niečo, čo sme tesne predtým sami zaradili (napr. "Aktuálna úroveň:" + číslo).
+    function speakQueued(key) {
+        enqueueAudio(AUDIO_MAP[key] || key, null, false);
+    }
+
     // ---------------------------------------------------------------------------
     // 3. STAV NAVIGÁCIE
     // ---------------------------------------------------------------------------
-    const SECTIONS = ["MENU", "OVLADACI_PANEL", "SPRAVY", "DENNIK"];
+    const SECTIONS_STANDARD = ["MENU", "OVLADACI_PANEL", "SPRAVY", "DENNIK"];
+    // Pred stlačením "ZAČAŤ" (WELCOME obrazovka, viď proceedBtn.innerText v script.js,
+    // handleChallengeTransition()) OVLÁDACÍ PANEL aj DENNÍK ešte nedávajú zmysel (hra
+    // sa ešte nerozbehla, karty/zbrane/schopnosti/denník sú prázdne/neaktívne) - preto sa
+    // v tomto momente z hlavného zoznamu sekcií vynechajú a namiesto nich pribudne vlastná
+    // sekcia ZAČAŤ (predtým súčasť Možností v Ovládacom paneli, viď getMoznostiItems()).
+    // MENU aj SPRÁVY zostávajú dostupné vždy.
+    //
+    // Zoznam sa POČÍTA NAŽIVO pri KAŽDOM prístupe (živou kontrolou tlačidla #proceed-btn cez
+    // zacatButtonVisible() nižšie), nie raz pri zapnutí audio UI - vďaka tomu funguje správne
+    // aj vtedy, keď hráč zapne audio UI (klávesa V) až KEDYKOĽVEK POČAS HRY, dávno po tom, čo
+    // tlačidlo "ZAČAŤ" už zmizlo: dostane rovno bežný 4-sekciový zoznam, žiadny jednorazový
+    // "hra sa ešte nezačala" príznak nastavený len pri štarte audio UI by mu inak mohol
+    // navždy blokovať prístup k OVLÁDACIEMU PANELU/DENNÍKU.
+    function zacatButtonVisible() {
+        const btn = document.getElementById("proceed-btn");
+        return !!(btn && isElementVisible(btn) && btn.textContent.trim() === "ZAČAŤ");
+    }
+
+    function getSections() {
+        return zacatButtonVisible() ? ["MENU", "ZACAT", "SPRAVY"] : SECTIONS_STANDARD;
+    }
+
+    function currentSection() {
+        const sections = getSections();
+        return sections[state.sectionIdx % sections.length] || sections[0];
+    }
     const SECTION_AUDIO_KEYS = {
         MENU: "section_menu",
         OVLADACI_PANEL: "section_ovladaci_panel",
         SPRAVY: "section_spravy",
-        DENNIK: "section_dennik"
+        DENNIK: "section_dennik",
+        ZACAT: "btn_zacat"
     };
 
     const PANEL_ELEMENTS = [
@@ -313,6 +417,28 @@
         { id: "UNIK", audio: "el_unik" }
     ];
 
+    // Kým prebieha akčná fáza (is_action_phase), pribudne NA ZAČIATOK zoznamu dočasná
+    // položka VÝZVA - Náročnosť/Hrozba aktuálnej výzvy (viď announceChallengeStats()
+    // v sekcii 6b nižšie). Mimo akčnej fázy sa vôbec neobjaví - rovnaký vzor "živo
+    // počítaného zoznamu" ako getSections()/ZAČAŤ vyššie.
+    const PANEL_ELEMENT_VYZVA = { id: "VYZVA", audio: "el_vyzva" };
+
+    // Rovnaký vzor ako VÝZVA vyššie, ale pre SPOR (is_conflict) - dočasná položka
+    // NEPRIATEL na začiatku zoznamu, kým prebieha konflikt. Obsah (typ/stres/výhoda/
+    // schopnosť/zbraň nepriateľa) je dynamický, viď announceEnemyStats() nižšie.
+    const PANEL_ELEMENT_NEPRIATEL = { id: "NEPRIATEL", audio: "el_nepriatel" };
+
+    function getPanelElements() {
+        let elements = PANEL_ELEMENTS;
+        if (typeof is_conflict !== "undefined" && is_conflict) {
+            elements = [PANEL_ELEMENT_NEPRIATEL].concat(elements);
+        }
+        if (typeof is_action_phase !== "undefined" && is_action_phase) {
+            elements = [PANEL_ELEMENT_VYZVA].concat(elements);
+        }
+        return elements;
+    }
+
     const state = {
         layer: "section",     // "section" | "element" | "sub"
         sectionIdx: 0,
@@ -321,8 +447,10 @@
         spravyIdx: 0          // 0 = najnovšia správa
     };
 
-    function currentSection() { return SECTIONS[state.sectionIdx]; }
-    function currentElement() { return PANEL_ELEMENTS[state.elementIdx]; }
+    function currentElement() {
+        const elements = getPanelElements();
+        return elements[state.elementIdx % elements.length] || elements[0];
+    }
 
     // ---------------------------------------------------------------------------
     // 4. SEKCIA: MENU
@@ -355,11 +483,15 @@
     // vedel objaviť v zozname Možností, aj keď v hre vôbec nebol vidno (napr. počas výberu hrdinu),
     // čo blokovalo/mätúc posúvalo kurzor na neaktuálnu položku. Táto funkcia prejde celý reťazec
     // predkov a použije computed style, takže zachytí skrytie na ktorejkoľvek úrovni.
-    function isElementVisible(el) {
+    // Voliteľný druhý parameter 'doc' je pre prvky VNÚTRI builder-iframe (viď handleBuilderKeydown
+    // nižšie) - getComputedStyle sa musí volať cez OKNO TOHO DOKUMENTU, kde prvok reálne žije
+    // (iframe má vlastné 'window'), inak by počítal štýly voči nesprávnemu view.
+    function isElementVisible(el, doc) {
         if (!el) return false;
+        const win = (doc && doc.defaultView) || window;
         let node = el;
         while (node && node.nodeType === 1) {
-            if (window.getComputedStyle(node).display === "none") return false;
+            if (win.getComputedStyle(node).display === "none") return false;
             node = node.parentElement;
         }
         return true;
@@ -369,16 +501,31 @@
         const items = [];
 
         // 1) položky z choice-prompt (ak je viditeľný a má validné možnosti)
+        //    POZOR: script.js (updateActionBackButton) POČAS AKČNEJ FÁZY recykluje ten
+        //    istý #choice-prompt element len na jediné tlačidlo "⬅" (dataset.actionBack
+        //    === "true") - innerHTML sa vtedy prepíše, ALE choicePrompt.userData.validChoices
+        //    NIE, takže by tam ostali navždy VOĽBY Z PREDOŠLÉHO narrative uzla. Presne to
+        //    spôsobovalo čítanie "starých" možností (typicky hneď na začiatku sporu/akčnej
+        //    fázy po naratívnom uzle) - zoznam sa staval z dávno neplatných validChoices,
+        //    hoci na obrazovke bolo vidno len tlačidlo Späť. Preto v tomto stave userData
+        //    ignorujeme úplne a zaradíme jedinú SKUTOČNE vykreslenú položku - tlačidlo Späť.
         const choicePrompt = document.getElementById("choice-prompt");
-        const data = choicePrompt && choicePrompt.userData;
-        if (choicePrompt && isElementVisible(choicePrompt) && data && data.validChoices) {
-            data.validChoices.forEach(function (choice, idx) {
-                items.push({
-                    type: "choice",
-                    choiceIndex: idx,
-                    label: choice.isBack ? "Späť" : choice.text
-                });
-            });
+        if (choicePrompt && isElementVisible(choicePrompt)) {
+            if (choicePrompt.dataset.actionBack === "true") {
+                const backBtn = choicePrompt.querySelector(".adrenaline-select");
+                if (backBtn) items.push({ type: "button", el: backBtn, audioKey: "btn_spat" });
+            } else {
+                const data = choicePrompt.userData;
+                if (data && data.validChoices) {
+                    data.validChoices.forEach(function (choice, idx) {
+                        items.push({
+                            type: "choice",
+                            choiceIndex: idx,
+                            label: choice.isBack ? "Späť" : choice.text
+                        });
+                    });
+                }
+            }
         }
 
         // 2) proceed / back / close tlačidlá - zaradené len ak sú SKUTOČNE viditeľné
@@ -389,9 +536,13 @@
             { el: document.getElementById("close-btn"), audioKey: "btn_ukoncit" }
         ];
         proceedDefs.forEach(function (d) {
-            if (d.el && isElementVisible(d.el)) {
-                items.push({ type: "button", el: d.el, dynamic: d.dynamic, audioKey: d.audioKey });
-            }
+            if (!d.el || !isElementVisible(d.el)) return;
+            // "ZAČAŤ" (#proceed-btn pred prvým stlačením) má teraz VLASTNÚ sekciu ZACAT
+            // (viď getSections()/enterSection() vyššie) - v Možnostiach sa preto neduplikuje.
+            // "ĎALEJ" (ten istý #proceed-btn, iný text v ostatných fázach hry) v Možnostiach
+            // naďalej ostáva ako predtým.
+            if (d.el.id === "proceed-btn" && zacatButtonVisible()) return;
+            items.push({ type: "button", el: d.el, dynamic: d.dynamic, audioKey: d.audioKey });
         });
 
         return items;
@@ -399,6 +550,10 @@
 
     function moznostiAnnounceCurrent() {
         const items = getMoznostiItems();
+        // Voľby medzičasom zmizli (napr. výber práve spustil prechod do sporu) - namiesto
+        // mätúceho "Chýba audiosúbor." (no_audio) sa jednoducho vrátime o vrstvu vyššie,
+        // presne tak, ako keby hráč sám stlačil Escape/Backspace.
+        if (items.length === 0) { goUp(); return; }
         const item = items[moznostiCursor];
         if (!item) { playAudio("no_audio"); return; }
 
@@ -417,14 +572,14 @@
 
     function moznostiLeft() {
         const items = getMoznostiItems();
-        if (items.length === 0) { playAudio("no_audio"); return; }
+        if (items.length === 0) { goUp(); return; }
         moznostiCursor = (moznostiCursor - 1 + items.length) % items.length;
         moznostiAnnounceCurrent();
     }
 
     function moznostiRight() {
         const items = getMoznostiItems();
-        if (items.length === 0) { playAudio("no_audio"); return; }
+        if (items.length === 0) { goUp(); return; }
         moznostiCursor = (moznostiCursor + 1) % items.length;
         moznostiAnnounceCurrent();
     }
@@ -486,16 +641,24 @@
     }
 
     // Ohlásenie AKTUÁLNEJ karty/strany - volá sa pri vstupe do Kariet aj po každej
-    // zmene šípkami (kartyLeft/kartyRight/kartyToggleSide nižšie). Hovorí rovno hodnoty
-    // danej (v spore konkrétnej) strany karty namiesto len samotného mena karty
+    // zmene šípkami (kartyLeft/kartyRight/kartyToggleSide nižšie). Prehrá MENO karty
+    // (card_o/s/b - "Opatrne."/"Smelo."/"Bezhlavo.") a - pokiaľ je karta PRÁVE
+    // ROZDELENÁ na dve strany (spor/eliminačná kontrola, rovnaká podmienka ako
+    // v kartyTooltipKey()/kartyToggleSide()) - hneď za ním (zaradené do frontu, aby
+    // to neznelo cez seba) aj to, KTORÁ strana (ČIN/ÚTOK) je práve zvolená. Bez tohto
+    // doplnku by hráč bez vizuálu nevedel rozlíšiť, ktorú z dvoch polovíc karty
+    // (s odlišnými hodnotami, viď card_*_d_tooltip / card_*_a_tooltip) práve ovláda.
+    // Podrobný obsah danej strany (Opatrnosť/Intenzita + Motivácia) sa naďalej
+    // prečíta až na požiadanie klávesou "I" (viď kartyTooltipKey() nižšie).
     function kartyAnnounceCurrent() {
         const cards = document.querySelectorAll("#card-tray-container .card-container");
         const card = cards[currentSelectedCardIdx];
         if (!card) { playAudio("no_audio"); return; }
         const code = (card.getAttribute("data-card") || "").toLowerCase();
-        const actual_card = "card_" + code
-        console.log(actual_card)
-        speak(actual_card);
+        playAudio("card_" + code);
+        if (is_conflict || is_elimination_check) {
+            enqueueLogNarrationAudio((currentSelectedActionType === "A") ? "utok" : "cin", null);
+        }
     }
 
     function kartyLeft() {
@@ -542,7 +705,113 @@
     }
 
     // ---------------------------------------------------------------------------
-    // 6b. AUTOMATICKÝ PRESUN FOKUSU NA KARTY POČAS AKČNEJ FÁZY (is_action_phase)
+    // 6b. VÝZVA - Náročnosť/Hrozba aktuálnej výzvy (dočasná položka VYZVA vyššie).
+    //    Hodnoty sa VŽDY čítajú NAŽIVO z #challenge-stats-display (.stat-item span,
+    //    spans[0] = Náročnosť, spans[1] = Hrozba - presne v tomto poradí a z tohto
+    //    elementu ich vypĺňa toggleChallengeDisplay(show, data) v script.js), nikdy
+    //    z JS premenných current_challenge.difficulty/.threat, aby hlásenie vždy
+    //    zodpovedalo tomu, čo je AKTUÁLNE zobrazené na obrazovke.
+    //
+    //    Hláška sa skladá zo ŠTATICKÝCH kúskov (nahrané slová 'vyzva'/'narocnost'/
+    //    'hrozba' + existujúce číselné súbory 'stres_0'..'stres_15' - tie sú čisté
+    //    číslovky bez ohľadu na názov, viď audio_manifest.json -> stres), miesto
+    //    jednej dlhej TTS vety - presne tak, ako si to autor hry vyžiadal. Súbory idú
+    //    za sebou vo FRONTE (enqueueLogNarrationAudio, bez prerušovania), aby zneli
+    //    poporadku a nie cez seba. Náročnosť/Hrozba MIMO rozsahu 0-15 (netypická/
+    //    neceločíselná hodnota) sa namiesto chýbajúceho číselného súboru prečíta cez
+    //    Web Speech fallback, aby hláška nikdy nezostala ticho na polceste.
+    // ---------------------------------------------------------------------------
+    function enqueueNumberAudio(text) {
+        const isPlainInt = /^-?\d+$/.test((text || "").trim());
+        const n = parseInt(text, 10);
+        if (isPlainInt && n >= 0 && n <= 15) {
+            enqueueLogNarrationAudio("stres_" + n, null);
+        } else {
+            enqueueLogNarrationAudio("cislo_" + slugifySk(text), text);
+        }
+    }
+
+    // `chained` = true: prvý kúsok ("Výzva.") NEPRERUŠÍ to, čo práve hrá, len sa pripojí
+    // na koniec fronty (používa sa pri vstupe do akčnej fázy nižšie, kde tejto hláške
+    // predchádza vlastné interrupt-volanie - obe by inak hrali cez seba). Vráti
+    // true/false, či sa vôbec dalo niečo prečítať (žiadne #challenge-stats-display
+    // span-y = nedá sa, napr. mimo hry).
+    function announceChallengeStats(chained) {
+        const displayEl = document.getElementById("challenge-stats-display");
+        const spans = displayEl ? displayEl.querySelectorAll(".stat-item span") : [];
+        const difficulty = spans[0] ? spans[0].textContent.trim() : "";
+        const threat = spans[1] ? spans[1].textContent.trim() : "";
+        if (!difficulty && !threat) { if (!chained) playAudio("no_audio"); return false; }
+
+        if (chained) enqueueLogNarrationAudio(AUDIO_MAP.el_vyzva, "Výzva.");
+        else playAudio(AUDIO_MAP.el_vyzva);
+
+        enqueueLogNarrationAudio("narocnost", "Náročnosť.");
+        if (difficulty) enqueueNumberAudio(difficulty);
+
+        enqueueLogNarrationAudio("hrozba", "Hrozba.");
+        if (threat) enqueueNumberAudio(threat);
+
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------
+    // 6b-bis. NEPRIATEĽ - stav súpera počas SPORU (dočasná položka NEPRIATEL vyššie).
+    //    Rovnaký vzor ako announceChallengeStats(): hodnoty sa VŽDY čítajú NAŽIVO
+    //    z #enemy-panel (enemy-heading-type/enemy-stress/enemy-advantage/enemy-skill/
+    //    enemy-weapon - presne tie polia, ktoré vypĺňa updateUI() v script.js), nikdy
+    //    z ENEMY_TYPES/enemy_stress/enemy_advantage priamo, aby hlásenie vždy
+    //    zodpovedalo tomu, čo je AKTUÁLNE zobrazené na obrazovke.
+    //
+    //    Stres sa hlási ako dve čísla (Stres X. Kolaps Y. - druhá hodnota je hranica
+    //    kolapsu nepriateľa, rovnaký rozklad "X / Y" ako vlastný Stres hráča, len sa
+    //    lomka "/" nečíta a namiesto nej sa vloží slovo "Kolaps"), Výhoda/Schopnosť/
+    //    Zbraň ako jedno číslo každé - všetko cez enqueueNumberAudio() (existujúce
+    //    stres_0..stres_15 súbory + fallback).
+    // ---------------------------------------------------------------------------
+    function announceEnemyStats(chained) {
+        const panel = document.getElementById("enemy-panel");
+        const visible = panel && panel.style.display !== "none";
+        const typeEl = document.getElementById("enemy-heading-type");
+        const stressEl = document.getElementById("enemy-stress");
+        const advantageEl = document.getElementById("enemy-advantage");
+        const skillEl = document.getElementById("enemy-skill");
+        const weaponEl = document.getElementById("enemy-weapon");
+
+        const type = (visible && typeEl) ? typeEl.textContent.trim() : "";
+        const stressRaw = (visible && stressEl) ? stressEl.textContent.trim() : "";
+        const advantage = (visible && advantageEl) ? advantageEl.textContent.trim() : "";
+        const skill = (visible && skillEl) ? skillEl.textContent.trim() : "";
+        const weapon = (visible && weaponEl) ? weaponEl.textContent.trim() : "";
+        if (!type && !stressRaw) { if (!chained) playAudio("no_audio"); return false; }
+
+        if (chained) enqueueLogNarrationAudio(AUDIO_MAP.el_nepriatel, "Nepriateľ.");
+        else playAudio(AUDIO_MAP.el_nepriatel);
+
+        if (type) enqueueLogNarrationAudio("typ_" + slugifySk(type), type);
+
+        const stressParts = stressRaw.split("/").map(function (s) { return s.trim(); });
+        enqueueLogNarrationAudio(AUDIO_MAP.el_stres, "Stres.");
+        if (stressParts[0]) enqueueNumberAudio(stressParts[0]);
+        if (stressParts[1]) {
+            enqueueLogNarrationAudio("kolaps", "Kolaps.");
+            enqueueNumberAudio(stressParts[1]);
+        }
+
+        enqueueLogNarrationAudio("vyhoda", "Výhoda.");
+        if (advantage) enqueueNumberAudio(advantage);
+
+        enqueueLogNarrationAudio("schopnost", "Schopnosť.");
+        if (skill) enqueueNumberAudio(skill);
+
+        enqueueLogNarrationAudio("zbran", "Zbraň.");
+        if (weapon) enqueueNumberAudio(weapon);
+
+        return true;
+    }
+
+    // ---------------------------------------------------------------------------
+    // 6c. AUTOMATICKÝ PRESUN FOKUSU NA KARTY POČAS AKČNEJ FÁZY (is_action_phase)
     //    Kým prebieha akčná fáza (script.js nastaví is_action_phase = true), pôvodné
     //    Možnosti (voľby z choice-promptu) už nie sú na obrazovke - ak by audio UI
     //    zostalo v Možnostiach, čítalo by staré/neaktuálne voľby (choicePrompt tam
@@ -555,6 +824,12 @@
     //    Možnostiach (inak ho nerušíme, napr. keď si práve prezerá SPRÁVY); a späť do
     //    Možnostiach ho vrátime len vtedy, ak medzitým sám neodišiel z Kariet niekam
     //    inam (napr. pozrieť si STRES) - v tom prípade rešpektujeme, kde práve je.
+    //
+    //    Hlásenie VÝZVY (Náročnosť/Hrozba, viď 6b vyššie) sa PREHRÁ VŽDY, hneď ako
+    //    akčná fáza začne - bez ohľadu na to, kde bol hráč predtým, keďže ide o
+    //    dôležitú informáciu o práve začínajúcej výzve. Ak sa fokus zároveň presúva
+    //    na Karty, jeho hláška sa len PRIPOJÍ za VÝZVU (chained:true), aby obe zneli
+    //    poporadku a nie cez seba.
     // ---------------------------------------------------------------------------
     let lastKnownActionPhase = false;
     let focusWasAutoMovedToKarty = false;
@@ -565,19 +840,26 @@
         return false;
     }
 
-    function focusOnKartyForActionPhase() {
-        state.sectionIdx = SECTIONS.indexOf("OVLADACI_PANEL");
-        state.elementIdx = PANEL_ELEMENTS.findIndex(function (e) { return e.id === "KARTY"; });
+    function focusOnKartyForActionPhase(chained) {
+        state.sectionIdx = getSections().indexOf("OVLADACI_PANEL");
+        state.elementIdx = getPanelElements().findIndex(function (e) { return e.id === "KARTY"; });
         state.layer = "sub";
         state.subMode = "karty";
         currentSelectedCardIdx = 0;
         if (typeof updateCardKeyboardHighlight === "function") updateCardKeyboardHighlight();
-        kartyAnnounceCurrent();
+        if (!chained) { kartyAnnounceCurrent(); return; }
+        const cards = document.querySelectorAll("#card-tray-container .card-container");
+        const card = cards[currentSelectedCardIdx];
+        const code = card && (card.getAttribute("data-card") || "").toLowerCase();
+        if (code === "o" || code === "s" || code === "b") {
+            const key = kartyTooltipKey(code);
+            enqueueLogNarrationAudio(AUDIO_MAP[key] || key, null);
+        }
     }
 
     function returnFocusToMoznostiAfterActionPhase() {
-        state.sectionIdx = SECTIONS.indexOf("OVLADACI_PANEL");
-        state.elementIdx = PANEL_ELEMENTS.findIndex(function (e) { return e.id === "MOZNOSTI"; });
+        state.sectionIdx = getSections().indexOf("OVLADACI_PANEL");
+        state.elementIdx = getPanelElements().findIndex(function (e) { return e.id === "MOZNOSTI"; });
         state.layer = "element";
         state.subMode = null;
         speak("el_moznosti");
@@ -595,9 +877,10 @@
         if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
 
         if (turningOn) {
+            const challengeAnnounced = announceChallengeStats(false);
             if (isFocusOnMoznosti()) {
                 focusWasAutoMovedToKarty = true;
-                focusOnKartyForActionPhase();
+                focusOnKartyForActionPhase(challengeAnnounced);
             }
         } else if (turningOff) {
             const stillOnKarty = state.layer === "sub" && state.subMode === "karty";
@@ -608,7 +891,30 @@
         }
     }
 
+    // ---------------------------------------------------------------------------
+    // 6d. AUTOMATICKÉ OHLÁSENIE NEPRIATEĽA NA ZAČIATKU SPORU (is_conflict)
+    //    Rovnaký vzor ako checkActionPhaseTransition() vyššie, ale pre is_conflict:
+    //    hneď ako sa spor začne, prehrá sa stav súpera (announceEnemyStats()), bez
+    //    ohľadu na to, kde bol hráč predtým - fokus sa (na rozdiel od VÝZVY) nikam
+    //    automaticky nepresúva, keďže spor sa vždy ovláda cez existujúce Karty/Únik.
+    // ---------------------------------------------------------------------------
+    let lastKnownConflict = false;
+
+    function checkConflictTransition() {
+        if (typeof is_conflict === "undefined") return;
+        if (!audioUIActive) { lastKnownConflict = is_conflict; return; }
+        if (is_conflict === lastKnownConflict) return;
+
+        const turningOn = is_conflict && !lastKnownConflict;
+        lastKnownConflict = is_conflict;
+
+        if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
+
+        if (turningOn) announceEnemyStats(false);
+    }
+
     setInterval(checkActionPhaseTransition, 200);
+    setInterval(checkConflictTransition, 200);
 
     // ---------------------------------------------------------------------------
     // 7. OVLÁDACÍ PANEL > Stres (jednoduchý readout)
@@ -767,11 +1073,34 @@
     // neponúka vôbec nič - žiadne info, žiadnu akciu. Pri prechádzaní OVLÁDACÍM PANELOM
     // šípkami ho preto v tomto stave úplne PRESKOČÍME, aby zbytočne nerozptyľoval.
     function isElementSkippable(el) {
-        return el.id === "UNIK" && !unikIsActive();
+        if (el.id === "UNIK" && !unikIsActive()) return true;
+        // Rovnaký princíp ako pri ÚNIKU vyššie: keď Možnosti nemajú čo ponúknuť (žiadny
+        // choice-prompt s voľbami, žiadne viditeľné ĎALEJ/Späť/Ukončiť tlačidlo), nemá
+        // zmysel prvok MOŽNOSTI vôbec ponúkať pri listovaní panelom - inak by naň hráč
+        // narazil, vstúpil dnu, a len by počul "Chýba audiosúbor." (no_audio), čo znie
+        // ako chyba, hoci ide o úplne bežný, prechodný stav (napr. tesne po tom, čo
+        // handleChallengeTransition() skryje starý choice-prompt a nový ešte nie je
+        // vykreslený). Skontroluje sa naživo pri každom prechode panelom.
+        if (el.id === "MOZNOSTI" && getMoznostiItems().length === 0) return true;
+        return false;
+    }
+
+    // Prvý prvok panela, ktorý NIE JE momentálne preskočiteľný (viď isElementSkippable
+    // vyššie) - použité pri VSTUPE do OVLÁDACIEHO PANELA (enterSection), kde predtým
+    // vždy natvrdo padol elementIdx = 0. Ak bol prvok na indexe 0 zrovna MOŽNOSTI bez
+    // voľby (viď vyššie), hráč by pri vstupe počul práve MOŽNOSTI namiesto toho, aby
+    // pristál rovno na prvom skutočne použiteľnom prvku - presne ten istý princíp, aký
+    // ArrowLeft/ArrowRight už používajú pri listovaní (do-while s isElementSkippable).
+    function firstPlayableElementIndex() {
+        const elements = getPanelElements();
+        for (let i = 0; i < elements.length; i++) {
+            if (!isElementSkippable(elements[i])) return i;
+        }
+        return 0; // obranná záloha - nemalo by nastať, panel má vždy aspoň jeden dostupný prvok
     }
 
     function unikSelect() {
-        if (!unikIsActive()) { speak("unik_neaktivne"); return; }
+        if (!unikIsActive()) return; // mimo sporu je UNIK vždy preskočený (isElementSkippable), niet čo hlásiť
         const escapeBtn = document.getElementById("escape-btn");
         if (escapeBtn) escapeBtn.click();
         // Ostávame na prvku ÚNIK - viď poznámka vyššie pri prvaPomocSelect().
@@ -864,10 +1193,28 @@
     initTerminalObserver();
 
     // ---------------------------------------------------------------------------
-    // 12. SEKCIA: DENNÍK (zatiaľ prázdne)
+    // 12. SEKCIA: DENNÍK = žurnál/karta postavy (builder, viď sekcia 13d)
+    //    DENNÍK v skutočnosti nie je samostatná obrazovka - je to ten istý
+    //    #builder-overlay/#builder-iframe, čo script.js otvára cez toggleBuilder(true)
+    //    (napr. po výbere počiatočnej zbrane). Vstup do sekcie DENNÍK teda jednoducho
+    //    zavolá toggleBuilder(true) - je to top-level funkcia v script.js zdieľanom
+    //    globálnom scope, takže ju vieme zavolať priamo, netreba hľadať/klikať tlačidlo.
+    //
+    //    toggleBuilder(true) má VLASTNÉ blokovanie (spor/akčná fáza/kontroly, alebo
+    //    ešte nevybraný hrdina) - v oboch prípadoch script.js sám buď zaloguje hlášku
+    //    (prečíta ju automatické live-čítanie logu, sekcia 11b) alebo otvorí
+    //    #general-prompt (ten už obsluhuje sekcia 13a) - netreba to tu duplikovať.
+    //    Ak sa builder naozaj otvorí, ďalší keydown ho zachytí cez detectOverlay()
+    //    (sekcia 13e) a odovzdá riadenie builderNav-u úplne rovnako, ako keby ho
+    //    otvorilo samotné script.js.
     // ---------------------------------------------------------------------------
     function dennikAnnounce() {
-        speak("dennik_prazdny");
+        if (typeof toggleBuilder === "function") {
+            toggleBuilder(true);
+        } else {
+            // Poistka pre prípad, že by toggleBuilder z nejakého dôvodu nebol dostupný.
+            speak("dennik_prazdny");
+        }
     }
 
     // ---------------------------------------------------------------------------
@@ -1072,8 +1419,14 @@ function playNumericValue(value) {
         return true;
     }
 
+    // Mimo nahratého rozsahu (0-15) - Body rastu/Ľudskosť/cena schopnosti bežne presiahnu 15.
+    // DÔLEŽITÉ: nesmie sa žiadať súbor "no_audio" priamo - ten SKUTOČNE existuje (je to práve
+    // ten "Chýba audiosúbor." fallback), takže by sa vždy prehral ON namiesto TTS. Namiesto
+    // toho žiadame súbor pre KONKRÉTNU hodnotu (napr. "hodnota_20.WAV"), ktorý pre čísla mimo
+    // rozsahu zámerne neexistuje - jeho chýbanie/404 correctne spustí TTS s presnou hodnotou.
+    const fileGuess = Number.isInteger(n) ? ("hodnota_" + n) : "hodnota_desatinne_cislo";
     enqueueAudio(
-        "no_audio",
+        fileGuess,
         String(value),
         false
     );
@@ -1225,6 +1578,19 @@ function handleHeroKeydown(e) {
     // ---------------------------------------------------------
     if (heroSelectionStage === "skills") {
 
+        if (e.key === "Escape" || e.key === "Backspace") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+
+            // Return to hero browsing stage
+            heroSelectionStage = "hero";
+            heroSkillCursor = 0;
+            
+            // Announce current hero
+            heroSelectAnnounceCurrent();
+            return;
+        }
+
         if (e.key === "ArrowLeft") {
             e.preventDefault();
             e.stopImmediatePropagation();
@@ -1272,20 +1638,40 @@ function handleHeroKeydown(e) {
     }
 
     // --- 13d. Builder (#builder-overlay > #builder-iframe) ---
-    // builderNav.stage:      "grid" (mriežka naučených schopností postavy) | "editor" (#info-panel-container)
-    // builderNav.editorSub:  "browse" (listovanie zoznamom schopností) | "actions" (zvýšiť/znížiť/vrátiť)
+    // builderNav.stage:      "grid" (mriežka postavy) | "editor" (#info-panel-container)
+    // builderNav.gridLayer:  (len keď stage === "grid") "section" (listovanie HLAVIČKA/
+    //                        SCHOPNOSTI/ZBRANE ako mini-sekcie) | "items" (listovanie
+    //                        položiek VNÚTRI zvolenej sekcie SCHOPNOSTI/ZBRANE)
+    // builderNav.editorSub:  "browse" (listovanie zoznamom schopností) | "actions" (cena/
+    //                        zvýšiť/znížiť/vrátiť)
+    // builderNav.pendingDirectSkill: true medzi slot.click() na KONKRÉTNU (už naučenú)
+    //                        schopnosť v mriežke (nie na "+") a najbližším keydown, ktorý
+    //                        detekuje otvorenie editora - viď handleBuilderGridItemsKeydown
+    //                        a handleBuilderKeydown nižšie.
+    const BUILDER_GRID_SECTIONS = ["HLAVICKA", "SCHOPNOSTI", "ZBRANE"];
+    const BUILDER_ACTION_IDS = ["cena", "zvysit", "znizit", "vratit"];
+    const BUILDER_ACTION_BUTTON_INDEX = { zvysit: 0, znizit: 1, vratit: 2 };
+
     const builderNav = {
         stage: "grid",
+        gridLayer: "section",
+        gridSectionIdx: 0,
+        itemCursor: 0,
         editorSub: "browse",
-        listCursor: 0,
-        actionCursor: 0
+        editorListCursor: 0,
+        actionCursor: 0,
+        pendingDirectSkill: false
     };
 
     function resetBuilderNav() {
         builderNav.stage = "grid";
+        builderNav.gridLayer = "section";
+        builderNav.gridSectionIdx = 0;
+        builderNav.itemCursor = 0;
         builderNav.editorSub = "browse";
-        builderNav.listCursor = 0;
+        builderNav.editorListCursor = 0;
         builderNav.actionCursor = 0;
+        builderNav.pendingDirectSkill = false;
     }
 
     let lastBuilderModalMsg = null;
@@ -1294,37 +1680,89 @@ function handleHeroKeydown(e) {
         return Array.from(doc.querySelectorAll("#character-stats .skill-slot"));
     }
 
-    function builderGridAnnounceCurrent() {
-        const doc = getBuilderDoc();
-        if (!doc) { playAudio("no_audio"); return; }
-        const slots = getBuilderGridSlots(doc);
-        const slot = slots[builderNav.listCursor];
-        if (!slot) { speak("grid_schopnosti"); return; }
-        if (slot.classList.contains("add-skill-slot")) { speak("pridat_schopnost"); return; }
-        const nameEl = slot.querySelector(".skill-name-text");
-        const label = nameEl ? nameEl.textContent.trim() : "";
-        if (!label) { playAudio("no_audio"); return; }
-        playAudioOrSpeak("skill_" + slugifySk(label), label);
+    // "add" = prázdny "+" slot na pridanie novej schopnosti, "skill" = naučená schopnosť
+    // (má dieťa .skill-cat-box - kategória), "item" = predmet/zbraň/munícia vo výbave
+    // (rovnaká trieda .skill-slot, ale BEZ .skill-cat-box - viď renderStats() v
+    // script_builder.js, obe typy zdieľajú CSS triedu, líšia sa len obsahom).
+    function builderSlotKind(slot) {
+        if (slot.classList.contains("add-skill-slot")) return "add";
+        if (slot.querySelector(".skill-cat-box")) return "skill";
+        return "item";
     }
 
-    function handleBuilderGridKeydown(doc, e) {
-        const slots = getBuilderGridSlots(doc);
+    // SlotY patriace pod aktuálne zvolenú mini-sekciu (SCHOPNOSTI = naučené schopnosti + "+",
+    // ZBRANE = predmety/zbrane/munícia vo výbave). HLAVIČKA nemá žiadne sloty - je to čistý
+    // prehľad (meno/BR/ľudskosť), viď builderAnnounceOverview().
+    function getBuilderSectionSlots(doc) {
+        const sectionId = BUILDER_GRID_SECTIONS[builderNav.gridSectionIdx];
+        const all = getBuilderGridSlots(doc);
+        if (sectionId === "SCHOPNOSTI") {
+            return all.filter(function (s) { const k = builderSlotKind(s); return k === "skill" || k === "add"; });
+        }
+        if (sectionId === "ZBRANE") {
+            return all.filter(function (s) { return builderSlotKind(s) === "item"; });
+        }
+        return [];
+    }
+
+    function builderAnnounceOverview(doc) {
+        const nameEl = doc.querySelector("#character-stats .name-field");
+        const brEl = doc.querySelector("#character-stats .br-field");
+        const humanityEl = doc.querySelector("#character-stats .humanity-field");
+        const name = nameEl ? nameEl.textContent.trim() : "";
+        const br = brEl ? brEl.textContent.trim() : "";
+        const humanity = humanityEl ? humanityEl.textContent.trim() : "";
+
+        if (name) {
+            playAudioOrSpeak("hero_" + slugifySk(name), name); // meno hrdinu - preruší, hrá sa prvé
+        } else {
+            speak("prehlad_postavy");
+        }
+        if (br !== "") {
+            enqueueAudio("label_body_rastu", "Body rastu:", false);
+            playNumericValue(br);
+        }
+        if (humanity !== "") {
+            enqueueAudio("label_ludskost", "Ľudskosť:", false);
+            playNumericValue(humanity);
+        }
+    }
+
+    // Predmety v mriežke DENNÍKA zahŕňajú aj zbrane/muníciu z výbavy (renderStats() v
+    // script_builder.js do rovnakého zoznamu pridáva items AJ weapons/ammo) - tie majú
+    // rovnaké mená ako v ovládacom paneli (sekcia ZBRANE), takže pre ne znovupoužijeme
+    // už existujúce 'weapon_<slug>.WAV' nahrávky namiesto vytvárania duplicitných 'item_'.
+    function isKnownWeaponName(label) {
+        return typeof WEAPON_LIST === "object" && WEAPON_LIST
+            && Object.prototype.hasOwnProperty.call(WEAPON_LIST, label.toUpperCase());
+    }
+
+    // --- Úroveň "section" (HLAVIČKA / SCHOPNOSTI / ZBRANE) ---
+    function builderGridSectionAnnounceCurrent(doc) {
+        const sectionId = BUILDER_GRID_SECTIONS[builderNav.gridSectionIdx];
+        if (sectionId === "HLAVICKA") { builderAnnounceOverview(doc); return; }
+        if (sectionId === "SCHOPNOSTI") { speak("el_schopnosti"); return; }
+        if (sectionId === "ZBRANE") { speak("el_zbrane"); return; }
+    }
+
+    function handleBuilderGridSectionKeydown(doc, e) {
         if (e.key === "ArrowLeft") {
-            if (slots.length === 0) { playAudio("no_audio"); return; }
-            builderNav.listCursor = (builderNav.listCursor - 1 + slots.length) % slots.length;
-            builderGridAnnounceCurrent();
+            builderNav.gridSectionIdx = (builderNav.gridSectionIdx - 1 + BUILDER_GRID_SECTIONS.length) % BUILDER_GRID_SECTIONS.length;
+            builderGridSectionAnnounceCurrent(doc);
             return;
         }
         if (e.key === "ArrowRight") {
-            if (slots.length === 0) { playAudio("no_audio"); return; }
-            builderNav.listCursor = (builderNav.listCursor + 1) % slots.length;
-            builderGridAnnounceCurrent();
+            builderNav.gridSectionIdx = (builderNav.gridSectionIdx + 1) % BUILDER_GRID_SECTIONS.length;
+            builderGridSectionAnnounceCurrent(doc);
             return;
         }
         if (e.key === " " || e.key === "Enter") {
-            const slot = slots[builderNav.listCursor];
-            if (slot) slot.click(); // spustí selectSkill()+toggleInfoOverlay(true), resp. len toggleInfoOverlay(true) pre "+"
-            return; // prechod do editora zachytí handleBuilderKeydown pri ďalšom stlačení
+            const sectionId = BUILDER_GRID_SECTIONS[builderNav.gridSectionIdx];
+            if (sectionId === "HLAVICKA") { builderAnnounceOverview(doc); return; } // prehľad nemá čo "vstúpiť", len znova prečíta
+            builderNav.gridLayer = "items";
+            builderNav.itemCursor = 0;
+            builderGridItemsAnnounceCurrent(doc);
+            return;
         }
         if (e.key === "Escape" || e.key === "Backspace") {
             clickIfExists("close-builder", doc); // window.parent.toggleBuilder(false)
@@ -1333,21 +1771,157 @@ function handleHeroKeydown(e) {
         }
     }
 
+    // --- Úroveň "items" (vnútri SCHOPNOSTI alebo ZBRANE) ---
+    function builderGridItemsAnnounceCurrent(doc) {
+        const slots = getBuilderSectionSlots(doc);
+        const slot = slots[builderNav.itemCursor];
+        if (!slot) {
+            speak(BUILDER_GRID_SECTIONS[builderNav.gridSectionIdx] === "ZBRANE" ? "grid_zbrane_prazdne" : "grid_schopnosti");
+            return;
+        }
+
+        const kind = builderSlotKind(slot);
+        if (kind === "add") { speak("pridat_schopnost"); return; }
+
+        const nameEl = slot.querySelector(".skill-name-text");
+        const label = nameEl ? nameEl.textContent.trim() : "";
+        if (!label) { playAudio("no_audio"); return; }
+
+        const prefix = kind === "skill" ? "skill_" : (isKnownWeaponName(label) ? "weapon_" : "item_");
+        enqueueAudio(prefix + slugifySk(label), label, true); // meno - preruší a hrá sa hneď
+
+        const lvlEl = slot.querySelector(".skill-lvl-box");
+        const lvlText = lvlEl ? lvlEl.textContent.trim() : "";
+        if (lvlText !== "") playNumericValue(lvlText); // úroveň/počet kusov - pripojí sa hneď za meno
+
+        if (kind === "item" && slot.classList.contains("selected")) {
+            const hasUseBtn = !!doc.querySelector("#character-stats > .basic-btn");
+            if (hasUseBtn) enqueueAudio("btn_pouzit", "Použiť.", false);
+        }
+    }
+
+    function handleBuilderGridItemsKeydown(doc, e) {
+        const slots = getBuilderSectionSlots(doc);
+
+        if (e.key === "ArrowLeft") {
+            if (slots.length === 0) { playAudio("no_audio"); return; }
+            builderNav.itemCursor = (builderNav.itemCursor - 1 + slots.length) % slots.length;
+            builderGridItemsAnnounceCurrent(doc);
+            return;
+        }
+        if (e.key === "ArrowRight") {
+            if (slots.length === 0) { playAudio("no_audio"); return; }
+            builderNav.itemCursor = (builderNav.itemCursor + 1) % slots.length;
+            builderGridItemsAnnounceCurrent(doc);
+            return;
+        }
+        if (e.key === " " || e.key === "Enter") {
+            const slot = slots[builderNav.itemCursor];
+            if (!slot) { playAudio("no_audio"); return; }
+            const kind = builderSlotKind(slot);
+
+            if (kind === "item") {
+                if (slot.classList.contains("selected")) {
+                    // Predmet je už vybraný - ak má efekt, DRUHÉ stlačenie ho POUŽIJE
+                    // (výsledok hlási sama hra do logu - automaticky ho prečíta sekcia 11b).
+                    const useBtn = doc.querySelector("#character-stats > .basic-btn");
+                    if (useBtn) { useBtn.click(); return; }
+                    playAudio("no_audio"); // vybraný, ale bez efektu - niet čo použiť
+                    return;
+                }
+                slot.click(); // selectItem(name) - prekreslí mriežku, prípadne pridá tlačidlo POUŽIŤ
+                builderGridItemsAnnounceCurrent(doc); // znova prečíta ten istý index (teraz už ako vybraný predmet)
+                return;
+            }
+
+            slot.click(); // schopnosť / "+" - spustí selectSkill()+toggleInfoOverlay(true), resp. len toggleInfoOverlay(true) pre "+"
+            // Ak ide o KONKRÉTNU (už naučenú) schopnosť, nie o "+", editor sa má otvoriť
+            // rovno v akciách pre TÚTO schopnosť (viď handleBuilderKeydown nižšie), nie
+            // v browse-zozname všetkých schopností.
+            builderNav.pendingDirectSkill = (kind === "skill");
+            return; // prechod do editora zachytí handleBuilderKeydown pri ďalšom stlačení
+        }
+        if (e.key === "Escape" || e.key === "Backspace") {
+            const slot = slots[builderNav.itemCursor];
+            if (slot && builderSlotKind(slot) === "item" && slot.classList.contains("selected")) {
+                slot.click(); // zruší výber predmetu, ostávame v ZBRANE (toggne selectItem naspäť na null)
+                builderGridItemsAnnounceCurrent(doc);
+                return;
+            }
+            builderNav.gridLayer = "section";
+            builderGridSectionAnnounceCurrent(doc); // späť na cyklus HLAVIČKA/SCHOPNOSTI/ZBRANE
+            return;
+        }
+    }
+
+    // Spoločný vstupný bod pre "grid" stage (volá ho announceOverlayEntry aj I-tooltip).
+    function builderGridAnnounceCurrent() {
+        const doc = getBuilderDoc();
+        if (!doc) { playAudio("no_audio"); return; }
+        if (builderNav.gridLayer === "items") { builderGridItemsAnnounceCurrent(doc); return; }
+        builderGridSectionAnnounceCurrent(doc);
+    }
+
+    function handleBuilderGridKeydown(doc, e) {
+        if (builderNav.gridLayer === "items") { handleBuilderGridItemsKeydown(doc, e); return; }
+        handleBuilderGridSectionKeydown(doc, e);
+    }
+
     function getBuilderListItems(doc) {
         return Array.from(doc.querySelectorAll("#builder-list .skill-list-item"));
     }
 
     function builderEditorAnnounceCurrent(doc) {
         const items = getBuilderListItems(doc);
-        const item = items[builderNav.listCursor];
+        const item = items[builderNav.editorListCursor];
         if (!item) { playAudio("no_audio"); return; }
         const label = item.textContent.trim();
         playAudioOrSpeak("skill_" + slugifySk(label), label);
     }
 
-    function builderActionsAnnounceCurrent() {
-        const actions = ["btn_zvysit_uroven", "btn_znizit_uroven", "btn_vratit_zmenu"];
-        speak(actions[builderNav.actionCursor]);
+    // "#sel-skill-name" má po selectSkill(name) tvar "NÁZOV: A → B" (A = aktuálna úroveň,
+    // B = úroveň PO prípadnom zvýšení) - viď script_builder.js. Toto je jediné miesto, kde je
+    // aktuálna úroveň k dispozícii (údaje o postave žijú len vo vnútri iframe-u, mimo dosahu
+    // audio-ui.js), preto ju parsujeme priamo z tohto textu namiesto počítania nanovo.
+    function parseSkillLevelsFromEditor(doc) {
+        const el = doc.getElementById("sel-skill-name");
+        if (!el) return null;
+        const m = (el.textContent || "").match(/:\s*(\d+)\s*\u2192\s*(\d+)/);
+        if (!m) return null;
+        return { current: parseInt(m[1], 10), target: parseInt(m[2], 10) };
+    }
+
+    // "#cost-disc" má tvar "<číslo> BR" - cena zvýšenia na ďalšiu úroveň.
+    function parseSkillCostFromEditor(doc) {
+        const el = doc.getElementById("cost-disc");
+        if (!el) return null;
+        const m = (el.textContent || "").match(/(-?\d+)/);
+        return m ? parseInt(m[1], 10) : null;
+    }
+
+    // "#br-label" má tvar "BR: <číslo>" - CELKOVÉ dostupné body rastu postavy (nie cena).
+    function parseTotalBrFromEditor(doc) {
+        const el = doc.getElementById("br-label");
+        if (!el) return null;
+        const m = (el.textContent || "").match(/(-?\d+)/);
+        return m ? parseInt(m[1], 10) : null;
+    }
+
+    // interrupt=true (predvolené) sa použije pri listovaní akciami šípkami (má prerušiť, čo
+    // hralo predtým); interrupt=false pri nadväzovaní hneď za inú frontu (napr. po "Aktuálna
+    // úroveň: X" pri prvom vstupe do akcií).
+    function builderActionsAnnounceCurrent(doc, interrupt) {
+        const doInterrupt = interrupt !== false;
+        const actionId = BUILDER_ACTION_IDS[builderNav.actionCursor];
+        if (actionId === "cena") {
+            const cost = parseSkillCostFromEditor(doc);
+            enqueueAudio(AUDIO_MAP.label_cena || "label_cena", "Cena:", doInterrupt);
+            if (cost !== null) playNumericValue(cost);
+            return;
+        }
+        const keyMap = { zvysit: "btn_zvysit_uroven", znizit: "btn_znizit_uroven", vratit: "btn_vratit_zmenu" };
+        const mapKey = keyMap[actionId];
+        enqueueAudio(AUDIO_MAP[mapKey] || mapKey, null, doInterrupt);
     }
 
     function handleBuilderEditorKeydown(doc, e) {
@@ -1355,23 +1929,29 @@ function handleHeroKeydown(e) {
             const items = getBuilderListItems(doc);
             if (e.key === "ArrowLeft") {
                 if (items.length === 0) { playAudio("no_audio"); return; }
-                builderNav.listCursor = (builderNav.listCursor - 1 + items.length) % items.length;
+                builderNav.editorListCursor = (builderNav.editorListCursor - 1 + items.length) % items.length;
                 builderEditorAnnounceCurrent(doc);
                 return;
             }
             if (e.key === "ArrowRight") {
                 if (items.length === 0) { playAudio("no_audio"); return; }
-                builderNav.listCursor = (builderNav.listCursor + 1) % items.length;
+                builderNav.editorListCursor = (builderNav.editorListCursor + 1) % items.length;
                 builderEditorAnnounceCurrent(doc);
                 return;
             }
             if (e.key === " " || e.key === "Enter") {
-                const item = items[builderNav.listCursor];
+                const item = items[builderNav.editorListCursor];
                 if (!item) { playAudio("no_audio"); return; }
                 item.click(); // selectSkill(name) - naplní control-box (cena, úroveň, príbuzné schopnosti)
                 builderNav.editorSub = "actions";
                 builderNav.actionCursor = 0;
-                builderActionsAnnounceCurrent();
+
+                const levels = parseSkillLevelsFromEditor(doc);
+                if (levels) {
+                    enqueueAudio("label_aktualna_uroven", "Aktuálna úroveň:", true); // preruší, hrá sa prvé
+                    playNumericValue(levels.current);
+                }
+                builderActionsAnnounceCurrent(doc, false); // nadviaže hneď za tým (napr. "Cena: X")
                 return;
             }
             if (e.key === "Escape" || e.key === "Backspace") {
@@ -1380,22 +1960,56 @@ function handleHeroKeydown(e) {
                 builderNav.stage = "grid";
                 return;
             }
-        } else { // "actions" - ZVÝŠIŤ ÚROVEŇ / ZNÍŽIŤ ÚROVEŇ (↓) / VRÁTIŤ (⤺)
+        } else { // "actions" - Cena / ZVÝŠIŤ ÚROVEŇ / ZNÍŽIŤ ÚROVEŇ (↓) / VRÁTIŤ (⤺)
             if (e.key === "ArrowLeft") {
-                builderNav.actionCursor = (builderNav.actionCursor - 1 + 3) % 3;
-                builderActionsAnnounceCurrent();
+                builderNav.actionCursor = (builderNav.actionCursor - 1 + BUILDER_ACTION_IDS.length) % BUILDER_ACTION_IDS.length;
+                builderActionsAnnounceCurrent(doc);
                 return;
             }
             if (e.key === "ArrowRight") {
-                builderNav.actionCursor = (builderNav.actionCursor + 1) % 3;
-                builderActionsAnnounceCurrent();
+                builderNav.actionCursor = (builderNav.actionCursor + 1) % BUILDER_ACTION_IDS.length;
+                builderActionsAnnounceCurrent(doc);
                 return;
             }
             if (e.key === " " || e.key === "Enter") {
+                const actionId = BUILDER_ACTION_IDS[builderNav.actionCursor];
+                if (actionId === "cena") { builderActionsAnnounceCurrent(doc); return; } // len znova prečíta, nič sa nekliká
+
+                const beforeLevels = parseSkillLevelsFromEditor(doc);
                 const buttons = doc.querySelectorAll("#skill-btn-container button");
-                const btn = buttons[builderNav.actionCursor];
+                const btn = buttons[BUILDER_ACTION_BUTTON_INDEX[actionId]];
                 if (btn) btn.click();
-                builderEditorAnnounceCurrent(doc); // spätná väzba: znova prehráme meno vybranej schopnosti
+
+                // Ak akcia zlyhala (napr. NEDOSTATOK BODOV RASTU pri ZVÝŠIŤ), script_builder.js
+                // namiesto zmeny úrovne zobrazí #custom-modal s dôvodom a úroveň ostane
+                // NEZMENENÁ. Preto sa musí najprv overiť, či sa úroveň skutočne zmenila (a
+                // či sa medzičasom neobjavil modal) - inak by hráč počul falošné "Úroveň
+                // zvýšená na X", hneď potom nasledované (jedinou pravdivou) hláškou modalu.
+                const modal = doc.getElementById("custom-modal");
+                const modalNowVisible = !!(modal && isElementVisible(modal, doc));
+                if (modalNowVisible) {
+                    handleBuilderModalKeydown(doc, modal, e); // ohlási dôvod zlyhania hneď teraz
+                    return;
+                }
+
+                // upgradeSelected()/downgradeSkill()/undoUpgrade() v script_builder.js na konci
+                // samy znova zavolajú selectSkill(selectedSkill) - #sel-skill-name aj #br-label
+                // teda už odrážajú NOVÝ stav, môžeme ich hneď prečítať ako spätnú väzbu.
+                const afterLevels = parseSkillLevelsFromEditor(doc);
+                const levelChanged = !!(beforeLevels && afterLevels && beforeLevels.current !== afterLevels.current);
+                if (!levelChanged) return; // akcia nemala žiadny efekt (napr. limit úrovne) - niet čo ohlásiť
+
+                const totalBr = parseTotalBrFromEditor(doc);
+                const verbKey = actionId === "zvysit" ? "level_zvysena_na"
+                    : actionId === "znizit" ? "level_znizena_na"
+                    : "level_vratena_na";
+
+                enqueueAudio(verbKey, null, true); // preruší, hrá sa prvé
+                playNumericValue(afterLevels.current);
+                if (totalBr !== null) {
+                    enqueueAudio("label_aktualne_body_rastu", "Aktuálne body rastu:", false);
+                    playNumericValue(totalBr);
+                }
                 return;
             }
             if (e.key === "Escape" || e.key === "Backspace") {
@@ -1430,8 +2044,21 @@ function handleHeroKeydown(e) {
 
     function handleBuilderKeydown(doc, e) {
         // #custom-modal (napr. hlášky BLOKOVANÉ pri downgradeSkill) má vždy prioritu
+        //
+        // POZOR: kým script_builder.js (showCustomAlert) modal ešte ANI RAZ nezobrazil,
+        // #custom-modal NEMÁ vlastný inline style.display - je skrytý LEN cez CSS triedu
+        // "modal-overlay" (predvolene display:none v štýloch). `modal.style.display` je
+        // vtedy prázdny reťazec, nie "none", takže naivné `!== "none"` ho OMYLOM vyhodnotí
+        // ako viditeľný - presne to spôsobovalo, že audio UI hneď po vstupe do DENNÍKA
+        // "skočilo" na modal so statickým placeholder textom priamo z index.html ("Tu sa
+        // zobrazí správa...") a zaseklo sa tam: modal totiž v tomto stave ani nemá tlačidlá
+        // #modal-confirm / #modal-cancel (tie script_builder.js vytvorí až vnútri
+        // showCustomAlert), takže Enter/Escape nenašli čo kliknúť a modal (podľa tejto
+        // chybnej podmienky) sa nikdy "nezavrel". Rovnaký problém, aký isElementVisible()
+        // rieši pre hlavný dokument (viď vyššie) - tu len navyše treba počítať štýly cez
+        // OKNO IFRAME-u (doc.defaultView), nie cez window nadradenej stránky.
         const modal = doc.getElementById("custom-modal");
-        if (modal && modal.style.display !== "none") {
+        if (modal && isElementVisible(modal, doc)) {
             handleBuilderModalKeydown(doc, modal, e);
             return;
         }
@@ -1443,8 +2070,35 @@ function handleHeroKeydown(e) {
 
         if (editorOpen && builderNav.stage !== "editor") {
             builderNav.stage = "editor";
+
+            if (builderNav.pendingDirectSkill) {
+                // Otvorené kliknutím na KONKRÉTNU (už naučenú) schopnosť v mriežke, nie na
+                // "+" - preskočí sa browse-zoznam a rovno sa vstúpi do akcií pre TÚTO
+                // schopnosť (server-side selectSkill() už prebehol pri slot.click()).
+                builderNav.pendingDirectSkill = false;
+                builderNav.editorSub = "actions";
+                builderNav.actionCursor = 0;
+
+                // Zosynchronizuje editorListCursor s práve vybranou schopnosťou, aby
+                // prípadný návrat Escape-om do browse-zoznamu ukázal na tú istú schopnosť,
+                // nie na prvú v zozname.
+                const items = getBuilderListItems(doc);
+                const selEl = doc.getElementById("sel-skill-name");
+                const selName = selEl ? (selEl.textContent || "").split(":")[0].trim() : "";
+                const idx = items.findIndex(function (it) { return it.textContent.trim() === selName; });
+                builderNav.editorListCursor = idx >= 0 ? idx : 0;
+
+                const levels = parseSkillLevelsFromEditor(doc);
+                if (levels) {
+                    enqueueAudio("label_aktualna_uroven", "Aktuálna úroveň:", true); // preruší, hrá sa prvé
+                    playNumericValue(levels.current);
+                }
+                builderActionsAnnounceCurrent(doc, false); // nadviaže hneď za tým (napr. "Cena: X")
+                return; // toto stlačenie len ohlási vstup do akcií, nezúčastní sa navigácie
+            }
+
             builderNav.editorSub = "browse";
-            builderNav.listCursor = 0;
+            builderNav.editorListCursor = 0;
         }
         if (!editorOpen && builderNav.stage === "editor") {
             builderNav.stage = "grid";
@@ -1517,7 +2171,7 @@ function handleHeroKeydown(e) {
         const section = currentSection();
         if (section === "OVLADACI_PANEL") {
             state.layer = "element";
-            state.elementIdx = 0;
+            state.elementIdx = firstPlayableElementIndex();
             announceElement();
         } else if (section === "MENU") {
             if (typeof showMenu === "function") showMenu();
@@ -1531,6 +2185,13 @@ function handleHeroKeydown(e) {
             spravyAnnounceCurrent();
         } else if (section === "DENNIK") {
             dennikAnnounce();
+        } else if (section === "ZACAT") {
+            // Rovnaký vzor ako výber zbrane (handleWeaponKeydown): najprv potvrdenie
+            // hlasom, potom skutočný klik - odstránením #proceed-btn zo scény sa aj
+            // zacatButtonVisible() vzápätí zmení na false, takže getSections() pri
+            // ďalšom prístupe vráti už bežný 4-sekciový zoznam (viď getSections() vyššie).
+            const btn = document.getElementById("proceed-btn");
+            if (btn) { speak("btn_zacat"); btn.click(); }
         }
     }
 
@@ -1546,6 +2207,14 @@ function handleHeroKeydown(e) {
         switch (el.id) {
             case "MOZNOSTI":
                 const items = getMoznostiItems();
+                // Za normálnych okolností sa sem s 0 položkami nedostaneme (MOŽNOSTI sú
+                // vtedy isElementSkippable, viď vyššie) - toto je len obrana proti
+                // časovému pretekaniu (voľby zmiznú presne medzi ArrowLeft/Right a
+                // stlačením medzerníka). Namiesto "Chýba audiosúbor." radšej mlčky
+                // ostaneme vo vrstve prvkov, akoby k stlačeniu vôbec nedošlo.
+                if (items.length === 0) {
+                    break;
+                }
                 if (items.length === 1) {
                     moznostiCursor = 0;
                     moznostiSelect();
@@ -1583,6 +2252,14 @@ function handleHeroKeydown(e) {
             case "UNIK":
                 unikSelect();
                 break;
+            case "VYZVA":
+                // Zostávame vo vrstve "element" (rovnaký vzor ako STRES vyššie) - VÝZVA
+                // len znova prečíta Náročnosť/Hrozba, nič sa "nevyberá".
+                announceChallengeStats(false);
+                break;
+            case "NEPRIATEL":
+                announceEnemyStats(false);
+                break;
         }
     }
 
@@ -1609,10 +2286,11 @@ function handleHeroKeydown(e) {
     // ---------------------------------------------------------------------------
     const STATE_TOOLTIPS = {
         // --- SEKCIE (vrstva "section") - kľúč = "SECTION_" + položka zo SECTIONS ---
-        SECTION_MENU: "Si v sekcii Menu. Šípkami vľavo a vpravo prepínaš medzi sekciami Menu, Ovládací panel, Správy a Denník. Medzerníkom vstúpiš do vybranej sekcie.",
+        SECTION_MENU: "Si v sekcii Menu. Šípkami vľavo a vpravo prepínaš medzi jednotlivými sekciami. Medzerníkom vstúpiš do vybranej sekcie.",
         SECTION_OVLADACI_PANEL: "Si v sekcii Ovládací panel. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať jednotlivými prvkami: Možnosti, Karty, Stres, Adrenalín, Zbrane, Schopnosti, Prvá pomoc a Únik.",
         SECTION_SPRAVY: "Si v sekcii Správy. Medzerníkom vstúpiš do zoznamu hlásení a šípkami budeš listovať staršími a novšími správami.",
         SECTION_DENNIK: "Si v sekcii Denník.",
+        SECTION_ZACAT: "Si na položke Začať. Medzerníkom spustíš hru.",
 
         // --- PRVKY OVLÁDACIEHO PANELA (vrstva "element") - kľúč = "ELEMENT_" + PANEL_ELEMENTS[].id ---
         ELEMENT_MOZNOSTI: "Si na položke Možnosti. Medzerníkom vstúpiš do zoznamu aktuálne dostupných možností a šípkami medzi nimi budeš listovať.",
@@ -1624,6 +2302,8 @@ function handleHeroKeydown(e) {
         ELEMENT_PRVA_POMOC: "Si na položke Prvá pomoc. Medzerníkom ju použiješ.",
         ELEMENT_UNIK: "Si na položke Únik. Medzerníkom ho použiješ - dostupné len počas sporu.",
         ELEMENT_MENU_OPTION: "Si na položke menu. Medzerníkom ju potvrdíš.",
+        ELEMENT_VYZVA: "Si na položke Výzva. Medzerníkom si znova vypočuješ náročnosť a hrozbu aktuálnej výzvy.",
+        ELEMENT_NEPRIATEL: "Si na položke Nepriateľ. Medzerníkom si znova vypočuješ stav súpera - typ, stres, výhodu, schopnosť a zbraň.",
 
         // --- PODVRSTVY (vrstva "sub") - kľúč = "SUB_" + state.subMode ---
         SUB_MOZNOSTI: "Listuješ možnosťami. Šípkami vľavo a vpravo meníš možnosť, medzerníkom ju potvrdíš, klávesou Escape sa vrátiš späť.",
@@ -1637,9 +2317,12 @@ function handleHeroKeydown(e) {
         OVERLAY_HERO_BROWSE: "Si vo výbere hrdinu. Šípkami vľavo a vpravo prechádzaš medzi uloženými hrdinami, medzerníkom hrdinu označíš a prejdeš k jeho schopnostiam.",
         OVERLAY_HERO_SKILLS: "Prezeráš schopnosti hrdinu. Šípkami vľavo a vpravo prechádzaš medzi jeho schopnosťami, medzerníkom ho potvrdíš a začneš hru, klávesou Escape sa vrátiš k výberu hrdinu.",
         OVERLAY_WEAPON: "Si vo výbere počiatočnej zbrane. Šípkami vľavo a vpravo prechádzaš medzi dostupnými zbraňami, medzerníkom zbraň potvrdíš.",
-        OVERLAY_BUILDER_GRID: "Si v builderi, v prehľade naučených schopností. Šípkami prechádzaš medzi políčkami, medzerníkom políčko otvoríš, klávesou Escape builder zavrieš.",
-        OVERLAY_BUILDER_EDITOR: "Si v builderi, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
-        OVERLAY_BUILDER_ACTIONS: "Si v builderi, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi možnosťami zvýšiť úroveň, znížiť úroveň a vrátiť zmenu, medzerníkom akciu potvrdíš.",
+        OVERLAY_BUILDER_OVERVIEW: "Si v builderi, na Hlavičke - meno, body rastu a ľudskosť. Šípkami prejdeš na Schopnosti a Zbrane, klávesou Escape builder zavrieš.",
+        OVERLAY_BUILDER_GRID_SECTIONS: "Si v builderi, medzi časťami Hlavička, Schopnosti a Zbrane. Šípkami medzi nimi prechádzaš, medzerníkom vstúpiš dovnútra, klávesou Escape builder zavrieš.",
+        OVERLAY_BUILDER_GRID: "Si v builderi, medzi políčkami v tejto časti. Šípkami prechádzaš medzi nimi, medzerníkom políčko otvoríš, klávesou Escape sa vrátiš na Hlavičku/Schopnosti/Zbrane.",
+        OVERLAY_BUILDER_ITEM_SELECTED: "Predmet je vybraný a má použiteľný efekt. Medzerníkom ho použiješ, klávesou Escape výber zrušíš bez použitia.",
+        OVERLAY_BUILDER_EDITOR: "Si v builderi, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (cena, zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
+        OVERLAY_BUILDER_ACTIONS: "Si v builderi, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi cenou, zvýšením úrovne, znížením úrovne a vrátením zmeny, medzerníkom akciu potvrdíš (cena sa len prečíta znova).",
         GENERAL_PROMPT: "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš."
     };
 
@@ -1709,15 +2392,24 @@ function handleHeroKeydown(e) {
             let fallbackKey;
             if (builderNav.stage === "editor") {
                 if (builderNav.editorSub === "actions") {
-                    el = doc.querySelectorAll("#skill-btn-container button")[builderNav.actionCursor];
+                    const actionId = BUILDER_ACTION_IDS[builderNav.actionCursor];
+                    el = actionId === "cena" ? null : doc.querySelectorAll("#skill-btn-container button")[BUILDER_ACTION_BUTTON_INDEX[actionId]];
                     fallbackKey = "OVERLAY_BUILDER_ACTIONS";
                 } else {
-                    el = getBuilderListItems(doc)[builderNav.listCursor];
+                    el = getBuilderListItems(doc)[builderNav.editorListCursor];
                     fallbackKey = "OVERLAY_BUILDER_EDITOR";
                 }
             } else {
-                el = getBuilderGridSlots(doc)[builderNav.listCursor];
-                fallbackKey = "OVERLAY_BUILDER_GRID";
+                if (builderNav.gridLayer === "section") {
+                    fallbackKey = BUILDER_GRID_SECTIONS[builderNav.gridSectionIdx] === "HLAVICKA"
+                        ? "OVERLAY_BUILDER_OVERVIEW"
+                        : "OVERLAY_BUILDER_GRID_SECTIONS";
+                } else {
+                    el = getBuilderSectionSlots(doc)[builderNav.itemCursor];
+                    fallbackKey = (el && builderSlotKind(el) === "item" && el.classList.contains("selected"))
+                        ? "OVERLAY_BUILDER_ITEM_SELECTED"
+                        : "OVERLAY_BUILDER_GRID";
+                }
             }
             speakElementTooltip(el, fallbackKey);
             return;
@@ -1736,6 +2428,16 @@ function handleHeroKeydown(e) {
         if (state.layer === "element") {
             if (currentSection() === "MENU") {
                 speakElementTooltip(getMenuOptions()[state.elementIdx], "ELEMENT_MENU_OPTION");
+            } else if (currentElement().id === "VYZVA") {
+                // VÝZVA nemá popisný text, ale samotný ÚČEL prvku - namiesto všeobecného
+                // stavového tooltipu preto rovno ZNOVA prečíta Náročnosť/Hrozbu ("read
+                // these again"). Ak by z nejakého dôvodu nešlo nič prečítať (napr.
+                // #challenge-stats-display medzičasom zmizol), padne späť na ELEMENT_VYZVA.
+                if (!announceChallengeStats(false)) speakStateTooltip("ELEMENT_VYZVA");
+            } else if (currentElement().id === "NEPRIATEL") {
+                // Rovnaký vzor ako VÝZVA vyššie - NEPRIATEL rovno ZNOVA prečíta stav
+                // súpera namiesto všeobecného stavového tooltipu.
+                if (!announceEnemyStats(false)) speakStateTooltip("ELEMENT_NEPRIATEL");
             } else {
                 // Prvky ovládacieho panela (Možnosti/Karty/Stres/...) nemajú v DOM vlastný
                 // data-tooltip, preto sa rovno ozve stavový tooltip pre daný prvok
@@ -1807,7 +2509,7 @@ function handleHeroKeydown(e) {
             if (readyPrompt && isElementVisible(readyPrompt)) {
                 e.preventDefault();
                 e.stopImmediatePropagation();
-                playAudio("ui_ready_priprav_sa");
+                playAudioOrSpeak("ui_ready_priprav_sa", "Priprav sa.");
                 const readyBtn = document.getElementById("ready-btn");
                 if (readyBtn) readyBtn.click();
                 return;
@@ -1880,18 +2582,19 @@ function handleHeroKeydown(e) {
 
         if (e.key === "ArrowLeft") {
             if (state.layer === "section") {
-                state.sectionIdx = (state.sectionIdx - 1 + SECTIONS.length) % SECTIONS.length;
+                state.sectionIdx = (state.sectionIdx - 1 + getSections().length) % getSections().length;
                 speak(SECTION_AUDIO_KEYS[currentSection()]);
             } else if (state.layer === "element") {
                 if (currentSection() === "MENU") {
                     state.elementIdx = (state.elementIdx - 1 + getMenuOptions().length) % getMenuOptions().length;
                     announceMenuOption(state.elementIdx);
                 } else {
+                    const count = getPanelElements().length;
                     let steps = 0;
                     do {
-                        state.elementIdx = (state.elementIdx - 1 + PANEL_ELEMENTS.length) % PANEL_ELEMENTS.length;
+                        state.elementIdx = (state.elementIdx - 1 + count) % count;
                         steps++;
-                    } while (isElementSkippable(currentElement()) && steps < PANEL_ELEMENTS.length);
+                    } while (isElementSkippable(currentElement()) && steps < count);
                     announceElement();
                 }
             } else if (state.layer === "sub") {
@@ -1907,18 +2610,19 @@ function handleHeroKeydown(e) {
 
         if (e.key === "ArrowRight") {
             if (state.layer === "section") {
-                state.sectionIdx = (state.sectionIdx + 1) % SECTIONS.length;
+                state.sectionIdx = (state.sectionIdx + 1) % getSections().length;
                 speak(SECTION_AUDIO_KEYS[currentSection()]);
             } else if (state.layer === "element") {
                 if (currentSection() === "MENU") {
                     state.elementIdx = (state.elementIdx + 1) % getMenuOptions().length;
                     announceMenuOption(state.elementIdx);
                 } else {
+                    const count = getPanelElements().length;
                     let steps = 0;
                     do {
-                        state.elementIdx = (state.elementIdx + 1) % PANEL_ELEMENTS.length;
+                        state.elementIdx = (state.elementIdx + 1) % count;
                         steps++;
-                    } while (isElementSkippable(currentElement()) && steps < PANEL_ELEMENTS.length);
+                    } while (isElementSkippable(currentElement()) && steps < count);
                     announceElement();
                 }
             } else if (state.layer === "sub") {
@@ -1935,7 +2639,21 @@ function handleHeroKeydown(e) {
         // Prepínanie polovíc karty (ÚTOK/ČIN) - len v Kartách, zrkadlí "ŠÍPKY HORE/DOLE"
         // z UNIFIED KEYBOARD CONTROLLER v script.js (mimo sporu nemá efekt, viď kartyToggleSide()).
         if (e.key === "ArrowUp" || e.key === "ArrowDown") {
-            if (state.layer === "sub" && state.subMode === "karty") kartyToggleSide();
+            if (state.layer === "sub" && state.subMode === "karty") {
+                kartyToggleSide();
+                return;
+            }
+            // Mimo Kariet nemá ArrowUp/ArrowDown vlastnú navigáciu - ArrowDown sa preto
+            // využije na PRESKOČENIE práve hrajúcej nahrávky, bez toho, aby sa čokoľvek
+            // pohlo v navigácii (na rozdiel od ArrowLeft/ArrowRight, ktoré prehrávanie
+            // prerušia LEN ako vedľajší účinok pohybu kurzora). Užitočné napr. počas
+            // dlhšieho automatického čítania novej správy v SPRÁVACH - hráč nahrávku
+            // jednoducho preskočí (posunie sa na ďalšiu vo fronte, ak nejaká čaká),
+            // bez toho, aby musel niekam navigovať.
+            if (e.key === "ArrowDown") {
+                stopCurrentPlayback();
+                playQueueNext();
+            }
             return;
         }
     }

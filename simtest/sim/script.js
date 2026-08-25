@@ -422,6 +422,20 @@ let test_mode = false;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
+            // Rovnaký vzor ako v handleConflictInput() / resolveActionPhase() - zaloguj
+            // kartu hneď po tom, čo prešla všetkými early-return kontrolami v listeneri.
+            if (rollsVisible()) {
+                let karta = null
+                if (cardCode == "O") { 
+                    karta = "opatrne"
+                } else if (cardCode == "S"){
+                    karta = "smelo"
+                } else {
+                    karta = "bezhlavo"
+                }
+                log(`Používaš kartu '${karta}' (${actionType === "A" ? "ÚTOK" : "PRIBLÍŽENIE"}).`, "error-msg");
+            }
+
             // --- 1. DETERMINE SKILL BONUS ---
             const skillDropdown = document.getElementById("player-skill-dropdown");
             const selectedSkillName = skillDropdown ? skillDropdown.value : "placeholder";
@@ -430,7 +444,7 @@ let test_mode = false;
                 chosenSkillBonus = HERO.skills[selectedSkillName] || 0;
             }
 
-            let roll_result = rollDice(cardCode, actionType === "A", chosenSkillBonus, false);
+            let { total: roll_result, rolls: roll_result_dice } = rollDice(cardCode, actionType === "A", chosenSkillBonus, false);
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
 
             roll_result += advantage + adrenaline;
@@ -1245,13 +1259,14 @@ let test_mode = false;
         function rollDice(cardCode, attack = false, skillLevel = 0, isEnemy = false) {
             if (!(cardCode in CARDS)) {
                 log("Invalid card code error!", "danger-msg", true);
-                return 0;
+                return { total: 0, rolls: [] };
             }
             
             let side = attack ? 1 : 0;
             let total_roll = 0;
             let dice_list = CARDS[cardCode][side][1];
             let rollsData = []; 
+            let rolls = [];
 
             if (skillLevel >= 6) {
                 dice_list = [...dice_list, 6];
@@ -1260,20 +1275,29 @@ let test_mode = false;
                         
             dice_list.forEach(d => {
                 let r = Math.floor(Math.random() * d) + 1;
+                if(rollsVisible()) log(`Hádžem D${d}. Výsledok: ${r}`,false,false,true);
                 total_roll += r;
+                rolls.push(r);
                 rollsData.push({ type: `D${d}`, value: r, isSkillDie: false });
             });
             
             for (let i = 0; i < skillLevel; i++) {
                 let r = Math.floor(Math.random() * 2); 
+                if(rollsVisible()) log(`Hádžem D1. Výsledok: ${r}`,false,false,true);
                 total_roll += r;
+                rolls.push(r);
                 rollsData.push({ type: 'DH', value: r, isSkillDie: true });
             }
             
             // Forward identity check state down to display pipeline layer
             triggerDiceVisualAnimation(rollsData, isEnemy);
             
-            return total_roll;
+            // Vracia OBOJE: total (súčet, pre porovnania s NÁROČNOSŤOU a arithmetiku
+            // s výhodou/adrenalínom - nezmenené správanie) aj rolls (pole jednotlivých
+            // hodov v poradí hlavná kocka -> prípadná bonusová D6 pri schopnosti 6+ ->
+            // schopnostné kocky - presne poradie, v akom sa hlásia hráčovi/nepriateľovi).
+            // KAŽDÉ volanie rollDice() musí odteraz čítať .total namiesto priameho čísla.
+            return { total: total_roll, rolls: rolls };
         }
 
         function restartGame(menu = false) {
@@ -3260,9 +3284,7 @@ let test_mode = false;
             const activeChallenge = CHALLENGES[current_challenge_key];
             current_challenge.difficulty = Math.max(4, activeChallenge.difficulty + diff_mod);
             current_challenge.threat = Math.max(1, activeChallenge.threat + threat_mod);
-            if (rollsVisible() && current_challenge.difficulty > 0 && current_challenge.threat > 0) {
-                log(` \n NÁROČNOSŤ: ${current_challenge.difficulty} - HROZBA: ${current_challenge.threat}`, "error-msg", true, true, true);
-            }
+
 
             // This helper executes the UI setup and logic flow
             const proceedWithPhase = () => {
@@ -3737,6 +3759,7 @@ let test_mode = false;
                 if (choicePrompt && choicePrompt.dataset.actionBack === "true") {
                     choicePrompt.style.display = "none";
                     choicePrompt.innerHTML = "";
+                    choicePrompt.userData = null;
                     delete choicePrompt.dataset.actionBack;
                 }
                 return;
@@ -3771,6 +3794,16 @@ let test_mode = false;
 
             choicePrompt.appendChild(btn);
             choicePrompt.dataset.actionBack = "true";
+            // userData sa nesmie nechať z PREDOŠLÉHO choice-promptu (viď renderChallengeChoices) -
+            // tento element sa tu len recykluje na jediné tlačidlo Späť, ale userData.validChoices
+            // by inak naďalej ukazovalo na dávno neplatné voľby z minulého naratívneho uzla. To sa
+            // reálne prejavovalo na dvoch miestach, čo z tohto poľa čítajú: audio UI (čítalo staré
+            // možnosti namiesto skutočného tlačidla Späť) a samohrajúci test() harness nižšie (jeho
+            // choiceIds/pickExploratoryIndex logovanie priraďovalo tlačidlu Späť cudzí target z
+            // predošlého uzla namiesto "BACK_ACTION_1"). Nastavením presne zodpovedajúcich dát sa
+            // choicePrompt.userData zosynchronizuje so skutočným obsahom, rovnako ako to pri
+            // skutočných voľbách robí renderChallengeChoices().
+            choicePrompt.userData = { validChoices: [{ text: "⬅", target: "BACK_ACTION_1", isBack: true }] };
             choicePrompt.style.display = "flex";
         }
 
@@ -4067,10 +4100,27 @@ let test_mode = false;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
             updateUI();
+
+            // Rovnaký vzor ako v handleConflictInput() - zaloguj kartu hneď po tom,
+            // čo prešla všetkými early-return kontrolami v listeneri, aby nevidiaci
+            // hráč dostal potvrdenie svojej voľby.
+            if (rollsVisible()) {
+                let karta = null
+                if (card == "O") { 
+                    karta = "opatrne"
+                } else if (card == "S"){
+                    karta = "smelo"
+                } else {
+                    karta = "bezhlavo"
+                }
+
+                log(`Používaš kartu '${karta}'.`, "error-msg");
+            }
+
             if (test_mode) skill = 3;
             const activeChallenge = CHALLENGES[current_challenge_key];
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
-            let roll_result = rollDice(card, false, skill);
+            let { total: roll_result, rolls: roll_result_dice } = rollDice(card, false, skill);
             
             roll_result_raw = roll_result
             roll_result += adrenaline; 
@@ -4159,7 +4209,7 @@ let test_mode = false;
                     }
 
                     if (rollsVisible()) {
-                        log(`VÝSLEDOK: ${roll_result_raw} (+${adrenaline})`, "error-msg", false, false, true);
+                        log(`VÝSLEDOK: ${roll_result_dice.join(', ')} (+${adrenaline})`, "error-msg", false, false, true);
                     }
 
                     // Log baseline success or failure text (after threat resolution)
@@ -4222,10 +4272,12 @@ let test_mode = false;
 
             inputs_frozen = true;
             if (test_mode) {skill = 10; weapon = 2};
-            let enemy_roll = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
+            if(rollsVisible) log(`Hádžem kocky za nepriateľa`,false,false,true);
+            let { total: enemy_roll, rolls: enemy_roll_dice } = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
 
+            if(rollsVisible) log(`Hádžem za teba`,false,false,true);
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
-            let player_roll = rollDice(player_action[1], player_action[0] === "A", skill, false);
+            let { total: player_roll, rolls: player_roll_dice } = rollDice(player_action[1], player_action[0] === "A", skill, false);
             let stress_increased = false;
             
             let p_adv_mod = advantage;
@@ -4242,7 +4294,7 @@ let test_mode = false;
 
 
             if (rollsVisible()) {
-                log(`TY: ${player_roll}${p_mods}   ⚔️   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
+                log(`TY: ${player_roll}${p_mods}   -   ${enemy.toUpperCase()}: ${enemy_roll}${e_mods}`, "error-msg");
             }
 
             enemy_roll += enemy_advantage;
@@ -4993,9 +5045,23 @@ let test_mode = false;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
-            let roll_result = rollDice(card, false, 0, false);
+            // Rovnaký vzor ako v handleConflictInput() / resolveActionPhase() - zaloguj
+            // kartu hneď po tom, čo prešla všetkými early-return kontrolami v listeneri.
+            if (rollsVisible()) {
+                let karta = null
+                if (card == "O") { 
+                    karta = "opatrne"
+                } else if (card == "S"){
+                    karta = "smelo"
+                } else {
+                    karta = "bezhlavo"
+                }
+                log(`Používaš kartu '${karta}'.`, "error-msg");
+            }
+
+            let { total: roll_result, rolls: roll_result_dice } = rollDice(card, false, 0, false);
    
-            log(`Výsledok pokusu o prvú pomoc: ${roll_result}`, "error-msg");
+            log(`Výsledok pokusu o prvú pomoc: ${roll_result_dice.join(', ')}`, "error-msg");
 
             let success = roll_result >= current_challenge.difficulty;
 
@@ -5112,6 +5178,20 @@ let test_mode = false;
             const scrollRow = document.querySelector('.card-scroll-row');
             if (scrollRow) scrollRow.classList.remove('enable-interaction');
 
+            // Rovnaký vzor ako v handleConflictInput() / resolveActionPhase() - zaloguj
+            // kartu hneď po tom, čo prešla všetkými early-return kontrolami v listeneri.
+            if (rollsVisible()) {
+                let karta = null
+                if (card == "O") { 
+                    karta = "opatrne"
+                } else if (card == "S"){
+                    karta = "smelo"
+                } else {
+                    karta = "bezhlavo"
+                }
+                log(`Používaš kartu '${karta}'.`, "error-msg");
+            }
+
             updateUI();
             let skill = 0;
             const heroSkillValue = HERO.skills?.["ODOLNOSŤ"] ?? 0;
@@ -5123,7 +5203,7 @@ let test_mode = false;
                 }
             }
 
-            let roll_result = rollDice(card, false, skill, false);
+            let { total: roll_result, rolls: roll_result_dice } = rollDice(card, false, skill, false);
 
             let success = roll_result > current_challenge.difficulty;
             let threat_realized = false;
@@ -5519,6 +5599,21 @@ let test_mode = false;
                     playerDisplay.classList.add("show");
                 }
 
+                // Rovnaký vzor ako v displayEnemyCard() - zaloguj presne v momente,
+                // keď sa karta vizuálne objaví na stole, aby nevidiaci hráč dostal
+                // potvrdenie svojej voľby v rovnakom okamihu ako sighted hráč.
+                if (rollsVisible()) {
+                    let karta = null
+                    if (cardCode == "O") { 
+                        karta = "opatrne"
+                    } else if (cardCode == "S"){
+                        karta = "smelo"
+                    } else {
+                        karta = "bezhlavo"
+                    }
+                    log(`Používaš kartu '${karta}' (${actionType === "A" ? "ÚTOK" : "ČIN"}).`, "error-msg");
+                }
+
                 player_action = [actionType, cardCode];
                 move += 1;
                 turn = "e";
@@ -5910,6 +6005,22 @@ let test_mode = false;
         function displayEnemyCard(actionType, cardCode) {
             const container = document.getElementById("enemy-card-container");
             if (!container) return;
+
+            // Zaloguj hneď v momente, keď sa karta vizuálne odhalí sighted hráčovi -
+            // presne táto funkcia je jediné miesto, kde sa to deje (obe volania
+            // v proceedWithEnemyChoice), takže nevidiaci hráč dostane informáciu
+            // v ROVNAKOM okamihu, nie až neskôr pri vyhodnotení hodu v resolveConflict().
+            if (rollsVisible()) {
+                let karta = null
+                if (cardCode == "O") { 
+                    karta = "opatrne"
+                } else if (cardCode == "S"){
+                    karta = "smelo"
+                } else {
+                    karta = "bezhlavo"
+                }
+                log(`Nepriateľ používa kartu '${karta}' (${actionType === "A" ? "ÚTOK" : "ČIN"}).`, "error-msg");
+            }
 
             // Determine rotation: Opposite of player logic 
             // (If Enemy Defends, they rotate -90 to face player's 90)

@@ -352,7 +352,7 @@
     },
     "BASEMENT_ENTRANCE": {
         "image": "assets/CITY.png",
-        "initial_msg": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom si ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
+        "initial_msg": "Nachádzaš sa na sídlisku. Je mŕtvolné ticho. Potom ale započuješ akýsi šramot. Všimneš si pootvorenú garáž. Zdá sa, že zvuk ide odtiaľ. Ideš dnu?",
         "choice_A": "Preskúmať.",
         "choice_B": "Ísť späť.",
         "case_A": [
@@ -1634,7 +1634,7 @@
         "case_failure": "",
         "next": "TUTORIAL_1",
         "image": "assets/tutorial/SVET.png",
-        "initial_msg_1": "Hra Hybrid zasadená do postapokalyptického sveta v blízkej budúcnosti. Na Zemi sa rozšíril neznámy druh gigantického ľudožravého hmyzu bežne nazývaného Somory.",
+        "initial_msg_1": "Hra Hybrid je zasadená do postapokalyptického sveta v blízkej budúcnosti. Na Zemi sa rozšíril neznámy druh gigantického ľudožravého hmyzu bežne nazývaného Somory.",
         "initial_msg_2": "Názov Hybrid sa viaže k postavám, ktoré sa nachádzajú na pomedzí tohto hmyzu a človeka.",
         "initial_msg_3": " Dokážu získať schopnosti Somôr, vďaka ktorým sa napríklad vedia pohybovať medzi nimi bez toho, aby na nich útočili. Aby schopnosti získali, musia sa vzdať svojej ľudskosti skonzumovaním ľudského mäsa. Ľudia nimi preto opovrhujú.",
         "initial_msg_4": "Ty sa ujmeš práve roly Hybrida."
@@ -1803,7 +1803,7 @@
         "case_threat_delayed": "",
         "case_failure_delayed": "",
         "case_threat": "stress+1",
-        "case_failure": "SKAUTKA_1"
+        "case_failure": ["alerted_SKAUTKA_1","SKAUTKA_1"]
     },
     "SET_TRAP": {
         "back": true,
