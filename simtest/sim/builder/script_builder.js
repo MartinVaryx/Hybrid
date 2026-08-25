@@ -1179,10 +1179,7 @@
         updateGroupDropdown();
         filterBuilder();
         renderStats();
-        renderEditorList();
-        filterRelSearch();
         initSkillTooltips(); 
-
     }
 
     async function loadSkills() {
