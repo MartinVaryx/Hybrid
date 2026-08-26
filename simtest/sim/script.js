@@ -42,6 +42,7 @@ let test_mode = false;
         let SETTINGS = {
             "tutorial": true,
             "logRolls": false,
+            "voiceSpeed": 1,
         };
 
         function rollsVisible() {
@@ -526,11 +527,11 @@ let test_mode = false;
                         };
                         return;
                     } else {
-                        log(`⚠️ Nepriateľ útok prežil! Odhalil ťa a začína otvorený boj.`, "failure-msg");
+                        log(` Nepriateľ útok prežil! Odhalil ťa a začína otvorený boj.`, "failure-msg");
                     }
                 } else {
                     // Failure — Attack missed
-                    log(`⚠️ Minieš! Nepriateľ si ťa všimne a okamžite vyráža do útoku.`, "failure-msg");
+                    log(` Minieš! Nepriateľ si ťa všimne a okamžite vyráža do útoku.`, "failure-msg");
                 }
 
                 // Cleanup and transition to regular combat on failure or survived attack
@@ -581,9 +582,9 @@ let test_mode = false;
                     }
                 } else {
                     if (dist > 0) {
-                        log(`⚠️ Nedarí sa ti nepozorovane priblížiť! Nepriateľ si dáva pozor.`, "failure-msg");
+                        log(` Nedarí sa ti nepozorovane priblížiť! Nepriateľ si dáva pozor.`, "failure-msg");
                     } else {
-                        log(`⚠️ Nedarí ti získať výhodnejšiu pozíciu. Začína otvorený boj.`, "failure-msg");
+                        log(` Nedarí ti získať výhodnejšiu pozíciu. Začína otvorený boj.`, "failure-msg");
                     }
                 }
 
@@ -1056,7 +1057,7 @@ let test_mode = false;
                     .filter(node => node.getAttribute("data-val") === targetBonus);
 
                 if (availableNodes.length === 0) {
-                    log(`⚠️ Bonus +${targetBonus} momentálne nie je k dispozícii alebo je zablokovaný.`, "error-msg");
+                    log(` Bonus +${targetBonus} momentálne nie je k dispozícii alebo je zablokovaný.`, "error-msg");
                     return;
                 }
 
@@ -1267,6 +1268,7 @@ let test_mode = false;
             let dice_list = CARDS[cardCode][side][1];
             let rollsData = []; 
             let rolls = [];
+            let roll_log = [];
 
             if (skillLevel >= 6) {
                 dice_list = [...dice_list, 6];
@@ -1275,7 +1277,7 @@ let test_mode = false;
                         
             dice_list.forEach(d => {
                 let r = Math.floor(Math.random() * d) + 1;
-                if(rollsVisible()) log(`Hádžem D${d}. Výsledok: ${r}`,false,false,true);
+                roll_log.push(r)
                 total_roll += r;
                 rolls.push(r);
                 rollsData.push({ type: `D${d}`, value: r, isSkillDie: false });
@@ -1283,12 +1285,16 @@ let test_mode = false;
             
             for (let i = 0; i < skillLevel; i++) {
                 let r = Math.floor(Math.random() * 2); 
-                if(rollsVisible()) log(`Hádžem D1. Výsledok: ${r}`,false,false,true);
+                roll_log.push(r);
                 total_roll += r;
                 rolls.push(r);
                 rollsData.push({ type: 'DH', value: r, isSkillDie: true });
             }
-            
+            let prefix = "";
+            if(roll_log.length < 2){prefix = "Hod:"} else {prefix = "Hody:"};
+            if(rollsVisible()) log(`${prefix} ${roll_log}`,false,false,true);
+
+
             // Forward identity check state down to display pipeline layer
             triggerDiceVisualAnimation(rollsData, isEnemy);
             
@@ -1551,6 +1557,7 @@ let test_mode = false;
             const audioCheckbox = document.getElementById('audio-checkbox');
             const modeDropdown = document.getElementById('mode-dropdown');
             const logRollsCheckbox = document.getElementById('log-rolls-checkbox');
+            const voiceSpeedSelect = document.getElementById('voice-speed-select');
             if (tutorialCheckbox) {
                 tutorialCheckbox.checked = !!SETTINGS.tutorial;
             }
@@ -1562,6 +1569,9 @@ let test_mode = false;
             }
             if (logRollsCheckbox) {
                 logRollsCheckbox.checked = !!SETTINGS.logRolls;
+            }
+            if (voiceSpeedSelect) {
+                voiceSpeedSelect.value = SETTINGS.voiceSpeed || 1;
             }
         }
 
@@ -1646,10 +1656,29 @@ let test_mode = false;
             }
         }
 
+        function changeVoiceSpeed() {
+            const select = document.getElementById('voice-speed-select');
+            if (!select) return;
+
+            if (typeof SETTINGS === 'undefined') {
+                window.SETTINGS = {};
+            }
+
+            // Ukladá sa ako číslo (rovnaký formát, aký audio-ui.js/getVoiceSpeed() číta
+            // naživo pri každej hláške - viď audio-ui.js). Hodnoty <option> sú v rozsahu
+            // 0.5-2, čo je vnútri medzí, ktoré getVoiceSpeed() aj tak zase orezáva (0.5-3).
+            SETTINGS.voiceSpeed = Number(select.value) || 1;
+
+            if (typeof saveSettings === 'function') {
+                saveSettings();
+            }
+        }
+
         function updateSettingsVisual() {
             const tutorial_checkbox = document.getElementById('tutorial-checkbox');
             const audio_checkbox = document.getElementById('audio-checkbox');
             const log_rolls_checkbox = document.getElementById('log-rolls-checkbox');
+            const voice_speed_select = document.getElementById('voice-speed-select');
 
             if (!tutorial_checkbox || !audio_checkbox) return;
 
@@ -1668,6 +1697,10 @@ let test_mode = false;
 
             if (log_rolls_checkbox) {
                 log_rolls_checkbox.checked = !!(typeof SETTINGS !== 'undefined' && SETTINGS.logRolls);
+            }
+
+            if (voice_speed_select) {
+                voice_speed_select.value = (typeof SETTINGS !== 'undefined' && SETTINGS.voiceSpeed) ? SETTINGS.voiceSpeed : 1;
             }
         }
 
@@ -2353,7 +2386,7 @@ let test_mode = false;
                             // Text je na obrazovke. Povieme tlačidlu Proceed, 
                             // že pri ďalšom kliknutí má vypísať bojovú hlášku a pripraviť štart.
                             proceed(() => {
-                                log(`\n⚔️ Priprav sa na boj! Proti tebe stojí: ${actualTarget}`, "danger-msg", true);
+                                log(`\n Priprav sa na boj! Proti tebe stojí: ${actualTarget}`, "danger-msg", true);
                                 
                                 // Následné kliknutie reálne spustí boj
                                 proceed(() => {
@@ -2377,7 +2410,7 @@ let test_mode = false;
 
                 } else {
                     // FALLBACK: Ak uzol nemá žiadne dodatočné texty
-                    log(`⚔️ Priprav sa na boj! Proti tebe stojí: ${actualTarget}`, "danger-msg", true);
+                    log(` Priprav sa na boj! Proti tebe stojí: ${actualTarget}`, "danger-msg", true);
                     
                     // Počkáme na jedno stlačenie Proceed, kým reálne spustíme bojové kolo
                     proceed(() => {
@@ -2693,7 +2726,7 @@ let test_mode = false;
                                 inputs_frozen = true;
                                 const scrollRow = document.querySelector('.card-scroll-row');
                                 if (scrollRow) scrollRow.classList.remove('enable-interaction');
-                                log("💀 Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
+                                log(" Stres presiahol hodnotu kolapsu. KONIEC HRY.", "failure-msg", true);
                                 
                                 onTerminalFinishedCallback = () => { 
                                     restartGame(); 
@@ -3488,7 +3521,7 @@ let test_mode = false;
                         (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
                 // PRVÝ KROK: Ak schopnosť nie je bojová a nie je ani v obranných, vyhodíme ju
                 if (!isCombatSkill && !isDefenseSkill && !isPlaceholder) {
-                    log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
+                    log(` "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
                     return;
                 };
                 return
@@ -3506,7 +3539,7 @@ let test_mode = false;
                 const isEliminationSkill = upperSkill.includes("ELIMIN");
 
                 if (!isSneakSkill && !isCombatSkill && !isEliminationSkill && !isPlaceholder) {
-                    log(`⚠️ "${selectedSkillName}" ti pri priblížení nepomôže.`, "error-msg");
+                    log(` "${selectedSkillName}" ti pri priblížení nepomôže.`, "error-msg");
                 }
                 return;
             }
@@ -3516,12 +3549,12 @@ let test_mode = false;
 
             if (activeChallenge && activeChallenge.skills && activeChallenge.skills.length > 0) {
                 if (!activeChallenge.skills.includes(selectedSkillName) && !isPlaceholder) {
-                    log(`⚠️ Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
+                    log(` Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
                 } else if(!isPlaceholder){
-                    log(`✅ ${selectedSkillName} (+${actualHeroValue}) je vhodná schopnosť!`, "success-msg");
+                    log(` ${selectedSkillName} (+${actualHeroValue}) je vhodná schopnosť!`, "success-msg");
                 }
             } else if (challengeDisplay) {
-                log(`ℹ️ Pri tejto výzve ti nepomôžu žiadne schopnosti.`, "system-msg");
+                log(` Pri tejto výzve ti nepomôžu žiadne schopnosti.`, "system-msg");
             }
         });
 
@@ -4201,7 +4234,7 @@ let test_mode = false;
                     let caution_threshold = CARDS[card][0][0];
                     if (threat_roll > caution_threshold) {
                         const prefix = rollsVisible() ? `(HROZBA: ${threat_roll} -  OPATRNOSŤ: ${caution_threshold})  \n ` : '';
-                        log(`${prefix}${activeChallenge.threat_msg || "⚠️ Hrozba sa naplnila!"}`, "failure-msg",false, false, true);
+                        log(`${prefix}${activeChallenge.threat_msg || " Hrozba sa naplnila!"}`, "failure-msg",false, false, true);
                         threat_realized = true;
                     } else {
                         const prefix = rollsVisible() ? `(HROZBA: ${threat_roll} - OPATRNOSŤ: ${caution_threshold}) \n ` : '';
@@ -4272,10 +4305,10 @@ let test_mode = false;
 
             inputs_frozen = true;
             if (test_mode) {skill = 10; weapon = 2};
-            if(rollsVisible) log(`Hádžem kocky za nepriateľa`,false,false,true);
+            if(rollsVisible()) log(`Hádžem kocky za nepriateľa`,false,false,true);
             let { total: enemy_roll, rolls: enemy_roll_dice } = rollDice(enemy_action[1], enemy_action[0] === "A", ENEMY_TYPES[enemy]["skill"], true);
 
-            if(rollsVisible) log(`Hádžem za teba`,false,false,true);
+            if(rollsVisible()) log(`Hádžem za teba`,false,false,true);
             let adrenaline = parseInt(document.getElementById("adrenaline-select").value) || 0;
             let { total: player_roll, rolls: player_roll_dice } = rollDice(player_action[1], player_action[0] === "A", skill, false);
             let stress_increased = false;
@@ -4306,11 +4339,11 @@ let test_mode = false;
             if (conflict_distance>0) {
                 if (enemy_action[0] === "D" && enemy_roll > player_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
-                    log(`👣 ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "error-msg");
+                    log(` ${enemy} sa k tebe priblížil! (Vzdialenosť: ${conflict_distance})`, "error-msg");
                 }
                 if (player_action[0] === "D" && player_roll > enemy_roll) {
                     conflict_distance = Math.max(0, conflict_distance - 1);
-                    log(`👣 Približuješ sa k nepriateľovi! (Vzdialenosť: ${conflict_distance})`, "error-msg");
+                    log(` Približuješ sa k nepriateľovi! (Vzdialenosť: ${conflict_distance})`, "error-msg");
                 }
 
                 if (enemy_id && CHALLENGES[enemy_id]) {
@@ -4319,7 +4352,7 @@ let test_mode = false;
 
                 if (conflict_distance <= 0) {
                     distance_combat_active = false;
-                    log(`⚔️ Nepriateľ je pri tebe, boj zblízka môže začať!`, "info-msg");
+                    log(` Nepriateľ je pri tebe, boj zblízka môže začať!`, "info-msg");
                     
                     // --- ADDED: Smoothly remove distance scale when gap is closed ---
                     const enemyContainer = document.getElementById("enemy-sprite-container");
@@ -4333,10 +4366,10 @@ let test_mode = false;
 
             // === CHASE MODE / BOTH ESCAPING ===
             if (chase_mode && player_escaping && enemy_escaping && player_action[0] === "D" && enemy_action[0] === "D") {
-                log(`🏃Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
+                log(`Obojstranný útek! Ty aj nepriateľ utekáte opačným smerom. Konflikt končí!`, "info-msg", true);
                 
                 enemy_escape_counter += 2;
-                log(`🏃 ${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
+                log(`${enemy.toUpperCase()} ti definitívne mizne z dohľadu!`, "danger-msg");
                 
                 inputs_frozen = true;
                 const scrollRow = document.querySelector('.card-scroll-row');
@@ -4396,13 +4429,13 @@ let test_mode = false;
 
             if (chase_mode) {
                 if (player_escaping && player_action[0] === "A") {
-                    log(`⚔️ Zaútočíš počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg", false,false,true);
+                    log(` Zaútočíš počas úteku! Rušíš útek a prechádzaš späť do tvrdého boja.`, "info-msg", false,false,true);
                     chase_mode = false;
                     player_escaping = false;
                     player_escape_counter = 0;
                 }
                 else if (enemy_escaping && enemy_action[0] === "A") {
-                    log(`⚔️ Protivník sa otočil a útočí na teba!`, "info-msg", false,false,true);
+                    log(`Protivník sa otočil a útočí na teba!`, "info-msg", false,false,true);
                     chase_mode = false;
                     enemy_escaping = false;
                     enemy_escape_counter = 0;
@@ -4424,7 +4457,7 @@ let test_mode = false;
                             }
                         } else {
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
-                            log(`⚠️ Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg", false,false,true);
+                            log(` Protivník ťa dobieha! (Únik: ${player_escape_counter}/2)`, "danger-msg", false,false,true);
                         }
                     }
                     else {
@@ -4664,7 +4697,7 @@ let test_mode = false;
             }
 
             if (pancier_absorbed > 0) {
-                log(`🛡️ Tvoj pancier absorboval zvýšenie stresu o ${pancier_absorbed}.`, "success-msg", false, false, true);
+                log(` Tvoj pancier absorboval zvýšenie stresu o ${pancier_absorbed}.`, "success-msg", false, false, true);
             }
 
             let player_collapse = HERO.stress > stress_thresh;
@@ -4750,7 +4783,7 @@ let test_mode = false;
                         (player_roll === enemy_roll && enemy_action[0] === "D" && player_action[0] === "A" && player_zero_counter > 1)) {
                             let adv_before = enemy_advantage;
                             enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-                            if(enemy_advantage>adv_before)log(`🛡️ Nepriateľ získava výhodu +1.`,"", false,false,true);
+                            if(enemy_advantage>adv_before)log(` Nepriateľ získava výhodu +1.`,"", false,false,true);
                         }
                     }
 
@@ -4773,7 +4806,7 @@ let test_mode = false;
                     player_action = null;
                     enemy_action = null;
 
-                    let delay = test_mode ? 100 : 2000; // ✅ Declared in outer scope first
+                    let delay = test_mode ? 100 : 2000; //  Declared in outer scope first
                     setTimeout(() => {
                         gameloop(false);
                     }, delay);
@@ -4913,15 +4946,15 @@ let test_mode = false;
                         enemy_stress += 1;
                         if(enemy_escaping){
                             enemy_escape_counter = Math.max(0, enemy_escape_counter - 1);
-                            log(`${threatPrefix}⚠️ Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix} Nepriateľ sa potkol!  Dobehneš ho.`, "danger-msg",false,false,true);
                         } else {
                             player_escape_counter += 1 ;
-                            log(`${threatPrefix}⚠️ Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix} Nepriateľ sa potkol!  Získavaš náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
                         let adv_before = advantage;
                         advantage = Math.min(advantage + 1, ADVANTAGE_CAP);
-                        log(`${threatPrefix}⚠️ Nepriateľ sa dostal do horšej pozície.`, "danger-msg",false,false,true);
+                        log(`${threatPrefix} Nepriateľ sa dostal do horšej pozície.`, "danger-msg",false,false,true);
                         if (advantage>adv_before) log("Získavaš výhodu +1","",false,false,true)
                     }
                 } else {
@@ -4931,16 +4964,16 @@ let test_mode = false;
                         heal_attempts = 0;
                         if(player_escaping){
                             player_escape_counter = Math.max(0, player_escape_counter - 1);
-                            log(`${threatPrefix}\n ⚠️ Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}\n  Potkneš sa počas úteku! Nepriateľ ťa dobehne.`, "danger-msg",false,false,true);
                         } else {
                             enemy_escape_counter += 1;
-                            log(`${threatPrefix}\n ⚠️ Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg",false,false,true);
+                            log(`${threatPrefix}\n  Potkneš sa!  Nepriateľ získava náskok.`, "danger-msg",false,false,true);
                         }
                     } else {
                         let adv_before = enemy_advantage;
                         enemy_advantage = Math.min(enemy_advantage + 1, ADVANTAGE_CAP);
-                        log(`${threatPrefix}⚠️ Dostaneš sa do horšej pozície.`, "danger-msg",false,false,true);
-                        if(enemy_advantage>adv_before) log(`🛡️ Nepriateľ získava výhodu +1.`,"", false,false,true);
+                        log(`${threatPrefix} Dostaneš sa do horšej pozície.`, "danger-msg",false,false,true);
+                        if(enemy_advantage>adv_before) log(` Nepriateľ získava výhodu +1.`,"", false,false,true);
                     }
                     
                     // --- NOVÁ ÚPRAVA: INTERCEPCIA KOLAPSU V SÚBOJI ---
@@ -5165,7 +5198,7 @@ let test_mode = false;
                 toggleChallengeDisplay(true, current_challenge);
             }
 
-            log("⚠️ KONTROLA KOLAPSU! Musíš odolať tlaku nahromadeného stresu.", "danger-msg", true);
+            log(" KONTROLA KOLAPSU! Musíš odolať tlaku nahromadeného stresu.", "danger-msg", true);
 
             // Allow the player to click a card to resolve the collapse check
             inputs_frozen = false;
@@ -5209,9 +5242,9 @@ let test_mode = false;
             let threat_realized = false;
 
             if (success) {
-                log("💪 Úspech! Zvládneš extrémny tlak a pokračuješ v boji.", "success-msg");
+                log(" Úspech! Zvládneš extrémny tlak a pokračuješ v boji.", "success-msg");
             } else {
-                log("❌ Zlyhanie! Skolabuješ pod extrémnym tlakom.", "failure-msg");
+                log("Zlyhanie! Skolabuješ pod extrémnym tlakom.", "failure-msg");
             }
             // Hrozba sa vyhodnocuje vždy - bez ohľadu na úspech/nerozhodné/zlyhanie -
             // rovnako ako v štandardnej akčnej fáze (runActionPhase).
@@ -5311,10 +5344,10 @@ let test_mode = false;
                 // 2. Predvolený mechanizmus konca hry (funguje výborne pre checkConflictThreat)
                 else {
                     if (typeof enemy !== 'undefined' && typeof ENEMY_TYPES !== 'undefined' && ENEMY_TYPES[enemy] && enemy_stress > ENEMY_TYPES[enemy]["stress_thresh"]) {
-                        log(`\n💀 Ou! Zabili ste sa navzájom! Skolabuješ v rovnakom momente, ako padol nepriateľ.`, "failure-msg", true);
+                        log(`\n Ou! Zabili ste sa navzájom! Skolabuješ v rovnakom momente, ako padol nepriateľ.`, "failure-msg", true);
                     } else {
                         // Bežný kolaps (padol iba hráč)
-                        log("💀 TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.", "failure-msg", true);
+                        log(" TVOJ STRES PREKROČIL HODNOTU KOLAPSU. KONIEC HRY.", "failure-msg", true);
                     }
 
                     is_collapse_check = false;
@@ -7205,13 +7238,13 @@ let test_mode = false;
 
 
                 if (is_conflict && selectedSkillName.includes("ELIMIN")){
-                    log(`⚠️ "${selectedSkillName}" nemôžeš počas boja.`, "error-msg");
+                    log(` "${selectedSkillName}" nemôžeš počas boja.`, "error-msg");
                     skill = 0; 
                     return;
                 }
 
                 if (is_conflict && !isCombatSkill && !isDefenseSkill && !isPlaceholder) {
-                    log(`⚠️ "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
+                    log(` "${selectedSkillName}" nemôžeš použiť v boji.`, "error-msg");
                     skill = 0; 
                     return;
                 }
@@ -7229,7 +7262,7 @@ let test_mode = false;
                 // Overenie Vrhania
                 if (upperSkill === "VRHANIE" || upperSkill === "ŤAŽKÉ PREDMETY") {
                     if (!WEAPON_LIST["VRHACIE"] || WEAPON_LIST["VRHACIE"][selectedWeaponName] === undefined) {
-                        log(`⚠️ ${upperSkill} vyžaduje vrhaciu zbraň!`, "error-msg");
+                        log(` ${upperSkill} vyžaduje vrhaciu zbraň!`, "error-msg");
                         return;
                     }
                 }
@@ -7239,7 +7272,7 @@ let test_mode = false;
                     const skillCategory = skillData[1] ? skillData[1].toUpperCase() : "";
                     if (skillCategory === "BOJ Z DIAĽKY" || upperSkill.includes("ZBRANE")) {
                         if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
-                            log(`⚠️ Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
+                            log(` Schopnosť ${upperSkill} vyžaduje zbraň!`, "error-msg");
                             return;
                         }
                     }
@@ -7250,7 +7283,7 @@ let test_mode = false;
                     const weaponAllowed = WEAPON_SKILLS[String(weapon)] || [];
                     const allowedSkills = weaponAllowed.concat(ATTACK_SKILLS);
                     if (allowedSkills && !allowedSkills.includes(upperSkill)) {
-                        log(`⚠️ Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje intenzitu ${weapon})!`, "error-msg");
+                        log(` Schopnosť ${upperSkill} nie je použiteľná s touto zbraňou (vyžaduje intenzitu ${weapon})!`, "error-msg");
                         return;
                     }
                 }
@@ -7287,14 +7320,14 @@ let test_mode = false;
                     
                     if (weaponCategory === "BOJ Z DIAĽKY" && upperSkill !== "VRHANIE" && upperSkill !== "ŤAŽKÉ PREDMETY") {
                         if (!skillCategory.includes("BOJ Z DIAĽKY")) {
-                            log(`⚠️ Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
+                            log(` Zbraň na diaľku (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ Z DIAĽKY!`, "error-msg");
                             return;
                         }
                     }
                     
                     if (weaponCategory === "BOJ ZBLÍZKA") {
                         if (!skillCategory.includes("BOJ ZBLÍZKA") && !upperSkill.includes("SILA")) {
-                            log(`⚠️ Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
+                            log(` Zbraň na blízko (${selectedWeaponName.toUpperCase()}) vyžaduje schopnosť pre BOJ ZBLÍZKA!`, "error-msg");
                             return;
                         }
                     }
@@ -7305,7 +7338,7 @@ let test_mode = false;
             
             if ((is_conflict  || isEliminationAttack) && actionType === "A" && typeof conflict_distance !== 'undefined' && conflict_distance > 0) {                
                 if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
-                    log(`⚠️ Na útok holými rukami je nepriateľ príliš ďaleko.`, "error-msg");
+                    log(` Na útok holými rukami je nepriateľ príliš ďaleko.`, "error-msg");
                     return;
                 } else {
                     const isRanged = WEAPON_LIST["BOJ Z DIAĽKY"] && WEAPON_LIST["BOJ Z DIAĽKY"][selectedWeaponName] !== undefined;
@@ -7315,9 +7348,9 @@ let test_mode = false;
 
                     if (!canAttackAtDistance) {
                         if (isThrownWeapon && !isThrownSkill) {
-                            log(`⚠️ Nepriateľ je ešte ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
+                            log(` Nepriateľ je ešte ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
                         } else {
-                            log(`⚠️ Nepriateľ je ešte ďaleko! Použi zbraň na diaľku.`, "error-msg");
+                            log(` Nepriateľ je ešte ďaleko! Použi zbraň na diaľku.`, "error-msg");
                         }
                         return;
                     }
@@ -7335,7 +7368,7 @@ let test_mode = false;
                     const currentAmmo = HERO["ammo"] ? HERO["ammo"][ammoKey] : undefined;
 
                     if (currentAmmo === undefined || currentAmmo <= 0) {
-                        log(`⚠️ Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
+                        log(` Nemáš muníciu pre zbraň: ${selectedWeaponName.toUpperCase()}!`, "error-msg");
                         return; // Zastaví vykonanie kliknutia skôr, než sa zavolá engine
                     }
 
@@ -7367,11 +7400,11 @@ let test_mode = false;
                                         (skillData && skillData[1] && skillData[1].toUpperCase().includes("BOJ"));                
                     
                     if (actionType === "A" && !isCombatSkill && isDefenseSkill) {
-                        log(`⚠️ Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU!`, "error-msg");
+                        log(` Nemôžeš použiť obrannú schopnosť (${selectedSkillName}) pri ÚTOKU!`, "error-msg");
                         return;
                     }
                     if (actionType === "D" && isCombatSkill && !isDefenseSkill) {
-                        log(`⚠️ Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE!`, "error-msg");
+                        log(` Nemôžeš použiť útočnú schopnosť (${selectedSkillName}) pri ČINE!`, "error-msg");
                         return;
                     }
                 }
@@ -7381,7 +7414,7 @@ let test_mode = false;
                     if (player_escaping) {
                         if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                             if (!CHASE_SKILLS.includes(upperSkill)) {
-                                log(`⚠️ Na únik nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
+                                log(` Na únik nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
                                 return;
                             }
                         }
@@ -7392,14 +7425,14 @@ let test_mode = false;
                     if (enemy_escaping) {
                         if (actionType === "D" && selectedSkillName !== "placeholder" && selectedSkillName !== "none") {
                             if (!CHASE_SKILLS.includes(upperSkill)) {
-                                log(`⚠️ Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
+                                log(` Na prenasledovanie nemôžeš použiť schopnosť ${upperSkill}!`, "error-msg");
                                 return;
                             }
                         }
                         if (actionType === "A") {
                             if (selectedWeaponName === "placeholder" || selectedWeaponName === "") {
                                 if (enemy_escape_counter >= 1) {
-                                    log(`⚠️ Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko.`, "error-msg");
+                                    log(` Nemáš vybranú žiadnu zbraň na diaľku! Na útok päsťami je nepriateľ príliš ďaleko.`, "error-msg");
                                     return;
                                 }
                             } else {
@@ -7410,9 +7443,9 @@ let test_mode = false;
                                 
                                 if (!(canAttackAtDistance || enemy_escape_counter < 1)) {
                                     if (isThrownWeapon && !isThrownSkill) {
-                                        log(`⚠️ Nepriateľ je príliš ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
+                                        log(` Nepriateľ je príliš ďaleko! Ak chceš zbraň hodiť, zvoľ si schopnosť VRHANIE / ŤAŽKÉ PREDMETY.`, "error-msg");
                                     } else {
-                                        log(`⚠️ Nepriateľ je príliš ďaleko! Použi zbraň na diaľku.`, "error-msg");
+                                        log(` Nepriateľ je príliš ďaleko! Použi zbraň na diaľku.`, "error-msg");
                                     }
                                     return;
                                 }
@@ -7433,7 +7466,7 @@ let test_mode = false;
                         activeChallenge.skills.length > 0;
 
                     if (skillRestricted && !isPlaceholder && !activeChallenge.skills.includes(selectedSkillName)) {
-                        log(`⚠️ Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
+                        log(` Schopnosť ${selectedSkillName} ti teraz nepomôže, skús jednu z týchto: (${activeChallenge.skills.join(', ')})`, "error-msg");
                         return;
                     }
                 }
@@ -7457,7 +7490,7 @@ let test_mode = false;
                 chase_mode = false;
                 player_escape_counter = 0;
                 this.style.background = "#000"; // Návrat do čiernej
-                log("⚔️ Zrušil si pokus o útek. Pokračuješ v boji.", "info-msg");
+                log("Zrušil si pokus o útek. Pokračuješ v boji.", "info-msg");
             }
 
             // Prekreslíme UI, aby sa zmeny aplikovali (ak schovávas/meníš nejaké prvky)
@@ -7516,11 +7549,11 @@ let test_mode = false;
 
             // Tvoje pôvodné ochranné kontroly proti nevýhodným ťahom
             if (HERO.stress < 4 && (targetStressVal === 5 || targetStressVal === 6 || targetStressVal === 7)) {
-                log("⚠️ Ten istý bonus môžeš získať aj lacnejšie.", "danger-msg");
+                log(" Ten istý bonus môžeš získať aj lacnejšie.", "danger-msg");
                 return;
             }
             if (HERO.stress > 3 && (targetStressVal > HERO.stress + 1)) {
-                log("⚠️ To je nevýhodná voľba. Môžeš získať väčší bonus pri menšom zvýšení stresu.", "danger-msg");
+                log(" To je nevýhodná voľba. Môžeš získať väčší bonus pri menšom zvýšení stresu.", "danger-msg");
                 return;
             }
 

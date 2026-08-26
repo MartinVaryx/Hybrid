@@ -60,6 +60,31 @@
     let isAudioReady = false;
     let audioUIActive = false;
 
+    // Rýchlosť prehrávania (nahrávky aj Web Speech fallback) - nastavuje sa v Nastaveniach
+    // (#voice-speed-select, viď index.html/script.js) a ukladá sa do SETTINGS.voiceSpeed
+    // (rovnaký localStorage mechanizmus ako ostatné nastavenia hry). Číta sa VŽDY NAŽIVO
+    // pri každom spustení novej hlášky (nie raz pri štarte), takže zmena v Nastaveniach
+    // sa prejaví okamžite aj na položkách, čo už čakajú vo fronte.
+    function getVoiceSpeed() {
+        const raw = (typeof SETTINGS !== "undefined" && SETTINGS && SETTINGS.voiceSpeed) ? Number(SETTINGS.voiceSpeed) : 1;
+        if (!isFinite(raw) || raw <= 0) return 1;
+        // Rovnaké medze, aké dovoľuje Web Speech API (utterance.rate) - AudioBufferSourceNode
+        // by zvládol aj viac, ale nad 3x už nie je reč rozumne zrozumiteľná.
+        return Math.min(3, Math.max(0.5, raw));
+    }
+
+    // AudioBufferSourceNode.playbackRate je NAIVNÝ time-domain resampling - okrem skrátenia
+    // dĺžky zároveň zdvihne aj výšku hlasu (efekt "čipmank"), čo pri ROVNAKEJ číselnej
+    // rýchlosti pôsobí citeľne agresívnejšie/rýchlejšie, než rovnaká rate hodnota u
+    // speechSynthesis (tá si tempo prerátava interne, bez tohto vedľajšieho efektu na výšku
+    // hlasu). Aby obe cesty (nahrávky aj TTS fallback) pôsobili pri rovnakom nastavení v
+    // Nastaveniach subjektívne rovnako rýchlo, odchýlku od 1x pre PREHRÁVANIE NAHRÁVOK
+    // stlmíme (vydelíme) - TTS (utterance.rate) naďalej používa getVoiceSpeed() bez zmeny.
+    function getBufferPlaybackRate() {
+        const raw = getVoiceSpeed();
+        return 1 + (raw - 1) / 1.5;
+    }
+
     // ---------------------------------------------------------------------------
     // 1. PREHRÁVANIE ZVUKU - jednotná FRONTA (jeden zdieľaný <audio> aj jeden
     //    zdieľaný window.speechSynthesis pre CELÚ stránku, žiadne dva paralelné kanály).
@@ -85,6 +110,22 @@
     let audioQueue = [];
     let audioQueuePlaying = false;
     let playToken = 0;
+
+    // Ak vo fronte čaká viac ako AUDIO_QUEUE_LIMIT ešte neprehratých položiek, najstaršie
+    // z nich (tie na ZAČIATKU fronty - teda tie, čo čakajú najdlhšie a sú na rade ako
+    // ĎALŠIE na prehratie) sa jednoducho PRESKOČIA (zahodia bez prehratia). Bez tohto
+    // limitu by pri rýchlo pribúdajúcich hláseniach (napr. veľa logov naraz počas
+    // búrlivého konfliktu) audio UI donekonečna zaostávalo za skutočným dianím - každé
+    // ďalšie enqueueLogNarrationAudio() by len predlžovalo frontu, hráč by počul čoraz
+    // staršie a menej relevantné hlášky. Zahodením najstarších sa fronta udrží krátka
+    // a hráč sa časom (aj keď so stratou pár hlášok) dobehne k aktuálnemu stavu hry.
+    const AUDIO_QUEUE_LIMIT = 8;
+
+    function enforceAudioQueueLimit() {
+        while (audioQueue.length > AUDIO_QUEUE_LIMIT) {
+            audioQueue.shift();
+        }
+    }
 
     // Nahraté súbory sú namrbytnuté hlasom "Slovak ViktoriaNeural" (Microsoft/Edge TTS).
     // Aby živé čítanie (Web Speech API fallback) znelo rovnako a nie mužským/iným hlasom,
@@ -139,6 +180,7 @@
         const voice = getSkVoice();
         if (voice) utterance.voice = voice;
         utterance.lang = "sk-SK";
+        utterance.rate = getVoiceSpeed();
 
         utterance.onend = function () {
             if (token === playToken) advance();
@@ -169,7 +211,7 @@
 
 function playQueueItem(item, token) {
     const name = item.name || "no_audio";
-    const OVERLAP_SEC = 0.8; // 400ms early start
+    const OVERLAP_SEC = 0.8; // 800ms early start (pri 1x rýchlosti - viď škálovanie nižšie)
     let advanced = false;
 
     function advance() {
@@ -183,15 +225,27 @@ function playQueueItem(item, token) {
         try {
             const source = audioCtx.createBufferSource();
             source.buffer = buffer;
+            const rate = getBufferPlaybackRate();
+            source.playbackRate.value = rate;
             source.connect(audioCtx.destination);
-            
+
             // Fallback in case the buffer ends earlier than expected
             source.onended = advance;
             currentSourceNode = source;
             source.start(0);
 
-            // Trigger the next queued file 400ms before this one ends
-            const advanceDelayMs = Math.max(0, (buffer.duration - OVERLAP_SEC) * 1000);
+            // Trigger the next queued file trochu PRED koncom - buffer.duration je NATÍVNA
+            // dĺžka nahrávky, skutočná dĺžka prehrávania pri zmenenej rýchlosti je
+            // buffer.duration / rate, preto sa ňou delí aj tu. OVERLAP_SEC sa DELÍ tou istou
+            // rate (nie odčítava ako fixný čas) - inak by pri vysokej rýchlosti krátka
+            // skutočná dĺžka klipu (buffer.duration / rate) bola menšia než samotný fixný
+            // overlap, čo pri Math.max(0, ...) klaplo na 0ms a ďalší klip sa spustil OKAMŽITE,
+            // teda prakticky celý súbežne s ešte dohrávajúcim predošlým (počuteľné "cez seba").
+            // Delením sa pomer overlapu k reálnej dĺžke klipu udrží konštantný pri hocijakej
+            // rýchlosti - overlap teda ostáva rovnakou ČASŤOU klipu, nie fixným počtom ms.
+            const realDuration = buffer.duration / rate;
+            const realOverlap = OVERLAP_SEC / rate;
+            const advanceDelayMs = Math.max(0, (realDuration - realOverlap) * 1000);
             setTimeout(advance, advanceDelayMs);
 
         } catch (e) {
@@ -221,17 +275,40 @@ function playQueueItem(item, token) {
     });
 }
 
-    function enqueueAudio(fileNameNoExt, fallbackText, interrupt) {
+    function enqueueAudio(fileNameNoExt, fallbackText, interrupt, tag) {
         const name = fileNameNoExt || "no_audio";
-        const item = { name: name, text: fallbackText || null };
+        const item = { name: name, text: fallbackText || null, tag: tag || null };
         if (interrupt) {
             stopCurrentPlayback();
             audioQueue.unshift(item); // predbehne prípadné čakajúce live-log hlášky, ale nezmaže ich
-            playQueueNext();
+            playQueueNext(); // rovno vyberie (shift()) práve pridanú položku z frontu na prehratie
+            enforceAudioQueueLimit(); // orezanie AŽ TERAZ - práve pridaná položka je už mimo frontu, netýka sa jej
         } else {
             audioQueue.push(item);
+            enforceAudioQueueLimit();
             if (!audioQueuePlaying) playQueueNext();
         }
+    }
+
+    // Odstráni z FRONTY (nie z práve prehrávanej položky) všetky doteraz nezahrané
+    // položky s daným tagom - viď enqueueTaggedAudio nižšie.
+    function removeQueuedByTag(tag) {
+        for (let i = audioQueue.length - 1; i >= 0; i--) {
+            if (audioQueue[i].tag === tag) audioQueue.splice(i, 1);
+        }
+    }
+
+    // Ako enqueueLogNarrationAudio (koniec fronty, bez prerušenia), ale navyše OZNAČÍ
+    // položku daným tagom a PRED pridaním zmaže prípadné PREDCHÁDZAJÚCE, ešte neprehraté
+    // položky s tým istým tagom. Použitie: hlášky, ktoré dopĺňajú PRÁVE PREHRÁVANÚ
+    // interaktívnu hlášku (napr. "Čin."/"Útok." za menom karty) - meno karty sa vďaka
+    // interrupt:true v playAudio() vždy správne nahradí najnovším pri rýchlom prechádzaní,
+    // ale jeho doplnok zaradený samostatne na koniec fronty by sa inak len HROMADIL
+    // (viď kartyAnnounceCurrent - pri rýchlom prechádzaní kartami šípkami by sa tak na
+    // konci nahromadilo "Čin. Čin. Čin." namiesto jedinej aktuálnej strany).
+    function enqueueTaggedAudio(fileNameNoExt, fallbackText, tag) {
+        removeQueuedByTag(tag);
+        enqueueAudio(fileNameNoExt, fallbackText, false, tag);
     }
 
     function stopAllAudio() {
@@ -331,6 +408,8 @@ function playQueueItem(item, token) {
         btn_vybrat: "btn_vybrat",
         btn_novy_hrdina: "btn_novy_hrdina",
         btn_vymazat: "btn_vymazat",
+        gp_confirm_enter_hint: "gp_confirm_enter_hint",
+        gp_input_empty: "gp_input_empty",
 
         // Builder (editor postavy - #builder-overlay/#builder-iframe) = obsah sekcie DENNÍK
         builder_otvoreny: "ui_builder_otvoreny",
@@ -406,6 +485,9 @@ function playQueueItem(item, token) {
         ZACAT: "btn_zacat"
     };
 
+    // ÚNIK (escape-btn) TU ZÁMERNE CHÝBA - presunutý do Kariet ako "ďalšia karta"
+    // na konci zoznamu (rovnako, ako je vizuálne umiestnený priamo v lište kariet
+    // v pôvodnej verzii hry), viď sekcia 6 nižšie (kartyUnikSelected a okolie).
     const PANEL_ELEMENTS = [
         { id: "MOZNOSTI", audio: "el_moznosti" },
         { id: "KARTY", audio: "el_karty" },
@@ -413,8 +495,7 @@ function playQueueItem(item, token) {
         { id: "ADRENALIN", audio: "el_adrenalin" },
         { id: "ZBRANE", audio: "el_zbrane" },
         { id: "SCHOPNOSTI", audio: "el_schopnosti" },
-        { id: "PRVA_POMOC", audio: "el_prva_pomoc" },
-        { id: "UNIK", audio: "el_unik" }
+        { id: "PRVA_POMOC", audio: "el_prva_pomoc" }
     ];
 
     // Kým prebieha akčná fáza (is_action_phase), pribudne NA ZAČIATOK zoznamu dočasná
@@ -603,6 +684,17 @@ function playQueueItem(item, token) {
 
     // ---------------------------------------------------------------------------
     // 6. OVLÁDACÍ PANEL > Karty (hooks existujúci card-cycling framework)
+    //
+    //    ÚNIK (escape-btn) je odteraz SÚČASŤOU tohto zoznamu - presne tak, ako je
+    //    umiestnený vo vizuálnej podobe pôvodnej verzie hry: escape-btn sa nachádza
+    //    priamo v lište kariet (#card-tray-container), nie ako samostatný ovládací
+    //    prvok. Preto ho aj audio navigácia teraz ponúka ako "ďalšiu kartu" na konci
+    //    zoznamu - šípka vpravo za poslednou kartou naň naďalej ostáva, šípka vľavo
+    //    pred prvou kartou naň prejde opačným smerom - namiesto toho, aby mal vlastnú
+    //    položku ÚNIK v Ovládacom paneli (tá bola z PANEL_ELEMENTS odstránená).
+    //    Rovnako ako predtým je dostupný len počas sporu (unikIsActive() nižšie) -
+    //    mimo sporu sa v zozname kariet vôbec neobjaví (rovnako, ako je escape-btn
+    //    mimo sporu v DOM skrytý, display:none, viď script.js).
     // ---------------------------------------------------------------------------
 
     // Presná kópia podmienky, ktorou script.js (UNIFIED KEYBOARD CONTROLLER) rozhoduje,
@@ -625,6 +717,55 @@ function playQueueItem(item, token) {
             !isReadyVisible && !isProceedVisible && !isGeneralVisible;
     }
 
+    // Únik má zmysel len počas sporu (is_conflict) - escape-btn je mimo sporu v DOM
+    // skrytý (display:none, viď script.js), takže mimo sporu ho nemá zmysel ani
+    // skúšať klikať (mohol by ísť tichý no-op alebo v horšom prípade spustiť logiku,
+    // ktorá počíta s tým, že spor prebieha).
+    function unikIsActive() {
+        return typeof is_conflict !== "undefined" && !!is_conflict;
+    }
+
+    // true = audio kurzor v Kartách je práve na virtuálnej POSLEDNEJ položke ÚNIK
+    // (za poslednou skutočnou kartou); false = na jednej zo skutočných kariet
+    // (currentSelectedCardIdx - zdieľaný priamo so script.js kvôli myšovému aj
+    // klávesovému zvýrazneniu pre vidiacich spoluhráčov, viď kartyUpdateVisualHighlight
+    // nižšie).
+    let kartyUnikSelected = false;
+
+    // Ak medzitým spor skončil (hráč unikol/vyhral/prehral) a audio kurzor pritom
+    // ostal na ÚNIKU, ticho ho presunieme späť na poslednú skutočnú kartu - Únik v tej
+    // chvíli reálne zmizne z obrazovky (escape-btn display:none), nemá preto zmysel
+    // na ňom ostávať. Volá sa na začiatku každej Karty-operácie (Left/Right/Select/
+    // Announce/ToggleSide/tooltip), aby stav nikdy nezostal nekonzistentný.
+    function kartySyncUnikState() {
+        if (kartyUnikSelected && !unikIsActive()) {
+            kartyUnikSelected = false;
+            const cards = document.querySelectorAll("#card-tray-container .card-container");
+            if (currentSelectedCardIdx >= cards.length) currentSelectedCardIdx = Math.max(0, cards.length - 1);
+        }
+    }
+
+    // Zosynchronizuje vizuálny (myšový/klávesový) highlight s aktuálnym kurzorom pre
+    // vidiacich spoluhráčov. Na skutočnej karte deleguje na existujúce script.js
+    // updateCardKeyboardHighlight() - to samo o sebe o Úniku nevie (vždy by highlight
+    // vrátilo na currentSelectedCardIdx-tu kartu), preto sa naň spoliehame LEN keď
+    // kurzor na Úniku nie je; keď je, zvýraznenie kariet ručne zrušíme a namiesto neho
+    // pridáme rovnakú CSS triedu ("keyboard-hover") priamo na escape-btn.
+    function kartyUpdateVisualHighlight() {
+        const escapeBtn = document.getElementById("escape-btn");
+        if (kartyUnikSelected) {
+            document.querySelectorAll("#card-tray-container .card-container").forEach(function (card) {
+                card.classList.remove("keyboard-hover");
+                if (card.children[0]) card.children[0].classList.remove("keyboard-hover-zone");
+                if (card.children[1]) card.children[1].classList.remove("keyboard-hover-zone");
+            });
+            if (escapeBtn) escapeBtn.classList.add("keyboard-hover");
+        } else {
+            if (escapeBtn) escapeBtn.classList.remove("keyboard-hover");
+            if (typeof updateCardKeyboardHighlight === "function") updateCardKeyboardHighlight();
+        }
+    }
+
     // Zistí, ktorý card_*_d_tooltip / card_*_a_tooltip kľúč sa má prehrať pre kartu
     // s daným kódom ("o"/"s"/"b"). Mimo sporu/eliminačnej kontroly sa vždy hlási HORNÁ
     // strana ("d" - Opatrnosť), keďže tá je pri bežnom (nie bojovom) použití karty
@@ -640,54 +781,81 @@ function playQueueItem(item, token) {
         return "card_" + code + "_" + side + "_tooltip";
     }
 
-    // Ohlásenie AKTUÁLNEJ karty/strany - volá sa pri vstupe do Kariet aj po každej
-    // zmene šípkami (kartyLeft/kartyRight/kartyToggleSide nižšie). Prehrá MENO karty
-    // (card_o/s/b - "Opatrne."/"Smelo."/"Bezhlavo.") a - pokiaľ je karta PRÁVE
-    // ROZDELENÁ na dve strany (spor/eliminačná kontrola, rovnaká podmienka ako
-    // v kartyTooltipKey()/kartyToggleSide()) - hneď za ním (zaradené do frontu, aby
-    // to neznelo cez seba) aj to, KTORÁ strana (ČIN/ÚTOK) je práve zvolená. Bez tohto
-    // doplnku by hráč bez vizuálu nevedel rozlíšiť, ktorú z dvoch polovíc karty
-    // (s odlišnými hodnotami, viď card_*_d_tooltip / card_*_a_tooltip) práve ovláda.
-    // Podrobný obsah danej strany (Opatrnosť/Intenzita + Motivácia) sa naďalej
-    // prečíta až na požiadanie klávesou "I" (viď kartyTooltipKey() nižšie).
+    // Ohlásenie AKTUÁLNEJ karty/strany (alebo ÚNIKU, ak je práve vybraný) - volá sa
+    // pri vstupe do Kariet aj po každej zmene šípkami (kartyLeft/kartyRight/
+    // kartyToggleSide nižšie). Pre skutočnú kartu prehrá jej MENO (card_o/s/b -
+    // "Opatrne."/"Smelo."/"Bezhlavo.") a - pokiaľ je karta PRÁVE ROZDELENÁ na dve
+    // strany (spor/eliminačná kontrola, rovnaká podmienka ako v kartyTooltipKey()/
+    // kartyToggleSide()) - hneď za ním (zaradené do frontu, aby to neznelo cez seba)
+    // aj to, KTORÁ strana (ČIN/ÚTOK) je práve zvolená. Bez tohto doplnku by hráč bez
+    // vizuálu nevedel rozlíšiť, ktorú z dvoch polovíc karty (s odlišnými hodnotami,
+    // viď card_*_d_tooltip / card_*_a_tooltip) práve ovláda. Podrobný obsah danej
+    // strany (Opatrnosť/Intenzita + Motivácia) sa naďalej prečíta až na požiadanie
+    // klávesou "I" (viď kartyTooltipKey() nižšie).
     function kartyAnnounceCurrent() {
+        kartySyncUnikState();
+        kartyUpdateVisualHighlight();
+        if (kartyUnikSelected) { playAudio(AUDIO_MAP.el_unik); return; }
         const cards = document.querySelectorAll("#card-tray-container .card-container");
         const card = cards[currentSelectedCardIdx];
         if (!card) { playAudio("no_audio"); return; }
         const code = (card.getAttribute("data-card") || "").toLowerCase();
         playAudio("card_" + code);
         if (is_conflict || is_elimination_check) {
-            enqueueLogNarrationAudio((currentSelectedActionType === "A") ? "utok" : "cin", null);
+            enqueueTaggedAudio((currentSelectedActionType === "A") ? "utok" : "cin", null, "karty_side");
         }
     }
 
     function kartyLeft() {
+        kartySyncUnikState();
         const cards = document.querySelectorAll("#card-tray-container .card-container");
-        if (cards.length === 0) return;
-        currentSelectedCardIdx = (currentSelectedCardIdx - 1 + cards.length) % cards.length;
-        updateCardKeyboardHighlight();
+        if (cards.length === 0 && !kartyUnikSelected) return;
+        if (kartyUnikSelected) {
+            kartyUnikSelected = false;
+            currentSelectedCardIdx = cards.length - 1;
+        } else if (currentSelectedCardIdx === 0 && unikIsActive()) {
+            kartyUnikSelected = true;
+        } else {
+            currentSelectedCardIdx = (currentSelectedCardIdx - 1 + cards.length) % cards.length;
+        }
         kartyAnnounceCurrent();
     }
 
     function kartyRight() {
+        kartySyncUnikState();
         const cards = document.querySelectorAll("#card-tray-container .card-container");
-        if (cards.length === 0) return;
-        currentSelectedCardIdx = (currentSelectedCardIdx + 1) % cards.length;
-        updateCardKeyboardHighlight();
+        if (cards.length === 0 && !kartyUnikSelected) return;
+        if (kartyUnikSelected) {
+            kartyUnikSelected = false;
+            currentSelectedCardIdx = 0;
+        } else if (currentSelectedCardIdx === cards.length - 1 && unikIsActive()) {
+            kartyUnikSelected = true;
+        } else {
+            currentSelectedCardIdx = (currentSelectedCardIdx + 1) % cards.length;
+        }
         kartyAnnounceCurrent();
     }
 
     // Prepnutie strany karty (šípky HORE/DOLE) - kópia logiky "2. PREPÍNANIE POLOVÍC
     // KARTY" z UNIFIED KEYBOARD CONTROLLER v script.js: mimo sporu/eliminačnej kontroly
     // strany neexistujú (celá karta je jeden klik), preto sa v tom prípade nič neprepína.
+    // ÚNIK žiadne strany nemá vôbec - ak je práve vybraný, šípky hore/dole nemajú efekt.
     function kartyToggleSide() {
+        kartySyncUnikState();
+        if (kartyUnikSelected) { playAudio("no_audio"); return; }
         if (!is_conflict && !is_elimination_check) { playAudio("no_audio"); return; }
         currentSelectedActionType = (currentSelectedActionType === "A") ? "D" : "A";
-        updateCardKeyboardHighlight();
         kartyAnnounceCurrent();
     }
 
     function kartySelect() {
+        kartySyncUnikState();
+        if (kartyUnikSelected) {
+            const escapeBtn = document.getElementById("escape-btn");
+            if (escapeBtn) escapeBtn.click();
+            // Ostávame na ÚNIKU - viď poznámka nižšie pri skutočných kartách.
+            return;
+        }
         const cards = document.querySelectorAll("#card-tray-container .card-container");
         const activeCard = cards[currentSelectedCardIdx];
         if (!activeCard) return;
@@ -769,7 +937,11 @@ function playQueueItem(item, token) {
     //    Zbraň ako jedno číslo každé - všetko cez enqueueNumberAudio() (existujúce
     //    stres_0..stres_15 súbory + fallback).
     // ---------------------------------------------------------------------------
-    function announceEnemyStats(chained) {
+    // `silent` = true: ak dáta ešte nie sú v DOM-e k dispozícii (napr. panel ešte nebol
+    // prekreslený), NEPREHRÁ sa "no_audio" - iba sa ticho vráti false, aby to volajúci
+    // mohol skúsiť znova o chvíľu (viď checkConflictTransition() nižšie, kde sa is_conflict
+    // v script.js nastaví SKÔR, ako sa #enemy-panel skutočne naplní štatistikami).
+    function announceEnemyStats(chained, silent) {
         const panel = document.getElementById("enemy-panel");
         const visible = panel && panel.style.display !== "none";
         const typeEl = document.getElementById("enemy-heading-type");
@@ -783,7 +955,7 @@ function playQueueItem(item, token) {
         const advantage = (visible && advantageEl) ? advantageEl.textContent.trim() : "";
         const skill = (visible && skillEl) ? skillEl.textContent.trim() : "";
         const weapon = (visible && weaponEl) ? weaponEl.textContent.trim() : "";
-        if (!type && !stressRaw) { if (!chained) playAudio("no_audio"); return false; }
+        if (!type && !stressRaw) { if (!chained && !silent) playAudio("no_audio"); return false; }
 
         if (chained) enqueueLogNarrationAudio(AUDIO_MAP.el_nepriatel, "Nepriateľ.");
         else playAudio(AUDIO_MAP.el_nepriatel);
@@ -827,12 +999,30 @@ function playQueueItem(item, token) {
     //
     //    Hlásenie VÝZVY (Náročnosť/Hrozba, viď 6b vyššie) sa PREHRÁ VŽDY, hneď ako
     //    akčná fáza začne - bez ohľadu na to, kde bol hráč predtým, keďže ide o
-    //    dôležitú informáciu o práve začínajúcej výzve. Ak sa fokus zároveň presúva
-    //    na Karty, jeho hláška sa len PRIPOJÍ za VÝZVU (chained:true), aby obe zneli
-    //    poporadku a nie cez seba.
+    //    dôležitú informáciu o práve začínajúcej výzve. Samotný presun fokusu na Karty
+    //    je ale TICHÝ (rovnaký princíp ako autoselect ĎALEJ nižšie) - žiadnu kartu pri
+    //    ňom NEHLÁSIME, aby sme nepresekli/nepreskočili VÝZVU ani inú práve prehrávanú
+    //    hlášku (napr. NEPRIATEĽA či koniec predošlej narácie). Hráč meno prvej karty
+    //    začuje bežným spôsobom, len čo sám pohne šípkou.
+    // ---------------------------------------------------------------------------
+    // ---------------------------------------------------------------------------
+    // 6c. AUTOMATICKÝ PRESUN FOKUSU NA KARTY NA ZAČIATKU AKČNEJ FÁZY (is_action_phase)
+    //    Keď sa akčná fáza začne a audio kurzor je práve VOĽNE v Možnostiach (viď
+    //    isFocusOnMoznosti() nižšie - t.j. hráč tam nič konkrétne nerobí, len tam
+    //    "stojí"), automaticky sa presunie na Karty a ostáva tam. Mimo Možností
+    //    (SPRÁVY, DENNÍK, MENU, alebo hráč už sám v Kartách) sa fokus NEHÝBE - hráč
+    //    nesmie byť vytrhnutý odtiaľ, kde si sám niečo prezerá.
+    //
+    //    NÁVRAT fokusu späť do Možností na konci akčnej fázy/keď karty prestanú byť
+    //    použiteľné je ZÁMERNE ODSTRÁNENÝ (predtým returnFocusToMoznostiAfterActionPhase()
+    //    nižšie prehrávala "Možnosti" a skákala tam aj vtedy, keď Možnosti boli v tej
+    //    chvíli PRÁZDNE - typicky uprostred sporu, medzi jednotlivými kolami, kým ešte
+    //    nestihlo doraziť ĎALEJ ani žiadna iná voľba). Namiesto toho fokus jednoducho
+    //    OSTÁVA v Kartách (aj keď dočasne neaktívnych - pokus o výber vtedy len povie
+    //    "Karty sú neaktívne", viď enterElement()/cardsAreActive()) a o presun ĎALEJ,
+    //    keď sa objaví, sa už postará samostatný autoselect (6e nižšie).
     // ---------------------------------------------------------------------------
     let lastKnownActionPhase = false;
-    let focusWasAutoMovedToKarty = false;
 
     function isFocusOnMoznosti() {
         if (state.layer === "element" && currentElement() && currentElement().id === "MOZNOSTI") return true;
@@ -840,55 +1030,63 @@ function playQueueItem(item, token) {
         return false;
     }
 
-    function focusOnKartyForActionPhase(chained) {
+    function focusOnKartyForActionPhase() {
         state.sectionIdx = getSections().indexOf("OVLADACI_PANEL");
         state.elementIdx = getPanelElements().findIndex(function (e) { return e.id === "KARTY"; });
         state.layer = "sub";
         state.subMode = "karty";
         currentSelectedCardIdx = 0;
-        if (typeof updateCardKeyboardHighlight === "function") updateCardKeyboardHighlight();
-        if (!chained) { kartyAnnounceCurrent(); return; }
-        const cards = document.querySelectorAll("#card-tray-container .card-container");
-        const card = cards[currentSelectedCardIdx];
-        const code = card && (card.getAttribute("data-card") || "").toLowerCase();
-        if (code === "o" || code === "s" || code === "b") {
-            const key = kartyTooltipKey(code);
-            enqueueLogNarrationAudio(AUDIO_MAP[key] || key, null);
-        }
-    }
-
-    function returnFocusToMoznostiAfterActionPhase() {
-        state.sectionIdx = getSections().indexOf("OVLADACI_PANEL");
-        state.elementIdx = getPanelElements().findIndex(function (e) { return e.id === "MOZNOSTI"; });
-        state.layer = "element";
-        state.subMode = null;
-        speak("el_moznosti");
+        kartyUnikSelected = false; // nová akčná fáza vždy začína na prvej skutočnej karte
+        kartyUpdateVisualHighlight();
+        // AUTOSELECT JE TICHÝ - žiadne hlásenie sa tu nespúšťa, viď poznámka vyššie.
     }
 
     function checkActionPhaseTransition() {
         if (typeof is_action_phase === "undefined") return;
-        if (!audioUIActive) { lastKnownActionPhase = is_action_phase; focusWasAutoMovedToKarty = false; return; }
+        if (!audioUIActive) { lastKnownActionPhase = is_action_phase; return; }
         if (is_action_phase === lastKnownActionPhase) return;
 
         const turningOn = is_action_phase && !lastKnownActionPhase;
-        const turningOff = !is_action_phase && lastKnownActionPhase;
         lastKnownActionPhase = is_action_phase;
 
+        if (!turningOn) return; // koniec akčnej fázy - fokus necháme tak, ako je (viď poznámka vyššie)
         if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
 
-        if (turningOn) {
-            const challengeAnnounced = announceChallengeStats(false);
-            if (isFocusOnMoznosti()) {
-                focusWasAutoMovedToKarty = true;
-                focusOnKartyForActionPhase(challengeAnnounced);
-            }
-        } else if (turningOff) {
-            const stillOnKarty = state.layer === "sub" && state.subMode === "karty";
-            if (focusWasAutoMovedToKarty && stillOnKarty) {
-                returnFocusToMoznostiAfterActionPhase();
-            }
-            focusWasAutoMovedToKarty = false;
-        }
+        announceChallengeStats(false);
+        if (isFocusOnMoznosti()) focusOnKartyForActionPhase();
+    }
+
+    // ---------------------------------------------------------------------------
+    // 6c-bis. AUTOMATICKÝ PRESUN FOKUSU NA KARTY MIMO AKČNEJ FÁZY (ostatné prípady,
+    //    kedy sa karty stanú klikateľné bez is_action_phase - napr. is_heal_check,
+    //    is_elimination_check, is_collapse_check po úspešnom hode, is_tutorial, alebo
+    //    obyčajné odmrazenie po naračnej správe). cardsAreActive() (viď 6a vyššie) je
+    //    presne tá istá podmienka, ktorou si aj vizuálne UI (script.js) samo rozhoduje,
+    //    kedy sú karty použiteľné - preto ju používame ako spúšťač namiesto surového
+    //    inputs_frozen (ktorý sa prepína aj mimo kariet, napr. počas ready/general
+    //    promptu, viď cardsAreActive() vyššie).
+    //
+    //    Prípad is_action_phase je ZÁMERNE VYNECHANÝ (skip nižšie) - ten má vlastný,
+    //    presnejšie časovaný mechanizmus v 6c vyššie (reťazenie za VÝZVU); tento poller
+    //    dopĺňa len OSTATNÉ, dovtedy nepokryté prechody, aby platilo to isté pravidlo
+    //    všade: "karty sa stali klikateľné -> ak je audio kurzor voľne v Možnostiach,
+    //    presuň ho rovno na prvú kartu (Opatrne)". Rovnaký NEVTIERAVÝ princíp ako v 6c
+    //    (fokus presunieme len z Možností) - a rovnako ako v 6c už NEROBÍ návrat späť
+    //    do Možností, keď karty prestanú byť aktívne (viď poznámka pri 6c vyššie).
+    // ---------------------------------------------------------------------------
+    let lastKnownCardsActive = false;
+
+    function checkCardsActiveTransition() {
+        if (!audioUIActive) { lastKnownCardsActive = cardsAreActive(); return; }
+        const nowActive = cardsAreActive();
+        if (nowActive === lastKnownCardsActive) return;
+        lastKnownCardsActive = nowActive;
+
+        if (!nowActive) return; // karty prestali byť použiteľné - fokus necháme tak, ako je
+        if (typeof is_action_phase !== "undefined" && is_action_phase) return; // má vlastný mechanizmus, viď 6c
+        if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
+
+        if (isFocusOnMoznosti()) focusOnKartyForActionPhase();
     }
 
     // ---------------------------------------------------------------------------
@@ -897,24 +1095,157 @@ function playQueueItem(item, token) {
     //    hneď ako sa spor začne, prehrá sa stav súpera (announceEnemyStats()), bez
     //    ohľadu na to, kde bol hráč predtým - fokus sa (na rozdiel od VÝZVY) nikam
     //    automaticky nepresúva, keďže spor sa vždy ovláda cez existujúce Karty/Únik.
+    //
+    //    POZOR - RACE CONDITION: script.js nastaví is_conflict = true HNEĎ na začiatku
+    //    (pred zobrazením úvodných hlášok "Priprav sa na boj..." a pred stlačením
+    //    ĎALEJ/Proceed hráčom), ale #enemy-panel (typ/stres/výhoda/schopnosť/zbraň
+    //    nepriateľa) sa reálne naplní až OMNOHO neskôr - vo vnútri updateUI(), ktoré sa
+    //    zavolá až po tom, čo hráč preklikne všetky úvodné naračné hlášky cez ĎALEJ a
+    //    boj sa reálne spustí (gameloop()). Keby sme sa o announceEnemyStats() pokúsili
+    //    len RAZ, hneď pri zachytení is_conflict===true (ako predtým), panel by ešte
+    //    bol prázdny/skrytý a namiesto stavu nepriateľa by sa nezmyselne ozvalo
+    //    "Chýba audiosúbor." (no_audio) - to bol presne nahlásený bug. Namiesto toho
+    //    teraz na "naplnenie" panela POČKÁME: zopakujeme pokus (potichu, bez no_audio)
+    //    pri každom ďalšom tiku, kým sa dáta neobjavia, spor medzitým neskončí, alebo
+    //    kým nevyprší bezpečnostný limit pokusov (aby sme v prípade nejakej inej
+    //    nečakanej situácie nekontrolovali navždy).
     // ---------------------------------------------------------------------------
     let lastKnownConflict = false;
+    let conflictAnnouncePending = false;
+    let conflictAnnounceAttempts = 0;
+    const CONFLICT_ANNOUNCE_MAX_ATTEMPTS = 75; // 75 * 200ms = 15s bezpečnostný limit
 
     function checkConflictTransition() {
         if (typeof is_conflict === "undefined") return;
-        if (!audioUIActive) { lastKnownConflict = is_conflict; return; }
-        if (is_conflict === lastKnownConflict) return;
+        if (!audioUIActive) {
+            lastKnownConflict = is_conflict;
+            conflictAnnouncePending = false;
+            conflictAnnounceAttempts = 0;
+            return;
+        }
 
-        const turningOn = is_conflict && !lastKnownConflict;
-        lastKnownConflict = is_conflict;
+        if (is_conflict !== lastKnownConflict) {
+            const turningOn = is_conflict && !lastKnownConflict;
+            lastKnownConflict = is_conflict;
+            conflictAnnouncePending = turningOn;
+            conflictAnnounceAttempts = 0;
+            if (!turningOn) return; // spor sa skončil - niet čo ohlasovať
+        }
 
+        if (!conflictAnnouncePending) return;
+        if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, skúsime znova nabudúce
+
+        // Ak medzitým spor skončil skôr, ako sa panel stihol naplniť (napr. hráč
+        // zrušil akciu), potichu prestaneme skúšať - nemá zmysel niečo ohlasovať.
+        if (!is_conflict) { conflictAnnouncePending = false; return; }
+
+        conflictAnnounceAttempts++;
+        const announced = announceEnemyStats(false, true); // silent=true - žiadne "no_audio" počas čakania
+        if (announced || conflictAnnounceAttempts >= CONFLICT_ANNOUNCE_MAX_ATTEMPTS) {
+            conflictAnnouncePending = false;
+        }
+    }
+
+    // ---------------------------------------------------------------------------
+    // 6e. AUTOMATICKÉ VÝBER TLAČIDLA "ĎALEJ" (#proceed-btn)
+    //    Rovnaký vzor pollingu ako VÝZVA/NEPRIATEĽ vyššie: hneď ako sa #proceed-btn
+    //    zobrazí S TEXTOM "ĎALEJ" (nie "ZAČAŤ" - to má vlastnú úvodnú sekciu ZAČAŤ,
+    //    viď getSections()/enterSection() vyššie), audio kurzor sa AUTOMATICKY presunie
+    //    na položku ĎALEJ v Možnostiach (aby naň hráč hneď mohol nadviazať šípkami,
+    //    keby chcel vidieť aj iné práve dostupné voľby).
+    //
+    //    ŽIADNE hlasové upozornenie sa tu NEPREHRÁVA - samotný presun kurzora stačí;
+    //    keď hráč potom pohne šípkou (napr. doľava/doprava v Možnostiach), bežné
+    //    ohlásenie položky ("Ďalej.") mu dá vedieť, kde sa nachádza. Predtým tu bol aj
+    //    samostatný "ĎALEJ?" manifest kľúč/hláška navyše, ktorá sa pri rušnejšej fronte
+    //    (najmä počas/po spore, keď ešte dobiehajú hlášky zo SPRÁV) vedela vsunúť do
+    //    stredu tejto fronty namiesto na jej koniec - zámerne odstránené, aby k tomu
+    //    už nemohlo dôjsť.
+    //
+    //    ZÁMERNE BEZ globálneho zachytávania MEDZERNÍKA (na rozdiel od #ready-prompt
+    //    vyššie): #ready-prompt blokuje celú hru, kým sa nepotvrdí, takže mu Medzerník
+    //    môže bez rizika patriť odkiaľkoľvek. ĎALEJ naopak môže byť viditeľné SÚČASNE
+    //    s tým, že hráč práve prezerá zbrane/schopnosti (dropdown) alebo je v MENU -
+    //    globálny listener by mu tam Medzerník "ukradol" a namiesto výberu položky by
+    //    mu vždy len preskočil ĎALEJ. Preto zostáva len autoselect kurzora (vyššie) -
+    //    Medzerník tlačidlo stlačí len vtedy, keď je naň kurzor SKUTOČNE nastavený
+    //    (bežná cesta cez Možnosti/moznostiSelect), MENU aj listovanie zbraňami/
+    //    schopnosťami tak zostávajú vždy dostupné bez kolízie.
+    // ---------------------------------------------------------------------------
+    function proceedButtonIsDalej() {
+        const btn = document.getElementById("proceed-btn");
+        const prompt = document.getElementById("proceed-prompt");
+        return !!(btn && prompt && isElementVisible(prompt) && isElementVisible(btn) && btn.textContent.trim() === "ĎALEJ");
+    }
+
+    let lastKnownProceedDalejVisible = false;
+
+    function checkProceedButtonTransition() {
+        if (!audioUIActive) { lastKnownProceedDalejVisible = proceedButtonIsDalej(); return; }
+        const nowVisible = proceedButtonIsDalej();
+        if (nowVisible === lastKnownProceedDalejVisible) return;
+        lastKnownProceedDalejVisible = nowVisible;
+        if (!nowVisible) return; // zmizlo (hráč už stlačil, alebo prešiel inam) - niet čo ohlasovať
         if (detectOverlay()) return; // výber hrdinu/zbrane/builder majú prioritu, nezasahujeme
 
-        if (turningOn) announceEnemyStats(false);
+        // AUTOSELECT: presunieme audio kurzor na MOŽNOSTI a v nich rovno na položku ĎALEJ.
+        state.sectionIdx = getSections().indexOf("OVLADACI_PANEL");
+        state.elementIdx = getPanelElements().findIndex(function (e) { return e.id === "MOZNOSTI"; });
+        state.layer = "sub";
+        state.subMode = "moznosti";
+        const items = getMoznostiItems();
+        const idx = items.findIndex(function (it) { return it.dynamic && it.el && it.el.id === "proceed-btn"; });
+        moznostiCursor = idx >= 0 ? idx : 0;
+    }
+
+    // ---------------------------------------------------------------------------
+    // 6f. AUTOMATICKÉ OHLÁSENIE #general-prompt PRI OTVORENÍ S TEXTOVÝM POĽOM
+    //    (zatiaľ jediné použitie: "Zadaj meno nového hrdinu:" cez #new-hero-btn,
+    //    viď script.js).
+    //
+    //    showGeneralPrompt(..., input=true) SYNCHRÓNNE (v tom istom volaní, ktoré
+    //    otvorenie promptu spôsobí) rovno aj FOKUSNE #general-prompt-input
+    //    (gp_input.focus()). To znamená, že v momente, keď hráč stlačí ĎALŠÍ kláves
+    //    (prvé písmeno mena), isTypingTarget() (viď handleAudioUIKeydown nižšie) je
+    //    UŽ true - a keďže sa v hlavnom dispečeri kontroluje SKÔR ako
+    //    generalPromptVisible()/handleGeneralPromptKeydown() (ktoré by inak na "prvé
+    //    stlačenie" ohlásili hlášku aj hint "Meno hrdinu potvrdíš stlačením enter..."),
+    //    táto vetva sa NIKDY nedostane k slovu - hint sa tak nikdy neprehral (presne
+    //    toto bol nahlásený bug: "hint sa má prehrať po stlačení N, ale neprehráva sa").
+    //
+    //    Namiesto spoliehania sa na "prvé stlačenie klávesy" (čo tu principiálne
+    //    nefunguje) preto tento poller detekuje PRIAMO OTVORENIE takéhoto promptu
+    //    (prechod false -> true, KEĎ je zároveň viditeľné aj textové pole) a ohlási ho
+    //    OKAMŽITE, nezávisle od klávesnice - rovnaký vzor pollingu ako #ready-prompt/
+    //    ĎALEJ vyššie. Funguje tak rovnako spoľahlivo, či prompt otvoril hráč
+    //    klávesou "N" (handleHeroKeydown), alebo naň klikol myšou vidiaci spoluhráč.
+    // ---------------------------------------------------------------------------
+    let lastKnownGeneralPromptInputOpen = false;
+
+    function checkGeneralPromptInputTransition() {
+        const gp = document.getElementById("general-prompt");
+        const inputEl = document.getElementById("general-prompt-input");
+        const nowOpen = !!(gp && isElementVisible(gp) && inputEl && isElementVisible(inputEl));
+        if (!audioUIActive) { lastKnownGeneralPromptInputOpen = nowOpen; return; }
+        if (nowOpen === lastKnownGeneralPromptInputOpen) return;
+        lastKnownGeneralPromptInputOpen = nowOpen;
+        if (!nowOpen) return; // zatvorilo sa - niet čo ohlasovať
+
+        // Nastavíme rovno na true, aby prípadné handleGeneralPromptKeydown() (Enter/
+        // Escape) už len KONALO, namiesto toho, aby sa na "prvé stlačenie" znova
+        // pokúšalo (zbytočne duplicitne) ohlasovať - viď jeho vlastná podmienka vyššie.
+        generalPromptWasAnnounced = true;
+        const textEl = document.getElementById("general-prompt-text");
+        const msg = textEl ? textEl.textContent.trim() : "";
+        playAudioOrSpeak("alert_" + slugifySk(msg.slice(0, 60)), msg);
+        enqueueLogNarrationAudio(AUDIO_MAP.gp_confirm_enter_hint, "Meno hrdinu potvrdíš stlačením enter. Stlačením CTRL si meno vypočuješ.");
     }
 
     setInterval(checkActionPhaseTransition, 200);
+    setInterval(checkCardsActiveTransition, 200);
     setInterval(checkConflictTransition, 200);
+    setInterval(checkProceedButtonTransition, 200);
+    setInterval(checkGeneralPromptInputTransition, 200);
 
     // ---------------------------------------------------------------------------
     // 7. OVLÁDACÍ PANEL > Stres (jednoduchý readout)
@@ -1051,7 +1382,8 @@ function playQueueItem(item, token) {
 
 
     // ---------------------------------------------------------------------------
-    // 10. OVLÁDACÍ PANEL > Prvá pomoc / Únik (priama akcia, žiadna podvrstva)
+    // 10. OVLÁDACÍ PANEL > Prvá pomoc (priama akcia, žiadna podvrstva)
+    //     ÚNIK sa už tu nenachádza - je teraz súčasťou Kariet, viď sekcia 6 vyššie.
     // ---------------------------------------------------------------------------
     function prvaPomocSelect() {
         if (typeof runHealCheck === "function") runHealCheck();
@@ -1060,27 +1392,13 @@ function playQueueItem(item, token) {
         // ohlásil jej názov, hoci hráč žiadnu zmenu sekcie nežiadal - len spustil kontrolu.
     }
 
-    // Únik (rovnako ako karty vyššie) má zmysel len počas sporu (is_conflict) - escape-btn
-    // je mimo sporu v DOM skrytý (display:none, viď script.js), takže mimo sporu ho
-    // nemá zmysel ani skúšať klikať (mohol by ísť tichý no-op alebo v horšom prípade
-    // spustiť logiku, ktorá počíta s tým, že spor prebieha).
-    function unikIsActive() {
-        return typeof is_conflict !== "undefined" && !!is_conflict;
-    }
-
-    // Na rozdiel od KARIET (ktoré aj mimo boja nesú informáciu a dá sa nimi listovať,
-    // viď cardsAreActive() vyššie - preto ostávajú v cykle vždy) ÚNIK mimo sporu
-    // neponúka vôbec nič - žiadne info, žiadnu akciu. Pri prechádzaní OVLÁDACÍM PANELOM
-    // šípkami ho preto v tomto stave úplne PRESKOČÍME, aby zbytočne nerozptyľoval.
+    // Keď Možnosti nemajú čo ponúknuť (žiadny choice-prompt s voľbami, žiadne viditeľné
+    // ĎALEJ/Späť/Ukončiť tlačidlo), nemá zmysel prvok MOŽNOSTI vôbec ponúkať pri listovaní
+    // panelom - inak by naň hráč narazil, vstúpil dnu, a len by počul "Chýba audiosúbor."
+    // (no_audio), čo znie ako chyba, hoci ide o úplne bežný, prechodný stav (napr. tesne po
+    // tom, čo handleChallengeTransition() skryje starý choice-prompt a nový ešte nie je
+    // vykreslený). Skontroluje sa naživo pri každom prechode panelom.
     function isElementSkippable(el) {
-        if (el.id === "UNIK" && !unikIsActive()) return true;
-        // Rovnaký princíp ako pri ÚNIKU vyššie: keď Možnosti nemajú čo ponúknuť (žiadny
-        // choice-prompt s voľbami, žiadne viditeľné ĎALEJ/Späť/Ukončiť tlačidlo), nemá
-        // zmysel prvok MOŽNOSTI vôbec ponúkať pri listovaní panelom - inak by naň hráč
-        // narazil, vstúpil dnu, a len by počul "Chýba audiosúbor." (no_audio), čo znie
-        // ako chyba, hoci ide o úplne bežný, prechodný stav (napr. tesne po tom, čo
-        // handleChallengeTransition() skryje starý choice-prompt a nový ešte nie je
-        // vykreslený). Skontroluje sa naživo pri každom prechode panelom.
         if (el.id === "MOZNOSTI" && getMoznostiItems().length === 0) return true;
         return false;
     }
@@ -1097,13 +1415,6 @@ function playQueueItem(item, token) {
             if (!isElementSkippable(elements[i])) return i;
         }
         return 0; // obranná záloha - nemalo by nastať, panel má vždy aspoň jeden dostupný prvok
-    }
-
-    function unikSelect() {
-        if (!unikIsActive()) return; // mimo sporu je UNIK vždy preskočený (isElementSkippable), niet čo hlásiť
-        const escapeBtn = document.getElementById("escape-btn");
-        if (escapeBtn) escapeBtn.click();
-        // Ostávame na prvku ÚNIK - viď poznámka vyššie pri prvaPomocSelect().
     }
 
     // ---------------------------------------------------------------------------
@@ -1293,6 +1604,11 @@ function playQueueItem(item, token) {
             playAudioOrSpeak("alert_" + slugifySk(msg.slice(0, 60)), msg);
             if (inputEl && isElementVisible(inputEl)) {
                 inputEl.focus(); // rovno sa dá písať meno hrdinu bez myši/Tabu
+                // Textové pole - na rozdiel od zvyšku audio UI tu Medzerník NEPOTVRDZUJE
+                // (musí sa dať napísať medzera priamo do mena), potvrdzuje sa len Enter.
+                // Bez tohto upozornenia hráč zvykne skúsiť Medzerník ako všade inde a
+                // "zasekne sa" - namiesto potvrdenia sa mu len vpíše medzera do textu.
+                enqueueLogNarrationAudio(AUDIO_MAP.gp_confirm_enter_hint, "Meno hrdinu potvrdíš stlačením enter. Stlačením CTRL si meno vypočuješ.");
             }
             return; // prvé stlačenie len ohlási hlásku (rovnaká konvencia ako enterSection/enterElement)
         }
@@ -1566,6 +1882,21 @@ function handleHeroKeydown(e) {
 
             // First Space = select/highlight hero and inspect skills.
             heroSelectEnterSkills();
+            return;
+        }
+
+        // "N" = vytvoriť nového hrdinu (#new-hero-btn) - klávesová obdoba tlačidla
+        // NOVÝ HRDINA vo vizuálnom UI. Manifest kľúč btn_novy_hrdina existoval už
+        // predtým, no nič ho nikdy nevolalo - handleHeroKeydown na "n"/"N" vôbec
+        // nereagoval a handleOverlayKeydown() volá e.stopImmediatePropagation() pre
+        // KAŽDÝ kláves, kým je prekryv otvorený, takže sa stlačenie ani nedostalo
+        // nikam ďalej (v script.js beztak žiadny "n" listener pre tento prekryv nie
+        // je - tlačidlo je len klikacie, viď onclick pri #new-hero-btn).
+        if (e.key === "n" || e.key === "N") {
+            e.preventDefault();
+            e.stopImmediatePropagation();
+            const btn = document.getElementById("new-hero-btn");
+            if (btn) { speak("btn_novy_hrdina"); btn.click(); }
             return;
         }
 
@@ -2108,13 +2439,166 @@ function handleHeroKeydown(e) {
         else handleBuilderGridKeydown(doc, e);
     }
 
-    // --- 13e. Spoločný dispečer prekryvov ---
+    // --- 13e. Nastavenia (#settings) / O hre (#credits) ---
+    //    Vlastné, jednoduchšie prekryvy nad celou hrou (rovnaká filozofia ako výber
+    //    hrdinu/zbrane/builder vyššie) - dostupné z MENU cez položky NASTAVENIA / O HRE.
+    //    Predtým vôbec neboli súčasťou stromu sekcií (viď manifest, '_note_nested' pri
+    //    'menu_o_hre' vyššie) - po kliknutí na tieto položky MENU (enterElement() len
+    //    zavolá opt.click()) audio UI "stratilo" hráča: obrazovka sa reálne otvorila, no
+    //    žiadny ďalší kláves už nemal čo robiť - presne tá "chýbajúca vrstva", čo si
+    //    autor hry všimol.
+    const SETTINGS_ITEM_IDS = ["tutorial-checkbox", "audio-checkbox", "log-rolls-checkbox", "voice-speed-select", "mode-dropdown", "about-btn-back"];
+    let settingsCursor = 0;
+
+    function settingsOverlayVisible() {
+        const el = document.getElementById("settings");
+        return !!(el && isElementVisible(el));
+    }
+
+    function creditsOverlayVisible() {
+        const el = document.getElementById("credits");
+        return !!(el && isElementVisible(el));
+    }
+
+    function getSettingsItems() {
+        return SETTINGS_ITEM_IDS.map(function (id) { return document.getElementById(id); }).filter(Boolean);
+    }
+
+    // Popisy jednotlivých prvkov (TUTORIÁL/AUDIO/LOGOVAŤ HODY majú <span> v spoločnom
+    // <label>, RÝCHLOSŤ HLASU/NÁROČNOSŤ majú popis v predchádzajúcom súrodencovi - <span>
+    // pred <select>, viď index.html) - v manifeste zatiaľ nemajú nahrávku (obrazovka
+    // predtým nebola ozvučená vôbec), preto vždy idú cez Web Speech fallback.
+    function settingsItemLabel(el) {
+        if (!el) return "";
+        if (el.id === "about-btn-back") return "Späť";
+        if (el.tagName === "SELECT") {
+            const prevSpan = el.parentElement ? el.parentElement.querySelector("span") : null;
+            return prevSpan ? prevSpan.textContent.trim() : "";
+        }
+        const wrapLabel = el.closest("label");
+        const span = wrapLabel ? wrapLabel.querySelector("span") : null;
+        return span ? span.textContent.trim() : "";
+    }
+
+    function settingsAnnounceCurrent() {
+        const items = getSettingsItems();
+        const el = items[settingsCursor];
+        if (!el) { playAudio("no_audio"); return; }
+        const label = settingsItemLabel(el);
+
+        if (el.id === "about-btn-back") { playAudio("btn_spat"); return; } // existujúca nahrávka ("Späť.")
+
+        if (el.tagName === "SELECT") {
+            const opt = el.options[el.selectedIndex];
+            const value = opt ? opt.textContent.trim() : "";
+            playAudioOrSpeak("nastavenia_" + slugifySk(label), label); // preruší, hrá sa prvé
+            // Tagované ako "nastavenia_hodnota" - rovnaký princíp ako karty_side (viď
+            // enqueueTaggedAudio vyššie): pri rýchlom prepínaní hodnôt (šípky na selecte,
+            // zapnutie/vypnutie checkboxu) sa každá predchádzajúca, ešte neprehraté hodnota
+            // najprv odstráni z fronty namiesto toho, aby sa tam hromadila.
+            enqueueTaggedAudio("nastavenia_hodnota_" + slugifySk(value), value, "nastavenia_hodnota");
+            return;
+        }
+
+        // checkbox (TUTORIÁL/AUDIO/LOGOVAŤ HODY)
+        playAudioOrSpeak("nastavenia_" + slugifySk(label), label);
+        enqueueTaggedAudio(el.checked ? "stav_zapnute" : "stav_vypnute", el.checked ? "Zapnuté." : "Vypnuté.", "nastavenia_hodnota");
+        // Vlastný tag ("nastavenia_upozornenie"), nie "nastavenia_hodnota" - inak by
+        // toto pridanie hneď zmazalo "Vypnuté."/"Zapnuté." pridané o riadok vyššie (obe
+        // by mali rovnaký tag a removeQueuedByTag by zasiahol aj čerstvo pridanú položku).
+        if (el.id === "log-rolls-checkbox") {
+            if (el.checked) removeQueuedByTag("nastavenia_upozornenie"); // znova zapnuté - staré upozornenie už neplatí
+            else enqueueTaggedAudio("nastavenia_upozornenie_logovat_hody", "Pozor: v audio verzii odporúčame nechať toto nastavenie zapnuté.", "nastavenia_upozornenie");
+        }
+    }
+
+    function handleSettingsKeydown(e) {
+        const items = getSettingsItems();
+        const count = items.length;
+
+        if (e.key === "ArrowLeft") {
+            if (count === 0) { playAudio("no_audio"); return; }
+            settingsCursor = (settingsCursor - 1 + count) % count;
+            settingsAnnounceCurrent();
+            return;
+        }
+        if (e.key === "ArrowRight") {
+            if (count === 0) { playAudio("no_audio"); return; }
+            settingsCursor = (settingsCursor + 1) % count;
+            settingsAnnounceCurrent();
+            return;
+        }
+        if (e.key === " " || e.key === "Enter") {
+            const el = items[settingsCursor];
+            if (!el) { playAudio("no_audio"); return; }
+            if (el.tagName === "SELECT") {
+                // cycleDropdown (zdieľaná funkcia zo script.js, viď ZBRANE/SCHOPNOSTI vyššie)
+                // je bezpečná aj počas sporu - pre ľubovoľné iné id ako 'player-weapon-dropdown'/
+                // 'player-skill-dropdown' jej validácia možností vždy skončí na "povolené".
+                cycleDropdown(el.id, 1);
+                settingsAnnounceCurrent();
+                return;
+            }
+            el.click(); // checkbox prepne (onchange uloží), SPÄŤ zavolá backToMenu()
+            if (el.id === "about-btn-back") { lastOverlay = null; return; } // #settings sa zavrelo
+            settingsAnnounceCurrent(); // checkbox - hneď potvrdí nový stav
+            return;
+        }
+        if (e.key === "Escape" || e.key === "Backspace") {
+            clickIfExists("about-btn-back"); // backToMenu() - uloží NÁROČNOSŤ, zavrie #settings, ukáže MENU
+            lastOverlay = null;
+            return;
+        }
+    }
+
+    // O HRE (#credits) je čisto informačná obrazovka (mená tvorcov, hudba, odkaz na web) -
+    // bez interaktívnych prvkov okrem SPÄŤ, preto sa celá prečíta naraz cez Web Speech
+    // namiesto položka-po-položke navigácie.
+    function creditsAnnounce() {
+        const container = document.querySelector("#credits > div");
+        const text = container ? container.textContent.replace(/\s+/g, " ").trim() : "Informácie o tvorivom tíme.";
+        playAudioOrSpeak("credits_o_hre", text);
+    }
+
+    function handleCreditsKeydown(e) {
+        if (e.key === " " || e.key === "Enter" || e.key === "Escape" || e.key === "Backspace") {
+            clickIfExists("about-btn-back"); // backToMenu()
+            lastOverlay = null;
+        }
+    }
+
+    // --- 13f. Spoločný dispečer prekryvov ---
     let lastOverlay = null;
 
+    // #hero-selection-overlay sa pri VÝBERE UŽ EXISTUJÚCEHO hrdinu (confirmHeroSelection()
+    // v script.js) po potvrdení rovno ODSTRÁNI z DOM-u (overlay.remove()) - od tej chvíle
+    // ho `document.getElementById(...)` už navždy spoľahlivo nenájde, žiadna staleness
+    // kontrola netreba. Pri TVORBE NOVÉHO hrdinu (createNewCharacterGlobally ->
+    // selectInitialWeapon -> po potvrdení zbrane toggleBuilder(true) pre POČIATOČNÚ FÁZU)
+    // sa ale NEODSTRÁNI - ostáva CELÝ ČAS visieť v DOM-e pod zbraňou aj builderom
+    // (vyšší z-index), a to ZÁMERNE: presne toto je aj samotná hra vizuálne robí - keď
+    // hráč dokončí tvorbu novej postavy v builderi a ten sa zavrie, spod neho sa vynorí
+    // TÁ ISTÁ, stále živá #hero-selection-overlay (teraz už aj s novou postavou v
+    // zozname), aby ju hráč mohol potvrdiť tlačidlom VYBRAŤ (čo ju KONEČNE odstráni,
+    // viď vyššie) - alebo pokojne stlačil "N" znova a pridal ďalšieho člena družiny.
+    //
+    // PREDTÝM sa tu (namiesto poradia nižšie) používal príznak `hero_selected === true`
+    // ako náhradná "stale" kontrola - ten sa ale nastaví na true HNEĎ po potvrdení
+    // zbrane (ešte PRED otvorením buildera) a NIKDY sa nevracia späť na false, takže
+    // od tej chvíle navždy blokoval aj úplne legitímne, neskoršie znovuobjavenie tej
+    // istej obrazovky (viď vyššie) - presne toto hlásil bug "po zavretí buildera sa
+    // audio UI nevráti do výberu hrdinu". Namiesto neho teraz jednoducho REŠPEKTUJEME
+    // SKUTOČNÉ VIZUÁLNE PORADIE prekryvov (rovnaké, akým sú v DOM-e nad sebou otvárané):
+    // ZBRAŇ je vždy nad HRDINOM (otvára sa z neho) a BUILDER je vždy nad HRDINOM (otvára
+    // sa po zbrani) - stačí preto len kontrolovať zbraň/builder SKÔR ako hrdinu; kým je
+    // čokoľvek z nich otvorené, vyhrá correctne ono, a hneď ako sa zatvorí, kontrola
+    // prirodzene "prepadne" na #hero-selection-overlay (ak ešte v DOM-e je).
     function detectOverlay() {
         if (document.getElementById("weapon-selection-overlay")) return "weapon";
-        if (document.getElementById("hero-selection-overlay")) return "hero";
         if (builderOverlayVisible()) return "builder";
+        if (document.getElementById("hero-selection-overlay")) return "hero";
+        if (settingsOverlayVisible()) return "settings";
+        if (creditsOverlayVisible()) return "credits";
         return null;
     }
 
@@ -2122,6 +2606,8 @@ function handleHeroKeydown(e) {
         if (overlay === "hero") { heroSelectAnnounceCurrent(); return; }
         if (overlay === "weapon") { weaponSelectAnnounceCurrent(); return; }
         if (overlay === "builder") { builderGridAnnounceCurrent(); return; }
+        if (overlay === "settings") { settingsCursor = 0; settingsAnnounceCurrent(); return; }
+        if (overlay === "credits") { creditsAnnounce(); return; }
     }
 
     function handleOverlayKeydown(overlay, e) {
@@ -2148,6 +2634,8 @@ function handleHeroKeydown(e) {
             handleBuilderKeydown(doc, e);
             return;
         }
+        if (overlay === "settings") { handleSettingsKeydown(e); return; }
+        if (overlay === "credits") { handleCreditsKeydown(e); return; }
     }
 
     // ---------------------------------------------------------------------------
@@ -2249,9 +2737,6 @@ function handleHeroKeydown(e) {
             case "PRVA_POMOC":
                 prvaPomocSelect();
                 break;
-            case "UNIK":
-                unikSelect();
-                break;
             case "VYZVA":
                 // Zostávame vo vrstve "element" (rovnaký vzor ako STRES vyššie) - VÝZVA
                 // len znova prečíta Náročnosť/Hrozba, nič sa "nevyberá".
@@ -2287,27 +2772,27 @@ function handleHeroKeydown(e) {
     const STATE_TOOLTIPS = {
         // --- SEKCIE (vrstva "section") - kľúč = "SECTION_" + položka zo SECTIONS ---
         SECTION_MENU: "Si v sekcii Menu. Šípkami vľavo a vpravo prepínaš medzi jednotlivými sekciami. Medzerníkom vstúpiš do vybranej sekcie.",
-        SECTION_OVLADACI_PANEL: "Si v sekcii Ovládací panel. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať jednotlivými prvkami: Možnosti, Karty, Stres, Adrenalín, Zbrane, Schopnosti, Prvá pomoc a Únik.",
+        SECTION_OVLADACI_PANEL: "Si v sekcii Ovládací panel. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať jednotlivými prvkami: Možnosti, Karty, Stres, Adrenalín, Zbrane, Schopnosti a Prvá pomoc.",
         SECTION_SPRAVY: "Si v sekcii Správy. Medzerníkom vstúpiš do zoznamu hlásení a šípkami budeš listovať staršími a novšími správami.",
         SECTION_DENNIK: "Si v sekcii Denník.",
         SECTION_ZACAT: "Si na položke Začať. Medzerníkom spustíš hru.",
 
         // --- PRVKY OVLÁDACIEHO PANELA (vrstva "element") - kľúč = "ELEMENT_" + PANEL_ELEMENTS[].id ---
         ELEMENT_MOZNOSTI: "Si na položke Možnosti. Medzerníkom vstúpiš do zoznamu aktuálne dostupných možností a šípkami medzi nimi budeš listovať.",
-        ELEMENT_KARTY: "Si na položke Karty. Medzerníkom vstúpiš k listovaniu kartami, šípkami vľavo a vpravo meníš kartu a šípkami hore a dole, počas sporu, meníš stranu karty.",
+        ELEMENT_KARTY: "Si na položke Karty. Medzerníkom vstúpiš k listovaniu kartami, šípkami vľavo a vpravo meníš kartu (počas sporu je za poslednou kartou aj Únik) a šípkami hore a dole, počas sporu, meníš stranu karty.",
         ELEMENT_STRES: "Si na položke Stres. Hodnota sa prečítala automaticky, medzerník tu nič nevyvolá.",
         ELEMENT_ADRENALIN: "Si na položke Adrenalín. Medzerníkom vstúpiš dovnútra, šípkami meníš hodnotu adrenalínu a medzerníkom ju potvrdíš.",
         ELEMENT_ZBRANE: "Si na položke Zbrane. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať zbraňami, ktoré má hrdina k dispozícii.",
         ELEMENT_SCHOPNOSTI: "Si na položke Schopnosti. Medzerníkom vstúpiš dovnútra a šípkami budeš listovať schopnosťami hrdinu.",
         ELEMENT_PRVA_POMOC: "Si na položke Prvá pomoc. Medzerníkom ju použiješ.",
-        ELEMENT_UNIK: "Si na položke Únik. Medzerníkom ho použiješ - dostupné len počas sporu.",
         ELEMENT_MENU_OPTION: "Si na položke menu. Medzerníkom ju potvrdíš.",
         ELEMENT_VYZVA: "Si na položke Výzva. Medzerníkom si znova vypočuješ náročnosť a hrozbu aktuálnej výzvy.",
         ELEMENT_NEPRIATEL: "Si na položke Nepriateľ. Medzerníkom si znova vypočuješ stav súpera - typ, stres, výhodu, schopnosť a zbraň.",
 
         // --- PODVRSTVY (vrstva "sub") - kľúč = "SUB_" + state.subMode ---
         SUB_MOZNOSTI: "Listuješ možnosťami. Šípkami vľavo a vpravo meníš možnosť, medzerníkom ju potvrdíš, klávesou Escape sa vrátiš späť.",
-        SUB_KARTY: "Listuješ kartami. Šípkami vľavo a vpravo meníš kartu, počas sporu šípkami hore a dole meníš jej stranu, medzerníkom kartu vyberieš, klávesou Escape sa vrátiš späť.",
+        SUB_KARTY: "Listuješ kartami. Šípkami vľavo a vpravo meníš kartu, počas sporu je za poslednou kartou aj Únik, šípkami hore a dole meníš stranu karty, medzerníkom kartu (alebo Únik) vyberieš, klávesou Escape sa vrátiš späť.",
+        SUB_KARTY_UNIK: "Si na Úniku - je zaradený za poslednou kartou. Medzerníkom sa oň pokúsiš, dostupné len počas sporu.",
         SUB_ADRENALIN: "Nastavuješ adrenalín. Šípkami vľavo a vpravo meníš hodnotu, medzerníkom ju potvrdíš, klávesou Escape sa vrátiš späť.",
         SUB_ZBRANE: "Listuješ zbraňami. Šípkami vľavo a vpravo meníš zbraň, klávesou Escape sa vrátiš späť.",
         SUB_SCHOPNOSTI: "Listuješ schopnosťami. Šípkami vľavo a vpravo meníš schopnosť, klávesou Escape sa vrátiš späť.",
@@ -2323,7 +2808,8 @@ function handleHeroKeydown(e) {
         OVERLAY_BUILDER_ITEM_SELECTED: "Predmet je vybraný a má použiteľný efekt. Medzerníkom ho použiješ, klávesou Escape výber zrušíš bez použitia.",
         OVERLAY_BUILDER_EDITOR: "Si v builderi, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (cena, zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
         OVERLAY_BUILDER_ACTIONS: "Si v builderi, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi cenou, zvýšením úrovne, znížením úrovne a vrátením zmeny, medzerníkom akciu potvrdíš (cena sa len prečíta znova).",
-        GENERAL_PROMPT: "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš."
+        GENERAL_PROMPT: "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš.",
+        GENERAL_PROMPT_INPUT: "Zobrazuje sa výzva na zadanie textu. Potvrdíš klávesou Enter, nie medzerníkom - ten sa vpíše ako medzera do textu. Klávesou Escape výzvu zrušíš."
     };
 
     // Prehrá stavový tooltip: skúsi statický 'state_<kľúč>' zvuk (kľúč malými písmenami),
@@ -2423,7 +2909,11 @@ function handleHeroKeydown(e) {
             return;
         }
         if (detectOverlay() === "weapon") { speakStateTooltip("OVERLAY_WEAPON"); return; }
-        if (generalPromptVisible()) { speakStateTooltip("GENERAL_PROMPT"); return; }
+        if (generalPromptVisible()) {
+            const inputEl = document.getElementById("general-prompt-input");
+            speakStateTooltip((inputEl && isElementVisible(inputEl)) ? "GENERAL_PROMPT_INPUT" : "GENERAL_PROMPT");
+            return;
+        }
 
         if (state.layer === "element") {
             if (currentSection() === "MENU") {
@@ -2449,11 +2939,16 @@ function handleHeroKeydown(e) {
 
         if (state.layer === "sub") {
             if (state.subMode === "karty") {
-                const cards = document.querySelectorAll("#card-tray-container .card-container");
-                const card = cards[currentSelectedCardIdx];
-                const code = card && (card.getAttribute("data-card") || "").toLowerCase();
-                if (code === "o" || code === "s" || code === "b") speak(kartyTooltipKey(code));
-                else speakStateTooltip("SUB_KARTY");
+                kartySyncUnikState();
+                if (kartyUnikSelected) {
+                    speakStateTooltip("SUB_KARTY_UNIK");
+                } else {
+                    const cards = document.querySelectorAll("#card-tray-container .card-container");
+                    const card = cards[currentSelectedCardIdx];
+                    const code = card && (card.getAttribute("data-card") || "").toLowerCase();
+                    if (code === "o" || code === "s" || code === "b") speak(kartyTooltipKey(code));
+                    else speakStateTooltip("SUB_KARTY");
+                }
             } else if (state.subMode === "moznosti") {
                 const items = getMoznostiItems();
                 const item = items[moznostiCursor];
@@ -2522,6 +3017,18 @@ function handleHeroKeydown(e) {
         if (isTypingTarget()) {
             const gp = document.getElementById("general-prompt");
             const gpOpen = !!(gp && isElementVisible(gp));
+            const gpInputEl = document.getElementById("general-prompt-input");
+            // CTRL nad textovým poľom #general-prompt-input (napr. rozpísané meno hrdinu)
+            // prečíta jeho AKTUÁLNY obsah nahlas - vždy cez TTS (playAudioOrSpeak s kľúčom,
+            // ktorý nikdy nemá nahratý súbor), keďže ide o voľne písaný text hráča, ktorý sa
+            // navyše priebežne mení počas písania.
+            if (gpOpen && gpInputEl && isElementVisible(gpInputEl) && e.key === "Control") {
+                e.preventDefault();
+                const val = gpInputEl.value.trim();
+                if (val) playAudioOrSpeak("gp_input_value_" + slugifySk(val.slice(0, 60)), val);
+                else playAudioOrSpeak(AUDIO_MAP.gp_input_empty, "Prázdne.");
+                return;
+            }
             if (gpOpen && e.key === "Enter") {
                 e.preventDefault();
                 document.getElementById("gp-confirm-btn")?.click();
@@ -2661,6 +3168,14 @@ function handleHeroKeydown(e) {
     // Zapnutie/vypnutie audio UI módu klávesou "V"
     window.addEventListener("keydown", function (e) {
         if (e.key === "v" || e.key === "V") {
+            // Textové pole je práve focusnuté (napr. hráč PRÁVE PÍŠE meno hrdinu, ktoré
+            // celkom bežne obsahuje písmeno "v" - "Viktor", "Slavomír"...) - tento listener
+            // je úplne SAMOSTATNÝ od handleAudioUIKeydown vyššie (ktorý "v"/"V" už správne
+            // ignoruje, viď komentár tam), takže bez tejto rovnakej podmienky by KAŽDÉ "v"
+            // napísané do mena audio UI uprostred písania VYPLO (alebo znova zapLO), čo
+            // pôsobilo presne ako "input vypína audio mód" - v skutočnosti nešlo o vypnutie
+            // kvôli otvoreniu inputu samotného, ale o KAŽDÉ ďalšie písmeno "v" v texte mena.
+            if (isTypingTarget()) return;
             audioUIActive = !audioUIActive;
             if (audioUIActive) {
                 state.layer = "section";
@@ -2669,7 +3184,7 @@ function handleHeroKeydown(e) {
                 generalPromptWasAnnounced = false;
                 lastBuilderModalMsg = null;
                 lastKnownActionPhase = (typeof is_action_phase !== "undefined") ? is_action_phase : false;
-                focusWasAutoMovedToKarty = false;
+                lastKnownCardsActive = cardsAreActive();
                 speak("voice_mode_on");
             } else {
                 stopAllAudio();

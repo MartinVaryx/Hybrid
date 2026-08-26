@@ -47,7 +47,8 @@
     "state_overlay_builder_item_selected.WAV": "Predmet je vybraný a má použiteľný efekt. Medzerníkom ho použiješ, klávesou Escape výber zrušíš bez použitia.",
     "state_overlay_builder_editor.WAV": "Máš otvorený denník, v zozname schopností. Šípkami prechádzaš medzi schopnosťami, medzerníkom prejdeš k akciám (cena, zvýšiť, znížiť, vrátiť), klávesou Escape sa vrátiš späť.",
     "state_overlay_builder_actions.WAV": "Máš otvorený denník, medzi akciami pre vybranú schopnosť. Šípkami prechádzaš medzi cenou, zvýšením úrovne, znížením úrovne a vrátením zmeny, medzerníkom akciu potvrdíš (cena sa len prečíta znova).",
-    "state_general_prompt.WAV": "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš."
+    "state_general_prompt.WAV": "Zobrazuje sa výzva na potvrdenie. Medzerníkom alebo klávesou Enter ju potvrdíš, klávesou Escape ju zrušíš.",
+    "state_general_prompt_input.WAV": "Zobrazuje sa výzva na zadanie textu. Potvrdíš klávesou Enter, nie medzerníkom - ten sa vpíše ako medzera do textu. Klávesou Escape výzvu zrušíš."
   },
   "sections": {
     "ui_section_menu.WAV": "Menu.",
@@ -67,8 +68,8 @@
     "ui_element_prva_pomoc.WAV": "Prvá pomoc.",
     "ui_element_unik.WAV": "Únik.",
     "ui_element_vyzva.WAV": "Výzva.",
-    "narocnost.WAV":"Náročnosť",
-    "hrozba.WAV":"Hrozba",
+    "narocnost.WAV": "Náročnosť",
+    "hrozba.WAV": "Hrozba",
     "ui_element_nepriatel.WAV": "Nepriateľ.",
     "vyhoda.WAV": "Výhoda",
     "schopnost.WAV": "Schopnosť",
@@ -1074,7 +1075,10 @@
     "item_feromony.WAV": "Feromóny.",
     "item_filter.WAV": "Filter.",
     "item_kluc.WAV": "Kľúč.",
-    "_note_alert": "Potvrdzovacie/upozorňovacie okno v builderi (#custom-modal, napr. hlášky BLOKOVANÉ pri znižovaní úrovne) je DYNAMICKÉ rovnako ako SPRÁVY: kľúč 'alert_<slug>.WAV' vzniká z prvých cca 60 znakov textu hlášky. Rovnaký 'alert_<slug>.WAV' vzor sa používa aj pre #general-prompt v hlavnej hre (napr. pri mazaní postavy, pri zadávaní mena hrdinu). Text tlačidiel (Áno./OK/Potvrdiť/Nie./Zrušiť) sa nehlási samostatne - po ohlásení hlášky Medzerník/Enter rovno potvrdí a Escape/Backspace zruší (ak zrušenie existuje)."
+    "_note_alert": "Potvrdzovacie/upozorňovacie okno v builderi (#custom-modal, napr. hlášky BLOKOVANÉ pri znižovaní úrovne) je DYNAMICKÉ rovnako ako SPRÁVY: kľúč 'alert_<slug>.WAV' vzniká z prvých cca 60 znakov textu hlášky. Rovnaký 'alert_<slug>.WAV' vzor sa používa aj pre #general-prompt v hlavnej hre (napr. pri mazaní postavy, pri zadávaní mena hrdinu). Text tlačidiel (Áno./OK/Potvrdiť/Nie./Zrušiť) sa nehlási samostatne - po ohlásení hlášky Medzerník/Enter rovno potvrdí a Escape/Backspace zruší (ak zrušenie existuje). VÝNIMKA: ak má #general-prompt viditeľné textové pole (#general-prompt-input, napr. zadávanie mena hrdinu), Medzerník NEPOTVRDZUJE (musí sa dať napísať medzera do textu) - potvrdzuje len Enter, viď 'gp_confirm_enter_hint.WAV' nižšie a 'state_general_prompt_input.WAV' vyššie.",
+    "gp_confirm_enter_hint.WAV": "Meno hrdinu potvrdíš stlačením enter. Stlačením CTRL si meno vypočuješ.",
+    "gp_input_empty.WAV": "Prázdne.",
+    "_note_gp_input_value": "Klávesa CTRL nad #general-prompt-input prečíta AKTUÁLNY (ešte nepotvrdený, priebežne písaný) obsah poľa - vždy cez Web Speech API, kľúč 'gp_input_value_' + slugifySk(text.slice(0, 60)) sa NEDÁ vopred nahrať (ľubovoľný text hráča, mení sa pri každom stlačení klávesy)."
   },
   "hodnoty": {
     "hodnota_0.WAV": "Nula.",
@@ -1093,5 +1097,27 @@
     "hodnota_13.WAV": "Trinásť.",
     "hodnota_14.WAV": "Štrnásť.",
     "hodnota_15.WAV": "Pätnásť."
+  },
+  "nastavenia": {
+    "_note": "Obrazovka NASTAVENIA (#settings, otvára sa z MENU) - odteraz vlastná 'overlay' vrstva v audio-ui.js (detectOverlay/handleSettingsKeydown), rovnako ako výber hrdinu/zbrane/builder. Návrat (SPÄŤ) používa existujúci moznosti_dynamic/btn_spat.WAV. Hodnoty (nastavenia_hodnota_*.WAV a stav_zapnute.WAV/stav_vypnute.WAV) sa hrajú TAGOVANE (tag 'nastavenia_hodnota') hneď za popiskom - pri rýchlom prepínaní sa predchádzajúca, ešte neprehraté hodnota z fronty odstráni namiesto toho, aby sa tam hromadila (rovnaký princíp ako karty_side pri kartách).",
+    "nastavenia_tutorial.WAV": "Tutoriál",
+    "nastavenia_audio.WAV": "Audio",
+    "nastavenia_logovat_hody.WAV": "Logovať hody",
+    "nastavenia_rychlost_hlasu.WAV": "Rýchlosť hlasu",
+    "nastavenia_narocnost.WAV": "Náročnosť",
+    "stav_zapnute.WAV": "Zapnuté.",
+    "stav_vypnute.WAV": "Vypnuté.",
+    "_note_hodnoty": "Hodnoty selectov (RÝCHLOSŤ HLASU / NÁROČNOSŤ) - vzor 'nastavenia_hodnota_<slug>.WAV', <slug> odvodený z viditeľného textu <option> (viď index.html #voice-speed-select, #mode-dropdown).",
+    "nastavenia_hodnota_0_5x.WAV": "0.5X",
+    "nastavenia_hodnota_0_75x.WAV": "0.75X",
+    "nastavenia_hodnota_1x_normalna.WAV": "1X (normálna)",
+    "nastavenia_hodnota_1_25x.WAV": "1.25X",
+    "nastavenia_hodnota_1_5x.WAV": "1.5X",
+    "nastavenia_hodnota_1_75x.WAV": "1.75X",
+    "nastavenia_hodnota_2x.WAV": "2X",
+    "nastavenia_hodnota_lahka.WAV": "Ľahká",
+    "nastavenia_hodnota_normalna.WAV": "Normálna",
+    "nastavenia_hodnota_tazka.WAV": "Ťažká",
+    "nastavenia_upozornenie_logovat_hody.WAV": "Pozor: v audio verzii odporúčame nechať toto nastavenie zapnuté."
   }
 }

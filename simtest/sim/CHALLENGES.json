@@ -1803,7 +1803,7 @@
         "case_threat_delayed": "",
         "case_failure_delayed": "",
         "case_threat": "stress+1",
-        "case_failure": ["alerted_SKAUTKA_1","SKAUTKA_1"]
+        "case_failure": ["alerted_SKAUTKA_1:true","SKAUTKA_1"]
     },
     "SET_TRAP": {
         "back": true,
