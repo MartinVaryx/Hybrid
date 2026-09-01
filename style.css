@@ -682,12 +682,18 @@
             margin-top: 2vh;
         }
 
+        .char-btn-container{
+            display: flex;
+            gap: 2vh;
+        }
+
         .extra-buttons{
             display: flex;
-            justify-content: flex-end;
+            justify-content: space-between;
             width: 100%;
             flex-wrap: wrap;
             gap: 2vh;
+            margin-top: 10px;
         }
 
         #char-table{
