@@ -466,6 +466,7 @@ const articles = [
         const char = characters[activeCharIdx];
         if (char.isInitialPhase) {
             showCustomAlert("Vo fáze DANOSTÍ nie je možné pridať body. Najskôr musíš minúť všetky BR, ktoré máš a uzavrieť fázu DANOSTÍ.");
+                return
         }
         char.sp += 1;
         saveState();
