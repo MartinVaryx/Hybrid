@@ -1,19 +1,26 @@
+// ============================================================================
+// NOTE: The DOM-free simulation core (state factory + pure sim math: dist,
+// fortMark, assignEventCoords, advanceStepLogic, advanceNestStepLogic,
+// processLifecycle, t/translations, etc.) has been extracted into
+// nest-core.js. index.html must load it BEFORE this file:
+//   <script src="nest-core.js"></script>
+//   <script src="script.js"></script>
+// Everything below still refers to S / advanceStepLogic / t / dist / ...
+// as plain globals - they now live in nest-core.js but are visible here
+// via the shared top-level script scope. See REFACTOR_NOTES.md.
+// ============================================================================
 /* ============================= I18N SYSTEM ============================= */
 let TRANSLATIONS = {};
 const DEBUG = false;
 const BUILD_FORT_COST = 8;
-const BUILD_FORT_CAPACITY = 10;
+const BUILD_FORT_CAPACITY = 40;
 const BUILD_FORT_DEFENSE = 10;
-const HIRE_COST = 5;
+// HIRE_COST removed - hiring a hybrid is now free, capped instead by
+// canSustainOneMoreHybrid() (see hireAtFort()).
 const DIST_FROM_FORT = 10;
-const CONQUEST_PRIORITY = 20;
-
-/* ============================= MULTI-NEST SUPPORT ============================= */
-// Nests compete for the same shared pool of humans/forts. Each nest keeps its
-// own food storage, queen, brood cohorts, scouts and predators. Which nest's
-// fields S.food / S.queen / S.eggs / ... (etc) "point at" is controlled by
-// S.activeNestIndex - see the accessor properties installed in freshState().
-const DEFAULT_NEST_COUNT = 2;
+const SCAN_REVEAL_RADIUS = 40;
+const REVEAL_CHANCE = 0.6;
+// [moved to nest-core.js] const CONQUEST_PRIORITY = 20; ... (8 lines)
 const MIN_NEST_DIST_FROM_OTHER_NEST = 100; // map units kept between two nests when generating a sandbox map
 
 // How much closer-to-an-enemy-nest hunting raises a predator's death risk.
@@ -21,30 +28,7 @@ const MIN_NEST_DIST_FROM_OTHER_NEST = 100; // map units kept between two nests w
 // hunting predator's death chance climbs linearly up to
 // +ENEMY_NEST_MAX_DEATH_RISK_BONUS at zero distance - nests fight over the
 // same humans, so hunting deep in a rival's territory is dangerous.
-const ENEMY_NEST_DEATH_RISK_RADIUS = 70;
-const ENEMY_NEST_MAX_DEATH_RISK_BONUS = 0.85;
-
-function makeNestState(id, x, y, settings){
-  return {
-    id, x, y,
-    alive: true,
-    food: 200,
-    queen: { alive: true },
-    queenReserve: settings ? settings.startQueenReserve : 230,
-    bounceback: null,
-    fortCooldown: 0,
-    reinforcedForts: [],
-    scoutsAvailable: 3,
-    scoutsHidden: 2,
-    scoutsCooldown: 4,
-    predatorsAvailable: 12,
-    predatorsCooldown: 12,
-    eggs: [{age: 0, count: 1},{age: 1, count: 0}],
-    larva: [{age: 0, count: 0},{age: 1, count: 0}],
-    cocoon: [{age: 0, count: 1}, {age: 1, count: 1}],
-    nymph: [{age: 0, count: 0},{age: 1, count: 1}]
-  };
-}
+// [moved to nest-core.js] const ENEMY_NEST_DEATH_RISK_RADIUS = 70; ... (25 lines)
 
 // Installs S.nest / S.food / S.queen / ... as accessor properties that
 // forward to whichever nest is "active" (S.activeNestIndex). This lets the
@@ -53,81 +37,21 @@ function makeNestState(id, x, y, settings){
 // simply re-run once per alive nest, with the active pointer moved between
 // runs. Direct multi-nest code (rendering, generation, save/load) works with
 // S.nests directly instead of going through these accessors.
-const NEST_SCOPED_FIELDS = [
-  'food', 'queenReserve', 'queen', 'eggs', 'larva', 'cocoon', 'nymph',
-  'scoutsAvailable', 'scoutsHidden', 'scoutsCooldown',
-  'predatorsAvailable', 'predatorsCooldown',
-  'fortCooldown', 'bounceback'
-];
-function installNestAccessors(state){
-  Object.defineProperty(state, 'nest', {
-    configurable: true, enumerable: true,
-    get(){ return this.nests[this.activeNestIndex]; },
-    set(v){
-      // Legacy single-nest assignment (e.g. `S.nest = {x,y}`): applied to
-      // the currently active nest's position only.
-      const n = this.nests[this.activeNestIndex];
-      if (n) { n.x = v.x; n.y = v.y; }
-    }
-  });
-  NEST_SCOPED_FIELDS.forEach(key => {
-    Object.defineProperty(state, key, {
-      configurable: true, enumerable: true,
-      get(){ return this.nests[this.activeNestIndex][key]; },
-      set(v){ this.nests[this.activeNestIndex][key] = v; }
-    });
-  });
-}
+// [moved to nest-core.js] const NEST_SCOPED_FIELDS = [ ... (25 lines)
 
-function fortMark(fort, nestId){
-  if (!fort.marks) fort.marks = {};
-  if (!fort.marks[nestId]) {
-    fort.marks[nestId] = { marked: false, markedAttackDispatched: false, markingScoutCount: 0, markedUntilStep: null };
-  }
-  return fort.marks[nestId];
-}
+// [moved to nest-core.js] function fortMark(fort, nestId){ ... (7 lines)
 function fortAnyMarked(fort){
   return !!(fort.marks && Object.values(fort.marks).some(m => m.marked));
 }
 
-function totalInsectsForNest(nest){
-  if (!nest) return 0;
-  const scouts = nest.scoutsAvailable + nest.scoutsCooldown + nest.scoutsHidden +
-    S.events.filter(e=>e.type==='search' && e.status==='pending' && !e.fortMarkScout && e.nestId===nest.id).length;
-  const predators = nest.predatorsAvailable + nest.predatorsCooldown +
-    S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nest.id).reduce((a,e)=>a + (e.groupSize - e.killed), 0) +
-    (() => { const e = S.events.find(e=>e.type==='fort' && e.status==='pending' && e.nestId===nest.id); return e ? Math.max(0, e.originalAttackers - e.killed) : 0; })();
-  return (nest.queen.alive?1:0) + scouts + predators +
-    sumCohort(nest.eggs) + sumCohort(nest.larva) + sumCohort(nest.cocoon) + sumCohort(nest.nymph);
-}
-function totalInsectsAll(){
-  return S.nests.reduce((a,n)=> a + (n.alive ? totalInsectsForNest(n) : 0), 0);
-}
+// [moved to nest-core.js] function totalInsectsForNest(nest){ ... (13 lines)
 // Per-nest breakdown used by S.history entries, so the Nest Analytics chart
 // can plot the historical line for whichever nest is selected (rather than
 // the combined total across all nests) - see renderChart().
-function insectsByNestSnapshot(){
-  const out = {};
-  S.nests.forEach(n => { out[n.id] = n.alive ? totalInsectsForNest(n) : 0; });
-  return out;
-}
-function nearestEnemyNestDistance(loc, ownNestId){
-  let minD = Infinity;
-  S.nests.forEach(n => {
-    if (!n.alive || n.id === ownNestId) return;
-    const d = dist(loc, n);
-    if (d < minD) minD = d;
-  });
-  return minD;
-}
+// [moved to nest-core.js] function insectsByNestSnapshot(){ ... (14 lines)
 // The closer `loc` (a hunt event's position) is to a rival, alive nest, the
 // higher the extra death-risk bonus returned here (0 when no rival is near).
-function enemyProximityDeathRisk(loc, ownNestId){
-  const d = nearestEnemyNestDistance(loc, ownNestId);
-  if (!isFinite(d)) return 0;
-  const closeness = Math.max(0, 1 - d / ENEMY_NEST_DEATH_RISK_RADIUS);
-  return closeness * ENEMY_NEST_MAX_DEATH_RISK_BONUS;
-}
+// [moved to nest-core.js] function enemyProximityDeathRisk(loc, ownNestId){ ... (6 lines)
 /* ============================= MODE & RESTART STATE ============================= */
 let currentGameMode = 'sandbox'; // 'sandbox' | 'campaign'
 let initialSandboxSnapshot = null; // Stores initial layout/params when sandbox starts
@@ -157,6 +81,23 @@ function restartGame() {
     if (initialSandboxSnapshot) {
       S.nests = JSON.parse(JSON.stringify(initialSandboxSnapshot.nests));
       S.forts = JSON.parse(JSON.stringify(initialSandboxSnapshot.forts));
+
+      // Make the restart path explicitly authoritative for fort resources and
+      // demand bundles. The stored snapshot already carries the original
+      // resource stock and desired level per fort; restoring them directly
+      // here prevents any mid-session trade / edit drift from surviving the
+      // restart call.
+      const snapshotFortMap = new Map((initialSandboxSnapshot.forts || []).map(f => [f.id, f]));
+      S.forts = S.forts.map(f => {
+        const src = snapshotFortMap.get(f.id);
+        if (!src) return f;
+        return {
+          ...f,
+          resources: JSON.parse(JSON.stringify(src.resources || emptyResourceBundle())),
+          desiredResources: JSON.parse(JSON.stringify(src.desiredResources || defaultDesiredResourceLevels()))
+        };
+      });
+
       initGame(true); // Keep recorded layout intact (nests + forts)
       render();
     } else {
@@ -183,6 +124,8 @@ function startSandboxMode() {
   recordSandboxSnapshot();
   
   hideMenu();
+  const menuOverlay = document.getElementById('menuOverlay');
+  if (menuOverlay) menuOverlay.classList.add('hidden');
 }
 
 
@@ -199,19 +142,22 @@ async function loadTranslations() {
   }
 }
 
-function t(key, params = {}) {
-  const lang = (S && S.settings && S.settings.lang) ? S.settings.lang : 'en';
-  let text = (TRANSLATIONS[lang] && TRANSLATIONS[lang][key]) ||
-             (TRANSLATIONS['en'] && TRANSLATIONS['en'][key]) || key;
-
-  for (const [pK, pV] of Object.entries(params)) {
-    text = text.replace(new RegExp(`\\{${pK}\\}`, 'g'), pV);
-  }
-  return text;
+function preloadMenuBackground() {
+  const image = new Image();
+  const revealPage = () => {
+    document.body.classList.remove('page-loading');
+  };
+  image.onload = revealPage;
+  image.onerror = revealPage;
+  image.src = '/nest/assets/menu.jpeg';
 }
 
+preloadMenuBackground();
+
+// [moved to nest-core.js] function t(key, params = {}) { ... (10 lines)
+
 /* ============================= STATE ============================= */
-let S = null;
+// [moved to nest-core.js] let S = null; ... (1 lines)
 let chart = null;
 
 // ---------------------------------------------------------------------------
@@ -229,13 +175,7 @@ let chart = null;
 // they're required to agree for the map to render without distortion or
 // wasted margin.
 // ---------------------------------------------------------------------------
-const WORLD_ASPECT_RATIO = 2; // width:height - keep in sync with #mapWrap's CSS aspect-ratio
-
-function dist(p1, p2) {
-  const dx = (p1.x - p2.x) * WORLD_ASPECT_RATIO;
-  const dy = p1.y - p2.y;
-  return Math.sqrt(dx * dx + dy * dy);
-}
+// [moved to nest-core.js] const WORLD_ASPECT_RATIO = 2; // width:height - keep in sync with #map ... (7 lines)
 
 // ---------------------------------------------------------------------------
 // WORLD -> SCREEN CONVERSION
@@ -291,6 +231,40 @@ window.addEventListener('resize', () => {
     if (typeof S !== 'undefined' && S && typeof renderMap === 'function') renderMap();
   }, 100);
 });
+
+// #mapWrap's own box can still settle to a different size AFTER the first
+// renderMap() call without any window 'resize' event ever firing - e.g. a
+// web font swapping in, or the sidebar reflowing once the menu overlay
+// hands off to the game screen - both typically only on the very first
+// paint right after a page load/refresh. Since icon positions are baked to
+// px at render time, that late settling left them stuck at the pre-layout
+// position until some unrelated render happened to fix it, which looked
+// like the nest/fort icons "snapping" into place a moment after pressing
+// Start. A ResizeObserver catches any actual box-size change directly
+// (first load included), the same way the window listener above does for
+// window resizes.
+function observeMapWrapResize() {
+  const wrap = document.getElementById('mapWrap');
+  if (!wrap || typeof ResizeObserver === 'undefined') return;
+  let lastW = wrap.clientWidth;
+  let lastH = wrap.clientHeight;
+  const ro = new ResizeObserver(() => {
+    if (wrap.clientWidth === lastW && wrap.clientHeight === lastH) return;
+    lastW = wrap.clientWidth;
+    lastH = wrap.clientHeight;
+    clearTimeout(_mapResizeHandle);
+    _mapResizeHandle = setTimeout(() => {
+      if (typeof S !== 'undefined' && S && typeof renderMap === 'function') renderMap();
+    }, 100);
+  });
+  ro.observe(wrap);
+}
+
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', observeMapWrapResize);
+} else {
+  observeMapWrapResize();
+}
 
 
 
@@ -427,69 +401,7 @@ document.getElementById('nestAnalyticsOverlay').addEventListener('click', (ev) =
   if (ev.target.id === 'nestAnalyticsOverlay') closeNestAnalytics();
 });
 
-function freshState(){
-  const state = {
-    step: 0,
-    points: 10,
-    maxPoints: 10,
-    phase: 'idle', // idle | active
-    humans: 150,
-    humansKilled: 0,
-    conditions: [],
-    lastTriggeredCondition: null,
-    settings: {
-      lang: 'sk', // 'en' | 'sk'
-      groupSize: 5, foodPerHuman: 5, maxPoints: 10, eggsPerSearch: 1,
-      eggCap: 20, eggsPerFood: 5,
-      searchBaseChance: 0.5, searchRatioScale: 0.25,
-      huntBaseChance: 0.9, huntRatioScale: 0.25,
-      huntDeathRisk: 0.4, searchDeathRisk: 0.6,
-      scoutBiasPerFailedSearch: 0,
-      fortLimit: 10,
-      defaultFortDefense: 50,
-      fortFoodLow: 2, fortFoodHigh: 5, fortHumanLow: 1, fortHumanHigh: 3,
-      fortDistLow: 15, fortDistHigh: 70,
-      fortPredatorThreshold: 30, fortAttackThreshold: 4.2,
-      scoutMarkChance: 0.2, fortMarkThreshold: 3.5,
-      fortCapacityIncreaseAmount: 5, costIncreaseFortCapacity: 1,
-      fortReinforceCost: 4, fortReinforceDefenseBonus: 10,
-      costDistractScout: 1, costKillScout: 2, costEscapePredator: 1, costKillPredator: 3,
-      costSaveHumans: 1, saveHumansAmount: 2, costScan: 1,
-      costNestAnalytics: 1,
-      // Attacking a nest directly is pricier than killing the same unit
-      // type mid-event (costKillPredator/costKillScout above), so these are
-      // deliberately separate settings rather than reusing those.
-      costAttackNestPredator: 4, costAttackNestScout: 3,
-      costKillNymph: 3, costAttackQueen: 6,
-      queenFoodReserveCap: 130,
-      startQueenReserve: 130, // defaults to full reserve (== queenFoodReserveCap above)
-      minPopulationThreshold: 30,
-      nestCount: DEFAULT_NEST_COUNT // how many rival nests to generate in sandbox/random levels
-    },
-    forts: [],
-    reinforcedForts: [], // fort ids the player reinforced this step (shared - a player action, not per-nest)
-
-    // Multiple nests compete for the same shared `humans`/`forts` above.
-    // activeNestIndex selects which nest S.food/S.queen/S.eggs/... (etc,
-    // see NEST_SCOPED_FIELDS) currently point at; focusedNestIndex is the
-    // nest shown in the Nest Analytics panel and defaults to the first one.
-    nests: [ makeNestState(1, 25, 25, null) ],
-    activeNestIndex: 0,
-    focusedNestIndex: 0,
-
-    events: [],
-    trails: [],
-    animating: false,
-    selectedEventId: null,
-    history: [],
-    log: [],
-    gameOver: false,
-    gameOverMsg: '',
-    nextEventId: 1
-  };
-  installNestAccessors(state);
-  return state;
-}
+// [moved to nest-core.js] function freshState(){ ... (64 lines)
 
 /**
  * Extracts the initial population fields (scouts, predators, eggs, larva,
@@ -529,7 +441,10 @@ function applyPopulationOverrides(pop) {
   if (pop.food != null) S.food = Math.max(0, Math.round(Number(pop.food)) || 0);
   if (pop.queenReserve != null) S.queenReserve = Math.max(0, Math.min(S.settings.queenFoodReserveCap, Math.round(Number(pop.queenReserve)) || 0));
   if (pop.scoutsAvailable != null) S.scoutsAvailable = Math.max(0, Math.round(Number(pop.scoutsAvailable)) || 0);
-  if (pop.scoutsHidden != null) S.scoutsHidden = Math.max(0, Math.round(Number(pop.scoutsHidden)) || 0);
+  if (pop.scoutsHidden != null) {
+    S.scoutsHidden = Math.max(0, Math.round(Number(pop.scoutsHidden)) || 0);
+    ensureHiddenScoutPositions(S.nest);
+  }
   if (pop.scoutsCooldown != null) S.scoutsCooldown = Math.max(0, Math.round(Number(pop.scoutsCooldown)) || 0);
   if (pop.predatorsAvailable != null) S.predatorsAvailable = Math.max(0, Math.round(Number(pop.predatorsAvailable)) || 0);
   if (pop.predatorsCooldown != null) S.predatorsCooldown = Math.max(0, Math.round(Number(pop.predatorsCooldown)) || 0);
@@ -539,64 +454,18 @@ function applyPopulationOverrides(pop) {
   if (Array.isArray(pop.nymph)) S.nymph = JSON.parse(JSON.stringify(pop.nymph));
 }
 
-function assignEventCoords(e) {
-  const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
-  const MARGIN_Y = 10; // Top/Bottom edge margin (y: 10 to 90)
-  const minDistance = 18; // Minimum percentage distance between map elements
-  let bestCand = null;
-  let maxMinDist = -1;
+// Search events are placed in a ring around their nest: SEARCH_MIN_DIST_FROM_NEST
+// ("just outside the nest") never changes, but the outer edge of the ring
+// shrinks as the wild (outside-fort) human population grows - scouts don't
+// need to range far when humans are everywhere. At/below
+// SEARCH_LOW_HUMANS_THRESHOLD the ring reaches SEARCH_FAR_MAX_DIST, comfortably
+// past the map's own diagonal so the real cap ends up being the map edges
+// themselves. At/above SEARCH_HIGH_HUMANS_THRESHOLD the ring shrinks to
+// SEARCH_NEAR_MAX_DIST, just past the inner edge. Distances are in the same
+// aspect-ratio-corrected "real" units as dist().
+// [moved to nest-core.js] const SEARCH_MIN_DIST_FROM_NEST = 20; // >= the general anti-overlap m ... (13 lines)
 
-  for (let attempt = 0; attempt < 300; attempt++) {
-    const cand = {
-      x: Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X)),
-      y: Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y))
-    };
-
-    let minDist = Infinity;
-
-    if (S.nests) {
-      S.nests.forEach(n => {
-        const d = dist(cand, n);
-        if (d < minDist) minDist = d;
-      });
-    }
-
-    if (S.forts) {
-      for (const f of S.forts) {
-        const d = dist(cand, f);
-        if (d < minDist) minDist = d;
-      }
-    }
-
-    if (S.events) {
-      for (const other of S.events) {
-        if (other !== e && other.x !== undefined && other.y !== undefined && other.status === 'pending') {
-          const d = dist(cand, other);
-          if (d < minDist) minDist = d;
-        }
-      }
-    }
-
-    if (minDist >= minDistance) {
-      e.x = cand.x;
-      e.y = cand.y;
-      return;
-    }
-
-    if (minDist > maxMinDist) {
-      maxMinDist = minDist;
-      bestCand = cand;
-    }
-  }
-
-  if (bestCand) {
-    e.x = bestCand.x;
-    e.y = bestCand.y;
-  } else {
-    e.x = Math.floor(MARGIN_X + Math.random() * (100 - 2 * MARGIN_X));
-    e.y = Math.floor(MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y));
-  }
-}
+// [moved to nest-core.js] function assignEventCoords(e) { ... (81 lines)
 
 function generateMapElements() {
   const MARGIN_X = 3;  // Left/Right side margin (x: 3 to 97)
@@ -648,18 +517,27 @@ function generateMapElements() {
 
     while (attempts < 3000) {
       attempts++;
-      
+
+      const population = Math.round(50 + Math.random() * 50);
       const cand = {
         id: i + 1,
         x: MARGIN_X + Math.random() * (100 - 2 * MARGIN_X),
         y: MARGIN_Y + Math.random() * (100 - 2 * MARGIN_Y),
         alive: true,
-        defense: S.settings.defaultFortDefense || 50,
-        maxDefense: S.settings.defaultFortDefense || 50,
+        defense: Math.floor(50 + Math.random() * 51),
+        maxDefense: null,
         capacity: 100,
-        population: Math.round(50 + Math.random() * 50),
+        population,
+        resources: randomFortResourceLevels(),
+        desiredResources: defaultDesiredResourceLevels(),
+        production: emptyFortResourceCounters(),
+        workers: emptyFortResourceCounters(), // real split computed once below, after this candidate is actually placed - see AUTO WORKER ALLOCATION
+        autoWorkers: true, // on by default
+        hybrids: 0, // real starting distribution computed once below, after every fort is placed - see distributeHybridsAcrossForts()
         marks: {}
       };
+
+      cand.maxDefense = cand.defense;
 
       let valid = true;
       let minDistToAll = Infinity;
@@ -690,41 +568,31 @@ function generateMapElements() {
       }
     }
 
-    if (!placed && bestCand) {
+    let finalFort = null;
+    if (placed) {
+      finalFort = S.forts[S.forts.length - 1]; // the cand just pushed above
+    } else if (bestCand) {
       S.forts.push(bestCand);
+      finalFort = bestCand;
     }
   }
-}
 
-function getNearestAliveFortDistance(originLoc) {
-  const aliveForts = S.forts.filter(f => f.alive);
-  if (aliveForts.length === 0) return Infinity;
-  const origin = originLoc || S.nest;
-  let minD = Infinity;
-  aliveForts.forEach(f => {
-    const d = dist(origin, f);
-    if (d < minD) minD = d;
+  // Distribute starting hybrids first, then allocate initial AUTO workers
+  // so their resource targets include hybrid upkeep.
+  distributeHybridsAcrossForts(S.settings.startingHybrids || 0);
+
+  S.forts.forEach(fort => {
+    if (fort.alive && fort.autoWorkers) {
+      autoAllocateFortWorkers(fort, { isInitial: true });
+    }
   });
-  return minD;
 }
 
-const FORT_STRENGTH_DISTANCE_DIVISOR = 280; // tune this - overall falloff radius (map units) for fort predator strength
-const FORT_STRENGTH_COMPRESSION_POWER = 1.4; // tune this - >1 shrinks the "2 dmg" band closer to the "3 dmg" edge, WITHOUT changing the size of the "3 dmg" zone. 1 = original linear behavior.
+// [moved to nest-core.js] function getNearestAliveFortDistance(originLoc) { ... (11 lines)
 
-function getFortStrengthAtDistance(d) {
-  const x = Math.max(0, 1.0 - (d / FORT_STRENGTH_DISTANCE_DIVISOR));
-  const zone3Breakpoint = 0.8333; // x value where strength 3 -> 2 begins - untouched by compression, so the 3-dmg zone size stays fixed
-  const adjustedX = x >= zone3Breakpoint
-    ? x
-    : zone3Breakpoint * Math.pow(x / zone3Breakpoint, FORT_STRENGTH_COMPRESSION_POWER);
-  return Math.max(1, Math.round(3 * adjustedX));
-}
+// [moved to nest-core.js] const FORT_STRENGTH_DISTANCE_DIVISOR = 280; // tune this - overall fal ... (11 lines)
 
-function getFortPredatorStrength(targetFort) {
-  if (!targetFort) return 3;
-  const d = dist(S.nest, targetFort);
-  return getFortStrengthAtDistance(d);
-}
+// [moved to nest-core.js] function getFortPredatorStrength(targetFort) { ... (5 lines)
 
 /* ===== DEBUG: FORT STRENGTH ZONES (delete this block + its call in renderMap to remove) ===== */
 function debugRenderFortStrengthZones(wrap) {
@@ -770,200 +638,90 @@ function debugRenderFortStrengthZones(wrap) {
 // the ratio of total predator damage to fort defense: defense at 2x damage
 // or more -> 90% die; damage at 2x defense or more -> 10% die; linear
 // interpolation in between.
-function conquestDeathPct(ratio){
-  if (!isFinite(ratio) || ratio >= 2) return 0.05;
-  if (ratio <= 0.5) return 0.7;
-  const frac = (ratio - 0.5) / 1.5;
-  return 0.8 - frac * 0.7;
-}
+// [moved to nest-core.js] function conquestDeathPct(ratio){ ... (6 lines)
 
-function searchChanceWithDistance(loc) {
-  const base = successChance(S.settings.searchBaseChance, S.settings.searchRatioScale, ratioHumansPerInsect());
-  const target = loc || S.nest;
+// [moved to nest-core.js] function searchChanceWithDistance(loc) { ... (24 lines)
 
-  const dFort = getNearestAliveFortDistance(target);
-  const fortBonus = (dFort === Infinity) ? 0 : Math.max(0, (50 - dFort) / 50) * 0.5;
+// Baseline share of active searchers to route toward fort marking, purely
+// from population scarcity - independent of naturalFailures, which gets
+// added on top of this at the call site. Same scarcity-onset idea as
+// searchChanceWithDistance's penalty above, but a different curve: it's 0
+// at ratio 2 (humans still plentiful - no baseline pressure to go marking),
+// ramps up steeply (quadratically) as the ratio falls from 2 toward 1, and
+// plateaus at its max (50%) for ratio <= 1 rather than continuing to
+// change - once humans are that scarce, marking is already at its top
+// baseline priority and shouldn't need to go higher just because things
+// get worse still (naturalFailures on top of it can still push the total
+// demand further).
+// [moved to nest-core.js] const MARK_BASELINE_ONSET_RATIO = 2; ... (10 lines)
 
-  const adjusted = base * (1 + fortBonus);
-  return Math.max(0.01, Math.min(0.90, adjusted));
-}
+// [moved to nest-core.js] function huntChanceWithDistance(loc) { ... (13 lines)
 
-function huntChanceWithDistance(loc) {
-  const base = successChance(S.settings.huntBaseChance, S.settings.huntRatioScale, ratioHumansPerInsect());
-  const target = loc || S.nest;
+// [moved to nest-core.js] function pickTargetFort(distancePower = 6) { ... (30 lines)
 
-  const dFort = getNearestAliveFortDistance(target);
-  const fortPenalty = (dFort === Infinity) ? 0 : Math.max(0, (50 - dFort) / 50) * 0.2;
-
-  const dNest = dist(target, S.nest);
-  const nestPenalty = Math.min(0.5, (dNest / 100) * 0.2);
-
-  const combinedMultiplier = Math.max(0, (1 - fortPenalty) * (1 - nestPenalty));
-  return Math.max(0.01, base * combinedMultiplier);
-}
-
-function pickTargetFort(distancePower = 6) {
-  // Only forts that have survived the scout-marking phase (for the active
-  // nest specifically - each nest tracks its own marks on a fort) can be
-  // conquered.
-  const nestId = S.nest.id;
-  const markedForts = S.forts.filter(
-    f =>
-      f.alive &&
-      fortMark(f, nestId).marked &&
-      !fortMark(f, nestId).markedAttackDispatched &&
-      (f.population || 0) > 0
-  );
-
-  if (markedForts.length === 0) return null;
-
-  const weights = markedForts.map(f => {
-    const d = Math.max(1, dist(S.nest, f));
-    return 1 / Math.pow(d, distancePower);
-  });
-
-  const totalWeight = weights.reduce((a, b) => a + b, 0);
-  let rand = Math.random() * totalWeight;
-
-  for (let i = 0; i < markedForts.length; i++) {
-    if (rand < weights[i]) return markedForts[i];
-    rand -= weights[i];
-  }
-
-  return markedForts[0];
-}
-
-// Scouts returning from a search have a small chance of spotting a fort
-// that looks ripe for conquest and marking it - a cheap early warning that
-// fires at a lower readiness bar than the real predator assault
-// (fortAttackThreshold). Unlike pickTargetFort (used to actually launch an
-// assault), this considers every alive, unmarked, populated fort that
-// clears the lower bar, so a single tick can mark more than one fort if
-// scout count and threshold both allow it.
+// Marking demand is built up in advanceNestStepLogic from three parts
+// (population-scarcity baseline + idle predators + last step's failed
+// searches - see the comment at that call site for the full breakdown),
+// then capped by this step's activeSearchers. This function itself just
+// receives that already-capped markerCount and doesn't care where the
+// number came from. Unlike pickTargetFort (used to actually launch an
+// assault, which requires a fort to already be marked), this makes fresh
+// marking attempts against every alive, unmarked, populated fort with an
+// open ring slot - there's no readiness bar to clear to be eligible, but
+// readiness does drive *priority*: among eligible forts, only the one(s)
+// tied for the highest readiness get picked from (see the selection logic
+// below), so the readiest fort is always marked first. A single call can
+// still mark more than one fort if markerCount and open slots both allow it.
 //
 // Normally only one scout at a time will approach a given fort to mark it.
-// But once a fort's readiness climbs to the same level that would trigger
-// a full predator assault (fortAttackThreshold), multiple scouts are
-// allowed to converge on it at once - a swarm racing to confirm the same
-// juicy target. Like the predator icons that ring a fort during an
-// assault, these scouts are positioned evenly around the fort instead of
-// stacking on the same spot.
-const MARKING_SWARM_SIZE = 3; // ring size once a fort's readiness is really high
-const SCOUT_FORT_DISTANCE = 5; // same positioning convention as predator icons around a fort
+// But multiple scouts are allowed to converge on it at once - a swarm
+// racing to confirm the same juicy target - up to MARKING_SWARM_SIZE, which
+// applies to every fort regardless of readiness (see maxMarkingScoutsForFort).
+// Like the predator icons that ring a fort during an assault, these scouts
+// are positioned evenly around the fort instead of stacking on the same
+// spot.
+// [moved to nest-core.js] const MARKING_SWARM_SIZE = 4; // ring size for every fort ... (6 lines)
 
-function maxMarkingScoutsForFort(f) {
-  return fortReadiness(f).total >= S.settings.fortAttackThreshold ? MARKING_SWARM_SIZE : 1;
-}
-
-function maybeMarkFortsFromSearch(scoutCount) {
-  if (scoutCount <= 0) return [];
-
-  const s = S.settings;
-  const nestId = S.nest.id;
-
-  const candidates = S.forts.filter(
-    f =>
-      f.alive &&
-      (fortMark(f, nestId).markingScoutCount || 0) < maxMarkingScoutsForFort(f) &&
-      (f.population || 0) > 0
-  );
-
-  if (candidates.length === 0) return [];
-
-  const newlyMarked = [];
-
-  for (let i = 0; i < scoutCount; i++) {
-
-    const eligible = candidates.filter(
-      f =>
-        (fortMark(f, nestId).markingScoutCount || 0) < maxMarkingScoutsForFort(f) &&
-        fortReadiness(f).total >= s.fortMarkThreshold
-    );
-
-    if (eligible.length === 0) continue;
-
-    const weights = eligible.map(
-      f => 1 / Math.pow(Math.max(1, dist(S.nest, f)), 3)
-    );
-
-    const totalWeight = weights.reduce((a, b) => a + b, 0);
-    let rand = Math.random() * totalWeight;
-
-    let picked = eligible[eligible.length - 1];
-
-    for (let j = 0; j < eligible.length; j++) {
-      if (rand < weights[j]) {
-        picked = eligible[j];
-        break;
-      }
-      rand -= weights[j];
-    }
-
-    // Fort readiness increases the chance that the scout successfully marks it.
-    // At fortMarkThreshold -> base scoutMarkChance.
-    // At fortAttackThreshold or above -> 100%.
-    const readiness = fortReadiness(picked).total;
-
-    const readinessFactor = Math.max(
-      0,
-      Math.min(
-        1,
-        (readiness - s.fortMarkThreshold) /
-          Math.max(1, s.fortAttackThreshold - s.fortMarkThreshold)
-      )
-    );
-
-    const markChance =
-      s.scoutMarkChance +
-      readinessFactor * (1 - s.scoutMarkChance);
-
-    if (Math.random() >= markChance) continue;
-
-    // Claim a ring slot for this scout. The ring size is fixed for the
-    // whole swarm (maxMarkingScoutsForFort), so every scout's angle stays
-    // put even as its siblings resolve independently.
-    const ringSize = maxMarkingScoutsForFort(picked);
-    const pickedMark = fortMark(picked, nestId);
-    const slot = pickedMark.markingScoutCount || 0;
-    pickedMark.markingScoutCount = slot + 1;
-
-    const angle = (2 * Math.PI * slot) / ringSize - Math.PI / 2;
-
-    const scoutEvent = {
-      id: nid(),
-      type: 'search',
-      status: 'pending',
-      outcome: null,
-      nestId,
-
-      // Special scout whose only purpose is to mark a fort.
-      fortMarkScout: true,
-      targetFortId: picked.id,
-
-      x: Math.max(
-        3,
-        Math.min(
-          97,
-          picked.x +
-            (SCOUT_FORT_DISTANCE / WORLD_ASPECT_RATIO) * Math.cos(angle)
-        )
-      ),
-
-      y: Math.max(
-        3,
-        Math.min(
-          97,
-          picked.y + SCOUT_FORT_DISTANCE * Math.sin(angle)
-        )
-      )
-    };
-
-    S.events.push(scoutEvent);
-    newlyMarked.push(picked);
+// True for a fort-marking scout that hasn't been revealed by scanForHidden()
+// yet. Used everywhere a pending/resolved event is turned into a map icon or
+// step-transition animation, so an un-scanned marking scout stays invisible
+// for its whole (usually one-step) lifetime, all the way through resolution
+// if it's never revealed at all.
+function isHiddenFortMarkScout(e) {
+  if (e.type !== 'search' || !e.fortMarkScout) return false;
+  // Per-individual reveal state (see scoutSlots in maybeMarkFortsFromSearch,
+  // nest-core.js): the wave counts as "hidden" only while every one of its
+  // still-alive scouts is unrevealed. Falls back to the old aggregate flag
+  // for any event that somehow lacks scoutSlots.
+  if (Array.isArray(e.scoutSlots)) {
+    return e.scoutSlots.length > 0 && e.scoutSlots.every(s => s.hidden);
   }
-
-  return newlyMarked;
+  return !!e.hidden;
 }
+
+// World position of one ring bucket around a fort - deterministic from the
+// fort + bucket index alone, out of the ring's MARKING_RING_SIZE physical
+// positions (independent of MARKING_SWARM_SIZE, the max scouts that can be
+// in flight - several scouts' slot ids can map onto the same bucket, see
+// callers below).
+function markingScoutSlotPosition(fort, ringIndex) {
+  const angle = (2 * Math.PI * ringIndex) / MARKING_RING_SIZE - Math.PI / 2;
+  return {
+    x: Math.max(3, Math.min(97, fort.x + (SCOUT_FORT_DISTANCE / WORLD_ASPECT_RATIO) * Math.cos(angle))),
+    y: Math.max(3, Math.min(97, fort.y + SCOUT_FORT_DISTANCE * Math.sin(angle)))
+  };
+}
+
+// Which of the ring's MARKING_RING_SIZE physical positions an individual
+// scout's stable slot id occupies. Several slot ids share one bucket once
+// there are more scouts in flight than ring positions - that's the whole
+// point (see MARKING_RING_SIZE in nest-core.js): it's what caps the number
+// of icons shown, instead of an icon per scout no matter how many.
+function markingScoutRingBucket(slotIndex) {
+  return slotIndex % MARKING_RING_SIZE;
+}
+
+// [moved to nest-core.js] function maybeMarkFortsFromSearch(markerCount) { ... (116 lines)
 
 function normalizeLevelConditions(rawConditions) {
   if (!Array.isArray(rawConditions)) return [];
@@ -1013,116 +771,67 @@ function summarizeConditions(conditions) {
   return entries.map(cond => `${cond.outcome === 'victory' ? 'Víťazstvo' : 'Porážka'}: ${describeCondition(cond)}`).join(' • ');
 }
 
-function conditionMatchesFort(cond, fort) {
-  if (!fort) return false;
-  if (!cond || !cond.fortId || cond.fortId === 'any') return true;
-  return Number(cond.fortId) === Number(fort.id);
-}
+// [moved to nest-core.js] function conditionMatchesFort(cond, fort) { ... (5 lines)
 
-function evaluateCustomCondition(cond) {
-  if (!cond || cond.active === false) return false;
-  const forts = Array.isArray(S.forts) ? S.forts : [];
-  switch (cond.type) {
-    case 'fort_falls':
-      return forts.some(f => conditionMatchesFort(cond, f) && !f.alive);
-    case 'fort_defense_below': {
-      const target = cond.fortId && cond.fortId !== 'any' ? forts.find(f => Number(f.id) === Number(cond.fortId)) : null;
-      if (!target) return false;
-      return Number(target.defense) < Number(cond.value || 0);
-    }
-    case 'fort_attacked': {
-      const target = cond.fortId && cond.fortId !== 'any' ? forts.find(f => Number(f.id) === Number(cond.fortId)) : null;
-      if (!target) return false;
-      return Boolean(target.lastAttackedStep != null && target.lastAttackedStep >= 0);
-    }
-    case 'forts_fallen_over':
-      return forts.filter(f => !f.alive).length > Number(cond.value || 0);
-    case 'humans_killed_over':
-      return Number(S.humansKilled || 0) > Number(cond.value || 0);
-    case 'humans_remaining_below':
-      return Number(S.humans || 0) < Number(cond.value || 0);
-    case 'nest_collapses':
-      return totalInsects() <= 0 || (S.humans <= 0 && (S.forts.length === 0 || S.forts.every(f => !f.alive)));
-    default:
-      return false;
-  }
-}
+// [moved to nest-core.js] function evaluateCustomCondition(cond) { ... (28 lines)
 
-function maybeTriggerConditionGameOver() {
-  if (S.gameOver || !Array.isArray(S.conditions)) return false;
-  for (const cond of S.conditions) {
-    if (!cond || cond.active === false) continue;
-    if (!evaluateCustomCondition(cond)) continue;
-    S.gameOver = true;
-    S.lastTriggeredCondition = cond;
-    S.gameOverMsg = `${cond.outcome === 'victory' ? 'Víťazstvo' : 'Prehra'}: ${describeCondition(cond)}`;
-    return true;
-  }
-  return false;
-}
+// [moved to nest-core.js] function maybeTriggerConditionGameOver() { ... (12 lines)
 
 /* ============================= HELPER UTILS ============================= */
-function scoutsWorking(){
-  // fortMarkScout events are a visual stand-in for an already-counted
-  // searcher confirming a fort target, not an additional body - excluding
-  // them here keeps scoutsTotal()/totalInsects() (and everything derived
-  // from them, like ratioHumansPerInsect() and searchChance) from being
-  // silently inflated every time a fort attracts confirming scouts.
-  const nestId = S.nest.id;
-  return S.events.filter(e=>e.type==='search' && e.status==='pending' && !e.fortMarkScout && e.nestId===nestId).length;
+// [moved to nest-core.js] function scoutsWorking(){ ... (19 lines)
+// Cross-nest totals for the top-level phase banner (which reports on the
+// whole battlefield, not just the focused/active nest). scoutsWorking() /
+// predatorsWorking() above are intentionally scoped to S.nest (the active
+// nest) since they back per-nest stat panels and per-nest game logic -
+// these variants sum the same pending-event counts across every alive nest.
+function scoutsWorkingAll(){
+  return S.nests.reduce((total, nest) => {
+    if (!nest.alive) return total;
+    return total + S.events.filter(e=>e.type==='search' && e.status==='pending' && !e.fortMarkScout && !e._hideOnMap && e.nestId===nest.id).length;
+  }, 0);
 }
-function predatorsWorking(){
-  const nestId = S.nest.id;
-  return S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nestId)
-    .reduce((a,e)=>a + (e.groupSize - e.killed), 0);
+function predatorsWorkingAll(){
+  return S.nests.reduce((total, nest) => {
+    if (!nest.alive) return total;
+    return total + S.events.filter(e=>e.type==='hunt' && e.status==='pending' && !e._hideOnMap && e.nestId===nest.id)
+      .reduce((a,e)=>a + (e.groupSize - e.killed), 0);
+  }, 0);
 }
-function predatorsFortDuty(){
-  const nestId = S.nest.id;
-  const e = S.events.find(e=>e.type==='fort' && e.status==='pending' && e.nestId===nestId);
-  return e ? Math.max(0, e.originalAttackers - e.killed) : 0;
-}
-function scoutsTotal(){ return S.scoutsAvailable + scoutsWorking() + S.scoutsCooldown + S.scoutsHidden; }
-function predatorsTotal(){ return S.predatorsAvailable + predatorsWorking() + S.predatorsCooldown + predatorsFortDuty(); }
+// [moved to nest-core.js] function scoutsTotal(){ return S.scoutsAvailable + scoutsWorking() + S ... (2 lines)
 
-function sumCohort(arr){ return arr.reduce((a,c)=>a+c.count,0); }
-function totalInsects(){
-  return (S.queen.alive?1:0) + scoutsTotal() + predatorsTotal() +
-    sumCohort(S.eggs) + sumCohort(S.larva) + sumCohort(S.cocoon) + sumCohort(S.nymph);
-}
-function nid(){ return S.nextEventId++; }
-function log(msg){
-  S.log.unshift({step:S.step, msg});
-  if(S.log.length>200) S.log.pop();
-}
+// [moved to nest-core.js] function sumCohort(arr){ return arr.reduce((a,c)=>a+c.count,0); } ... (10 lines)
 
-function selectNextPendingEvent(){
-  const activeEvents = S.events.filter(e => {
-    if (e.status !== 'pending') return false;
-    if (e.type === 'search' && (e.outcome === 'distracted' || e.outcome === 'killed' || e.outcome === 'failed')) return false;
-    if (e.type === 'hunt' && (e.neutralized + e.killed >= e.groupSize)) return false;
-    if (e.type === 'fort' && (e.originalAttackers - e.killed <= 0)) return false;
-    return true;
-  });
-  if (activeEvents.length > 0) {
-    S.selectedEventId = activeEvents[0].id;
-  }
-}
+// [moved to nest-core.js] function selectNextPendingEvent(){ ... (12 lines)
 
 /* ============================= SETUP ============================= */
 const SETTINGS_INPUT_IDS = [
-  'langSelect','groupSizeInput','foodPerHumanInput','startHumansInput',
+  'groupSizeInput','foodPerHumanInput','startHumansInput',
   'maxPointsInput','eggsPerSearchInput','eggCapInput','eggsPerFoodInput',
   'searchBaseChanceInput','searchRatioScaleInput','huntBaseChanceInput','huntRatioScaleInput',
   'huntDeathRiskInput','searchDeathRiskInput','scoutBiasPerFailedSearchInput','fortLimitInput','defaultFortDefenseInput',
   'fortFoodLowInput','fortFoodHighInput','fortHumanLowInput','fortHumanHighInput',
   'fortDistLowInput','fortDistHighInput',
   'fortPredatorThresholdInput','fortAttackThresholdInput',
-  'scoutMarkChanceInput','fortMarkThresholdInput',
+  'scoutMarkChanceInput','fortMarkThresholdInput','autoTradeToggleBtn',
   'costDistractScoutInput','costKillScoutInput','costEscapePredatorInput','costKillPredatorInput',
+  'costKillFortAttackerInput',
   'costSaveHumansInput','saveHumansAmountInput','costScanInput',
   'costIncreaseFortCapacityInput','fortCapacityIncreaseAmountInput','queenFoodReserveCapInput',
   'minPopulationThresholdInput','fortReinforceCostInput','fortReinforceDefenseBonusInput'
 ];
+
+// Reflects `enabled` into the auto-trade toggle button's visual state.
+// A <button> doesn't carry a `.value` the way the other settings inputs
+// do, so it's handled separately here rather than through the generic
+// value-map helpers (applyDefaultsToInputs/applySettingsToInputs) below -
+// initGame() reads it back the same way, off btn.dataset.enabled.
+function setAutoTradeToggleUI(enabled) {
+  const btn = document.getElementById('autoTradeToggleBtn');
+  if (!btn) return;
+  btn.dataset.enabled = enabled ? 'true' : 'false';
+  btn.setAttribute('aria-pressed', enabled ? 'true' : 'false');
+  btn.textContent = enabled ? '✓' : '✗';
+}
 
 function initGame(keepMap = false){
   const existingNests = S ? S.nests : null;
@@ -1173,10 +882,13 @@ function initGame(keepMap = false){
   S.settings.fortAttackThreshold   = clampFloat(g('fortAttackThresholdInput'), 0, 10, D.settings.fortAttackThreshold);
   S.settings.scoutMarkChance       = clampFloat(g('scoutMarkChanceInput'), 0, 100, D.settings.scoutMarkChance*100) / 100;
   S.settings.fortMarkThreshold     = clampFloat(g('fortMarkThresholdInput'), 0, 10, D.settings.fortMarkThreshold);
+  const autoTradeBtn = document.getElementById('autoTradeToggleBtn');
+  S.settings.autoTradeEnabled      = autoTradeBtn ? (autoTradeBtn.dataset.enabled === 'true') : D.settings.autoTradeEnabled;
   S.settings.costDistractScout     = clampInt(g('costDistractScoutInput'), 0, 50, D.settings.costDistractScout);
   S.settings.costKillScout         = clampInt(g('costKillScoutInput'), 0, 50, D.settings.costKillScout);
   S.settings.costEscapePredator    = clampInt(g('costEscapePredatorInput'), 0, 50, D.settings.costEscapePredator);
   S.settings.costKillPredator      = clampInt(g('costKillPredatorInput'), 0, 50, D.settings.costKillPredator);
+  S.settings.costKillFortAttacker  = clampInt(g('costKillFortAttackerInput'), 0, 50, D.settings.costKillFortAttacker);
   S.settings.costSaveHumans        = clampInt(g('costSaveHumansInput'), 0, 50, D.settings.costSaveHumans);
   S.settings.saveHumansAmount      = clampInt(g('saveHumansAmountInput'), 0, 500, D.settings.saveHumansAmount);
   S.settings.costScan              = clampInt(g('costScanInput'), 0, 50, D.settings.costScan);
@@ -1207,11 +919,68 @@ function initGame(keepMap = false){
     S.nests = levelNests.map((n, i) => makeNestState(n.id ?? (i + 1), n.x, n.y, S.settings));
     const li = CURRENT_LEVEL.locationIcon || { x: 10, y: 10 };
     S.locationIcon = { x: li.x, y: li.y };
+    // Captured BEFORE the .map() below, which caches resolved values (incl.
+    // hybrids) back onto these same CURRENT_LEVEL.forts[i] objects - a level
+    // that hand-places specific hybrid counts per fort keeps them exactly as
+    // authored; only when NONE of them do does distributeHybridsAcrossForts()
+    // get a say below.
+    const anyLevelAuthoredHybrids = CURRENT_LEVEL.forts.some(f => f.hybrids != null);
     S.forts = CURRENT_LEVEL.forts.map(f => {
       const def = (f.defense != null) ? f.defense : S.settings.defaultFortDefense;
       const capacity = (f.capacity != null) ? f.capacity : 100;
       const population = (f.population != null) ? f.population : Math.round(50 + Math.random() * 50);
-      return { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population, marks: {} };
+      const resources = f.resources || randomFortResourceLevels();
+      const desiredResources = f.desiredResources || defaultDesiredResourceLevels();
+      const production = f.production || emptyFortResourceCounters();
+      const hadExplicitWorkers = f.workers != null; // a level authoring its own split wins over AUTO's default
+      const workers = f.workers || emptyFortResourceCounters();
+      const autoWorkers = (f.autoWorkers != null) ? f.autoWorkers : true; // on by default
+      const hybrids = (f.hybrids != null) ? f.hybrids : 0; // real starting distribution computed once below, after every fort exists, unless the level authored its own per-fort counts
+
+      const fort = { id: f.id, x: f.x, y: f.y, alive: true, defense: def, maxDefense: def, capacity, population, resources, desiredResources, production, workers, autoWorkers, hybrids, marks: {} };
+
+      // Cache a PRISTINE, independently-cloned copy back onto
+      // CURRENT_LEVEL.forts[i] - restartGame()'s campaign path just calls
+      // initGame(false) again on this SAME level object (no re-fetch), so
+      // without this, every restart would re-roll fresh resources/workers/
+      // population via the `|| randomFn()` fallbacks above, instead of
+      // staying consistent across restarts the way the sandbox restart path
+      // already does (see restartGame()). Cloning (rather than caching the
+      // same object the live fort below uses) matters: without it, live
+      // gameplay mutating S.forts[i].resources would drift the cached copy
+      // right along with it, and a later restart would "restart" back into
+      // whatever the economy happened to look like when the player quit,
+      // not the level's actual original starting values.
+      f.resources = JSON.parse(JSON.stringify(fort.resources));
+      f.desiredResources = JSON.parse(JSON.stringify(fort.desiredResources));
+      f.production = JSON.parse(JSON.stringify(fort.production));
+      f.workers = JSON.parse(JSON.stringify(fort.workers));
+      f.autoWorkers = fort.autoWorkers;
+      f.hybrids = fort.hybrids;
+      if (f.population == null) f.population = population;
+
+      return fort;
+    });
+
+    // Only steps in when the level didn't hand-place hybrids itself (see
+    // anyLevelAuthoredHybrids above) - spreads CURRENT_LEVEL.startingHybrids
+    // (falling back to S.settings.startingHybrids, then 0) across whichever
+    // forts are best equipped to sustain them. Hybrids hired afterward go
+    // straight to whichever fort the player picks instead - see hireAtFort().
+    if (!anyLevelAuthoredHybrids) {
+      distributeHybridsAcrossForts(CURRENT_LEVEL.startingHybrids ?? S.settings.startingHybrids ?? 0);
+    }
+
+    // Allocate AUTO workers only after starting hybrids are in place.
+    // Explicit worker splits remain untouched.
+    S.forts.forEach(fort => {
+      if (
+        fort.alive &&
+        fort.autoWorkers &&
+        !CURRENT_LEVEL.forts.find(f => f.id === fort.id)?.workers
+      ) {
+        autoAllocateFortWorkers(fort, { isInitial: true });
+      }
     });
 
     // Default starting food/reserve for every nest, then let per-nest
@@ -1253,6 +1022,8 @@ function initGame(keepMap = false){
     });
   }
 
+  S.nests.forEach(ensureHiddenScoutPositions);
+
   S.activeNestIndex = 0;
   S.focusedNestIndex = 0;
 
@@ -1276,10 +1047,25 @@ function initGame(keepMap = false){
     S.conditions = [];
   }
 
-  S.history.push({step:0, humans:S.humans, insects: totalInsectsAll(), insectsByNest: insectsByNestSnapshot()});
-  log(t('log.nest_stirs', { insects: totalInsectsAll(), humans: S.humans }));
+  S.history.push({step:0, humans:S.humans, insects: totalInsectsAll(), insectsByNest: insectsByNestSnapshot(), adultInsects: totalAdultInsectsAll(), adultInsectsByNest: adultInsectsByNestSnapshot()});
+  {
+    const insectsCount = totalInsectsAll();
+    log(
+      t('log.nest_stirs_insects', { insects: insectsCount }, insectsCount) +
+      t('log.nest_stirs_humans', { humans: S.humans }, S.humans)
+    );
+  }
   document.getElementById('gameOverOverlay').classList.add('hidden');
   setSetupEnabled(currentGameMode === 'sandbox');
+  // Campaign levels lock the rest of SETTINGS_INPUT_IDS above (they're
+  // level-design parameters, fixed by whoever built the level) - but
+  // auto-trade is a player preference, not a level parameter, so it should
+  // stay adjustable in SETUP regardless of game mode. It only actually
+  // needs to lock once the simulation is running - beginSimulation()'s own
+  // setSetupEnabled(false) call already covers that correctly, since it
+  // isn't conditioned on currentGameMode the way this one is.
+  const autoTradeBtnEl = document.getElementById('autoTradeToggleBtn');
+  if (autoTradeBtnEl) autoTradeBtnEl.disabled = false;
   ensureSandboxMode();
   render();
 }
@@ -1352,6 +1138,7 @@ function applyDefaultsToInputs(){
     costKillScoutInput: d.settings.costKillScout,
     costEscapePredatorInput: d.settings.costEscapePredator,
     costKillPredatorInput: d.settings.costKillPredator,
+    costKillFortAttackerInput: d.settings.costKillFortAttacker,
     costSaveHumansInput: d.settings.costSaveHumans,
     saveHumansAmountInput: d.settings.saveHumansAmount,
     costScanInput: d.settings.costScan,
@@ -1366,6 +1153,7 @@ function applyDefaultsToInputs(){
     const el = document.getElementById(id);
     if(el) el.value = map[id];
   });
+  setAutoTradeToggleUI(!!d.settings.autoTradeEnabled);
 }
 
 function clampInt(v,min,max,fallback){
@@ -1378,14 +1166,19 @@ function clampFloat(v,min,max,fallback){
   if(isNaN(n)) return fallback;
   return Math.max(min, Math.min(max, n));
 }
-function successChance(base, ratioScale, ratio){
-  return Math.min(0.9, Math.max(0, base + ratio*ratioScale));
-}
+// [moved to nest-core.js] function successChance(base, ratioScale, ratio){ ... (3 lines)
 function setSetupEnabled(enabled){
   SETTINGS_INPUT_IDS.forEach(id=>{
     const el = document.getElementById(id);
     if(el) el.disabled = !enabled;
   });
+  // Language is a player preference, not a level/gameplay parameter (same
+  // reasoning as autoTradeToggleBtn below) - it should stay changeable
+  // regardless of game mode or whether the simulation is already running,
+  // so it's deliberately left out of SETTINGS_INPUT_IDS and force-enabled
+  // here instead, covering every caller of this function in one place.
+  const langSelectEl = document.getElementById('langSelect');
+  if (langSelectEl) langSelectEl.disabled = false;
   const note = document.getElementById('settingsNote');
   if(note){
     note.textContent = enabled ? t('settings.note_enabled') : t('settings.note_disabled');
@@ -1459,6 +1252,31 @@ document.addEventListener('DOMContentLoaded', () => {
   if (ingameSandboxBtn) ingameSandboxBtn.onclick = startSandboxMode;
   if (ingameSettingsBtn) ingameSettingsBtn.onclick = () => { hideMenu(); openOptions(); };
   if (ingameAboutBtn) ingameAboutBtn.onclick = () => { hideMenu(); openAbout(); };
+
+  const merchantLimitInput = document.getElementById('merchantLimitInput');
+  const merchantLimitUp = document.getElementById('merchantLimitUp');
+  const merchantLimitDown = document.getElementById('merchantLimitDown');
+  const clampMerchantLimit = (v) => Math.max(0, Math.min(99, Number.isFinite(v) ? v : 3));
+
+  const syncMerchantLimit = (val) => {
+    if (!S || !S.settings) return;
+    const n = clampMerchantLimit(Number(val));
+    S.settings.merchantLimit = n;
+    if (merchantLimitInput) merchantLimitInput.value = String(n);
+  };
+
+  if (merchantLimitInput) {
+    merchantLimitInput.min = '0';
+    merchantLimitInput.max = '99';
+    merchantLimitInput.addEventListener('change', () => syncMerchantLimit(merchantLimitInput.value));
+    merchantLimitInput.addEventListener('input', () => syncMerchantLimit(merchantLimitInput.value));
+  }
+
+  if (merchantLimitUp) merchantLimitUp.onclick = () => syncMerchantLimit((parseInt(merchantLimitInput?.value || S?.settings?.merchantLimit || 3, 10) || 3) + 1);
+  if (merchantLimitDown) merchantLimitDown.onclick = () => syncMerchantLimit((parseInt(merchantLimitInput?.value || S?.settings?.merchantLimit || 3, 10) || 3) - 1);
+
+  const autoTradeToggleBtn = document.getElementById('autoTradeToggleBtn');
+  if (autoTradeToggleBtn) autoTradeToggleBtn.onclick = () => setAutoTradeToggleUI(autoTradeToggleBtn.dataset.enabled !== 'true');
 });
 
 /* Event Detail Overlay Handlers */
@@ -1477,6 +1295,13 @@ document.getElementById('eventDetailCloseX').onclick = closeEventDetails;
 document.getElementById('eventDetailOverlay').addEventListener('click', (ev) => {
   if(ev.target.id === 'eventDetailOverlay') closeEventDetails();
 });
+
+document.getElementById('fortResourcesCloseX').onclick = closeFortResourcesOverlay;
+document.getElementById('fortResourcesOverlay').addEventListener('click', (ev) => {
+  if(ev.target.id === 'fortResourcesOverlay') closeFortResourcesOverlay();
+});
+
+initCustomTooltips();
 
 function beginSimulation() {
   if (S.phase === 'active' || S.animating) return;
@@ -1504,13 +1329,11 @@ function beginSimulation() {
   // Dispatch each alive nest's initial scouts separately (tagged with its
   // own nestId) and give each nest a chance to open a fort assault, the
   // same way advanceStepLogic() loops nest-by-nest for every later step.
-  let totalScouts = 0;
   S.nests.forEach((nest, idx) => {
     if (!nest.alive) return;
     S.activeNestIndex = idx;
     const n = S.scoutsAvailable;
     S.scoutsAvailable = 0;
-    totalScouts += n;
     for (let i = 0; i < n; i++) {
       const e = { id: nid(), type: 'search', status: 'pending', outcome: null, nestId: nest.id };
       assignEventCoords(e);
@@ -1522,12 +1345,12 @@ function beginSimulation() {
 
   S.step = 1;
   S.points = S.maxPoints;
-  log(t('log.step_begins', { step: S.step, scouts: totalScouts }));
   selectNextPendingEvent();
 
   const incoming = S.events.filter(
     e => e.status === 'pending' &&
-        (e.type === 'search' || e.type === 'hunt' || e.type === 'fort')
+        (e.type === 'search' || e.type === 'hunt' || e.type === 'fort') &&
+        !isHiddenFortMarkScout(e)
   );
 
   // Normal incoming events are hidden while their movement animation runs.
@@ -1584,8 +1407,8 @@ function renderPhaseBanner() {
     btn.disabled = false;
     btn.onclick = beginSimulation;
   } else {
-    const searching = scoutsWorking();
-    const hunting = predatorsWorking();
+    const searching = scoutsWorkingAll();
+    const hunting = predatorsWorkingAll();
     const fortPending = S.events.some(e => e.type === 'fort' && e.status === 'pending');
     const parts = [];
     if (searching > 0) parts.push(t('activity.searching', { count: searching }));
@@ -1599,7 +1422,12 @@ function renderPhaseBanner() {
     btn.onclick = advanceStep;
   }
 
-  postPhaseLog(txt);
+  // Skip logging while the incoming events for this step are still
+  // mid-animation (_hideOnMap): scoutsWorkingAll()/predatorsWorkingAll()
+  // read as transiently low (or zero) until the fly-in finishes, which
+  // would otherwise log a bogus "quiet step" line right before the real,
+  // settled count a moment later.
+  if (!S.animating) postPhaseLog(txt);
 }
 
 /**
@@ -1652,8 +1480,8 @@ function advanceStep(){
 
   maybeTriggerConditionGameOver();
 
-  const outgoing = S.events.filter(e => e.status === 'resolved' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort'));
-  const incoming = S.events.filter(e => e.status === 'pending' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort'));
+  const outgoing = S.events.filter(e => e.status === 'resolved' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort') && !isHiddenFortMarkScout(e));
+  const incoming = S.events.filter(e => e.status === 'pending' && (e.type === 'search' || e.type === 'hunt' || e.type === 'fort') && !isHiddenFortMarkScout(e));
 
   incoming.forEach(e => { e._hideOnMap = true; });
   render();
@@ -1667,24 +1495,14 @@ function advanceStep(){
   });
 }
 
-function ratioHumansPerInsect(){
-  // Uses the GLOBAL insect count (all nests), not just the active nest's -
-  // search/hunt success and fort-trigger scarcity depend on how many
-  // humans exist per insect across every competing nest, since insects
-  // from rival nests can reach prey too.
-  const insects = totalInsectsAll();
-  if(insects<=0) return 0;
-  return S.humans / insects;
-}
+// [moved to nest-core.js] function ratioHumansPerInsect(){ ... (9 lines)
 
 // Number of nests still in play. Fort-trigger thresholds below were tuned
 // assuming a single nest could hoard the colony's whole predator/food
 // growth; with more rivals splitting the same humans/food over time, each
 // nest structurally ends up smaller, so those thresholds are scaled down
 // per alive nest so attacks remain reachable as nestCount grows.
-function aliveNestCount(){
-  return S.nests ? Math.max(1, S.nests.filter(n => n.alive).length) : 1;
-}
+// [moved to nest-core.js] function aliveNestCount(){ ... (3 lines)
 
 function minHuntersForFeeding(){
   const s = S.settings;
@@ -1696,1699 +1514,135 @@ function minHuntersForFeeding(){
   return s.foodPerHuman > 0 ? Math.ceil(deficit / s.foodPerHuman) : 0;
 }
 
-function fortFactorPct(value, low, high){
-  if(high <= low) return value <= low ? 1 : 0;
-  if(value <= low) return 1;
-  if(value >= high) return 0;
-  return (high - value) / (high - low);
-}
+// [moved to nest-core.js] function fortFactorPct(value, low, high){ ... (6 lines)
 
-function fortReadiness(targetFort){
-  const s = S.settings;
-  const insects = totalInsects();
-  const foodPerInsect = insects > 0 ? S.food / insects : 0;
-  const foodPct = insects > 0 ? fortFactorPct(foodPerInsect, s.fortFoodLow, s.fortFoodHigh) : 0;
-  
-  // Revised humanPct logic
-  let humanPct = 0;
-  if (insects > 0) {
-    const ratio = ratioHumansPerInsect();
-    
-    // Check the ratio directly instead of S.humans
-    if (ratio < 1.0) {
-      // Scarcity ranges from 0 (humans equal insects) to 1 (humans reach 0)
-      const scarcity = 1 - ratio; 
-      
-      // Starts at 1.0 and grows steeply up to 3.0 using a quadratic curve
-      humanPct = 1 + 3 * Math.pow(scarcity, 2); 
-    } else {
-      humanPct = fortFactorPct(ratio, s.fortHumanLow, s.fortHumanHigh);
-    }
-  }
+// [moved to nest-core.js] function fortReadiness(targetFort){ ... (34 lines)
 
-  const nestCount = aliveNestCount();
-  const effectivePredatorThreshold = s.fortPredatorThreshold / nestCount;
-  const predatorPct = effectivePredatorThreshold > 0 ? (predatorsTotal() / effectivePredatorThreshold) : 0;
-  const d = targetFort ? dist(S.nest, targetFort) : 0;
-  const distPct = targetFort ? fortFactorPct(d, s.fortDistLow, s.fortDistHigh) : 0;
-  const pendingHuntSlots = S.events.filter(e => e.type === 'hunt' && e.status === 'pending' && e.nestId === S.nest.id).length;
-  const idlePredators = Math.max(0, S.predatorsAvailable - pendingHuntSlots);
-  const idlePct = Math.min(1, idlePredators / 30);
-  
-  return { foodPct, humanPct, predatorPct, distPct, idlePct, total: foodPct + humanPct + predatorPct + distPct + idlePct };
-}
+// [moved to nest-core.js] function maybeTriggerFort() { ... (86 lines)
 
-function maybeTriggerFort() {
-  const nestId = S.nest.id;
-  if (S.events.some(e => e.type === 'fort' && e.status === 'pending' && e.nestId === nestId)) return;
-  if (S.fortCooldown > 0) { S.fortCooldown -= 1; return; }
+// [moved to nest-core.js] function removeProportionally(pools, totalToRemove){ ... (19 lines)
 
-  const targetFort = pickTargetFort();
-  if (!targetFort) return;
+/* ============================= HUMAN POPULATION MOBILITY ============================= */
+// Each step, some humans wander into or out of the area depending on how
+// dangerous it felt last step: many insects per human -> people flee
+// (mobility skews toward -5), many humans per insect -> people resettle
+// (mobility skews toward +5). A second, independent factor adds extra flee
+// pressure just from a large absolute insect population, regardless of the
+// ratio - see humanMobilityPopulationBias(). This models migration in/out of
+// the whole map, so it runs once per step rather than once per nest.
+// [moved to nest-core.js] const HUMAN_MOBILITY_MIN = -5; ... (16 lines)
 
-  const readiness = fortReadiness(targetFort);
-  const effectiveAttackThreshold = S.settings.fortAttackThreshold / aliveNestCount();
-  if (readiness.total < effectiveAttackThreshold) return;
+// The total insect count (all nests) recorded at the end of the previous
+// step - or null before any step has run. Mirrors previousHumanInsectRatio().
+// [moved to nest-core.js] function previousTotalInsects(){ ... (4 lines)
 
-  const idlePredators = S.predatorsAvailable;
-  if (idlePredators <= 0) return;
+// Maps a humans:insects ratio to a bias in [-1, 1]: -1 is full "flee" skew
+// (insects far outnumber humans, i.e. ratio <= HUMAN_MOBILITY_FLEE_RATIO),
+// +1 is full "return" skew (humans far outnumber insects, ratio >=
+// HUMAN_MOBILITY_RETURN_RATIO). Interpolated on a log scale between those
+// two thresholds so ratios in between map smoothly onto intermediate bias.
+// [moved to nest-core.js] function humanMobilityBias(ratio){ ... (9 lines)
 
-  // 1. Calculate Scarcity Factors (0.0 to 1.0 scale)
-  const foodScarcity = Math.max(0, Math.min(1, readiness.foodPct));
+// Maps the previous step's total insect count (all nests) to a bias in
+// [-1, 0]: 0 means the population is small enough to add no extra flee
+// pressure, -1 means it's at/above HUMAN_MOBILITY_POP_SATURATION and pushes
+// migration weights toward full flee (-5) as hard as this factor allows.
+// Unlike the ratio bias, sheer insect numbers only ever push people to
+// leave - a huge nest is a threat on its own regardless of the human:insect
+// ratio right now - so this never skews toward "return".
+// [moved to nest-core.js] function humanMobilityPopulationBias(totalInsectsPrev){ ... (4 lines)
 
-  const wildHumans = S.humans || 0;
-  const targetHumanThreshold = 10;
-  const humanScarcity = Math.max(0, Math.min(1, 1 - (wildHumans / targetHumanThreshold)));
+// Rolls a weighted-random integer in [HUMAN_MOBILITY_MIN, HUMAN_MOBILITY_MAX].
+// Each candidate value v starts from a neutral weight of 1, then gets two
+// independent additive contributions:
+//  - the humans:insects ratio bias, worth up to HUMAN_MOBILITY_RATIO_MAX_WEIGHT
+//  - the absolute insect-population bias, worth up to HUMAN_MOBILITY_POP_MAX_WEIGHT
+//    (about half the ratio's cap), which only ever pushes toward -5 (flee)
+// A contribution is positive when its bias and v agree in sign (pushing that
+// value's weight up toward the cap), and negative when they disagree
+// (pulling it down) - so ratioBias near -1 puts most weight on -5 (mass
+// exodus), near +1 puts most weight on +5 (mass resettling), and a large
+// populationBias further stacks extra weight onto -5 on top of whatever the
+// ratio is doing. Weight is floored just above zero so no value ever hits
+// exactly zero chance.
+// [moved to nest-core.js] function rollHumanMobility(ratioBias, populationBias){ ... (20 lines)
 
-  // 2. Derive relative weights, scaled by CONQUEST_PRIORITY
-  const huntWeight = 0.1 + foodScarcity;
-  const conquestWeight = (0.1 + humanScarcity) * CONQUEST_PRIORITY;
-  const totalWeight = huntWeight + conquestWeight;
+// Picks the {base}_singular / {base}_few / {base}_many translation key for a
+// head-count, following Slovak numeral agreement (1 = singular, 2-4 = "few"
+// plural, 5+ = "many"/genitive plural). English just reuses the same string
+// for _few and _many, so this works for both languages via the same keys.
+// [moved to nest-core.js] function humanCountPluralKey(base, count){ ... (6 lines)
 
-  const huntShare = totalWeight > 0 ? huntWeight / totalWeight : 0.5;
-  const conquestShare = totalWeight > 0 ? conquestWeight / totalWeight : 0.5;
-
-  // 3. Allocate predator pools based on weighted shares
-  const huntPool = Math.floor(idlePredators * huntShare);
-  const conquestPool = Math.floor(idlePredators * conquestShare);
-
-  // 4. Fill pending hunt slots strictly within the allocated hunt pool
-  let huntUsed = 0;
-  for (const e of S.events) {
-    if (huntUsed >= huntPool) break;
-    if (e.type !== 'hunt' || e.status !== 'pending' || e.nestId !== nestId) continue;
-    
-    const openSlots = Math.max(0, e.groupSize - e.neutralized - e.killed);
-    if (openSlots <= 0) continue;
-    
-    const fill = Math.min(openSlots, huntPool - huntUsed);
-    if (fill <= 0) continue;
-    
-    e.groupSize += fill;
-    huntUsed += fill;
-  }
-
-  // 5. Assign fort attackers up to the conquest pool limit
-  const remainingAfterHunts = idlePredators - huntUsed;
-  const attackers = Math.min(remainingAfterHunts, conquestPool);
-
-  if (attackers <= 0) {
-    S.predatorsAvailable -= huntUsed;
-    return;
-  }
-
-  S.predatorsAvailable -= (huntUsed + attackers);
-
-  fortMark(targetFort, nestId).markedAttackDispatched = true;
-
-  S.events.push({ 
-    id: nid(), 
-    type: 'fort', 
-    status: 'pending', 
-    outcome: null, 
-    nestId,
-    originalAttackers: attackers, 
-    killed: 0, 
-    targetFortId: targetFort.id 
-  });
-
-  const reasons = [];
-  if (foodScarcity > 0.5) reasons.push(t('fort_trigger.food_low'));
-  if (humanScarcity > 0.5) reasons.push(t('fort_trigger.humans_trapped'));
-  const reasonText = reasons.length ? reasons.join(' & ') : t('fort_trigger.default_reason');
-
-  log(t('fort_trigger.msg', {
-    reason: reasonText,
-    readiness: Math.round(readiness.total * 100),
-    attackers,
-    id: targetFort.id
-  }));
-}
-
-function removeProportionally(pools, totalToRemove){
-  const keys = Object.keys(pools);
-  const total = keys.reduce((a,k)=>a+pools[k],0);
-  const result = {...pools};
-  if(total<=0 || totalToRemove<=0) return result;
-  const capped = Math.min(totalToRemove, total);
-  const raw = keys.map(k=>(pools[k]/total)*capped);
-  const floors = raw.map(Math.floor);
-  let assigned = floors.reduce((a,b)=>a+b,0);
-  let remainder = capped - assigned;
-  const byFrac = raw
-    .map((r,i)=>({ i, frac: r-floors[i], capacity: pools[keys[i]]-floors[i] }))
-    .filter(x=>x.capacity>0)
-    .sort((a,b)=>b.frac-a.frac);
-  let idx = 0;
-  while(remainder>0 && idx<byFrac.length){ floors[byFrac[idx].i] += 1; remainder--; idx++; }
-  keys.forEach((k,i)=>{ result[k] = Math.max(0, pools[k] - Math.min(floors[i], pools[k])); });
-  return result;
-}
+// Applies this step's population mobility to S.humans (never below 0), based
+// on last step's human:insect ratio and total insect count. Stores the rolled
+// value on S.humanMobility so it's available to UI/logging/save-state if
+// needed, and logs it.
+// [moved to nest-core.js] function applyHumanMobility(){ ... (15 lines)
 
 // Runs one simulation step for every alive nest in turn (each drawing on the
 // same shared S.humans/S.forts pool - this is how nests "compete" for
 // humans), then does the shared end-of-step bookkeeping once.
-function advanceStepLogic(){
-  if(S.gameOver) return;
-  S.events = S.events.filter(e=>e.status==='pending');
-  S.selectedEventId = null;
-
-  S.nests.forEach((nest, idx) => {
-    if (!nest.alive) return;
-    S.activeNestIndex = idx;
-    if (totalInsectsForNest(nest) <= 0) {
-      nest.alive = false;
-      log(t('log.rival_nest_collapsed', { id: nest.id }) !== 'log.rival_nest_collapsed'
-        ? t('log.rival_nest_collapsed', { id: nest.id })
-        : `Hniezdo ${nest.id} zaniklo.`);
-      return;
-    }
-    advanceNestStepLogic(nest);
-  });
-
-  S.activeNestIndex = S.focusedNestIndex || 0;
-
-  S.history.push({step:S.step, humans:S.humans, insects: totalInsectsAll(), insectsByNest: insectsByNestSnapshot()});
-
-  const allFortsConquered = S.forts.length === 0 || S.forts.every(f => !f.alive);
-  const allNestsGone = S.nests.every(n => !n.alive);
-
-  if (S.humans <= 0 && allFortsConquered) {
-    S.gameOver = true;
-    S.gameOverMsg = t('gameover.all_humans_dead');
-    S.lastTriggeredCondition = { outcome: 'defeat', type: 'humans_remaining_below', value: 0 };
-  } else if (allNestsGone) {
-    S.gameOver = true;
-    S.gameOverMsg = t('gameover.swarm_eliminated');
-    S.lastTriggeredCondition = { outcome: 'victory', type: 'nest_collapses', value: 0 };
-  }
-
-  if (!S.gameOver) {
-    maybeTriggerConditionGameOver();
-  }
-  if (S.gameOver) return;
-
-  S.step += 1;
-  S.points = S.maxPoints;
-  S.reinforcedForts = []; // a fort can be reinforced again once the new step begins
-
-  selectNextPendingEvent();
-}
+// [moved to nest-core.js] function advanceStepLogic(){ ... (48 lines)
 
 // Per-nest simulation step: search/hunt/fort-assault dispatch & resolution,
 // brood lifecycle, and starvation - all scoped to the currently active nest
 // (S.activeNestIndex, set by advanceStepLogic above) via the S.food/S.queen/
 // S.eggs/... accessor properties. S.humans and S.forts are shared across
 // every nest, which is what makes nests compete for the same humans.
-function advanceNestStepLogic(nest){
-  const nestId = nest.id;
-  const oldScoutsAvailable = S.scoutsAvailable;
-  const oldScoutsCooldown = S.scoutsCooldown;
-  const oldPredatorsAvailable = S.predatorsAvailable;
-  const oldPredatorsCooldown = S.predatorsCooldown;
+// [moved to nest-core.js] function advanceNestStepLogic(nest){ ... (360 lines)
 
-  /* ---- 1. reveal hidden scouts and resolve the full search batch ---- */
-  const humansAreGone = S.humans <= 0;
-  if (S.scoutsHidden > 0) {
-    const revealedHidden = S.scoutsHidden;
-    S.scoutsHidden = 0;
-    // Push events regardless of humansAreGone so they exist for fort marking
-    for (let i = 0; i < revealedHidden; i++) {
-      const e = { id: nid(), type: 'search', status: 'pending', outcome: null, nestId };
-      assignEventCoords(e);
-      S.events.push(e);
-    }
-    log(t('log.hidden_scouts_revealed', { count: revealedHidden }));
-  }
 
-  // Resolve scout sent to mark a fort.
-  // This scout can be killed, but cannot be distracted.
-  S.events
-    .filter(e => e.type === 'search' && e.fortMarkScout && e.status === 'pending' && e.nestId === nestId)
-    .forEach(e => {
-      const targetFort = S.forts.find(f => f.id === e.targetFortId);
+// [moved to nest-core.js] function processLifecycle(bonusEggs, pop, naturalFailures, successfulS ... (1143 lines)
 
-      e.status = 'resolved';
 
-      // Free up this scout's slot in the fort's marking swarm/ring regardless
-      // of outcome - siblings from the same swarm may still be in flight.
-      if (targetFort) {
-        const mark = fortMark(targetFort, nestId);
-        mark.markingScoutCount = Math.max(0, (mark.markingScoutCount || 0) - 1);
-      }
 
-      // Roll death risk (double the rate of standard search death risk)
-      if (!e.outcome) {
-        const markDeathRisk = Math.min(1, S.settings.searchDeathRisk * 1.2);
-        if (Math.random() < markDeathRisk) {
-          e.outcome = 'killed';
-        }
-      }
+// [moved to nest-core.js] function eatFromCohorts(n){ ... (12 lines)
 
-      if (e.outcome === 'killed') {
-        // Killing the marking scout has no other effect.
-        return;
-      }
+// [moved to nest-core.js] function removeFromNymphCohorts(n){ ... (9 lines)
 
-      if (!targetFort || !targetFort.alive) return;
+// [moved to nest-core.js] function removeFromRecoveryLarvaCohorts(n){ ... (10 lines)
 
-      const mark = fortMark(targetFort, nestId);
-      // Another scout from the same swarm may have already marked this fort -
-      // only log it the first time, but let every confirming scout refresh
-      // the visible timer.
-      if (!mark.marked) {
-        mark.marked = true;
-        log(`Hniezdo ${nestId}: skaut označil pevnosť ${targetFort.id} ako cieľ na dobytie.`);
-      }
-
-      mark.markedUntilStep = S.step + 2;
-      mark.markedAttackDispatched = false;
-
-      e.outcome = 'fort_marked';
-    });
-
-    let successfulSearches = 0, naturalFailures = 0, activeSearchers = 0;
-
-    S.events
-      .filter(e =>
-        e.type === 'search' &&
-        !e.fortMarkScout &&
-        e.status === 'pending' &&
-        e.nestId === nestId
-      )
-      .forEach(e => {
-        e.status = 'resolved';
-        
-        // Count every scout as an active searcher for fort marking first
-        activeSearchers++;
-
-        if (humansAreGone) {
-          e.outcome = 'failed';
-          naturalFailures++;
-          return; // Skip food search success, but keep activeSearchers count
-        }
-
-        const searchChance = searchChanceWithDistance(e);
-        if (!e.outcome) { 
-          if (0.5 < searchChance) { e.outcome = 'succeeded'; successfulSearches++; }
-          else { e.outcome = 'failed'; naturalFailures++; }
-        } else if (e.outcome === 'distracted' || e.outcome === 'killed') {
-          naturalFailures++;
-        }
-      });
-
-  // There can be at most as many successful searches as humans currently alive;
-  // this makes the zero-human edge case redundant while still guarding it.
-  successfulSearches = Math.max(0, Math.min(successfulSearches, S.humans));
-
-  const bonusEggs = Math.round(successfulSearches * S.settings.eggsPerSearch);
-
-  const killedScouts = Math.round(Math.max(0, naturalFailures * S.settings.searchDeathRisk));
-  if(killedScouts>0) log(t('log.scouts_died_search', { count: killedScouts }));
-
-  let scoutSurvivorsThisTick = S.events.filter(e=>e.type==='search' && e.outcome!=='killed' && e.nestId===nestId).length;
-  if(successfulSearches>0) log(t('log.searches_succeeded', { count: successfulSearches, eggs: bonusEggs }));
-  if(naturalFailures>0) log(t('log.searches_failed', { count: naturalFailures }));
-
-  const newlyMarkedForts = maybeMarkFortsFromSearch(activeSearchers);
-  newlyMarkedForts.forEach(f => {
-    log(`Hniezdo ${nestId}: skaut označil pevnosť ${f.id} ako cieľ na dobytie.`);
-  });
-
-  /* ---- 2. resolve hunts ---- */
-  let totalHunted = 0, totalHuntDeaths = 0, predatorSurvivorsThisTick = 0;
-  const pendingHunts = S.events.filter(e=>e.type==='hunt' && e.status==='pending' && e.nestId===nestId);
-  pendingHunts.forEach(e=>{
-    const huntChance = huntChanceWithDistance(e);
-    const activeHunters = e.groupSize - e.neutralized - e.killed;
-    let eventSurvivors = activeHunters;
-    if(activeHunters>0){
-      let caught = 0;
-      for(let i=0;i<activeHunters;i++){
-        if(S.humans - totalHunted - caught <= 0) break;
-        if(0.5 < huntChance) caught++;
-      }
-      totalHunted += caught;
-      // Nests compete for the same humans: hunting close to a rival, alive
-      // nest raises this batch of predators' death risk on top of the base
-      // huntDeathRisk setting.
-      const deathRisk = Math.min(0.95, S.settings.huntDeathRisk + enemyProximityDeathRisk(e, nestId));
-      let huntDeaths = 0;
-      for(let i=0;i<activeHunters;i++){ if(huntChance<deathRisk) huntDeaths++; }
-      if(huntDeaths>0){ totalHuntDeaths += huntDeaths; eventSurvivors = Math.max(0, activeHunters-huntDeaths); }
-    }
-    predatorSurvivorsThisTick += eventSurvivors + e.neutralized;
-    e.status = 'resolved';
-    e.outcome = 'done';
-    e.survivors = eventSurvivors + e.neutralized;
-  });
-  if(totalHunted>0){
-    S.humans -= totalHunted;
-    S.humansKilled += totalHunted;
-    S.food += totalHunted * S.settings.foodPerHuman;
-    log(t('log.humans_hunted', { count: totalHunted, food: totalHunted * S.settings.foodPerHuman }));
-  } else if(pendingHunts.length>0){
-    log(t('log.all_hunts_failed'));
-  }
-  if(totalHuntDeaths>0) log(t('log.predators_died_hunt', { count: totalHuntDeaths }));
-
-  /* ---- 3. resolve fort assault ---- */
-  S.events.filter(e => e.type === 'fort' && e.status === 'pending' && e.nestId === nestId).forEach(e => {
-    e.status = 'resolved';
-    const remaining = Math.max(0, e.originalAttackers - e.killed);
-    const targetFort = S.forts.find(f => f.id === e.targetFortId);
-
-    if (targetFort && targetFort.alive) {
-      const s = S.settings;
-      const d = dist(S.nest, targetFort);
-      // % distance = how far along the close->far scale (fortDistLow..High)
-      // the fort sits; farther forts bleed more attackers on the way in.
-      const distanceFraction = 1 - fortFactorPct(d, s.fortDistLow, s.fortDistHigh);
-      const attritionDeaths = Math.round(remaining * 0.01 * distanceFraction);
-      const reaching = Math.max(0, remaining - attritionDeaths);
-
-      const predStrength = getFortPredatorStrength(targetFort);
-      const totalDamage = reaching * predStrength;
-      const defenseBefore = targetFort.defense;
-      const ratio = defenseBefore > 0 ? totalDamage / defenseBefore : Infinity;
-      const combatDeaths = Math.round(reaching * conquestDeathPct(ratio));
-
-      const lostInAssault = Math.min(remaining, attritionDeaths + combatDeaths);
-      predatorSurvivorsThisTick += remaining - lostInAssault;
-
-      targetFort.defense = Math.max(0, defenseBefore - totalDamage);
-
-      if (targetFort.defense <= 0) {
-        e.outcome = 'conquered';
-        targetFort.alive = false;
-        targetFort.marks = {}; // clear every nest's marking state on this fort
-        const releasedHumans = targetFort.population || 0;
-        S.humans += releasedHumans;
-        targetFort.population = 0;
-        S.fortCooldown = 1;
-        log(t('log.fort_fallen', {
-          id: targetFort.id,
-          damage: totalDamage,
-          attackers: remaining,
-          strength: predStrength,
-          lost: lostInAssault,
-          humans: releasedHumans
-        }));
-      } else {
-        e.outcome = 'defended';
-        log(t('log.fort_held', {
-          id: targetFort.id,
-          damage: totalDamage,
-          defense: targetFort.defense,
-          maxDefense: targetFort.maxDefense,
-          attackers: remaining,
-          strength: predStrength,
-          lost: lostInAssault
-        }));
-      }
-    }
-  });
-
-  /* ---- 4. lifecycle ---- */
-  const scoutsAliveBefore = oldScoutsAvailable + oldScoutsCooldown + scoutSurvivorsThisTick - killedScouts;
-  const predatorsAliveBefore = oldPredatorsAvailable + oldPredatorsCooldown + predatorSurvivorsThisTick;
-  const lc = processLifecycle(bonusEggs, { scoutsAlive: scoutsAliveBefore, predatorsAlive: predatorsAliveBefore }, naturalFailures, successfulSearches);
-
-  /* ---- 5. starvation deaths ---- */
-  const scoutPools = { available: oldScoutsAvailable, cooldown: oldScoutsCooldown, survivors: scoutSurvivorsThisTick, newlyMatured: lc.newlyMaturedScouts };
-  const scoutsAfter = removeProportionally(scoutPools, lc.scoutDeaths);
-  const predatorPools = { available: oldPredatorsAvailable, cooldown: oldPredatorsCooldown, survivors: predatorSurvivorsThisTick, newlyMatured: lc.newlyMaturedPredators };
-  const predatorsAfter = removeProportionally(predatorPools, lc.predatorDeaths);
-
-  /* ---- 6. finalize buckets ---- */
-  S.scoutsCooldown = scoutsAfter.survivors;
-  // Half of every batch of scouts becoming ready this step starts out hidden
-  // (mirrors the initial seed split). This must cover the whole ready pool
-  // (cooldown graduates + newly matured), not just newlyMatured: population
-  // growth plateaus once scoutsAlive catches up to predatorsAlive/groupSize,
-  // so newlyMatured alone permanently hits 0 after a few steps and would
-  // starve the hidden pool. Cooldown graduates keep cycling every step, so
-  // splitting off of the full pool keeps scanning relevant long-term.
-  const readyScouts = scoutsAfter.available + scoutsAfter.cooldown + scoutsAfter.newlyMatured;
-  const newlyHiddenScouts = Math.floor(readyScouts * 0.8);
-  S.scoutsHidden += newlyHiddenScouts;
-  S.scoutsAvailable = readyScouts - newlyHiddenScouts;
-  S.predatorsCooldown = predatorsAfter.survivors;
-  S.predatorsAvailable = predatorsAfter.available + predatorsAfter.cooldown + predatorsAfter.newlyMatured;
-
-  if (totalInsectsForNest(nest) <= 0) {
-    nest.alive = false;
-    return;
-  }
-
-  /* ---- 7. dispatch NEXT step ---- */
-  const scoutsToDispatch = humansAreGone ? 0 : S.scoutsAvailable;
-  S.scoutsAvailable = 0;
-  for(let i=0;i<scoutsToDispatch;i++){ 
-    const e = { id:nid(), type:'search', status:'pending', outcome:null, nestId }; 
-    assignEventCoords(e);
-    S.events.push(e); 
-  }
-  maybeTriggerFort();
-  const groupSize = S.settings.groupSize;
-  const numGroups = humansAreGone ? 0 : Math.max(0, Math.min(Math.floor(S.predatorsAvailable/groupSize), successfulSearches));
-  const dispatched = numGroups*groupSize;
-  S.predatorsAvailable -= dispatched;
-  for(let i=0;i<numGroups;i++){ 
-    const e = { id:nid(), type:'hunt', status:'pending', outcome:null, groupSize, neutralized:0, killed:0, nestId }; 
-    const avail = S.trails.find(t => !t.claimedByHuntId && t.stepsLeft > 0 && t.nestId === nestId);
-    if (avail) {
-      avail.claimedByHuntId = e.id;
-      e._trailId = avail.id;
-      e.x = avail.waypoints[0].x;
-      e.y = avail.waypoints[0].y;
-    } else {
-      assignEventCoords(e);
-    }
-    S.events.push(e); 
-  }
-  if(numGroups>0) log(t('log.hunts_dispatched', { count: numGroups }));
-
-  S.forts.forEach(f => {
-    const mark = fortMark(f, nestId);
-    if (
-      mark.marked &&
-      mark.markedUntilStep != null &&
-      S.step + 1 >= mark.markedUntilStep
-    ) {
-      mark.marked = false;
-      mark.markedUntilStep = null;
-      mark.markedAttackDispatched = false;
-      mark.markingScoutCount = 0;
-    }
-  });
-}
-
-
-function processLifecycle(bonusEggs, pop, naturalFailures, successfulSearches = 0){
-  let scoutsAlive = pop.scoutsAlive;
-  let predatorsAlive = pop.predatorsAlive;
-  let newlyMaturedScouts = 0;
-  let newlyMaturedPredators = 0;
-
-  // ---------------------------------------------------------------------------
-  // POPULATION STATUS
-  // ---------------------------------------------------------------------------
-
-  const isLowPopulation =
-    totalInsects() < S.settings.minPopulationThreshold;
-
-  const scoutBias = isLowPopulation
-    ? 0
-    : (naturalFailures || 0) * S.settings.scoutBiasPerFailedSearch;
-
-  const adultPopulationBeforeDevelopment =
-    scoutsAlive + predatorsAlive;
-
-
-  // ---------------------------------------------------------------------------
-  // NYMPHS -> PREDATORS
-  // ---------------------------------------------------------------------------
-
-  let maturingCount = 0;
-  let recoveryPredatorsMaturedThisStep = 0;
-  let stillNymph = [];
-
-  S.nymph.forEach(c => {
-    c.age += 1;
-
-    if(c.age >= 2){
-      maturingCount += c.count;
-
-      if(c.recovery){
-        recoveryPredatorsMaturedThisStep += c.count;
-      }
-
-    } else {
-      stillNymph.push(c);
-    }
-  });
-
-  S.nymph = stillNymph;
-
-  for(let i = 0; i < maturingCount; i++){
-    predatorsAlive += 1;
-    newlyMaturedPredators += 1;
-  }
-
-  if(maturingCount > 0){
-    let matureMsg = t('log.nymphs_matured', {
-      count: maturingCount
-    });
-
-    if(naturalFailures > 0 && !isLowPopulation){
-      matureMsg += t('log.nymphs_bias_note', {
-        failures: naturalFailures,
-        bias: scoutBias >= 1
-          ? t('bias.strongly')
-          : t('bias.slightly')
-      });
-    }
-
-    log(matureMsg);
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // COCOONS -> SCOUTS / NYMPHS
-  //
-  // Recovery cohorts must be internally viable:
-  // 1 scout per predator group.
-  // ---------------------------------------------------------------------------
-
-  let newNymph = 0;
-  let newRecoveryNymph = 0;
-  let stillCocoon = [];
-
-  S.cocoon.forEach(c => {
-    c.age += 1;
-
-    if(c.age >= 1){
-
-      // -----------------------------------------------------------------------
-      // RECOVERY COHORT
-      // -----------------------------------------------------------------------
-
-      if(c.recovery){
-
-        // Same ratio cap as the normal-cohort path below - previously this
-        // branch created scouts with no ceiling at all, which is exactly
-        // why scouts could climb above predators: recovery cohorts fire
-        // during S.bounceback, i.e. right when predatorsAlive is at its
-        // lowest, so an uncapped recovery scout batch is the most likely
-        // way to breach the intended ratio.
-        const maxScoutsAllowedRecovery = predatorsAlive < 15 ? Math.round(predatorsAlive / 4) : Math.round(predatorsAlive / 5);
-
-        const recoveryScoutsNeeded =
-          Math.max(
-            1,
-            Math.ceil(c.count / S.settings.groupSize)
-          );
-
-        const roomUnderCap = Math.max(0, maxScoutsAllowedRecovery - scoutsAlive);
-
-        // Viability floor: if this nest currently has zero scouts, allow at
-        // least 1 through even over the cap, so predators maturing out of
-        // recovery aren't left with no scout to lead a hunting group.
-        const viabilityFloor = scoutsAlive === 0 ? 1 : 0;
-
-        const recoveryScoutsToCreate =
-          Math.min(
-            recoveryScoutsNeeded,
-            c.count,
-            Math.max(roomUnderCap, viabilityFloor)
-          );
-
-        const recoveryPredatorsToCreate =
-          c.count - recoveryScoutsToCreate;
-
-        for(let i = 0; i < recoveryScoutsToCreate; i++){
-
-          scoutsAlive += 1;
-          newlyMaturedScouts += 1;
-
-          if(
-            S.bounceback &&
-            S.bounceback.active
-          ){
-            S.bounceback.recoveryScouts =
-              (S.bounceback.recoveryScouts || 0) + 1;
-          }
-        }
-
-        if(recoveryPredatorsToCreate > 0){
-
-          newRecoveryNymph +=
-            recoveryPredatorsToCreate;
-        }
-
-      } else {
-
-        // ---------------------------------------------------------------------
-        // NORMAL COHORT
-        // ---------------------------------------------------------------------
-
-        for(let i = 0; i < c.count; i++){
-
-          const ratioScouts = Math.max(
-            1,
-            Math.ceil(
-              predatorsAlive /
-              S.settings.groupSize
-            )
-          );
-
-          const desiredScouts = isLowPopulation
-            ? ratioScouts
-            : Math.ceil(
-                predatorsAlive /
-                S.settings.groupSize +
-                scoutBias
-              );
-
-          // Hard cap scout creation at 2 scouts per 3 predators (2/3 ratio)
-          const maxScoutsAllowed = predatorsAlive < 15 ? Math.round(predatorsAlive / 4) : Math.round(predatorsAlive / 5);
-
-          if(scoutsAlive < desiredScouts && scoutsAlive < maxScoutsAllowed){
-
-            scoutsAlive += 1;
-            newlyMaturedScouts += 1;
-
-          } else {
-
-            newNymph += 1;
-          }
-        }
-      }
-
-    } else {
-
-      stillCocoon.push(c);
-    }
-  });
-
-  S.cocoon = stillCocoon;
-
-  if(newNymph > 0){
-    S.nymph.push({
-      age: 0,
-      count: newNymph,
-      recovery: false
-    });
-  }
-
-  if(newRecoveryNymph > 0){
-    S.nymph.push({
-      age: 0,
-      count: newRecoveryNymph,
-      recovery: true
-    });
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // LARVAE -> COCOONS
-  // ---------------------------------------------------------------------------
-
-  let newCocoon = 0;
-  let newRecoveryCocoon = 0;
-  let stillLarva = [];
-
-  S.larva.forEach(c => {
-    c.age += 1;
-
-    if(c.age >= 2){
-
-      if(c.recovery){
-        newRecoveryCocoon += c.count;
-      } else {
-        newCocoon += c.count;
-      }
-
-    } else {
-      stillLarva.push(c);
-    }
-  });
-
-  S.larva = stillLarva;
-
-  if(newCocoon > 0){
-    S.cocoon.push({
-      age: 0,
-      count: newCocoon,
-      recovery: false
-    });
-  }
-
-  if(newRecoveryCocoon > 0){
-    S.cocoon.push({
-      age: 0,
-      count: newRecoveryCocoon,
-      recovery: true
-    });
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // EGGS -> LARVAE
-  // ---------------------------------------------------------------------------
-
-  let newLarva = 0;
-  let newRecoveryLarva = 0;
-  let stillEggs = [];
-
-  S.eggs.forEach(c => {
-    c.age += 1;
-
-    if(c.age >= 1){
-
-      if(c.recovery){
-        newRecoveryLarva += c.count;
-      } else {
-        newLarva += c.count;
-      }
-
-    } else {
-      stillEggs.push(c);
-    }
-  });
-
-  S.eggs = stillEggs;
-
-  if(newLarva > 0){
-    S.larva.push({
-      age: 0,
-      count: newLarva,
-      recovery: false
-    });
-  }
-
-  if(newRecoveryLarva > 0){
-    S.larva.push({
-      age: 0,
-      count: newRecoveryLarva,
-      recovery: true
-    });
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // FEEDER COUNTS & CRITICAL RESERVE DUMP
-  // ---------------------------------------------------------------------------
-
-  const nymphCount = sumCohort(S.nymph);
-
-  const totalInsectsSum =
-    sumCohort(S.eggs) +
-    sumCohort(S.larva) +
-    sumCohort(S.cocoon) +
-    nymphCount +
-    scoutsAlive +
-    predatorsAlive;
-
-  if (totalInsectsSum < 5 && S.queenReserve > 0) {
-    S.food += S.queenReserve;
-    log(t('log.queen_dumped_reserve') || `Kráľovná presunula rezervu (${S.queenReserve}) do hlavných zásob potravy.`);
-    S.queenReserve = 0;
-  }
-
-  const feederGroups = [
-    {
-      key: 'scouts',
-      count: scoutsAlive
-    },
-    {
-      key: 'predators',
-      count: predatorsAlive
-    },
-    {
-      key: 'nymphs',
-      count: nymphCount
-    }
-  ];
-
-  const totalFeeders = feederGroups.reduce(
-    (a, g) => a + g.count,
-    0
-  );
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK TRIGGER GATE
-  // ---------------------------------------------------------------------------
-
-  const queenReserveCap =
-    S.settings.queenFoodReserveCap || 0;
-
-  const queenReserveFull =
-    S.queenReserve >= queenReserveCap;
-
-  const criticalRecoveryPopulation =
-    totalInsects() <=
-    S.settings.minPopulationThreshold * 0.5;
-
-  const bouncebackTriggerAllowed =
-    queenReserveFull ||
-    criticalRecoveryPopulation;
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK START (STEP 1 BATCH)
-  // ---------------------------------------------------------------------------
-
-  let queenLaidBounceback = false;
-
-  const FOOD_PER_RECOVERY_INSECT = 6;
-  const totalBouncebackEggs = Math.floor(S.queenReserve / FOOD_PER_RECOVERY_INSECT);
-
-  if(
-    S.queen.alive &&
-    (!S.bounceback || (!S.bounceback.active && !S.bounceback.controlledRecovery)) &&
-    isLowPopulation &&
-    bouncebackTriggerAllowed &&
-    totalBouncebackEggs > 0
-  ){
-
-    const batch1 = Math.ceil(totalBouncebackEggs / 2);
-    const batch2 = totalBouncebackEggs - batch1;
-
-    S.eggs.push({
-      age: 0,
-      count: batch1,
-      recovery: true
-    });
-
-    S.bounceback = {
-      active: true,
-      recoveryScouts: 0,
-      recoveryPredatorsMatured:
-        recoveryPredatorsMaturedThisStep > 0,
-      controlledRecovery: false,
-      recoveryTick: 0,
-      stepsElapsed: 0,
-      reserveDumped: false,
-      pendingBatch2: batch2
-    };
-
-    queenLaidBounceback = true;
-
-    log(t('log.bounceback_started', {
-      count: batch1
-    }));
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK STEP 2 BATCH
-  // ---------------------------------------------------------------------------
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    S.bounceback.pendingBatch2 > 0 &&
-    !queenLaidBounceback
-  ){
-    S.eggs.push({
-      age: 0,
-      count: S.bounceback.pendingBatch2,
-      recovery: true
-    });
-
-    log(t('log.bounceback_started', {
-      count: S.bounceback.pendingBatch2
-    }));
-
-    S.bounceback.pendingBatch2 = 0;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK PROGRESS
-  // ---------------------------------------------------------------------------
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    recoveryPredatorsMaturedThisStep > 0
-  ){
-    S.bounceback.recoveryPredatorsMatured = true;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK CONTROLLED-RECOVERY LAYING UNLOCK
-  // ---------------------------------------------------------------------------
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    !S.bounceback.controlledRecovery &&
-    !queenLaidBounceback
-  ){
-    S.bounceback.controlledRecovery = true;
-    S.bounceback.recoveryTick = 0;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // QUEEN FEEDING
-  // ---------------------------------------------------------------------------
-
-  let queenStarved = false;
-
-  if(S.queen.alive){
-
-    if(S.food >= 1){
-
-      S.food -= 1;
-
-    } else if(
-      S.bounceback &&
-      S.bounceback.active &&
-      S.queenReserve >= 1
-    ){
-
-      S.queenReserve -= 1;
-
-    } else if(S.queenReserve >= 1){
-
-      S.queenReserve -= 1;
-
-    } else {
-
-      S.queen.alive = false;
-      queenStarved = true;
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // RECOVERY SCOUT PROTECTION
-  // ---------------------------------------------------------------------------
-
-  let protectedRecoveryScouts = 0;
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    S.bounceback.recoveryScouts > 0
-  ){
-
-    const recoveryScouts = Math.min(
-      S.bounceback.recoveryScouts,
-      scoutsAlive
-    );
-
-    const fromFood = Math.min(
-      recoveryScouts,
-      S.food
-    );
-
-    S.food -= fromFood;
-    protectedRecoveryScouts += fromFood;
-
-    const stillNeeded =
-      recoveryScouts - protectedRecoveryScouts;
-
-    if(
-      stillNeeded > 0 &&
-      S.queenReserve > 0
-    ){
-
-      const fromReserve = Math.min(
-        stillNeeded,
-        S.queenReserve
-      );
-
-      S.queenReserve -= fromReserve;
-      protectedRecoveryScouts += fromReserve;
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // NORMAL FEEDING
-  // ---------------------------------------------------------------------------
-
-  const normalScouts =
-    Math.max(
-      0,
-      scoutsAlive - protectedRecoveryScouts
-    );
-
-  const normalFeederGroups = [
-    {
-      key: 'scouts',
-      count: normalScouts
-    },
-    {
-      key: 'predators',
-      count: predatorsAlive
-    },
-    {
-      key: 'nymphs',
-      count: nymphCount
-    }
-  ];
-
-  const normalFeeders =
-    normalFeederGroups.reduce(
-      (a, g) => a + g.count,
-      0
-    );
-
-  const shortage =
-    S.food < normalFeeders;
-
-  let unfed = 0;
-
-  if(shortage){
-
-    unfed =
-      normalFeeders - S.food;
-
-    S.food = 0;
-
-  } else {
-
-    S.food -= normalFeeders;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // RECOVERY STEP COUNTER
-  // ---------------------------------------------------------------------------
-
-  const RESERVE_DUMP_DELAY_STEPS = 3;
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    !queenLaidBounceback
-  ){
-    S.bounceback.stepsElapsed =
-      (S.bounceback.stepsElapsed || 0) + 1;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // RECOVERY LARVA FEEDING / RESERVE DUMP
-  // ---------------------------------------------------------------------------
-
-  const reserveWindowOpen =
-    S.bounceback &&
-    S.bounceback.active &&
-    !S.bounceback.reserveDumped;
-
-  const recoveryLarvaCount =
-    S.larva.reduce(
-      (a, c) => a + (c.recovery ? c.count : 0),
-      0
-    );
-
-  let unfedRecoveryLarvae = 0;
-
-  if(recoveryLarvaCount > 0 && reserveWindowOpen){
-
-    let recoveryLarvaCost =
-      recoveryLarvaCount;
-
-    const paidFromFood =
-      Math.min(S.food, recoveryLarvaCost);
-
-    S.food -= paidFromFood;
-    recoveryLarvaCost -= paidFromFood;
-
-    const paidFromReserve =
-      Math.min(S.queenReserve, recoveryLarvaCost);
-
-    S.queenReserve -= paidFromReserve;
-    recoveryLarvaCost -= paidFromReserve;
-
-    if(recoveryLarvaCost > 0){
-
-      unfedRecoveryLarvae = recoveryLarvaCost;
-
-      removeFromRecoveryLarvaCohorts(unfedRecoveryLarvae);
-    }
-  }
-
-  let queenReserveDumped = 0;
-
-  if(
-    reserveWindowOpen &&
-    S.bounceback.stepsElapsed >= RESERVE_DUMP_DELAY_STEPS
-  ){
-
-    S.bounceback.reserveDumped = true;
-
-    if(S.queenReserve > 0){
-
-      queenReserveDumped = S.queenReserve;
-
-      S.food += S.queenReserve;
-      S.queenReserve = 0;
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // BOUNCEBACK COMPLETION
-  // ---------------------------------------------------------------------------
-
-  let bouncebackJustFinished = false;
-
-  if(
-    S.bounceback &&
-    S.bounceback.active &&
-    S.bounceback.recoveryPredatorsMatured
-  ){
-
-    const recoveryStillDeveloping =
-      S.eggs.some(c => c.recovery) ||
-      S.larva.some(c => c.recovery) ||
-      S.cocoon.some(c => c.recovery) ||
-      S.nymph.some(c => c.recovery);
-
-    if(!recoveryStillDeveloping){
-
-      if(S.queenReserve > 0){
-
-        S.food += S.queenReserve;
-        S.queenReserve = 0;
-      }
-
-      S.bounceback.active = false;
-
-      bouncebackJustFinished = true;
-
-      log(t('log.bounceback_wave'));
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // QUEEN RESERVE REFILL
-  // ---------------------------------------------------------------------------
-
-  const QUEEN_RESERVE_REFILL_PER_STEP = 50;
-
-  if(
-    S.queen.alive &&
-    (!S.bounceback || !S.bounceback.active) &&
-    !isLowPopulation &&
-    S.queenReserve < queenReserveCap &&
-    S.food > 0
-  ){
-
-    const refillAmount = Math.min(
-      QUEEN_RESERVE_REFILL_PER_STEP,
-      S.food,
-      queenReserveCap - S.queenReserve
-    );
-
-    S.food -= refillAmount;
-    S.queenReserve += refillAmount;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // QUEEN EGG LAYING
-  // ---------------------------------------------------------------------------
-
-  let eggsLaid = 0;
-  let eggFoodCost = 0;
-  let eggsWereCapped = false;
-  let baseEggs = 0;
-
-  if(
-    S.queen.alive &&
-    (!S.bounceback || !S.bounceback.active || S.bounceback.controlledRecovery)
-  ){
-
-    const controlledRecovery =
-      S.bounceback &&
-      S.bounceback.controlledRecovery;
-
-    if(controlledRecovery){
-
-      S.bounceback.recoveryTick =
-        (S.bounceback.recoveryTick || 0) + 1;
-
-      const recoveryEggs =
-        Math.min(
-          S.settings.eggsPerFood,
-          S.settings.eggCap
-        );
-
-      const recoveryLayStep =
-        S.bounceback.recoveryTick % 2 === 0;
-
-      if(
-        recoveryLayStep &&
-        recoveryEggs > 0 &&
-        S.food >= 1
-      ){
-
-        S.food -= 1;
-
-        eggsLaid = recoveryEggs;
-        eggFoodCost = 1;
-
-        S.eggs.push({
-          age: 0,
-          count: recoveryEggs,
-          recovery: false
-        });
-      }
-
-      const adultPopulation =
-        scoutsAlive + predatorsAlive;
-
-      if(
-        adultPopulation >=
-        S.settings.minPopulationThreshold
-      ){
-        S.bounceback.controlledRecovery = false;
-      }
-
-    } else if(
-      isLowPopulation &&
-      S.food >= 1
-    ){
-
-      S.food -= 1;
-
-      const countToLay = Math.min(
-        S.settings.eggCap,
-        S.settings.eggsPerFood + bonusEggs 
-      );
-
-      if(countToLay > 0){
-
-        eggsLaid = countToLay;
-        eggFoodCost = 1;
-
-        S.eggs.push({
-          age: 0,
-          count: eggsLaid,
-          recovery: false
-        });
-      }
-
-    } else if(!shortage){
-
-      const insectCount =
-        Math.max(1, totalInsects());
-
-      const foodRatio =
-        S.food / insectCount;
-
-      if(foodRatio >= 5){
-
-        baseEggs =
-          S.settings.eggCap;
-
-      } else {
-
-        baseEggs = Math.round(
-          S.settings.eggCap *
-          (foodRatio - 1) / 3
-        );
-      }
-      let minimalEggs = 0;
-      if (insectCount < 5) {
-        minimalEggs = 2;
-      }
-      const FreeNestCapacity = Math.max(0.1, Math.min(1, 1-(predatorsAlive + scoutsAlive) / 50));
-      const desiredEggs =
-        Math.max(0,baseEggs) + bonusEggs + minimalEggs;
-
-      const cappedEggs =
-        Math.min(
-          S.settings.eggCap,
-          Math.round(desiredEggs * FreeNestCapacity)
-        );
-      eggsWereCapped =
-        cappedEggs < desiredEggs;
-    
-      const foodRemaining =
-        S.food;
-
-      const eggsPerFood =
-        S.settings.eggsPerFood;
-
-      let affordableEggs =
-        cappedEggs;
-
-      if(eggsPerFood > 0){
-
-        const foodBudget =
-          Math.max(0, foodRemaining);
-
-        const maxAffordable =
-          foodBudget * eggsPerFood +
-          (eggsPerFood - 1);
-
-        affordableEggs =
-          Math.min(
-            cappedEggs,
-            maxAffordable
-          );
-      }
-
-      eggsLaid =
-        affordableEggs;
-
-      eggFoodCost =
-        eggsPerFood > 0
-          ? Math.floor(
-              eggsLaid / eggsPerFood
-            )
-          : 0;
-
-      if(eggsLaid > 0){
-
-        S.eggs.push({
-          age: 0,
-          count: eggsLaid,
-          recovery: false
-        });
-
-        S.food -= eggFoodCost;
-      }
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // EGG-LAYING LOG
-  // ---------------------------------------------------------------------------
-
-  if(eggsLaid > 0){
-
-    let eggMsg =
-      t('log.queen_laid_eggs', {
-        count: eggsLaid
-      });
-
-    if(eggFoodCost > 0){
-
-      eggMsg +=
-        t('log.cost_food', {
-          cost: eggFoodCost
-        });
-    }
-
-    if(eggsWereCapped){
-
-      eggMsg +=
-        t('log.capped_at', {
-          cap: S.settings.eggCap
-        });
-    }
-
-    log(eggMsg + '.');
-
-  } else if(
-    S.queen.alive &&
-    !shortage &&
-    !(
-      S.bounceback &&
-      (
-        S.bounceback.active ||
-        S.bounceback.controlledRecovery
-      )
-    ) &&
-    (baseEggs + bonusEggs) > 0 &&
-    S.settings.eggCap > 0
-  ){
-
-    log(t('log.queen_withheld_food'));
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // IMMATURE CANNIBALISM
-  // ---------------------------------------------------------------------------
-
-  let eatenImmature = 0;
-
-  if(
-    unfed > 0 &&
-    !isLowPopulation &&
-    (!S.bounceback || !S.bounceback.active)
-  ){
-
-    eatenImmature =
-      eatFromCohorts(unfed);
-
-    unfed -= eatenImmature;
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // STARVATION
-  // ---------------------------------------------------------------------------
-
-  let deaths = {
-    queen: 0,
-    scouts: 0,
-    predators: 0,
-    nymphs: 0
-  };
-
-  if(unfed > 0){
-
-    deaths =
-      distributeDeaths(
-        normalFeederGroups,
-        unfed
-      );
-
-
-    // -------------------------------------------------------------------------
-    // QUEEN RESERVE BAILOUT (future-food protection)
-    // -------------------------------------------------------------------------
-    // distributeDeaths() above doesn't distinguish insects that are truly
-    // doomed from ones with a concrete shot at bringing food home very soon.
-    // If the queen still holds reserve food, she'll spend it to pull two
-    // groups out of the death toll:
-    //   - up to 1 scout per successful search THIS step - it just found
-    //     food; starving it the instant before delivery makes no sense.
-    //   - a full hunting group's worth of predators, but only if the nest
-    //     currently has at least groupSize predators alive (cooldown +
-    //     available) to form one - a partial group has no hunt to look
-    //     forward to, so it isn't protected.
-    // This only pulls FROM the death counts already assigned above, so it
-    // never protects more insects than distributeDeaths actually condemned.
-    let queenBailoutScouts = 0;
-    let queenBailoutPredators = 0;
-
-    // Queen's survival is an absolute priority over this bailout: her own
-    // feeding step above already runs first and is never touched here, but
-    // that only guarantees THIS step - if the bailout drained the reserve
-    // to 0, she could still starve next step should S.food happen to be
-    // empty then too. Reserve 1 unit (exactly what her own feeding costs
-    // per step) as an untouchable floor before the bailout may spend
-    // anything, so she's always covered one step ahead regardless.
-    const queenReserveFloor = S.queen.alive ? 1 : 0;
-    const availableForBailout = Math.max(0, S.queenReserve - queenReserveFloor);
-
-    if(availableForBailout > 0){
-
-      const groupSize = S.settings.groupSize;
-
-      queenBailoutScouts =
-        Math.min(
-          deaths.scouts,
-          successfulSearches,
-          availableForBailout
-        );
-
-      if(queenBailoutScouts > 0){
-        deaths.scouts -= queenBailoutScouts;
-        S.queenReserve -= queenBailoutScouts;
-      }
-
-      const stillAvailableForBailout = availableForBailout - queenBailoutScouts;
-
-      if(predatorsAlive >= groupSize && stillAvailableForBailout > 0){
-
-        queenBailoutPredators =
-          Math.min(
-            deaths.predators,
-            groupSize,
-            stillAvailableForBailout
-          );
-
-        if(queenBailoutPredators > 0){
-          deaths.predators -= queenBailoutPredators;
-          S.queenReserve -= queenBailoutPredators;
-        }
-      }
-
-      if(queenBailoutScouts > 0 || queenBailoutPredators > 0){
-        const bailoutMsg = t('log.queen_reserve_bailout', {
-          scouts: queenBailoutScouts,
-          predators: queenBailoutPredators
-        });
-        log(
-          bailoutMsg !== 'log.queen_reserve_bailout'
-            ? bailoutMsg
-            : `Kráľovná zachránila z rezervy ${queenBailoutScouts} skautov a ${queenBailoutPredators} predátorov pred hladom.`
-        );
-      }
-    }
-
-
-    scoutsAlive -= deaths.scouts;
-    predatorsAlive -= deaths.predators;
-
-    if(deaths.nymphs > 0){
-
-      removeFromNymphCohorts(
-        deaths.nymphs
-      );
-    }
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // QUEEN STARVATION LOG
-  // ---------------------------------------------------------------------------
-
-  if(queenStarved){
-    log(t('log.queen_starved'));
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // FAMINE LOG
-  // ---------------------------------------------------------------------------
-
-  if(shortage){
-
-    let msg =
-      t('log.famine', {
-        feeders: totalFeeders
-      });
-
-    if(eatenImmature > 0){
-
-      msg +=
-        t('log.devoured_immature', {
-          count: eatenImmature
-        });
-    }
-
-    if(unfed > 0){
-
-      const parts = [];
-
-      if(deaths.scouts){
-
-        parts.push(
-          deaths.scouts +
-          ' ' +
-          t('stats.scouts').toLowerCase()
-        );
-      }
-
-      if(deaths.predators){
-
-        parts.push(
-          deaths.predators +
-          ' ' +
-          t('stats.predators').toLowerCase()
-        );
-      }
-
-      if(deaths.nymphs){
-
-        parts.push(
-          deaths.nymphs +
-          ' ' +
-          t('stats.nymphs').toLowerCase()
-        );
-      }
-
-      if(parts.length > 0){
-
-        msg +=
-          t('log.starved_breakdown', {
-            parts: parts.join(', ')
-          });
-      }
-    }
-
-    if(S.queen.alive){
-
-      msg +=
-        t('log.queen_withheld_famine');
-    }
-
-    log(msg);
-  }
-
-
-  // ---------------------------------------------------------------------------
-  // RETURN
-  // ---------------------------------------------------------------------------
-
-  return {
-    newlyMaturedScouts,
-    newlyMaturedPredators,
-    scoutDeaths: deaths.scouts,
-    predatorDeaths: deaths.predators,
-  };
-}
-
-
-
-function eatFromCohorts(n){
-  let remaining = n;
-  [S.eggs].forEach(arr=>{
-    for(let i=0;i<arr.length && remaining>0;i++){
-      const take = Math.min(arr[i].count, remaining);
-      arr[i].count -= take;
-      remaining -= take;
-    }
-    for(let i=arr.length-1;i>=0;i--){ if(arr[i].count<=0) arr.splice(i,1); }
-  });
-  return n - remaining;
-}
-
-function removeFromNymphCohorts(n){
-  let remaining = n;
-  for(let i=0;i<S.nymph.length && remaining>0;i++){
-    const take = Math.min(S.nymph[i].count, remaining);
-    S.nymph[i].count -= take;
-    remaining -= take;
-  }
-  for(let i=S.nymph.length-1;i>=0;i--){ if(S.nymph[i].count<=0) S.nymph.splice(i,1); }
-}
-
-function removeFromRecoveryLarvaCohorts(n){
-  let remaining = n;
-  for(let i=0;i<S.larva.length && remaining>0;i++){
-    if(!S.larva[i].recovery) continue;
-    const take = Math.min(S.larva[i].count, remaining);
-    S.larva[i].count -= take;
-    remaining -= take;
-  }
-  for(let i=S.larva.length-1;i>=0;i--){ if(S.larva[i].count<=0) S.larva.splice(i,1); }
-}
-
-function distributeDeaths(groups, unfed){
-  const result = { queen:0, scouts:0, predators:0, nymphs:0 };
-  const total = groups.reduce((a,g)=>a+g.count,0);
-  if(total<=0) return result;
-  const capped = Math.min(unfed, total);
-  const raw = groups.map(g => (g.count/total) * capped);
-  const floors = raw.map(Math.floor);
-  let assigned = floors.reduce((a,b)=>a+b,0);
-  let remainder = capped - assigned;
-  const byFrac = raw
-    .map((r,i)=>({ i, frac: r-floors[i], capacity: groups[i].count-floors[i] }))
-    .filter(x=>x.capacity>0)
-    .sort((a,b)=>b.frac-a.frac);
-  let idx = 0;
-  while(remainder>0 && idx<byFrac.length){
-    floors[byFrac[idx].i] += 1;
-    remainder--; idx++;
-  }
-  groups.forEach((g,i)=>{ result[g.key] = Math.min(floors[i], g.count); });
-  return result;
-}
+// [moved to nest-core.js] function distributeDeaths(groups, unfed){ ... (21 lines)
 
 /* ============================= PLAYER ACTIONS ============================= */
 function findEvent(id){ return S.events.find(e=>e.id===id); }
+
+// Rolls a combat/field action's chance of ALSO costing an extra 1 AP -
+// "your soldier gets killed" doing it - on top of the action's normal AP
+// cost. Uses rollSoldierLoss() (nest-core.js, shared with
+// nest_defense_dqn.html) against the relevant apLossRisk* setting. The loss
+// is permanent - it reduces S.maxPoints (the inverse of what hireAtFort()
+// does), not just the current turn's S.points - since points reset to
+// maxPoints every step and a same-turn-only deduction would be invisible by
+// the next step. Floored at 1 so the player is never left with zero max AP.
+// Never blocks or reverses the action itself; the normal cost is already
+// spent by the time callers reach this.
+//
+// Every AP is a hybrid stationed at SOME fort (fort.hybrids - see
+// distributeHybridsAcrossForts()/hireAtFort() in nest-core.js), so losing
+// one here has to come off a fort's count too, not just the global total -
+// otherwise sum(fort.hybrids) would silently drift away from S.maxPoints,
+// and a fort destroyed later would deduct its (now stale, too-high) hybrid
+// count on top of losses already reflected in maxPoints from here. Picked
+// at random among alive forts that currently host at least one; if none do
+// (shouldn't normally happen while maxPoints > 0, but a level could hand-
+// author maxPoints without matching hybrids), maxPoints still drops - it's
+// just not attributable to any specific fort.
+function applySoldierLossRisk(probability){
+  if (!rollSoldierLoss(probability)) return;
+  S.maxPoints = Math.max(1, S.maxPoints - 1);
+  S.points = Math.min(S.points, S.maxPoints);
+
+  const hostForts = S.forts.filter(f => f.alive && (f.hybrids || 0) > 0);
+  if (hostForts.length > 0) {
+    const fort = hostForts[Math.floor(Math.random() * hostForts.length)];
+    fort.hybrids -= 1;
+  }
+
+  log(t('log.soldier_lost') !== 'log.soldier_lost'
+    ? t('log.soldier_lost')
+    : 'Prišli sme o bojovníka - maximálne body akcie klesli o 1.');
+}
 
 function distractScout(eid){
   const e = findEvent(eid);
@@ -3399,6 +1653,7 @@ function distractScout(eid){
   if(!e || e.status!=='pending' || e.outcome || S.points<cost) return;
   
   S.points -= cost; 
+  applySoldierLossRisk(S.settings.apLossRiskDistractScout);
   e.outcome='distracted';
   log(t('log.scout_distracted'));
   selectNextPendingEvent();
@@ -3407,13 +1662,54 @@ function distractScout(eid){
 
 function killScout(eid){
   const e = findEvent(eid);
+
+  if (e && e.fortMarkScout) { killMarkingScout(eid); return; }
+
   const cost = S.settings.costKillScout;
   if(!e || e.status!=='pending' || e.outcome || S.points<cost) return;
   
   S.points -= cost; 
+  applySoldierLossRisk(S.settings.apLossRiskKillScout);
   e.outcome='killed';
   log(t('log.scout_killed'));
   selectNextPendingEvent();
+  render();
+}
+
+// Kills one scout out of a marking-scout wave/group (see
+// maybeMarkFortsFromSearch in nest-core.js). Same "pay AP, remove one unit"
+// pattern as killPredatorAction/killFortAttacker: the group stays pending
+// and selected so the player can click this repeatedly until it's empty.
+function killMarkingScout(eid){
+  const e = findEvent(eid);
+  if(!e || !e.fortMarkScout || e.status!=='pending') return;
+
+  const remaining = (e.groupSize || 1) - (e.killed || 0);
+  if(remaining<=0) return;
+
+  const cost = S.settings.costKillScout;
+  if(S.points<cost) return;
+
+  S.points -= cost;
+  applySoldierLossRisk(S.settings.apLossRiskKillMarkingScout);
+  e.killed = (e.killed || 0) + 1;
+
+  // Drop one individual slot along with the kill - prefer a revealed one,
+  // since that's the only kind the player could actually have clicked on
+  // the map (a hidden slot has no icon to click). Falls back to any slot if
+  // none are currently revealed (e.g. killed via the event-details panel).
+  if (Array.isArray(e.scoutSlots) && e.scoutSlots.length > 0) {
+    let idx = e.scoutSlots.findIndex(s => !s.hidden);
+    if (idx === -1) idx = 0;
+    e.scoutSlots.splice(idx, 1);
+    e.hidden = isHiddenFortMarkScout(e);
+  }
+
+  log(t('log.scout_killed'));
+
+  if((e.groupSize || 1) - e.killed <= 0){
+    selectNextPendingEvent();
+  }
   render();
 }
 
@@ -3422,8 +1718,10 @@ function escapePredator(eid){
   const cost = S.settings.costEscapePredator;
   if(!e || e.status!=='pending') return;
   if(e.neutralized+e.killed >= e.groupSize) return;
+  if(e.routeHunt && (e.neutralized || 0) >= MERCHANT_PAIR_SIZE) return; // only 2 humans on a merchant run - both already safe
   if(S.points<cost) return;
   S.points -= cost; e.neutralized += 1;
+  applySoldierLossRisk(S.settings.apLossRiskEscapeHunt);
   log(t('log.human_escaped'));
   if(e.neutralized+e.killed >= e.groupSize){
     selectNextPendingEvent();
@@ -3438,6 +1736,7 @@ function killPredatorAction(eid){
   if(e.neutralized+e.killed >= e.groupSize) return;
   if(S.points<cost) return;
   S.points -= cost; e.killed += 1;
+  applySoldierLossRisk(S.settings.apLossRiskKillPredator);
   log(t('log.predator_killed'));
   if(e.neutralized+e.killed >= e.groupSize){
     selectNextPendingEvent();
@@ -3467,9 +1766,14 @@ function openNestAnalyticsAction(idx){
 // become a target. Returns null once there's nothing left to attack.
 function nestAttackTargetInfo(nest){
   if (!nest) return null;
-  if (nest.predatorsCooldown > 0) return { type: 'predator', cost: S.settings.costAttackNestPredator };
+  // Both *Cooldown (resting after a mission) and *Available (idle, ready
+  // to deploy) insects are physically present at the nest right now - only
+  // scoutsWorking()/predatorsWorking() are actually out in the field. Both
+  // pools must be checked here, or idle-but-available insects get skipped
+  // straight past to the nymphs/queen even though they're sitting right there.
+  if (nest.predatorsCooldown > 0 || nest.predatorsAvailable > 0) return { type: 'predator', cost: S.settings.costAttackNestPredator };
   if (sumCohort(nest.nymph) > 0) return { type: 'nymph', cost: S.settings.costKillNymph };
-  if (nest.scoutsCooldown > 0) return { type: 'scout', cost: S.settings.costAttackNestScout };
+  if (nest.scoutsCooldown > 0 || nest.scoutsAvailable > 0) return { type: 'scout', cost: S.settings.costAttackNestScout };
   if (nest.queen && nest.queen.alive) return { type: 'queen', cost: S.settings.costAttackQueen };
   return null;
 }
@@ -3504,6 +1808,7 @@ function attackNest(nestId){
   if (!target || S.points < target.cost) return;
 
   S.points -= target.cost;
+  applySoldierLossRisk(S.settings.apLossRiskAttackNest);
 
   // Route through the S.food/S.queen/S.nymph/... accessor shim so the
   // existing cohort helpers (removeFromNymphCohorts) act on THIS nest,
@@ -3512,7 +1817,14 @@ function attackNest(nestId){
   S.activeNestIndex = S.nests.indexOf(nest);
 
   if (target.type === 'predator') {
-    nest.predatorsCooldown -= 1;
+    // Kill from whichever pool the target check actually found - mirror its
+    // priority so we never decrement an empty *Cooldown pool into negative
+    // numbers when it was really an idle *Available predator that qualified.
+    if (nest.predatorsCooldown > 0) {
+      nest.predatorsCooldown -= 1;
+    } else {
+      nest.predatorsAvailable -= 1;
+    }
     log(t('log.nest_predator_killed', { id: nest.id }) !== 'log.nest_predator_killed'
       ? t('log.nest_predator_killed', { id: nest.id })
       : `Predátor v hniezde ${nest.id} bol zabitý útokom na hniezdo.`);
@@ -3522,7 +1834,11 @@ function attackNest(nestId){
       ? t('log.nest_nymph_killed', { id: nest.id })
       : `Nymfa v hniezde ${nest.id} bola zabitá útokom na hniezdo.`);
   } else if (target.type === 'scout') {
-    nest.scoutsCooldown -= 1;
+    if (nest.scoutsCooldown > 0) {
+      nest.scoutsCooldown -= 1;
+    } else {
+      nest.scoutsAvailable -= 1;
+    }
     log(t('log.nest_scout_killed', { id: nest.id }) !== 'log.nest_scout_killed'
       ? t('log.nest_scout_killed', { id: nest.id })
       : `Skaut v hniezde ${nest.id} bol zabitý útokom na hniezdo.`);
@@ -3565,37 +1881,172 @@ function saveHumans(fortId){
   fort.population += amount;
   S.points -= cost;
   S.humans -= amount;
+  applySoldierLossRisk(S.settings.apLossRiskSaveHumans);
 
   log(t('log.humans_evacuated', { count: amount }));
   render();
 }
 
+// The scan action reveals scouts from a single combined "hidden" pool:
+//  - fort-marking scouts already dispatched with a target/position, just
+//    waiting to be unhidden in place (see isHiddenFortMarkScout)
+//  - the generic S.scoutsHidden count, which has no mission yet and gets
+//    dispatched as a fresh search event on reveal (as before)
+// While both pools still have scouts left, each reveal is picked one at a
+// time with a 70% chance of coming from the marking pool (it's the more
+// useful/urgent intel - which fort, how many scouts). Once one pool runs
+// out, the rest of the budget just drains the other - most notably, if the
+// marking pool is empty from the start, the whole weighted pick is skipped
+// and every reveal just comes from the generic pool.
+const SCAN_REVEAL_MARK_SCOUT_CHANCE = 0.6;
+const SCAN_NOTHING_MAX_PROBABILITY = 0.6;
+const SCAN_NOTHING_ZERO_THRESHOLD = 15;
+
+function scanNothingProbability(hiddenCount){
+  if (hiddenCount >= SCAN_NOTHING_ZERO_THRESHOLD) return 0;
+  return SCAN_NOTHING_MAX_PROBABILITY *
+    (SCAN_NOTHING_ZERO_THRESHOLD - hiddenCount) /
+    (SCAN_NOTHING_ZERO_THRESHOLD - 1);
+}
+
+function hiddenFortMarkScouts(nestId) {
+  return S.events.filter(e => isHiddenFortMarkScout(e) && e.status === 'pending' && e.nestId === nestId);
+}
+
+let scanPlacementMode = false;
+
+function hiddenScoutCountAllNests(){
+  const generic = S.nests.reduce((total, nest) => total + Math.max(0, nest.scoutsHidden || 0), 0);
+  const marking = S.events.reduce((total, e) => {
+    if (e.type !== 'search' || !e.fortMarkScout || e.status !== 'pending') return total;
+    if (Array.isArray(e.scoutSlots)) return total + e.scoutSlots.filter(s => s.hidden).length;
+    return total + (e.hidden ? 1 : 0);
+  }, 0);
+  return generic + marking;
+}
+
 function scanForHidden(){
-  const cost = S.settings.costScan;
-  if(S.phase!=='active' || S.gameOver) return;
-  if(S.points<cost) return;
-  S.points -= cost;
-  if(S.scoutsHidden>0){
-    const revealed = Math.ceil(S.scoutsHidden / 3);
-    S.scoutsHidden -= revealed;
-    // Dispatch revealed scouts as pending search events right away so their
-    // icons show up on the map immediately, instead of parking them in
-    // scoutsAvailable where they'd stay invisible until the next step dispatch.
-    for (let i = 0; i < revealed; i++) {
-      const e = { id: nid(), type: 'search', status: 'pending', outcome: null };
-      assignEventCoords(e);
-      S.events.push(e);
-    }
-    log(t('log.scan_revealed', { count: revealed, remaining: S.scoutsHidden }));
+  if (scanPlacementMode) {
+    scanPlacementMode = false;
+    render();
+    return;
   }
+  if(S.phase!=='active' || S.gameOver) return;
+  if(S.points<S.settings.costScan) return;
+
+  scanPlacementMode = true;
+  log('Kliknite na mapu a vyberte miesto skenovania.');
   render();
 }
 
-function Hire(){
-  const cost = HIRE_COST;
-  if(S.phase!=='active' || S.gameOver) return;
-  if(S.points<cost) return;
-  S.points -= cost;
+function scanAt(clientX, clientY){
+  const wrap = document.getElementById('mapWrap');
+  scanPlacementMode = false;
+  if(!wrap || S.phase!=='active' || S.gameOver || S.points<S.settings.costScan){
+    render();
+    return;
+  }
+
+  const point = screenPxToWorld(wrap, clientX, clientY);
+  const genericMatches = [];
+  const markingMatches = [];
+
+  S.nests.forEach(nest => {
+    ensureHiddenScoutPositions(nest);
+    nest.hiddenScoutPositions.forEach((position, index) => {
+      if (dist(point, position) <= SCAN_REVEAL_RADIUS && Math.random() < REVEAL_CHANCE) {
+        genericMatches.push({ nest, index, position });
+      }
+    });
+  });
+
+  S.events.forEach(event => {
+    if (event.type !== 'search' || !event.fortMarkScout || event.status !== 'pending') return;
+    if (!Array.isArray(event.scoutSlots)) return;
+    const fort = S.forts.find(f => f.id === event.targetFortId);
+    if (!fort) return;
+    // Roll each still-hidden individual scout separately, against its own
+    // fixed ring position - so a scan can reveal part of a wave without
+    // revealing the rest, instead of one roll deciding the whole group.
+    event.scoutSlots.forEach(slot => {
+      if (!slot.hidden) return;
+      const pos = markingScoutSlotPosition(fort, markingScoutRingBucket(slot.slot));
+      if (dist(point, pos) <= SCAN_REVEAL_RADIUS && Math.random() < REVEAL_CHANCE) {
+        markingMatches.push({ event, slot });
+      }
+    });
+  });
+
+  S.points -= S.settings.costScan;
+
+  genericMatches.forEach(match => {
+    const event = {
+      id: nid(),
+      type: 'search',
+      status: 'pending',
+      outcome: null,
+      nestId: match.nest.id,
+      x: match.position.x,
+      y: match.position.y
+    };
+    S.events.push(event);
+  });
+
+  const indicesByNest = new Map();
+  genericMatches.forEach(match => {
+    if (!indicesByNest.has(match.nest)) indicesByNest.set(match.nest, []);
+    indicesByNest.get(match.nest).push(match.index);
+  });
+  indicesByNest.forEach((indices, nest) => {
+    [...indices].sort((a, b) => b - a).forEach(index => nest.hiddenScoutPositions.splice(index, 1));
+    nest.scoutsHidden = Math.max(0, nest.scoutsHidden - indices.length);
+  });
+
+  const touchedMarkingEvents = new Set();
+  markingMatches.forEach(match => {
+    match.slot.hidden = false;
+    touchedMarkingEvents.add(match.event);
+  });
+  // Keep the legacy aggregate flag in sync for anything that still reads it
+  // directly (e.g. the sandbox "show all hidden" toggle's event filter).
+  touchedMarkingEvents.forEach(event => { event.hidden = isHiddenFortMarkScout(event); });
+
+  const totalRevealed = genericMatches.length + markingMatches.length;
+  const remaining = hiddenScoutCountAllNests();
+  log(t('log.scan_revealed', {
+    count: totalRevealed,
+    remaining,
+    remainingWord: wordForm('adj.hidden_fem', remaining)
+  }));
+  render();
+  showScanRipple(document.getElementById('mapWrap'), point);
+}
+
+function showScanRipple(wrap, point){
+  const position = worldToScreenPx(wrap, point.x, point.y);
+  const ripple = document.createElement('div');
+  ripple.className = 'scan-ripple';
+  ripple.style.left = position.left + 'px';
+  ripple.style.top = position.top + 'px';
+  ripple.style.setProperty('--scan-ripple-diameter', `${SCAN_REVEAL_RADIUS * 2 * position.scale}px`);
+  ripple.addEventListener('animationend', () => ripple.remove(), { once: true });
+  wrap.appendChild(ripple);
+}
+
+// Hiring is free (no AP cost) but tied to a specific fort and capped by
+// canSustainOneMoreHybrid() - a fort that couldn't afford one more hybrid's
+// sustainHybrids() upkeep right now doesn't get to hire one, so the button
+// itself is disabled in that case (see the per-fort controls in renderMap())
+// rather than silently accepting a hire it can't keep. No per-step throttle
+// any more - canSustainOneMoreHybrid() is what naturally limits how many
+// hires a fort can support, not an arbitrary once-per-turn cap.
+function hireAtFort(fortId){
+  if (S.phase !== 'active' || S.gameOver) return;
+  const fort = S.forts.find(f => f.id === fortId && f.alive);
+  if (!fort) return;
+  if (!canSustainOneMoreHybrid(fort)) return;
+
+  fort.hybrids = (fort.hybrids || 0) + 1;
   S.maxPoints += 1;
   log(t('log.hybrid_hired'));
   render();
@@ -3658,6 +2109,11 @@ function placeFortAt(clientX, clientY){
     maxDefense: BUILD_FORT_DEFENSE,
     capacity: BUILD_FORT_CAPACITY,
     population: 0,
+    resources: emptyResourceBundle(), // freshly built - starts with nothing, unlike the random initial forts
+    desiredResources: defaultDesiredResourceLevels(),
+    production: emptyFortResourceCounters(),
+    workers: emptyFortResourceCounters(), // no population yet either - nobody to assign
+    autoWorkers: true, // on by default - starts assigning as soon as this fort gains population
     marked: false
   };
 
@@ -3666,13 +2122,316 @@ function placeFortAt(clientX, clientY){
   render();
 }
 
-function costBadgeHTML(cost){
-  return `<span class="btn-cost"><span class="btn-cost-val"><strong>${cost}</strong></span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>`;
+// ---------------------------------------------------------------------------
+// CUSTOM ICON TOOLTIPS
+//
+// Native title="" tooltips can only ever render plain text. The AP cost
+// badge on every action needs to show not just its own cost but also,
+// folded in, any resource costs/requirements/loss-risk that action
+// involves (see costTooltipItems() below) - as icons only, no words, since
+// there also isn't room to show those as a separate row of badges next to
+// the AP badge. This is a single shared floating element, positioned next
+// to whatever element the pointer is over, built from a
+// data-tooltip-items attribute (a base64-JSON {icon, value}[] list - see
+// encodeTooltipItems()) set INSTEAD OF title, on either a createElement'd
+// element or one built via an HTML string - a single delegated listener on
+// document handles both, so neither costBadgeHTML() (raw HTML, inserted
+// via innerHTML) nor buildCostBadgeEl() (a real DOM element) need their
+// own hover wiring.
+// ---------------------------------------------------------------------------
+let _customTooltipEl = null;
+let _customTooltipTarget = null;
+
+function ensureCustomTooltipEl() {
+  if (_customTooltipEl) return _customTooltipEl;
+  const el = document.createElement('div');
+  el.id = 'customTooltip';
+  document.body.appendChild(el);
+  _customTooltipEl = el;
+  return el;
 }
 
-function buildCostBadgeEl(cost){
+// Renders a data-tooltip-items payload (base64-JSON {icon, value, net?}[] -
+// e.g. the AP cost badge's breakdown - see costTooltipItems()/
+// buildFortPeekItems()) as the shared white/black #customTooltip shell. A
+// divider is drawn after any item explicitly flagged dividerAfter
+// (costTooltipItems uses this to separate its AP entry from the resources
+// that follow it). By default every item flows in one row; the target
+// element can instead opt into data-tooltip-stacked (one item per row,
+// e.g. the fort marker's resource peek, so each resource's stock and net
+// production sit together on their own line) - see the #customTooltip.
+// stacked rules, style.css.
+// A THIRD payload, data-tooltip-columns (base64-JSON {title, items}[] - see
+// buildMerchantIcons()), renders side-by-side columns instead: each with a
+// text header (the only place this tooltip ever shows words - see
+// buildMerchantIcons()) followed by that same icon+value item styling,
+// stacked one per row. Used for the merchant icon's per-fort trade
+// breakdown, where a flat single-column list can't show which goods belong
+// to which fort. Mutually exclusive with data-tooltip-items - an element
+// is expected to carry only one of the two attributes.
+function buildTooltipItemEl(item) {
+  const entry = document.createElement('span');
+  entry.className = 'tooltip-item';
+
+  const img = document.createElement('img');
+  img.src = item.icon;
+  img.alt = item.alt || '';
+  entry.appendChild(img);
+
+  const val = document.createElement('span');
+  val.className = 'tooltip-item-value' + (item.insufficient ? ' tooltip-item-value-insufficient' : '');
+  val.textContent = item.value;
+  entry.appendChild(val);
+
+  if (item.net != null) {
+    const net = document.createElement('span');
+    net.className = 'tooltip-item-net' +
+      (item.netPositive ? ' tooltip-item-net-positive' : item.netNegative ? ' tooltip-item-net-negative' : '');
+    net.textContent = item.net;
+    entry.appendChild(net);
+  }
+
+  return entry;
+}
+
+function showCustomTooltip(target, x, y) {
+  const itemsRaw = target.getAttribute('data-tooltip-items');
+  const columnsRaw = target.getAttribute('data-tooltip-columns');
+  if (!itemsRaw && !columnsRaw) return;
+
+  const el = ensureCustomTooltipEl();
+  el.innerHTML = '';
+
+  if (columnsRaw) {
+    let columns;
+    try {
+      columns = decodeTooltipPayload(columnsRaw);
+    } catch (err) {
+      return; // malformed payload - fail silently rather than show a broken tooltip
+    }
+    if (!Array.isArray(columns) || columns.length === 0) return;
+
+    el.classList.remove('stacked');
+    el.classList.add('columns-mode');
+
+    columns.forEach((col, i) => {
+      if (i > 0) {
+        const divider = document.createElement('span');
+        divider.className = 'tooltip-divider';
+        el.appendChild(divider);
+      }
+
+      const colEl = document.createElement('span');
+      colEl.className = 'tooltip-column';
+
+      const title = document.createElement('span');
+      title.className = 'tooltip-column-title';
+      title.textContent = col.title;
+      colEl.appendChild(title);
+
+      if (!col.items || col.items.length === 0) {
+        const empty = document.createElement('span');
+        empty.className = 'tooltip-column-empty';
+        empty.textContent = '\u2014';
+        colEl.appendChild(empty);
+      } else {
+        col.items.forEach(item => colEl.appendChild(buildTooltipItemEl(item)));
+      }
+
+      el.appendChild(colEl);
+    });
+
+    el.classList.add('visible');
+    _customTooltipTarget = target;
+    positionCustomTooltip(x, y);
+    return;
+  }
+
+  let items;
+  try {
+    items = decodeTooltipPayload(itemsRaw);
+  } catch (err) {
+    return; // malformed payload - fail silently rather than show a broken tooltip
+  }
+  if (!Array.isArray(items) || items.length === 0) return;
+
+  el.classList.remove('columns-mode');
+  el.classList.toggle('stacked', target.hasAttribute('data-tooltip-stacked'));
+
+  items.forEach((item, i) => {
+    if (i > 0 && items[i - 1].dividerAfter) {
+      const divider = document.createElement('span');
+      divider.className = 'tooltip-divider';
+      el.appendChild(divider);
+    }
+    el.appendChild(buildTooltipItemEl(item));
+  });
+
+  el.classList.add('visible');
+  _customTooltipTarget = target;
+  positionCustomTooltip(x, y);
+}
+
+function hideCustomTooltip() {
+  if (!_customTooltipEl) return;
+  _customTooltipEl.classList.remove('visible');
+  _customTooltipTarget = null;
+}
+
+// Follows the cursor, offset down-right, clamped so it never runs off the
+// viewport edge (flips to the other side of the cursor instead).
+function positionCustomTooltip(x, y) {
+  const el = _customTooltipEl;
+  if (!el || !el.classList.contains('visible')) return;
+
+  const OFFSET = 14;
+  const rect = el.getBoundingClientRect();
+  let left = x + OFFSET;
+  let top = y + OFFSET;
+
+  if (left + rect.width > window.innerWidth) left = x - OFFSET - rect.width;
+  if (top + rect.height > window.innerHeight) top = y - OFFSET - rect.height;
+
+  el.style.left = Math.max(4, left) + 'px';
+  el.style.top = Math.max(4, top) + 'px';
+}
+
+function initCustomTooltips() {
+  document.addEventListener('mouseover', (ev) => {
+    const el = ev.target.closest('[data-tooltip-items], [data-tooltip-columns]');
+    if (el && el !== _customTooltipTarget) showCustomTooltip(el, ev.clientX, ev.clientY);
+  });
+  document.addEventListener('mousemove', (ev) => {
+    if (_customTooltipTarget) positionCustomTooltip(ev.clientX, ev.clientY);
+  });
+  document.addEventListener('mouseout', (ev) => {
+    if (_customTooltipTarget && ev.target.closest('[data-tooltip-items], [data-tooltip-columns]') === _customTooltipTarget) {
+      const stillInside = ev.relatedTarget && _customTooltipTarget.contains(ev.relatedTarget);
+      if (!stillInside) hideCustomTooltip();
+    }
+  });
+  // A tooltipped element can be removed from the DOM (e.g. re-rendered)
+  // while still hovered, which would otherwise leave a stale tooltip
+  // floating with no way to dismiss it - render() runs constantly, so this
+  // is cheap insurance rather than a real per-frame cost.
+  document.addEventListener('scroll', hideCustomTooltip, true);
+}
+
+// Builds the ordered {icon, value}[] list shown by the AP cost badge's
+// tooltip (see showCustomTooltip() above): the AP cost itself first,
+// always, then - only if `costDef` (a FORT_ACTION_COSTS entry) is given -
+// requirement (not consumed - see meetsFortActionRequirement()), and/or
+// its `lossRisk` chance of losing one more unit of some resource. This
+// used to be a separate row of visible badges next to the AP badge
+// (resourceCostBadgesHTML/buildResourceCostBadgesEl) - there wasn't room
+// for that, so it all lives in the tooltip now instead.
+//
+// showCustomTooltip() can flag (and color red) whichever ones this
+// SPECIFIC fort can't actually afford right now - the same shortfall
+// meetsFortActionRequirement() uses to disable the button itself, just
+// surfaced per-resource instead of as one pass/fail. Left null for cost
+// badges with no particular fort in mind (or nothing to check against
+// yet), which just skips flagging anything as insufficient.
+// Builds the {icon, alt, value, net}[] items for a fort marker's hover
+// "peek" tooltip - same {icon, value} shape as the cost-badge tooltip
+// (costTooltipItems()) plus a `net` field the cost tooltip never sets:
+// this step's net production (estimateFortResourceNet(), nest-core.js -
+// production minus the guaranteed recurring drains: population's own food
+// upkeep, hybrids' ammo/fuel upkeep), signed and pre-formatted so the
+// player can gauge a fort's trajectory at a glance without opening the
+// full resources overlay. Applies the same rounding as the resources
+// overlay's own stock display for visual consistency. A final HYBRIDS
+// entry (AP's own icon, no net - see below) tags along after the six
+// resource types. Read-only/display-only - never touches fort state.
+function buildFortPeekItems(fort) {
+  const items = FORT_RESOURCE_TYPES.map(type => {
+    const net = estimateFortResourceNet(fort, type);
+    return {
+      icon: `/nest/assets/${RESOURCE_ICONS[type]}`,
+      alt: resourceLabel(type),
+      value: String(roundResource(fort.resources ? fort.resources[type] : 0)),
+      net: (net > 0 ? '+' : '') + String(net),
+      netPositive: net > 0,
+      netNegative: net < 0
+    };
+  });
+
+  // Hybrids aren't a resource type (no FORT_RESOURCE_TYPES entry, no
+  // production/net concept) but still belong in the same at-a-glance peek -
+  // reuses the AP badge's own icon (logo_icon.png) since hybrids, like AP,
+  // don't have a dedicated resource icon of their own.
+  items.push({
+    icon: '../assets/logo_icon.png',
+    alt: t('stats.hybrids'),
+    value: String(fort.hybrids || 0)
+  });
+
+  return items;
+}
+
+function costTooltipItems(cost, costDef, fort) {
+  // dividerAfter marks the AP entry as its own group, separate from
+  // whatever resources follow - see showCustomTooltip()'s divider logic,
+  // which only draws one where a payload actually asks for it (a plain
+  // resource list, like the fort marker's peek, has no such split).
+  const items = [{ icon: '../assets/logo_icon.png', value: String(cost), alt: 'AP', dividerAfter: true }];
+  if (!costDef) return items;
+
+  FORT_RESOURCE_TYPES.forEach(type => {
+    const amount = costDef[type];
+    if (!amount) return;
+    const owned = (fort && fort.resources) ? (fort.resources[type] || 0) : null;
+    items.push({
+      icon: `/nest/assets/${RESOURCE_ICONS[type]}`,
+      value: String(amount),
+      alt: resourceLabel(type),
+      insufficient: owned != null && owned < amount
+    });
+  });
+
+
+  if (costDef.lossRisk) {
+    const chancePct = Math.round(costDef.lossRisk.chance * 100);
+    items.push({ icon: `/nest/assets/${RESOURCE_ICONS[costDef.lossRisk.type]}`, value: `${chancePct}%`, alt: resourceLabel(costDef.lossRisk.type) });
+  }
+
+  return items;
+}
+
+// Base64-encoding the items JSON (rather than interpolating it straight
+// into an HTML attribute) sidesteps quote-escaping entirely: every value
+// going in here is either a fixed asset path or a plain number/percent
+// string, so there's never any non-ASCII content to worry about.
+// btoa()/atob() only handle strings whose characters are all in the Latin-1
+// range (0-255) - Slovak diacritics like č/š/ž/ď/ľ/ň/ť/ô fall outside that,
+// so encoding tooltip payloads with plain btoa(JSON.stringify(...)) throws
+// InvalidCharacterError the moment any of them show up (resource/fort
+// labels, log text, etc.). Route through UTF-8 bytes first so any Unicode
+// text round-trips safely.
+function encodeTooltipItems(items) {
+  const bytes = new TextEncoder().encode(JSON.stringify(items));
+  let binary = '';
+  bytes.forEach(b => { binary += String.fromCharCode(b); });
+  return btoa(binary);
+}
+
+function decodeTooltipPayload(raw) {
+  const binary = atob(raw);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return JSON.parse(new TextDecoder().decode(bytes));
+}
+
+function costBadgeHTML(cost, costDef, fort){
+  const iconSrc = '../assets/logo_icon.png';
+  const items = encodeTooltipItems(costTooltipItems(cost, costDef, fort));
+  return `<span class="btn-cost" data-tooltip-items="${items}"><span class="btn-cost-val"><strong>${cost}</strong></span><img src="${iconSrc}" alt="ap-icon" class="ap-icon"></span>`;
+}
+
+function buildCostBadgeEl(cost, costDef, fort){
   const span = document.createElement('span');
   span.className = 'btn-cost';
+  span.setAttribute('data-tooltip-items', encodeTooltipItems(costTooltipItems(cost, costDef, fort)));
   const val = document.createElement('span');
   val.className = 'btn-cost-val';
   val.textContent = cost;
@@ -3687,13 +2446,19 @@ function buildCostBadgeEl(cost){
 
 // Wraps a control button together with its AP cost badge using the same
 // layout as the hire/scan/build-fort buttons: cost shown above the button
-// rather than inside it.
-function wrapButtonWithCostAbove(button, cost, alignRight = false){
+// rather than inside it. `resourceCostDef` (an optional FORT_ACTION_COSTS
+// entry) folds into that same badge's tooltip - see costTooltipItems() -
+// rather than a separate row of badges; there wasn't room for one. `fort`,
+// if given, lets that tooltip flag any resource in `resourceCostDef` this
+// particular fort can't currently afford (see costTooltipItems()) - pass
+// the fort the button acts on whenever resourceCostDef is a real cost, so
+// the two stay in sync with each other.
+function wrapButtonWithCostAbove(button, cost, alignRight = false, resourceCostDef = null, fort = null){
   const container = document.createElement('div');
   container.className = 'btn-container';
 
   const costHolder = document.createElement('div');
-  costHolder.appendChild(buildCostBadgeEl(cost));
+  costHolder.appendChild(buildCostBadgeEl(cost, resourceCostDef, fort));
 
   // Keep the cost badge aligned with the action below it
   if (alignRight) {
@@ -3720,10 +2485,13 @@ function killFortAttacker(eid){
   if(!e || e.type!=='fort' || e.status!=='pending') return;
   const remaining = e.originalAttackers - e.killed;
   if(remaining<=0) return;
-  const cost = S.settings.costKillPredator;
+  const cost = S.settings.costKillFortAttacker;
   if(S.points<cost) return;
   S.points -= cost;
   e.killed += 1;
+  applySoldierLossRisk(S.settings.apLossRiskDefendFort);
+  const targetFort = S.forts.find(f => f.id === e.targetFortId);
+  if (targetFort) applyFortActionCost(targetFort, FORT_ACTION_COSTS.fortDefense);
   log(t('log.fort_attacker_killed', { id: e.targetFortId }));
   if(e.originalAttackers - e.killed <= 0){
     selectNextPendingEvent();
@@ -3744,7 +2512,7 @@ function render(){
   const killedEl = document.getElementById('humansKilledVal');
   if(killedEl) killedEl.textContent = S.humansKilled;
 
-  document.getElementById('insectsVal').textContent = totalInsectsAll();
+  document.getElementById('insectsVal').textContent = totalAdultInsectsAll();
   document.getElementById('pointsVal').textContent = S.points;
   document.getElementById('maxPointsVal').textContent = S.maxPoints;
 
@@ -3762,6 +2530,7 @@ function render(){
   renderLog();
   renderChart();
   renderOverlay();
+  refreshFortResourcesOverlay();
 }
 
 
@@ -3771,13 +2540,17 @@ function renderGlobalActions(){
     const costLbl = document.getElementById('scanCostLbl');
     if(costLbl) costLbl.textContent = S.settings.costScan;
     scanBtn.disabled = S.gameOver || S.phase!=='active' || S.points<S.settings.costScan;
+    scanBtn.classList.toggle('placing', scanPlacementMode);
+    scanBtn.title = scanPlacementMode
+      ? 'Kliknite na mapu a vyberte miesto skenovania.'
+      : 'Skenovať skryté skautky v označenej oblasti.';
   }
 
-  const hireBtn = document.getElementById('hire-btn');
-  if(hireBtn){
-    const costLbl = document.getElementById('hireCostLbl');
-    if(costLbl) costLbl.textContent = HIRE_COST;
-  }
+  // The old global "Hire" button/DOM sync lived here - hiring is now a
+  // per-fort action button built inside each fort's own controls (see
+  // renderMap()'s fort-panel button block, next to reinforce/capacity/
+  // evacuate/scavenge), so there's nothing to sync at the header level
+  // anymore. See hireAtFort().
 
   const buildFortBtn = document.getElementById('build-fort-btn');
   if(buildFortBtn){
@@ -3832,22 +2605,40 @@ function renderQueue(){
     li.onclick = ()=>selectEvent(e.id);
 
     const eventDescription = e.type==='search'
-      ? t('event.search_title')
+      ? t(e.routeSearch ? 'event.route_search_title' : 'event.search_title')
       : (e.type==='hunt'
-        ? t('event.hunt_title')
+        ? t(e.routeHunt ? 'event.route_hunt_title' : 'event.hunt_title')
         : t('event.fort_title', { id: e.targetFortId }));
 
     li.title = eventDescription;
 
     const badge = document.createElement('span');
-    badge.className = 'badge ' + e.type;
-    badge.textContent = e.type==='search' ? t('badge.search') : (e.type==='hunt' ? t('badge.hunt') : t('badge.fort'));
+    // 'route' modifier class alongside the base type class gives a CSS hook
+    // to style merchant-route search/hunt badges distinctly (e.g. a
+    // different accent color) without touching the normal search/hunt look.
+    badge.className = 'badge ' + e.type + (e.routeSearch || e.routeHunt ? ' route' : '');
+    badge.textContent = e.type==='search'
+      ? t(e.routeSearch ? 'badge.route_search' : 'badge.search')
+      : (e.type==='hunt' ? t(e.routeHunt ? 'badge.route_hunt' : 'badge.hunt') : t('badge.fort'));
 
     const actionsWrap = document.createElement('div');
     actionsWrap.className = 'q-actions';
 
     if (e.status === 'pending') {
-      if (e.type === 'search' && !e.outcome) {
+      if (e.type === 'search' && e.fortMarkScout) {
+        const remaining = (e.groupSize || 1) - (e.killed || 0);
+        if (remaining > 0) {
+          const killBtn = document.createElement('button');
+          killBtn.className = 'act-mini danger';
+          killBtn.textContent = t('actions.kill');
+          killBtn.title = t('actions.kill_scout_tooltip', { cost: S.settings.costKillScout });
+          killBtn.disabled = S.points < S.settings.costKillScout;
+          killBtn.onclick = (ev) => { ev.stopPropagation(); killMarkingScout(e.id); };
+
+          actionsWrap.appendChild(killBtn);
+        }
+
+      } else if (e.type === 'search' && !e.outcome) {
         const distractBtn = document.createElement('button');
         distractBtn.className = 'act-mini';
         distractBtn.textContent = t('actions.distract');
@@ -3868,11 +2659,17 @@ function renderQueue(){
       } else if (e.type === 'hunt') {
         const active = e.groupSize - (e.neutralized + e.killed);
         if (active > 0) {
+          const humansAlreadySaved = e.routeHunt && (e.neutralized || 0) >= MERCHANT_PAIR_SIZE;
+
           const rescueBtn = document.createElement('button');
           rescueBtn.className = 'act-mini';
           rescueBtn.textContent = t('actions.rescue');
-          rescueBtn.title = t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
-          rescueBtn.disabled = S.points < S.settings.costEscapePredator;
+          rescueBtn.title = humansAlreadySaved
+            ? (t('actions.rescue_all_saved_tooltip') !== 'actions.rescue_all_saved_tooltip'
+                ? t('actions.rescue_all_saved_tooltip')
+                : 'Obaja ľudia z tejto karavány sú už v bezpečí.')
+            : t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
+          rescueBtn.disabled = S.points < S.settings.costEscapePredator || humansAlreadySaved;
           rescueBtn.onclick = (ev) => { ev.stopPropagation(); escapePredator(e.id); };
 
           const killBtn = document.createElement('button');
@@ -3891,8 +2688,8 @@ function renderQueue(){
           const defendBtn = document.createElement('button');
           defendBtn.className = 'act-mini danger';
           defendBtn.textContent = t('actions.defend');
-          defendBtn.title = t('actions.defend_fort_tooltip', { id: e.targetFortId, cost: S.settings.costKillPredator });
-          defendBtn.disabled = S.points < S.settings.costKillPredator;
+          defendBtn.title = t('actions.defend_fort_tooltip', { id: e.targetFortId, cost: S.settings.costKillFortAttacker });
+          defendBtn.disabled = S.points < S.settings.costKillFortAttacker;
           defendBtn.onclick = (ev) => { ev.stopPropagation(); killFortAttacker(e.id); };
 
           actionsWrap.appendChild(defendBtn);
@@ -3908,6 +2705,7 @@ function renderQueue(){
       if(e.outcome==='distracted'){ status.textContent=t('status.distracted'); status.classList.add('good'); }
       else if(e.outcome==='killed'){ status.textContent=t('status.scout_killed'); status.classList.add('good'); }
       else if(e.outcome==='failed'){ status.textContent=t('status.found_nothing'); status.classList.add('good'); }
+      else if(e.outcome==='route_marked'){ status.textContent=t('status.route_marked'); status.classList.add('bad'); }
       else { status.textContent=t('status.succeeded'); status.classList.add('bad'); }
     } else if(e.type==='hunt'){
       const stopped = e.neutralized+e.killed;
@@ -3943,8 +2741,15 @@ function getEventDetailsHTML(eid){
     const s = S.settings;
     const remaining = Math.max(0, e.originalAttackers - e.killed);
     const targetFort = S.forts.find(f => f.id === e.targetFortId);
-    const predStrength = targetFort ? getFortPredatorStrength(targetFort) : 3;
-    const totalDamage = remaining * predStrength;
+    // Same shared projection resolution itself uses (estimateFortAssaultOutcome,
+    // nest-core.js) - MUST pass the actual attacking nest (e.nestId), not
+    // whatever nest the player currently has focused in the UI (S.nest),
+    // since distance-to-fort is what predator strength is computed from and
+    // those can easily be two very different nests.
+    const attackingNest = S.nests.find(n => n.id === e.nestId) || null;
+    const outcome = targetFort ? estimateFortAssaultOutcome(e, targetFort, attackingNest) : null;
+    const predStrength = outcome ? outcome.predStrength : 3;
+    const totalDamage = outcome ? outcome.totalDamage : 0;
     const currentDef = targetFort ? targetFort.defense : 0;
     const maxDef = targetFort ? targetFort.maxDefense : 50;
 
@@ -3959,7 +2764,7 @@ function getEventDetailsHTML(eid){
     html += '</div>';
     if(e.status==='pending'){
       html += '<div class="actions">';
-      html += `<button class="act danger" ${((S.points<s.costKillPredator || remaining<=0)?'disabled':'')} onclick="killFortAttacker(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.defend_fort')}</span>${costBadgeHTML(s.costKillPredator)}</button>`;
+      html += `<button class="act danger" ${((S.points<s.costKillFortAttacker || remaining<=0)?'disabled':'')} onclick="killFortAttacker(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.defend_fort')}</span>${costBadgeHTML(s.costKillFortAttacker, FORT_ACTION_COSTS.fortDefense, targetFort)}</button>`;
       html += '</div>';
       if(remaining<=0){
         html += `<div class="detail-desc" style="margin-top:8px;">${t('event.fort_safe', { id: e.targetFortId })}</div>`;
@@ -3970,10 +2775,39 @@ function getEventDetailsHTML(eid){
     return html;
   }
 
+  if(e.type==='search' && e.fortMarkScout){
+    const targetFort = S.forts.find(f => f.id === e.targetFortId);
+    const groupSize = e.groupSize || 1;
+    const killed = e.killed || 0;
+    const remaining = Math.max(0, groupSize - killed);
+
+    let html = `<h3 class="detail-title">${t('event.search_title')}</h3>`;
+    html += `<div class="detail-desc">${t('event.fort_attacker_map', { count: remaining, id: targetFort ? targetFort.id : e.targetFortId })}</div>`;
+    html += '<div class="detail-meta">';
+    html += `<div>${t('event.fort_orig_attackers')}<b>${groupSize}</b></div>`;
+    html += `<div>${t('event.fort_killed')}<b>${killed}</b></div>`;
+    html += '</div>';
+    if(e.status==='pending' && remaining>0){
+      html += '<div class="actions">';
+      html += `<button class="act danger" ${(S.points<S.settings.costKillScout?'disabled':'')} onclick="killMarkingScout(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.kill_scout')}</span>${costBadgeHTML(S.settings.costKillScout)}</button>`;
+      html += '</div>';
+    } else if(e.status==='pending'){
+      html += `<div class="detail-desc" style="margin-top:8px;">${t('event.fort_safe', { id: e.targetFortId })}</div>`;
+    } else {
+      html += `<div class="detail-meta"><div>${t('outcome.label')}<b>${outcomeLabel(e)}</b></div></div>`;
+    }
+    return html;
+  }
+
   if(e.type==='search'){
     const chance = Math.round(searchChanceWithDistance(e)*100);
-    let html = `<h3 class="detail-title">${t('event.search_title')}</h3>`;
-    html += `<div class="detail-desc">${t('event.search_desc', { chance, eggs: S.settings.eggsPerSearch })}</div>`;
+    // Route-scouting shares the same scout/death-risk mechanics as a normal
+    // search, but doesn't hunt for eggs - it's watching a trade route for a
+    // merchant to come by, so it gets its own title/description instead of
+    // the normal search copy (which would misleadingly mention an egg bonus).
+    const isRouteSearch = !!e.routeSearch;
+    let html = `<h3 class="detail-title">${t(isRouteSearch ? 'event.route_search_title' : 'event.search_title')}</h3>`;
+    html += `<div class="detail-desc">${isRouteSearch ? t('event.route_search_desc', { chance }) : t('event.search_desc', { chance, eggs: S.settings.eggsPerSearch })}</div>`;
     if(e.status==='pending' && !e.outcome){
       html += '<div class="actions">';
       html += `<button class="act" ${(S.points<S.settings.costDistractScout?'disabled':'')} onclick="distractScout(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.distract_scout')}</span>${costBadgeHTML(S.settings.costDistractScout)}</button>`;
@@ -3988,8 +2822,13 @@ function getEventDetailsHTML(eid){
     const active = e.groupSize - stopped;
     const huntChancePct = Math.round(huntChanceWithDistance(e)*100);
     const deathRiskPct = Math.round(S.settings.huntDeathRisk*100);
-    let html = `<h3 class="detail-title">${t('event.hunt_title')}</h3>`;
-    html += `<div class="detail-desc">${t('event.hunt_desc', { groupSize: e.groupSize, chance: huntChancePct, deathRisk: deathRiskPct })}</div>`;
+    // Route ambushes share the same predator/death-risk mechanics as a
+    // normal hunt, but only ever have MERCHANT_PAIR_SIZE (2) humans to
+    // actually kill, so it gets its own description calling that out
+    // instead of the normal hunt copy (which implies open-ended prey).
+    const isRouteHunt = !!e.routeHunt;
+    let html = `<h3 class="detail-title">${t(isRouteHunt ? 'event.route_hunt_title' : 'event.hunt_title')}</h3>`;
+    html += `<div class="detail-desc">${isRouteHunt ? t('event.route_hunt_desc', { groupSize: e.groupSize, chance: huntChancePct, deathRisk: deathRiskPct }) : t('event.hunt_desc', { groupSize: e.groupSize, chance: huntChancePct, deathRisk: deathRiskPct })}</div>`;
     html += '<div class="detail-meta">';
     html += `<div>${t('event.hunt_pack_size')}<b>${e.groupSize}</b></div>`;
     html += `<div>${t('event.hunt_escaped')}<b>${e.neutralized}</b></div>`;
@@ -3997,8 +2836,10 @@ function getEventDetailsHTML(eid){
     html += `<div>${t('event.hunt_still_hunting')}<b>${active}</b></div>`;
     html += '</div>';
     if(e.status==='pending' && active>0){
+      const humansAlreadySaved = isRouteHunt && (e.neutralized || 0) >= MERCHANT_PAIR_SIZE;
+      const rescueDisabled = S.points<S.settings.costEscapePredator || humansAlreadySaved;
       html += '<div class="actions">';
-      html += `<button class="act" ${(S.points<S.settings.costEscapePredator?'disabled':'')} onclick="escapePredator(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.help_escape')}</span>${costBadgeHTML(S.settings.costEscapePredator)}</button>`;
+      html += `<button class="act" ${(rescueDisabled?'disabled':'')} onclick="escapePredator(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.help_escape')}</span>${costBadgeHTML(S.settings.costEscapePredator)}</button>`;
       html += `<button class="act danger" ${(S.points<S.settings.costKillPredator?'disabled':'')} onclick="killPredatorAction(${e.id}); openEventDetails(${e.id});"><span class="btn-main">${t('actions.kill_predator')}</span>${costBadgeHTML(S.settings.costKillPredator)}</button>`;
       html += '</div>';
     } else if(e.status==='pending'){
@@ -4015,6 +2856,15 @@ function outcomeLabel(e){
   if(e.outcome==='killed') return t('outcome.scout_killed');
   if(e.outcome==='failed') return t('outcome.found_nothing');
   if(e.outcome==='succeeded') return t('outcome.succeeded');
+  // Merchant-route outcomes (see MERCHANT HUNTING in nest-core.js) - a
+  // route search never fails to find anything once dispatched (the
+  // eligibility roll already happened before dispatch), so there's no
+  // 'failed' case to mirror here, only 'killed'/'distracted' (handled
+  // above the same as a normal scout) or a successful mark.
+  if(e.outcome==='route_marked') return t('outcome.route_marked');
+  if(e.outcome==='ambush_succeeded') return t('outcome.ambush_succeeded');
+  if(e.outcome==='ambush_failed') return t('outcome.ambush_failed');
+  if(e.outcome==='no_target') return t('outcome.no_target');
   return e.outcome || '—';
 }
 
@@ -4078,6 +2928,78 @@ function pointAtDistance(pts, d){
     acc += segLen;
   }
   return pts[pts.length - 1];
+}
+
+// ---------------------------------------------------------------------------
+// ROUTE LAYER (static, non-animated)
+//
+// Draws S.routes (see regenerateRoutes()/findRouteCurve() in nest-core.js)
+// as quadratic-bezier curves between fort pairs. Geometry is fully
+// determined by fort/nest positions, so this layer is just rebuilt from
+// scratch on every renderMap() call - no per-frame animation loop needed,
+// unlike the trail layer below.
+// ---------------------------------------------------------------------------
+const ROUTE_STROKE_WIDTH = 3.2;
+const ROUTE_STROKE_COLOR = '#000000';
+const ROUTE_STROKE_DASHARRAY = '3,2.4';
+
+function buildRouteLayer() {
+  if (!S.routes || !S.routes.length) return null;
+
+  const svgNS = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(svgNS, 'svg');
+  svg.setAttribute('viewBox', `0 0 ${100 * WORLD_ASPECT_RATIO} 100`);
+  svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+  svg.setAttribute('class', 'route-layer');
+
+  const scaleG = document.createElementNS(svgNS, 'g');
+  scaleG.setAttribute('transform', `scale(${WORLD_ASPECT_RATIO}, 1)`);
+
+  function drawRoutePath(pts) {
+    if (!pts || pts.length < 2) return;
+    const d = `M ${pts[0].x} ${pts[0].y} ` + pts.slice(1).map(p => `L ${p.x} ${p.y}`).join(' ');
+    const path = document.createElementNS(svgNS, 'path');
+    path.setAttribute('d', d);
+    path.setAttribute('fill', 'none');
+    path.setAttribute('stroke', ROUTE_STROKE_COLOR);
+    path.setAttribute('stroke-width', String(ROUTE_STROKE_WIDTH));
+    path.setAttribute('stroke-dasharray', ROUTE_STROKE_DASHARRAY);
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('vector-effect', 'non-scaling-stroke');
+    scaleG.appendChild(path);
+  }
+
+  let drewAny = false;
+
+  // Triangle-hub trunks (see tryAddTriangleHubEntries in nest-core.js) are
+  // drawn ONCE here - each branch that forks off one has already had that
+  // same leading stretch trimmed out of its own points by
+  // getRouteCurveWorldPoints, so this is the only place it gets drawn.
+  (getRouteTrunkSegmentsWorldPoints() || []).forEach(pts => {
+    drawRoutePath(pts);
+    drewAny = true;
+  });
+
+  S.routes.forEach(route => {
+    const curve = getRouteCurveWorldPoints(route);
+    if (!curve) return;
+
+    // Rendered from the dense sampled polyline (curve.points) rather than
+    // the raw p0/c1/c2/p3 bezier - applyFortClusterHubs() (nest-core.js)
+    // may have routed this pair via a rectangle/triangle junction, or
+    // trimmed off a leading stretch that's drawn separately as a shared
+    // trunk, neither of which a single cubic bezier can still represent.
+    // A plain "L"-segment polyline at this sample density
+    // (ROUTE_MERGE_SAMPLES) still reads as a smooth curve at the route
+    // layer's stroke width.
+    const pts = curve.points && curve.points.length ? curve.points : [curve.p0, curve.p3];
+    drawRoutePath(pts);
+    drewAny = true;
+  });
+
+  if (!drewAny) return null;
+  svg.appendChild(scaleG);
+  return svg;
 }
 
 const TRAIL_DRAW_MS = 1200;
@@ -4324,6 +3246,17 @@ function ensureTrailAnimationLoop(){
   if (_trailAnimHandle == null) _trailAnimHandle = requestAnimationFrame(tickTrailAnimation);
 }
 
+// Elements spawned by spawnTempIcon() have no backing model in S - they're
+// pure transient DOM nodes driven by animateAlongPath/fadeOut's own
+// requestAnimationFrame/setTimeout loops. A coarse renderMap() call (from
+// any unguarded map/action handler) does `wrap.innerHTML = ''`, which
+// detaches them from the DOM without stopping their animation loops - they
+// keep "running" invisibly and their promises still resolve on schedule.
+// This array is how we find and reattach any of them that are still
+// in-flight, mirroring refreshTrailLayer's stillMounted self-healing for
+// the trail SVG layer.
+let _liveTempIcons = [];
+
 function spawnTempIcon(type, x, y){
   const wrap = document.getElementById('mapWrap');
   const el = document.createElement('div');
@@ -4334,7 +3267,29 @@ function spawnTempIcon(type, x, y){
   img.src = type === 'search' ? '/nest/assets/scout.png' : '/nest/assets/predator.png';
   el.appendChild(img);
   wrap.appendChild(el);
+  _liveTempIcons.push(el);
   return el;
+}
+
+// Call once an icon's animation (fadeOut and/or arrival) has actually
+// finished, so it stops being tracked/reattached and is removed from the
+// DOM - otherwise it would linger and get re-appended by a later,
+// unrelated renderMap() wipe.
+function retireTempIcon(el){
+  const idx = _liveTempIcons.indexOf(el);
+  if (idx !== -1) _liveTempIcons.splice(idx, 1);
+  if (el.parentNode) el.parentNode.removeChild(el);
+}
+
+// Re-appends any temp icons that are still mid-animation (and therefore
+// still tracked) but got detached by this renderMap()'s wrap.innerHTML =
+// '' wipe. Must run after that wipe (and is safe to run after the rest of
+// renderMap()'s normal content is built) so in-flight scout/predator
+// icons don't just vanish mid-step.
+function reattachLiveTempIcons(wrap){
+  _liveTempIcons.forEach(el => {
+    if (el.parentNode !== wrap) wrap.appendChild(el);
+  });
 }
 
 function easeInOutQuad(t){
@@ -4377,16 +3332,13 @@ function waitForAnimationAssets() {
   return Promise.all(
     assets.map(src => new Promise(resolve => {
       const img = new Image();
-
-      if (img.complete) {
-        resolve();
-        return;
-      }
-
       img.onload = resolve;
       img.onerror = resolve; // Don't block the game if an asset fails.
-
       img.src = src;
+      // If the browser already had this cached, .complete can flip to true
+      // synchronously right after assigning src, before onload ever fires -
+      // check it explicitly instead of relying on onload alone.
+      if (img.complete) resolve();
     }))
   );
 }
@@ -4405,6 +3357,27 @@ function runStepAnimation(outgoing, incoming, onComplete){
   if (!wrap || !S.nest) { onComplete(); return; }
   const promises = [];
 
+  // Icons in this batch have different durations (TRAIL_DRAW_MS, 900, 1000,
+  // 1100...), so they naturally finish walking/fading at different times.
+  // The underlying events stay _hideOnMap until the WHOLE batch's
+  // Promise.all below resolves and onComplete()'s render() runs - so every
+  // temp icon here must stay in the DOM (fully visible, or faded-but-present
+  // via fadeOut) until that same moment, and only then get retired together.
+  // Retiring an icon as soon as ITS OWN animation finishes (rather than
+  // waiting for the whole batch) is exactly what caused the "icon vanishes
+  // then reappears" / "trail with no scout icon" bug: a fast icon would be
+  // torn out of the DOM while slower icons in the same batch were still
+  // animating and _hideOnMap hadn't been cleared yet, leaving a real gap
+  // with nothing shown for that event until the batch's final render().
+  const batchEls = [];
+
+  const origSpawnTempIcon = spawnTempIcon;
+  function spawnBatchIcon(type, x, y){
+    const el = origSpawnTempIcon(type, x, y);
+    batchEls.push(el);
+    return el;
+  }
+
   S.trails.forEach(t => {
     if (t.claimedByHuntId != null) return;
     t.stepsLeft -= 1;
@@ -4416,34 +3389,44 @@ function runStepAnimation(outgoing, incoming, onComplete){
     if (e.type === 'search') {
       if (e.x === undefined || e.y === undefined) return;
 
-      // Fort-marking scout:
+      // Fort-marking scout wave:
       // - survived and marked the fort -> return to nest
       // - killed -> disappear at the fort
+      // One icon is animated per remaining map icon the wave was showing
+      // (see e.iconPositions, set while it was pending), not per scout.
       if (e.fortMarkScout) {
+        const positions = (e.iconPositions && e.iconPositions.length)
+          ? e.iconPositions
+          : [{ x: e.x, y: e.y }];
+
         if (e.outcome === 'fort_marked') {
-          const wp = curveWaypoints(
-            { x: e.x, y: e.y },
-            nestPt,
-            1,
-            6
-          );
+          positions.forEach(pos => {
+            const wp = curveWaypoints(
+              { x: pos.x, y: pos.y },
+              nestPt,
+              1,
+              6
+            );
 
-          const dense = denseSmoothPath(wp);
+            const dense = denseSmoothPath(wp);
 
-          const el = spawnTempIcon('search', e.x, e.y);
+            const el = spawnBatchIcon('search', pos.x, pos.y);
 
-          promises.push(
-            animateAlongPath(el, dense, TRAIL_DRAW_MS)
-              .then(() => fadeOut(el))
-          );
+            promises.push(
+              animateAlongPath(el, dense, TRAIL_DRAW_MS)
+                .then(() => fadeOut(el))
+            );
+          });
 
           return;
         }
 
-        // Marking scout was killed.
+        // Marking scout wave was wiped out.
         if (e.outcome === 'killed') {
-          const el = spawnTempIcon('search', e.x, e.y);
-          promises.push(fadeOut(el));
+          positions.forEach(pos => {
+            const el = spawnBatchIcon('search', pos.x, pos.y);
+            promises.push(fadeOut(el));
+          });
           return;
         }
 
@@ -4452,7 +3435,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
 
       // Normal scout behaviour stays unchanged.
       if (e.outcome !== 'succeeded') {
-        const el = spawnTempIcon('search', e.x, e.y);
+        const el = spawnBatchIcon('search', e.x, e.y);
         promises.push(fadeOut(el));
         return;
       }
@@ -4485,7 +3468,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
 
       ensureTrailAnimationLoop();
 
-      const el = spawnTempIcon('search', e.x, e.y);
+      const el = spawnBatchIcon('search', e.x, e.y);
 
       promises.push(
         animateAlongPath(el, dense, TRAIL_DRAW_MS)
@@ -4500,7 +3483,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
       if (e.x === undefined || e.y === undefined) return;
       if ((e.survivors || 0) <= 0) {
         if (e._trailId) retireTrail(e._trailId);
-        const el = spawnTempIcon('hunt', e.x, e.y);
+        const el = spawnBatchIcon('hunt', e.x, e.y);
         promises.push(fadeOut(el));
         return;
       }
@@ -4513,7 +3496,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
       } else {
         dense = denseSmoothPath(curveWaypoints({ x: e.x, y: e.y }, nestPt, 1, 6));
       }
-      const el = spawnTempIcon('hunt', e.x, e.y);
+      const el = spawnBatchIcon('hunt', e.x, e.y);
       promises.push(animateAlongPath(el, dense, 900).then(() => fadeOut(el)));
       return;
     }
@@ -4544,7 +3527,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
               )
             );            
             const dense = denseSmoothPath(curveWaypoints({ x: fx, y: fy }, nestPt, 1, 6));
-            const el = spawnTempIcon('hunt', fx, fy);
+            const el = spawnBatchIcon('hunt', fx, fy);
             promises.push(animateAlongPath(el, dense, 900).then(() => fadeOut(el)));
           }
         }
@@ -4558,7 +3541,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
     if (e.type === 'search') {
       if (e.x === undefined || e.y === undefined) return;
       const dense = denseSmoothPath(curveWaypoints(nestPt, { x: e.x, y: e.y }, 3, 15));
-      const el = spawnTempIcon('search', nestPt.x, nestPt.y);
+      const el = spawnBatchIcon('search', nestPt.x, nestPt.y);
       el.style.opacity = '0';
       requestAnimationFrame(() => { el.style.transition = 'opacity 0.3s ease'; el.style.opacity = '1'; });
       promises.push(animateAlongPath(el, dense, 1100));
@@ -4568,7 +3551,12 @@ function runStepAnimation(outgoing, incoming, onComplete){
     if (e.type === 'hunt') {
       let dense;
       const trail = e._trailId ? S.trails.find(t => t.id === e._trailId) : null;
-      if (!trail) {
+      // A merchant-route ambush already has its own deliberate x/y (the
+      // route's marked point, set at dispatch) - unlike a normal hunt, it
+      // must never adopt some unrelated leftover trail from the same nest
+      // just because one happens to be free, or it'd silently teleport to
+      // wherever that trail was heading instead of the actual route mark.
+      if (!trail && !e.routeHunt) {
         const avail = S.trails.find(t => !t.claimedByHuntId && t.stepsLeft > 0 && t.nestId === e.nestId);
         if (avail) {
           avail.claimedByHuntId = e.id;
@@ -4580,7 +3568,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
       if (e.x === undefined || e.y === undefined) assignEventCoords(e);
       dense = denseSmoothPath(curveWaypoints(nestPt, { x: e.x, y: e.y }, 2, 10));
 
-      const el = spawnTempIcon('hunt', nestPt.x, nestPt.y);
+      const el = spawnBatchIcon('hunt', nestPt.x, nestPt.y);
       el.style.opacity = '0';
       requestAnimationFrame(() => { el.style.transition = 'opacity 0.3s ease'; el.style.opacity = '1'; });
       promises.push(animateAlongPath(el, dense, 1000));
@@ -4627,7 +3615,7 @@ function runStepAnimation(outgoing, incoming, onComplete){
           // 2. Animate to the saved positions
           e.iconPositions.forEach((pos) => {
             const dense = denseSmoothPath(curveWaypoints(nestPt, pos, 2, 10));
-            const el = spawnTempIcon('hunt', nestPt.x, nestPt.y);
+            const el = spawnBatchIcon('hunt', nestPt.x, nestPt.y);
             el.style.opacity = '0';
             requestAnimationFrame(() => { el.style.transition = 'opacity 0.3s ease'; el.style.opacity = '1'; });
             promises.push(animateAlongPath(el, dense, 1000));
@@ -4638,7 +3626,17 @@ function runStepAnimation(outgoing, incoming, onComplete){
     }
   });
 
-  Promise.all(promises).then(() => onComplete());
+  Promise.all(promises).then(() => {
+    // Now that every icon in this batch has finished walking/fading (so
+    // the caller's onComplete -> render() is about to draw the "real"
+    // resting icons for these now-non-hidden events), retire them all
+    // together - untracking each from _liveTempIcons and removing it from
+    // the DOM. Doing this per-batch (not per-icon as each one's own,
+    // possibly-shorter animation finished) is what keeps every icon visible
+    // right up until the atomic swap, instead of leaving a gap.
+    batchEls.forEach(el => retireTempIcon(el));
+    onComplete();
+  });
 }
 
 function reinforceFort(fortId) {
@@ -4667,13 +3665,55 @@ function reinforceFort(fortId) {
     return;
   }
 
+  if (!meetsFortActionRequirement(fort, FORT_ACTION_COSTS.reinforceFort)) {
+    log(t('log.fort_reinforce_missing_resources', { id: fort.id }));
+    render();
+    return;
+  }
+
   S.points -= cost;
+  applyFortActionCost(fort, FORT_ACTION_COSTS.reinforceFort);
   fort.defense += S.settings.fortReinforceDefenseBonus;
   if (fort.defense > fort.maxDefense) {
     fort.maxDefense = fort.defense;
   }
   S.reinforcedForts.push(fort.id);
   log(t('log.reinforce_success', { id: fort.id, def: fort.defense, maxDef: fort.maxDefense }));
+  render();
+}
+
+// Free-form resource windfall - see applyFortScavenge() (nest-core.js) for
+// the actual pick-3-random-types-and-roll logic. Unlike reinforceFort()/
+// increaseFortCapacity() there's no per-fort "already done" gate and no
+// resource cost/requirement to check first - just the flat AP cost.
+function scavengeFort(fortId) {
+  if (S.gameOver) return;
+
+  if (S.phase !== 'active') {
+    log(t('log.scavenge_not_started'));
+    render();
+    return;
+  }
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  if (S.points < SCAVENGE_AP_COST) {
+    log(t('log.scavenge_no_ap', { id: fort.id }));
+    render();
+    return;
+  }
+
+  S.points -= SCAVENGE_AP_COST;
+  const found = applyFortScavenge(fort);
+  const summary = found
+    .filter(entry => entry.amount > 0)
+    .map(entry => `${entry.amount} ${resourceLabel(entry.type)}`)
+    .join(', ');
+
+  log(summary
+    ? t('log.scavenge_success', { id: fort.id, summary })
+    : t('log.scavenge_nothing', { id: fort.id }));
   render();
 }
 
@@ -4696,10 +3736,474 @@ function increaseFortCapacity(fortId) {
     return;
   }
 
+  if (!meetsFortActionRequirement(fort, FORT_ACTION_COSTS.increaseFortCapacity)) {
+    log(t('log.fort_capacity_missing_resources', { id: fort.id }));
+    render();
+    return;
+  }
+
   S.points -= cost;
-  fort.capacity += S.settings.fortCapacityIncreaseAmount;
+  applyFortActionCost(fort, FORT_ACTION_COSTS.increaseFortCapacity);
+  const capacityGain = capacityIncreaseAmount(fort.capacity, S.settings.fortCapacityIncreaseAmount);
+  fort.capacity += capacityGain;
   log(t('log.fort_capacity_increased', { id: fort.id, capacity: fort.capacity }));
   render();
+}
+
+// How much one click of a fort's resource up/down arrow changes that
+// resource's desired level by. A flat amount for every type for now -
+// tune freely, same spirit as FORT_RESOURCE_CAPS/FORT_DESIRED_RESOURCE_FRACTION.
+const RESOURCE_DEMAND_STEP = 5;
+
+// Fallback (Slovak) display labels for FORT_RESOURCE_TYPES, used for the
+// icon's alt/title text whenever the 'resources.<type>' translation key
+// isn't defined in TRANSLATIONS.
+const RESOURCE_LABELS_SK = {
+  ammo: 'Munícia',
+  food: 'Jedlo',
+  materials: 'Materiály',
+  fuel: 'Palivo'
+};
+
+// Icon filenames (under /nest/assets/) shown for each FORT_RESOURCE_TYPES
+// entry in the fort resource panel, in place of a text label.
+const RESOURCE_ICONS = {
+  ammo: 'ammo_icon.png',
+  food: 'food_icon.png',
+  materials: 'materials_icon.png',
+  fuel: 'fuel_icon.png'
+};
+
+// Shared with the fort-resource-panel labeling below: 'resources.<type>'
+// translation if defined, else the hardcoded Slovak fallback. Used anywhere
+// a resource icon needs a readable name (tooltips, alt text).
+function resourceLabel(type){
+  const labelKey = 'resources.' + type;
+  return t(labelKey) !== labelKey ? t(labelKey) : (RESOURCE_LABELS_SK[type] || type);
+}
+
+// ---------------------------------------------------------------------------
+// FORT CRITICAL-DEMAND BADGE
+//
+// The small top-left icon badge on a fort marker (see fortContainer
+// construction above) showing whichever resource(s) that fort holds under
+// 50% of what it's asking for (getCriticalDemandTypes(), nest-core.js).
+// When more than one resource qualifies, rather than picking a single
+// "most critical" one, the badge cycles through ALL of them, one per
+// second, via a single shared interval below - not a timer per fort
+// marker, since fort markers are fully torn down and rebuilt on every
+// render() and a per-element setInterval would just leak on every rebuild.
+// _demandCycleTick is shared by every fort's badge, so they all advance in
+// lockstep rather than independently drifting out of sync with each other.
+// ---------------------------------------------------------------------------
+let _demandCycleTick = 0;
+
+function updateFortDemandBadge(fort, badgeEl) {
+  const types = getCriticalDemandTypes(fort);
+  if (!types.length) {
+    badgeEl.style.display = 'none';
+    return;
+  }
+
+  const type = types[_demandCycleTick % types.length];
+  const icon = badgeEl.querySelector('img');
+  icon.src = `/nest/assets/${RESOURCE_ICONS[type]}`;
+  icon.alt = resourceLabel(type);
+  badgeEl.title = resourceLabel(type);
+  badgeEl.style.display = '';
+}
+
+// Advances the shared cycle tick and refreshes every currently-rendered
+// demand badge in place (just the icon/visibility - never rebuilds the
+// fort marker itself). Looks the fort back up by id rather than closing
+// over it, since the badge element handed to updateFortDemandBadge() when
+// it was first created could be long gone from the actual game state by
+// the time this next fires (fort died, etc.) - querySelectorAll here only
+// ever sees whichever badges are actually in the DOM right now.
+function tickFortDemandBadges() {
+  _demandCycleTick++;
+  document.querySelectorAll('.fort-demand-badge').forEach(badgeEl => {
+    const fortId = Number(badgeEl.dataset.fortId);
+    const fort = S.forts.find(f => f.id === fortId && f.alive);
+    if (!fort) { badgeEl.style.display = 'none'; return; }
+    updateFortDemandBadge(fort, badgeEl);
+  });
+}
+
+setInterval(tickFortDemandBadges, 1000);
+
+// Adjusts one resource type's desired level at one fort, up or down, by
+// RESOURCE_DEMAND_STEP. This is a FREE action - no AP cost, no S.phase
+// check - the player is just telling the fort what it wants, not doing
+// anything in the world. Clamped to [0, FORT_RESOURCE_CAPS[type]].
+//
+// Safe to call mid-step, including while merchants from this fort are
+// already out on the road: spawnMerchants()/resolveMerchants() (nest-core.js)
+// never re-read desiredResources mid-step - spawnMerchants() only reads it
+// once, at the very start of the NEXT advanceStepLogic() call, to decide
+// that step's barter matches. So changing this any number of times during
+// the current step just leaves whatever the value is when the step actually
+// ends/the next one begins - it can't retroactively touch a merchant that's
+// already pending, and can't be read twice with two different values by the
+// same step.
+function adjustFortDesiredResource(fortId, type, delta) {
+  if (S.gameOver) return;
+  if (!FORT_RESOURCE_TYPES.includes(type)) return;
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  if (!fort.desiredResources) fort.desiredResources = defaultDesiredResourceLevels();
+
+  const cap = FORT_RESOURCE_CAPS[type] || 0;
+  const current = fort.desiredResources[type] || 0;
+  fort.desiredResources[type] = Math.max(0, Math.min(cap, current + delta));
+  render();
+}
+
+// Empty (all-zero) per-type bundle, same shape as emptyResourceBundle() -
+// used for the two fields below (production, workers) that don't have
+// their own dedicated constructor yet.
+function emptyFortResourceCounters() {
+  return FORT_RESOURCE_TYPES.reduce((acc, type) => { acc[type] = 0; return acc; }, {});
+}
+
+// Lazily backfills a fort's resource-panel fields the first time it's
+// opened, same pattern as the existing resources/desiredResources
+// lazy-init. `production` (per-step output, once the production logic
+// exists) and `workers` (humans assigned to producing each type) are new -
+// UI only for now, per-type counters that just sit at 0 until that logic
+// is wired in.
+function ensureFortResourceFieldsInit(fort) {
+  if (!fort.resources) fort.resources = emptyResourceBundle();
+  if (!fort.desiredResources) fort.desiredResources = defaultDesiredResourceLevels();
+  if (!fort.production) fort.production = emptyFortResourceCounters();
+  if (!fort.workers) fort.workers = emptyFortResourceCounters();
+}
+
+// Adjusts how many of a fort's population are assigned to producing one
+// resource type, up or down by 1. FREE action, same spirit as
+// adjustFortDesiredResource() - no AP cost, no S.phase check. Clamped to
+// [0, fort.population]: a fort obviously can't put more people to work on
+// one resource than it actually shelters. This doesn't yet check the
+// total assigned across ALL types against population (nothing stops
+// over-assigning several resources past what the fort actually has) -
+// that, and any actual production math reading this field, is the "logic"
+// to add once this UI is in place.
+// Manual worker assignment: PERMANENT, "+1 only" - once committed to a
+// resource, a worker can never be reassigned or sent back to unemployed
+// (matches autoAllocateFortWorkers() in nest-core.js, which is equally
+// one-directional for the same reason). `delta` is only ever +1 from the
+// UI's single "+" button now, but this still clamps defensively to the
+// fort's remaining unemployed headcount either way.
+function adjustFortWorkers(fortId, type, delta) {
+  if (S.gameOver) return;
+  if (!FORT_RESOURCE_TYPES.includes(type)) return;
+  if (!(delta > 0)) return; // committed workers only ever increase
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  ensureFortResourceFieldsInit(fort);
+
+  const totalAssigned = FORT_RESOURCE_TYPES.reduce((sum, t) => sum + (fort.workers[t] || 0), 0);
+  const room = Math.max(0, (fort.population || 0) - totalAssigned);
+  const toAdd = Math.min(delta, room);
+  if (toAdd <= 0) return;
+
+  fort.workers[type] = (fort.workers[type] || 0) + toAdd;
+
+  // Update production immediately when worker allocation changes.
+  fort.production[type] = roundResource(resourceProductionForWorkers(fort.workers[type]));
+
+  render();
+}
+
+// Flips fort.autoWorkers and, when switching it ON, immediately re-plans
+// this fort's workers (autoAllocateFortWorkers(), nest-core.js) rather
+// than waiting for the next step - so the overlay reflects the new plan
+// right away instead of showing the old manual split until the game's own
+// per-step re-allocation has had a chance to run once.
+function toggleFortAutoWorkers(fortId) {
+  if (S.gameOver) return;
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort || !fort.alive) return;
+
+  ensureFortResourceFieldsInit(fort);
+  fort.autoWorkers = !fort.autoWorkers;
+  if (fort.autoWorkers) autoAllocateFortWorkers(fort);
+
+  render();
+}
+
+// ---------------------------------------------------------------------------
+// FORT RESOURCES OVERLAY
+//
+// The resource panel used to be built inline in the bottom control bar
+// (a cramped 3-column grid - see the .fort-resources rule in style.css history)
+// but there isn't room there for two more columns (production, workers), so
+// it now lives in its own overlay, opened via a single "RESOURCES" button in
+// the bottom bar. activeResourcesOverlayFortId tracks which fort it's
+// currently showing so render() (called after every arrow click, and every
+// simulation step) can keep it in sync without the player having to
+// close/reopen it - see refreshFortResourcesOverlay() below.
+// ---------------------------------------------------------------------------
+let activeResourcesOverlayFortId = null;
+
+function openFortResourcesOverlay(fortId) {
+  activeResourcesOverlayFortId = fortId;
+  renderFortResourcesOverlayContent(fortId);
+  const overlay = document.getElementById('fortResourcesOverlay');
+  if (overlay) overlay.classList.remove('hidden');
+}
+
+function closeFortResourcesOverlay() {
+  activeResourcesOverlayFortId = null;
+  const overlay = document.getElementById('fortResourcesOverlay');
+  if (overlay) overlay.classList.add('hidden');
+}
+
+// Called at the end of render() - re-renders the overlay's content in
+// place if it's currently open, so worker/desired-amount arrow clicks (and
+// ordinary step advancement, once production is wired in) update the
+// numbers immediately without needing to close and reopen it. If the fort
+// it was showing died or vanished, closes it instead of showing stale data.
+function refreshFortResourcesOverlay() {
+  const overlay = document.getElementById('fortResourcesOverlay');
+  if (!overlay || overlay.classList.contains('hidden') || activeResourcesOverlayFortId == null) return;
+
+  const fort = S.forts.find(f => f.id === activeResourcesOverlayFortId && f.alive);
+  if (!fort) { closeFortResourcesOverlay(); return; }
+
+  renderFortResourcesOverlayContent(activeResourcesOverlayFortId);
+}
+
+// Builds the actual resource list: one row per FORT_RESOURCE_TYPES entry,
+// stacked in a single column (unlike the old 3-column grid), each with -
+// left to right - the icon+label, current stock / desired goal with its
+// existing up/down control, this-step production (read-only display for
+// now), and assigned workers with its own up/down control.
+function renderFortResourcesOverlayContent(fortId) {
+  const container = document.getElementById('fortResourcesContent');
+  if (!container) return;
+  container.innerHTML = '';
+
+  const fort = S.forts.find(f => f.id === fortId);
+  if (!fort) return;
+  ensureFortResourceFieldsInit(fort);
+
+  const title = document.createElement('h3');
+  title.className = 'detail-title';
+  title.textContent = t('map.fort_resources_title') + ' #' + fort.id;
+  container.appendChild(title);
+
+  const table = document.createElement('div');
+  table.className = 'fort-resources';
+
+  const header = document.createElement('div');
+  header.className = 'fort-resource-row fort-resource-header';
+  header.appendChild(document.createElement('span')); // empty cell above the icon column
+  const stockHeader = document.createElement('span');
+  stockHeader.textContent = t('map.fort_resources_stock_header');
+  header.appendChild(stockHeader);
+  const productionHeader = document.createElement('span');
+  productionHeader.textContent = t('map.fort_resources_production_header');
+  header.appendChild(productionHeader);
+  const workersHeader = document.createElement('span');
+  workersHeader.className = 'fort-resource-workers-header';
+  const workersHeaderLabel = document.createElement('span');
+  workersHeaderLabel.textContent = t('map.fort_resources_workers_header');
+  workersHeader.appendChild(workersHeaderLabel);
+
+  // AUTO toggle - not localized on purpose (same "AUTO" text either
+  // language), same visual language as the auto-trade toggle in Options
+  // (nest-btn toggle-btn, data-enabled driving its ✓/✗ + color). Unlike
+  // that one this is per-FORT state (fort.autoWorkers), so it's built here
+  // fresh every render rather than being a single static button with a
+  // fixed id.
+  const autoWorkersBtn = document.createElement('button');
+  autoWorkersBtn.type = 'button';
+  autoWorkersBtn.className = 'nest-btn toggle-btn fort-auto-workers-btn';
+  autoWorkersBtn.dataset.enabled = fort.autoWorkers ? 'true' : 'false';
+  autoWorkersBtn.setAttribute('aria-pressed', fort.autoWorkers ? 'true' : 'false');
+  autoWorkersBtn.textContent = 'AUTO ' + (fort.autoWorkers ? '✓' : '✗');
+  autoWorkersBtn.title = 'AUTO';
+  autoWorkersBtn.onclick = (ev) => { ev.stopPropagation(); toggleFortAutoWorkers(fort.id); };
+  workersHeader.appendChild(autoWorkersBtn);
+
+  header.appendChild(workersHeader);
+  table.appendChild(header);
+
+  // Total headcount already assigned across every resource type - the "up"
+  // arrow for any one type must respect the fort's population as a WHOLE,
+  // not just that type's own count (a fort with population 100 shouldn't
+  const totalAssignedWorkers = FORT_RESOURCE_TYPES.reduce((sum, t) => sum + (fort.workers[t] || 0), 0);
+
+  FORT_RESOURCE_TYPES.forEach(type => {
+    const row = document.createElement('div');
+    row.className = 'fort-resource-row';
+
+    const label = document.createElement('img');
+    label.className = 'fort-resource-icon';
+    const labelKey = 'resources.' + type;
+    const labelText = t(labelKey) !== labelKey ? t(labelKey) : RESOURCE_LABELS_SK[type];
+    label.src = `/nest/assets/${RESOURCE_ICONS[type]}`;
+    label.alt = labelText;
+    label.title = labelText;
+    row.appendChild(label);
+
+    // Stock / desired goal, with the existing free up/down control.
+    const stockCell = document.createElement('span');
+    stockCell.className = 'fort-resource-cell';
+
+    const stockValue = document.createElement('span');
+    stockValue.className = 'fort-resource-value';
+    // Defensive display-side rounding to 1 decimal - the underlying value
+    // should already be clean (see roundResource() in nest-core.js), but
+    // this is what actually stops a stray float like 194.60000000000002
+    // from ever reaching the player even if some future code path forgets
+    // to round after mutating it.
+    stockValue.textContent = `${roundResource(fort.resources[type])} / ${fort.desiredResources[type] || 0}`;
+    stockCell.appendChild(stockValue);
+
+    const stockArrows = document.createElement('span');
+    stockArrows.className = 'fort-resource-arrows';
+
+    const stockDown = document.createElement('button');
+    stockDown.type = 'button';
+    stockDown.className = 'fort-resource-arrow';
+    stockDown.textContent = '▼';
+    stockDown.title = t('map.fort_resource_decrease');
+    stockDown.disabled = (fort.desiredResources[type] || 0) <= 0;
+    stockDown.onclick = (ev) => { ev.stopPropagation(); adjustFortDesiredResource(fort.id, type, -RESOURCE_DEMAND_STEP); };
+    stockArrows.appendChild(stockDown);
+
+    const stockUp = document.createElement('button');
+    stockUp.type = 'button';
+    stockUp.className = 'fort-resource-arrow';
+    stockUp.textContent = '▲';
+    stockUp.title = t('map.fort_resource_increase');
+    stockUp.disabled = (fort.desiredResources[type] || 0) >= (FORT_RESOURCE_CAPS[type] || 0);
+    stockUp.onclick = (ev) => { ev.stopPropagation(); adjustFortDesiredResource(fort.id, type, RESOURCE_DEMAND_STEP); };
+    stockArrows.appendChild(stockUp);
+
+    stockCell.appendChild(stockArrows);
+    row.appendChild(stockCell);
+
+    // Production is calculated live from the current worker assignment.
+    // This means opening the overlay or changing workers with ▲ / ▼
+    // immediately shows the correct production value.
+    const productionCell = document.createElement('span');
+    productionCell.className = 'fort-resource-cell fort-resource-production';
+    const liveProduction = resourceProductionForWorkers(fort.workers[type] || 0);
+    productionCell.textContent = Number(liveProduction).toFixed(1);
+    row.appendChild(productionCell);
+
+    // Workers assigned to this resource - PERMANENT once committed (see
+    // adjustFortWorkers()/autoAllocateFortWorkers()), so there's only ever
+    // a single "+" here, no "-" - a worker can never be moved back off a
+    // job once assigned.
+    const workersCell = document.createElement('span');
+    workersCell.className = 'fort-resource-cell';
+
+    const workersValue = document.createElement('span');
+    workersValue.className = 'fort-resource-value';
+    workersValue.textContent = String(fort.workers[type] || 0);
+    workersCell.appendChild(workersValue);
+
+    const workersAdd = document.createElement('button');
+    workersAdd.type = 'button';
+    workersAdd.className = 'fort-resource-arrow fort-resource-add';
+    workersAdd.textContent = '+';
+    workersAdd.title = t('map.fort_worker_increase');
+    workersAdd.disabled = fort.autoWorkers || totalAssignedWorkers >= Math.max(0, fort.population || 0);
+    workersAdd.onclick = (ev) => { ev.stopPropagation(); adjustFortWorkers(fort.id, type, 1); };
+    workersCell.appendChild(workersAdd);
+
+    row.appendChild(workersCell);
+
+    table.appendChild(row);
+  });
+
+  // Summary footer row: how much of this fort's population is NOT
+  // currently assigned to any resource job - the pool unemployedPopulation()
+  // (nest-core.js) draws merchants from. Shown once, under the workers
+  // column specifically (rather than as its own per-resource row), since
+  // it's a fort-wide total rather than a per-type value.
+  const availableRow = document.createElement('div');
+  availableRow.className = 'fort-resource-row fort-resource-summary';
+
+  const availableLabel = document.createElement('span');
+  availableLabel.className = 'fort-resource-summary-label';
+  availableLabel.textContent = t('stats.available') + ':  ' + String(unemployedPopulation(fort));
+  availableRow.appendChild(availableLabel);
+
+  table.appendChild(availableRow);
+
+    const hybridsRow = document.createElement('div');
+  hybridsRow.className = 'fort-resource-row fort-resource-summary';
+
+  const hybridsLabel = document.createElement('span');
+  hybridsLabel.className = 'fort-resource-summary-label';
+  hybridsLabel.textContent = t('stats.hybrids') + ':  ' + String(fort.hybrids || 0);
+  hybridsRow.appendChild(hybridsLabel);
+
+  table.appendChild(hybridsRow);
+
+  // Fourth summary footer row: what sustaining ALL of this fort's current
+  // hybrids actually costs, per step - FORT_ACTION_COSTS.sustainHybrid
+  // (nest-core.js) is a PER-HYBRID cost, so this is that multiplied by
+  // fort.hybrids, one icon+value pair per resource type it touches. Purely
+  // informational (mirrors what sustainHybrids() will actually charge this
+  // fort next step) - never touches fort state itself.
+
+  const hybridCostValues = document.createElement('span');
+  hybridCostValues.className = 'fort-resource-summary-values';
+
+  const hybridCostLabel = document.createElement('span');
+  hybridCostLabel.className = 'fort-resource-summary-label';
+  hybridCostLabel.textContent = t('stats.hybrid_cost') + ':';
+  hybridCostValues.appendChild(hybridCostLabel);
+
+  const hybridCount = fort.hybrids || 0;
+  FORT_RESOURCE_TYPES.forEach(type => {
+    const perHybrid = FORT_ACTION_COSTS.sustainHybrid[type];
+    if (!perHybrid) return;
+
+    const pair = document.createElement('span');
+    pair.className = 'fort-resource-summary-value-pair';
+
+    const icon = document.createElement('img');
+    icon.className = 'fort-resource-icon';
+    icon.src = `/nest/assets/${RESOURCE_ICONS[type]}`;
+    icon.alt = resourceLabel(type);
+    pair.appendChild(icon);
+
+    const value = document.createElement('span');
+    value.textContent = String(roundResource(perHybrid * hybridCount));
+    pair.appendChild(value);
+
+    hybridCostValues.appendChild(pair);
+  });
+  hybridsRow.appendChild(hybridCostValues);
+
+
+  // Third summary footer row: how many of this fort's population are
+  // committed merchantWorkers - a permanent vocation (see MERCHANT AS A
+  // FIXED VOCATION, nest-core.js) already excluded from the AVAILABLE row
+  // above and from every per-type WORKERS count, so this is the only place
+  // in the panel that headcount is visible at all.
+  const merchantsRow = document.createElement('div');
+  merchantsRow.className = 'fort-resource-row fort-resource-summary';
+
+  const merchantsLabel = document.createElement('span');
+  merchantsLabel.className = 'fort-resource-summary-label';
+  merchantsLabel.textContent = t('stats.merchants') + ':  ' + String(fort.merchantWorkers || 0);
+  merchantsRow.appendChild(merchantsLabel);
+
+  table.appendChild(merchantsRow);
+
+  container.appendChild(table);
 }
 
 let activeOpenMapKey = null;
@@ -4855,6 +4359,112 @@ function initMapFullscreenToggle() {
   });
 }
 
+// Icon+value list (no headers, no net info) for one fort's side of a
+// merchant tooltip column - only the resource types actually being carried
+// this step, since an empty "0" row for everything NOT being traded would
+// just be noise here (unlike the fort peek, which always lists every type).
+function cargoToTooltipItems(cargo) {
+  return FORT_RESOURCE_TYPES
+    .filter(type => (cargo[type] || 0) > 0)
+    .map(type => ({
+      icon: `/nest/assets/${RESOURCE_ICONS[type]}`,
+      alt: resourceLabel(type),
+      value: String(roundResource(cargo[type]))
+    }));
+}
+
+// One merchant icon per fort pair that just traded THIS step (at least one
+// resolved 'merchant' event on that route, either direction), planted at
+// the route's own curve midpoint (routeFarthestPointFromForts(), nest-core.js -
+// a cheap stand-in for "the middle of the route" that already accounts for
+// hub/bifurcated routing). Deliberately checks status === 'resolved', not
+// 'pending': a merchant event is spawned AND resolved within the same
+// synchronous advanceStepLogic() call (unlike search/hunt/fort, which stay
+// pending across a render boundary), so 'pending' never actually occurs by
+// the time anything outside that call gets to look at S.events. The
+// resolved event sticks around in S.events (and so keeps rendering here)
+// until the next advanceStepLogic() call purges it at the start of the
+// following step. Hovering it shows a two-column breakdown of what each
+// fort actually sent this step - each column headed by that fort's own
+// label (the only text in this tooltip - see buildTooltipItemEl() for why
+// everything else stays icon-only) followed by the same icon+value styling
+// as the fort peek tooltip.
+function buildMerchantIcons(wrap) {
+  const eventsByRoute = new Map(); // routeKey -> this step's resolved merchant events on it
+  (S.events || []).forEach(e => {
+    if (e.type !== 'merchant' || e.status !== 'resolved') return;
+    if (!eventsByRoute.has(e.routeKey)) eventsByRoute.set(e.routeKey, []);
+    eventsByRoute.get(e.routeKey).push(e);
+  });
+  if (eventsByRoute.size === 0) return;
+
+  eventsByRoute.forEach((events, rKey) => {
+    const route = (S.routes || []).find(r => routeKey(r.fortIdA, r.fortIdB) === rKey);
+    if (!route) return; // the route itself is gone (e.g. a fort died) - nothing to anchor the icon to
+
+    const fortA = S.forts.find(f => f.id === route.fortIdA && f.alive);
+    const fortB = S.forts.find(f => f.id === route.fortIdB && f.alive);
+    if (!fortA || !fortB) return;
+
+    const point = routeFarthestPointFromForts(route);
+    if (!point) return;
+
+    const cargoA = emptyResourceBundle();
+    const cargoB = emptyResourceBundle();
+    events.forEach(e => {
+      const bucket = e.fromFortId === fortA.id ? cargoA : (e.fromFortId === fortB.id ? cargoB : null);
+      if (!bucket) return;
+      FORT_RESOURCE_TYPES.forEach(type => { bucket[type] = (bucket[type] || 0) + (e.cargo[type] || 0); });
+    });
+
+    const columns = [
+      { title: t('map.fort_label', { id: fortA.id }), items: cargoToTooltipItems(cargoA) },
+      { title: t('map.fort_label', { id: fortB.id }), items: cargoToTooltipItems(cargoB) }
+    ];
+
+    const merchantContainer = document.createElement('div');
+    // Deliberately NOT relying on .map-icon's own absolute-position/self-
+    // centering behavior for this container - that class is pointer-events:
+    // none (see fortContainer's own comment on this same trick above), and
+    // with no intrinsic size of its own an absolutely-positioned child
+    // wouldn't give it one either, so hover would never register on it.
+    // This container does the positioning/centering/sizing itself (exactly
+    // like fortContainer does), and the actual icon inside is simplified to
+    // just fill it, same override fortImg uses when nested this way.
+    merchantContainer.style.position = 'absolute';
+    merchantContainer.style.transform = 'translate(-50%, -50%)';
+    merchantContainer.style.width = '3%';
+    merchantContainer.style.minWidth = '20px';
+    merchantContainer.style.aspectRatio = '1';
+    merchantContainer.style.zIndex = '4';
+    setWorldPosition(merchantContainer, wrap, point.x, point.y);
+    merchantContainer.setAttribute('data-tooltip-columns', encodeTooltipItems(columns));
+
+    const icon = document.createElement('img');
+    icon.className = 'map-icon merchant-icon';
+    icon.src = '/nest/assets/merchant_icon.png';
+    icon.alt = t('map.fort_label', { id: fortA.id }) + ' \u2194 ' + t('map.fort_label', { id: fortB.id });
+    // Exact same override set fortImg uses (see there) - position/zIndex/
+    // transform/width/height/display all have to match, not just most of
+    // them: .map-icon's own base rule sets its own z-index as part of its
+    // absolute-positioning defaults, and position:relative alone doesn't
+    // clear that - without this explicit zIndex override too, the icon
+    // silently inherits whatever stacking .map-icon's default gives it
+    // instead, which can bury it behind an earlier-painted layer (the
+    // route/trail SVG, the map background) while everything else about it
+    // - position, size - still looks perfectly correct.
+    icon.style.position = 'relative';
+    icon.style.zIndex = '1';
+    icon.style.transform = 'none';
+    icon.style.width = '100%';
+    icon.style.height = 'auto';
+    icon.style.display = 'block';
+    merchantContainer.appendChild(icon);
+
+    wrap.appendChild(merchantContainer);
+  });
+}
+
 function renderMap() {
   const wrap = document.getElementById('mapWrap');
   const fortsTag = document.getElementById('fortsTag');
@@ -4864,6 +4474,7 @@ function renderMap() {
   initMapFullscreenToggle();
 
   wrap.classList.toggle('fort-placement-active', fortPlacementMode);
+  wrap.classList.toggle('scan-placement-active', scanPlacementMode);
 
   const aliveForts = S.forts.filter(f => f.alive);
   if (fortsTag) {
@@ -4873,8 +4484,14 @@ function renderMap() {
   wrap.innerHTML = '';
   if (controlsContainer) controlsContainer.innerHTML = '';
 
+  ensureRoutesUpToDate();
+  const routeLayer = buildRouteLayer();
+  if (routeLayer) wrap.appendChild(routeLayer);
+
   const trailLayer = buildTrailLayer();
   if (trailLayer) wrap.appendChild(trailLayer);
+
+  buildMerchantIcons(wrap);
 
   // Render icons for alive nests only
   S.nests.forEach((nest, idx) => {
@@ -4886,8 +4503,6 @@ function renderMap() {
     nestContainer.dataset.nestId = nest.id;
     nestContainer.style.position = 'absolute';
     setWorldPosition(nestContainer, wrap, nest.x, nest.y);
-    nestContainer.style.transform = 'translate(-50%, -50%)';
-    nestContainer.style.transform = 'scale(3)';
     nestContainer.style.zIndex = '5';
     nestContainer.style.cursor = 'pointer';
 
@@ -4903,12 +4518,9 @@ function renderMap() {
     wrap.appendChild(nestContainer);
 
     if (activeOpenMapKey === nestKey && controlsContainer && S.phase === 'active') {
-      const analyticsBtn = document.createElement('button');
-      analyticsBtn.className = 'nest-btn control-btn map-action-btn';
-      const analyticsMain = document.createElement('span');
-      analyticsMain.className = 'btn-main';
-      analyticsMain.textContent = '📊';
-      analyticsBtn.appendChild(analyticsMain);
+      const analyticsBtn = document.createElement('img');
+      analyticsBtn.className = 'plain-icon';
+      analyticsBtn.src = '/nest/assets/inspect_nest_icon.png'
       analyticsBtn.title = t('map.nest_analytics_btn', { cost: S.settings.costNestAnalytics }) !== 'map.nest_analytics_btn'
         ? t('map.nest_analytics_btn', { cost: S.settings.costNestAnalytics })
         : `Analytika hniezda (${S.settings.costNestAnalytics} AP)`;
@@ -4920,12 +4532,9 @@ function renderMap() {
       };
 
       const target = nestAttackTargetInfo(nest);
-      const attackBtn = document.createElement('button');
-      attackBtn.className = 'nest-btn control-btn danger map-action-btn';
-      const attackMain = document.createElement('span');
-      attackMain.className = 'btn-main';
-      attackMain.textContent = '⚔️';
-      attackBtn.appendChild(attackMain);
+      const attackBtn = document.createElement('img');
+      attackBtn.className = 'plain-icon';
+      attackBtn.src = '/nest/assets/attack_nest_icon.png'
       const attackCost = target ? target.cost : 0;
       if (target) {
         const targetLabel = nestAttackTargetLabel(target.type);
@@ -4984,12 +4593,31 @@ function renderMap() {
 
     if (!f.alive) {
       cls += ' fallen';
-      fortImg.title = t('map.fort_fallen', { id: f.id });
+      // Same pointer-events:none issue as the alive-fort peek tooltip
+      // below - fortImg never actually receives the hover, so the title
+      // has to live on fortContainer (the element that does) instead.
+      fortContainer.title = t('map.fort_fallen', { id: f.id });
     } else {
       if (isUnderAssault) {
         cls += ' under-attack';
       }
-      fortImg.title = t('map.fort_active', { id: f.id, def: f.defense, maxDef: f.maxDefense });
+      // Set on fortContainer, NOT fortImg: the base .map-icon CSS rule is
+      // pointer-events:none (fort icons only opt back into pointer-events
+      // for the .under-attack state - see style.css), so fortImg itself
+      // never actually receives the hover in the normal case - the mouse
+      // event passes straight through it to fortContainer underneath,
+      // which is what carries the click handler/pointer cursor too. The
+      // delegated listener's ev.target.closest('[data-tooltip-items], [data-tooltip-columns]')
+      // only searches upward from wherever the event actually landed, so
+      // an attribute sitting on a pointer-events:none descendant is
+      // unreachable - this replaces the plain "Fort #ID (Defense: X/Y)"
+      // native title entirely (this tooltip covers stock, not defense)
+      // rather than risking both a native title AND this custom one
+      // showing at once - same icons-only form as the cost-badge tooltip,
+      // see buildFortPeekItems().
+      ensureFortResourceFieldsInit(f);
+      fortContainer.setAttribute('data-tooltip-items', encodeTooltipItems(buildFortPeekItems(f)));
+      fortContainer.setAttribute('data-tooltip-stacked', '1'); // one resource per row - see showCustomTooltip()
       fortContainer.style.cursor = 'pointer';
 
       fortContainer.onclick = (ev) => {
@@ -4999,42 +4627,33 @@ function renderMap() {
       if (activeOpenMapKey === fortKey && controlsContainer) {
         if (S.phase === 'active') {
           const alreadyReinforced = Array.isArray(S.reinforcedForts) && S.reinforcedForts.includes(f.id);
-          const reinforceBtn = document.createElement('button');
-          reinforceBtn.className = 'nest-btn control-btn map-action-btn';
-          const reinforceMain = document.createElement('span');
-          reinforceMain.className = 'btn-main';
-          reinforceMain.textContent = '🛡️';
-          reinforceBtn.appendChild(reinforceMain);
+          const reinforceBtn = document.createElement('img');
+          reinforceBtn.src = '/nest/assets/increase_defense_icon.png'
+          reinforceBtn.className = 'plain-icon';
           reinforceBtn.title = alreadyReinforced
             ? t('map.fort_reinforce_done_btn', { id: f.id })
             : t('map.fort_reinforce_btn', { cost: S.settings.fortReinforceCost, amount: S.settings.fortReinforceDefenseBonus });
-          reinforceBtn.disabled = S.points < S.settings.fortReinforceCost || alreadyReinforced;
+          reinforceBtn.disabled = S.points < S.settings.fortReinforceCost || alreadyReinforced || !meetsFortActionRequirement(f, FORT_ACTION_COSTS.reinforceFort);
           reinforceBtn.onclick = (ev) => {
             ev.stopPropagation();
             activeOpenMapKey = fortKey;
             reinforceFort(f.id);
           };
 
-          const capacityBtn = document.createElement('button');
-          capacityBtn.className = 'nest-btn control-btn map-action-btn';
-          const capacityMain = document.createElement('span');
-          capacityMain.className = 'btn-main';
-          capacityMain.textContent = '📦';
-          capacityBtn.appendChild(capacityMain);
-          capacityBtn.title = t('map.fort_capacity_btn', { cost: S.settings.costIncreaseFortCapacity, amount: S.settings.fortCapacityIncreaseAmount });
-          capacityBtn.disabled = S.points < S.settings.costIncreaseFortCapacity;
+          const capacityBtn = document.createElement('img');
+          capacityBtn.className = 'plain-icon';
+          capacityBtn.src = '/nest/assets/expand_fort_icon.png'
+          capacityBtn.title = t('map.fort_capacity_btn', { cost: S.settings.costIncreaseFortCapacity, amount: capacityIncreaseAmount(f.capacity, S.settings.fortCapacityIncreaseAmount) });
+          capacityBtn.disabled = S.points < S.settings.costIncreaseFortCapacity || !meetsFortActionRequirement(f, FORT_ACTION_COSTS.increaseFortCapacity);
           capacityBtn.onclick = (ev) => {
             ev.stopPropagation();
             activeOpenMapKey = fortKey;
             increaseFortCapacity(f.id);
           };
 
-          const evacuateBtn = document.createElement('button');
-          evacuateBtn.className = 'nest-btn control-btn map-action-btn';
-          const evacuateMain = document.createElement('span');
-          evacuateMain.className = 'btn-main';
-          evacuateMain.textContent = '🚑';
-          evacuateBtn.appendChild(evacuateMain);
+          const evacuateBtn = document.createElement('img');
+          evacuateBtn.className = 'plain-icon';
+          evacuateBtn.src = '/nest/assets/save_humans.png';
           evacuateBtn.title = t('map.evacuate_tooltip', { cost: S.settings.costSaveHumans, amount: S.settings.saveHumansAmount });
           evacuateBtn.disabled = S.gameOver || S.phase !== 'active' || S.points < S.settings.costSaveHumans || S.humans <= 0;
           evacuateBtn.onclick = (ev) => {
@@ -5043,9 +4662,41 @@ function renderMap() {
             saveHumans(f.id);
           };
 
-          controlsContainer.appendChild(wrapButtonWithCostAbove(reinforceBtn, S.settings.fortReinforceCost));
-          controlsContainer.appendChild(wrapButtonWithCostAbove(capacityBtn, S.settings.costIncreaseFortCapacity));
+          const scavengeBtn = document.createElement('img');
+          scavengeBtn.className = 'plain-icon';
+          scavengeBtn.src = '/nest/assets/scavenge_icon.PNG';
+          scavengeBtn.title = t('map.fort_scavenge_btn', { cost: SCAVENGE_AP_COST });
+          scavengeBtn.disabled = S.gameOver || S.points < SCAVENGE_AP_COST;
+          scavengeBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = fortKey;
+            scavengeFort(f.id);
+          };
+
+          // Free (no AP cost) - capped instead by canSustainOneMoreHybrid(),
+          // so the button is just disabled outright rather than showing a
+          // cost the player could conceivably pay but the fort can't back up.
+          // See hireAtFort() for why the once-per-step throttle still exists
+          // even though there's no cost to naturally rate-limit it.
+          const hireBtn = document.createElement('img');
+          hireBtn.className = 'plain-icon';
+          hireBtn.src = '/nest/assets/logo_icon.png';
+          const canHireHere = canSustainOneMoreHybrid(f);
+          hireBtn.title = canHireHere
+            ? t('map.fort_hire_btn', { count: f.hybrids || 0 })
+            : t('map.fort_hire_unaffordable_btn', { count: f.hybrids || 0 });
+          hireBtn.disabled = S.gameOver || S.phase !== 'active' || !canHireHere;
+          hireBtn.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = fortKey;
+            hireAtFort(f.id);
+          };
+
+          controlsContainer.appendChild(wrapButtonWithCostAbove(reinforceBtn, S.settings.fortReinforceCost, false, FORT_ACTION_COSTS.reinforceFort, f));
+          controlsContainer.appendChild(wrapButtonWithCostAbove(capacityBtn, S.settings.costIncreaseFortCapacity, false, FORT_ACTION_COSTS.increaseFortCapacity, f));
           controlsContainer.appendChild(wrapButtonWithCostAbove(evacuateBtn, S.settings.costSaveHumans));
+          controlsContainer.appendChild(wrapButtonWithCostAbove(scavengeBtn, SCAVENGE_AP_COST));
+          controlsContainer.appendChild(hireBtn);
         }
 
         const fortCapacity = Math.max(0, f.capacity || 0);
@@ -5067,7 +4718,7 @@ function renderMap() {
         popInput.id = 'fortPopulationInput';
         popInput.min = '0';
         popInput.max = String(fortCapacity);
-        popInput.value = String(Math.max(0, Math.min(f.population || 0, fortCapacity)));
+        popInput.value = String(Math.max(0, Math.min(Math.round(f.population || 0), fortCapacity)));
         popInput.readOnly = true;
         popInput.disabled = true;
 
@@ -5095,6 +4746,23 @@ function renderMap() {
         popField.appendChild(popLabelWrap);
         popField.appendChild(popValueWrap);
         controlsContainer.appendChild(popField);
+
+        // Resources used to be shown inline here as a 3-column grid, but
+        // the bottom bar doesn't have room for that plus a production and
+        // a workers column too - see openFortResourcesOverlay() and
+        // renderFortResourcesOverlayContent() further down for the actual
+        // resource list, now in its own overlay.
+        ensureFortResourceFieldsInit(f);
+
+        const resourcesBtn = document.createElement('button');
+        resourcesBtn.type = 'button';
+        resourcesBtn.className = 'nest-btn control-btn';
+        resourcesBtn.textContent = t('map.fort_resources_btn');
+        resourcesBtn.onclick = (ev) => {
+          ev.stopPropagation();
+          openFortResourcesOverlay(f.id);
+        };
+        controlsContainer.appendChild(resourcesBtn);
 
         if (f.alive && f.marked) {
           const markNote = document.createElement('div');
@@ -5161,6 +4829,38 @@ function renderMap() {
     fortContainer.appendChild(fortImg);
     fortContainer.appendChild(defBadge);
 
+    // Critical-demand badge: top-left counterpart to defBadge above,
+    // shows an icon (not text - see getCriticalDemandTypes(), nest-core.js)
+    // for whichever resource(s) this fort holds under 50% of what it's
+    // asking for. Hidden entirely (updateFortDemandBadge, below) when
+    // nothing qualifies. When more than one resource qualifies at once, it
+    // cycles through all of them a second at a time rather than picking
+    // just one - see tickFortDemandBadges()'s setInterval further down.
+    const demandBadge = document.createElement('span');
+    demandBadge.className = 'fort-demand-badge';
+    demandBadge.dataset.fortId = f.id;
+    demandBadge.style.position = 'absolute';
+    demandBadge.style.top = '-2px';
+    demandBadge.style.left = '-4px';
+    demandBadge.style.background = '#ffffff';
+    demandBadge.style.border = '1px solid #e02020';
+    demandBadge.style.padding = '1px 3px';
+    demandBadge.style.borderRadius = '3px';
+    demandBadge.style.pointerEvents = 'none';
+    demandBadge.style.zIndex = '6';
+    demandBadge.style.lineHeight = '1';
+    demandBadge.style.display = 'none'; // shown by updateFortDemandBadge() below, only if something actually qualifies
+
+    const demandIcon = document.createElement('img');
+    demandIcon.style.display = 'block';
+    demandIcon.style.width = '11px';
+    demandIcon.style.height = '11px';
+    demandIcon.style.objectFit = 'contain';
+    demandBadge.appendChild(demandIcon);
+
+    fortContainer.appendChild(demandBadge);
+    if (f.alive) updateFortDemandBadge(f, demandBadge);
+
     if (f.alive && f.marked) {
       const glow = document.createElement('div');
       glow.className = 'fort-pheromone-glow';
@@ -5185,7 +4885,12 @@ function renderMap() {
     }
 
     const capacity = Math.max(0, f.capacity || 0);
-    const population = Math.max(0, Math.min(f.population || 0, capacity));
+    // Population is always a whole number of people (see the comment on
+    // fort.population in consumeFortFood(), nest-core.js) - Math.round here
+    // is defensive display-side insurance, same spirit as the resource
+    // panel's roundResource() call, so a stray drifted value never reaches
+    // the player even if some future code path forgets to keep it clean.
+    const population = Math.max(0, Math.min(Math.round(f.population || 0), capacity));
     const popPct = capacity > 0 ? (population / capacity) * 100 : 0;
 
     const popBarTrack = document.createElement('div');
@@ -5204,7 +4909,9 @@ function renderMap() {
   const activeMapEvents = S.events.filter(e => {
     if (e.status !== 'pending') return false;
     if (e._hideOnMap) return false;
-    if (e.type === 'search' && e.outcome) return false;
+    if (isHiddenFortMarkScout(e)) return false;
+    if (e.type === 'search' && e.fortMarkScout && (e.groupSize || 1) - (e.killed || 0) <= 0) return false;
+    if (e.type === 'search' && !e.fortMarkScout && e.outcome) return false;
     if (e.type === 'hunt' && (e.neutralized + e.killed >= e.groupSize)) return false;
     if (e.type === 'fort' && (e.originalAttackers - e.killed <= 0)) return false;
     return e.type === 'search' || e.type === 'hunt' || e.type === 'fort';
@@ -5223,27 +4930,48 @@ function renderMap() {
       // correctly check .alive and simply drops the mark).
       if (!targetFort || !targetFort.alive) return;
 
-      const container = document.createElement('div');
-      container.className =
-        'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
+      const remaining = Math.max(0, (e.groupSize || 1) - (e.killed || 0));
+      if (remaining <= 0) return;
 
-      container.style.position = 'absolute';
-      container.dataset.eventId = e.id;
-      container.dataset.eventType = e.type;
-      setWorldPosition(container, wrap, e.x, e.y);
-      container.style.zIndex = '12';
+      // One icon per occupied ring position, not per scout - several
+      // revealed scouts can share a bucket once there are more than
+      // MARKING_RING_SIZE of them (see markingScoutRingBucket in
+      // script.js / MARKING_RING_SIZE in nest-core.js), which is what caps
+      // the display at MARKING_RING_SIZE icons no matter how large the
+      // wave gets.
+      const revealedSlots = Array.isArray(e.scoutSlots)
+        ? e.scoutSlots.filter(s => !s.hidden)
+        : [];
 
-      const iconImg = document.createElement('img');
-      iconImg.className = 'map-icon event-icon';
-      iconImg.src = '/nest/assets/scout.png';
-      iconImg.title = `Skaut označuje pevnosť ${targetFort.id}`;
+      const occupiedBuckets = [...new Set(revealedSlots.map(s => markingScoutRingBucket(s.slot)))];
 
-      iconImg.onclick = (ev) => {
-        toggleMapSelection(eventKey, ev);
-      };
+      e.iconPositions = occupiedBuckets.map(bucket => markingScoutSlotPosition(targetFort, bucket));
 
-      container.appendChild(iconImg);
-      wrap.appendChild(container);
+      if (e.iconPositions.length === 0) return;
+
+      e.iconPositions.forEach((pos) => {
+        const container = document.createElement('div');
+        container.className =
+          'map-event' + (activeOpenMapKey === eventKey ? ' open' : '');
+
+        container.style.position = 'absolute';
+        container.dataset.eventId = e.id;
+        container.dataset.eventType = e.type;
+        setWorldPosition(container, wrap, pos.x, pos.y);
+        container.style.zIndex = '12';
+
+        const iconImg = document.createElement('img');
+        iconImg.className = 'map-icon event-icon';
+        iconImg.src = '/nest/assets/scout.png';
+        iconImg.title = t('event.fort_attacker_map', { count: remaining, id: targetFort.id });
+
+        iconImg.onclick = (ev) => {
+          toggleMapSelection(eventKey, ev);
+        };
+
+        container.appendChild(iconImg);
+        wrap.appendChild(container);
+      });
 
       if (activeOpenMapKey === eventKey && controlsContainer) {
         const infoBtn = document.createElement('button');
@@ -5271,7 +4999,7 @@ function renderMap() {
           killBtn.onclick = (ev) => {
             ev.stopPropagation();
             activeOpenMapKey = eventKey;
-            killScout(e.id);
+            killMarkingScout(e.id);
           };
         }
 
@@ -5368,9 +5096,9 @@ function renderMap() {
         const rightBtn = document.createElement('img');
         rightBtn.className = 'btn-icon';
         rightBtn.src = '../sim/assets/THREAT.png';
-        rightBtn.title = t('actions.defend_fort_tooltip', { id: targetFort.id, cost: S.settings.costKillPredator });
+        rightBtn.title = t('actions.defend_fort_tooltip', { id: targetFort.id, cost: S.settings.costKillFortAttacker });
         
-        if (S.points < S.settings.costKillPredator) {
+        if (S.points < S.settings.costKillFortAttacker) {
           rightBtn.style.opacity = '0.5';
           rightBtn.style.pointerEvents = 'none';
         } else {
@@ -5382,7 +5110,7 @@ function renderMap() {
         }
 
         controlsContainer.appendChild(infoBtn);
-        controlsContainer.appendChild(rightBtn);
+        controlsContainer.appendChild(wrapButtonWithCostAbove(rightBtn, S.settings.costKillFortAttacker, false, FORT_ACTION_COSTS.fortDefense, targetFort));
       }
       return;
     }
@@ -5474,18 +5202,27 @@ function renderMap() {
         controlsContainer.appendChild(infoBtn);
 
       } else {
-        leftBtn.textContent = '🏃';
-        leftBtn.id = 'save-human-btn';
-        leftBtn.title = t('actions.rescue_tooltip', {
-          cost: S.settings.costEscapePredator
-        });
-        leftBtn.disabled = S.points < S.settings.costEscapePredator;
+        const leftButton = document.createElement('img');
+        leftButton.className = 'plain-icon';
+        leftButton.id = 'save-human-btn';
+        leftButton.src = '/nest/assets/save_humans.png';
+        const humansAlreadySaved = e.routeHunt && (e.neutralized || 0) >= MERCHANT_PAIR_SIZE;
+        leftButton.title = humansAlreadySaved
+          ? (t('actions.rescue_all_saved_tooltip') !== 'actions.rescue_all_saved_tooltip'
+              ? t('actions.rescue_all_saved_tooltip')
+              : 'Obaja ľudia z tejto karavány sú už v bezpečí.')
+          : t('actions.rescue_tooltip', { cost: S.settings.costEscapePredator });
 
-        leftBtn.onclick = (ev) => {
-          ev.stopPropagation();
-          activeOpenMapKey = eventKey;
-          escapePredator(e.id);
-        };
+        if (S.points < S.settings.costEscapePredator || humansAlreadySaved) {
+          leftButton.style.opacity = '0.5';
+          leftButton.style.pointerEvents = 'none';
+        } else {
+          leftButton.onclick = (ev) => {
+            ev.stopPropagation();
+            activeOpenMapKey = eventKey;
+            escapePredator(e.id);
+          };
+        }
 
         rightBtn.title = t('actions.kill_predator_tooltip', {
           cost: S.settings.costKillPredator
@@ -5503,7 +5240,7 @@ function renderMap() {
         }
 
         controlsContainer.appendChild(
-          wrapButtonWithCostAbove(leftBtn, S.settings.costEscapePredator)
+          wrapButtonWithCostAbove(leftButton, S.settings.costEscapePredator)
         );
 
         controlsContainer.appendChild(
@@ -5518,10 +5255,32 @@ function renderMap() {
     wrap.appendChild(container);
   });
 
+  // A step animation may still be in flight (its promises resolve on their
+  // own schedule regardless of what the DOM is doing) even though this
+  // renderMap() call is happening now - e.g. from a map-icon click or a
+  // Kill/Rescue/Distract button firing mid-animation. Put any still-
+  // animating scout/predator icons back on top of the nest/fort/trail
+  // layers just built above, instead of leaving them wiped by the
+  // wrap.innerHTML reset earlier in this function.
+  reattachLiveTempIcons(wrap);
+
   if (typeof window.sandboxOnMapRendered === 'function') window.sandboxOnMapRendered();
 }
 
 document.addEventListener('click', (ev) => {
+  if (scanPlacementMode) {
+    if (ev.target.closest('#scan-btn')) return;
+
+    const wrap = document.getElementById('mapWrap');
+    if (wrap && wrap.contains(ev.target)) {
+      scanAt(ev.clientX, ev.clientY);
+    } else {
+      scanPlacementMode = false;
+      render();
+    }
+    return;
+  }
+
   if (fortPlacementMode) {
     if (ev.target.closest('#build-fort-btn')) return; // handled by buildFort()'s own onclick (toggles off)
 
@@ -5554,7 +5313,7 @@ function renderLog(){
 }
 
 function simulateForecast(numSteps = 10) {
-  if (!S || S.gameOver) return { labels: [], humans: [], insects: [], insectsByNest: [] };
+  if (!S || S.gameOver) return { labels: [], humans: [], insects: [], insectsByNest: [], adultInsectsByNest: [] };
 
   const realState = S;
   const realRender = render;
@@ -5567,6 +5326,9 @@ function simulateForecast(numSteps = 10) {
   // Per-step snapshot of every nest's insect count, so the chart can plot a
   // forecast line for each nest, not just whichever nest is selected.
   const forecastInsectsByNest = [];
+  // Adult-only counterpart of forecastInsectsByNest, used by the chart
+  // (see totalAdultInsectsForNest() in nest-core.js).
+  const forecastAdultInsectsByNest = [];
 
   try {
     S = simState;
@@ -5584,6 +5346,7 @@ function simulateForecast(numSteps = 10) {
       forecastHumans.push(S.humans);
       forecastInsects.push(totalInsectsAll());
       forecastInsectsByNest.push(insectsByNestSnapshot());
+      forecastAdultInsectsByNest.push(adultInsectsByNestSnapshot());
     }
   } finally {
     S = realState;
@@ -5594,7 +5357,8 @@ function simulateForecast(numSteps = 10) {
     labels: forecastLabels,
     humans: forecastHumans,
     insects: forecastInsects,
-    insectsByNest: forecastInsectsByNest
+    insectsByNest: forecastInsectsByNest,
+    adultInsectsByNest: forecastAdultInsectsByNest
   };
 }
 
@@ -5637,16 +5401,16 @@ function renderChart() {
       : `Nest ${nestId}`;
 
     const historyInsectsForNest = h =>
-      (h.insectsByNest && Object.prototype.hasOwnProperty.call(h.insectsByNest, nestId))
-        ? h.insectsByNest[nestId]
-        : (i === 0 ? h.insects : null); // pre-multi-nest history only had a combined total
+      (h.adultInsectsByNest && Object.prototype.hasOwnProperty.call(h.adultInsectsByNest, nestId))
+        ? h.adultInsectsByNest[nestId]
+        : (i === 0 ? h.adultInsects : null); // pre-adult-tracking history only had a combined total
 
     const actualInsects = [...S.history.map(historyInsectsForNest), ...Array(forecast.labels.length).fill(null)];
     const forecastInsectsData = Array(combinedLabels.length).fill(null);
 
     if (lastIndex >= 0) {
-      forecastInsectsData[lastIndex] = nest.alive ? totalInsectsForNest(nest) : 0;
-      forecast.insectsByNest.forEach((snapshot, j) => {
+      forecastInsectsData[lastIndex] = nest.alive ? totalAdultInsectsForNest(nest) : 0;
+      forecast.adultInsectsByNest.forEach((snapshot, j) => {
         forecastInsectsData[lastIndex + 1 + j] = Object.prototype.hasOwnProperty.call(snapshot, nestId)
           ? snapshot[nestId]
           : null;
@@ -5804,11 +5568,16 @@ function renderOverlay(){
     const allFortsConquered = S.forts.length === 0 || S.forts.every(f => !f.alive);
     const isVictory = S.lastTriggeredCondition && S.lastTriggeredCondition.outcome === 'victory';
     document.getElementById('overTitle').textContent = isVictory ? 'Víťazstvo' : ((S.humans<=0 && allFortsConquered) ? t('gameover.humanity_fallen') : t('gameover.nest_collapsed'));
-    document.getElementById('overText').textContent = t('gameover.survived_msg', {
-      msg: S.gameOverMsg,
-      step: S.step,
-      days: Math.round(S.step*12/24*10)/10
-    });
+    {
+      const daysVal = Math.round(S.step*12/24*10)/10;
+      document.getElementById('overText').textContent = t('gameover.survived_msg', {
+        msg: S.gameOverMsg,
+        step: S.step,
+        stepWord: wordForm('noun.step', S.step),
+        days: daysVal,
+        dayWord: wordForm('noun.day', daysVal)
+      });
+    }
     ov.classList.remove('hidden');
   } else {
     ov.classList.add('hidden');
@@ -6326,7 +6095,8 @@ const LEVEL_SETTINGS_INPUT_MAP = {
   scoutMarkChance:'scoutMarkChanceInput', fortMarkThreshold:'fortMarkThresholdInput',
   costDistractScout:'costDistractScoutInput',
   costKillScout:'costKillScoutInput', costEscapePredator:'costEscapePredatorInput',
-  costKillPredator:'costKillPredatorInput', costSaveHumans:'costSaveHumansInput',
+  costKillPredator:'costKillPredatorInput', costKillFortAttacker:'costKillFortAttackerInput',
+  costSaveHumans:'costSaveHumansInput',
   saveHumansAmount:'saveHumansAmountInput', costScan:'costScanInput',
   costIncreaseFortCapacity:'costIncreaseFortCapacityInput',
   fortCapacityIncreaseAmount:'fortCapacityIncreaseAmountInput',
@@ -6344,6 +6114,7 @@ function applySettingsToInputs(overrides) {
     const el = inputId && document.getElementById(inputId);
     if (el) el.value = value;
   });
+  if (overrides.autoTradeEnabled !== undefined) setAutoTradeToggleUI(!!overrides.autoTradeEnabled);
 }
 
 function loadLevelIntoGame(level) {
@@ -6687,7 +6458,22 @@ function wireCampaignMenu() {
 }
 
 function showMenu(){
-  document.getElementById('ingameMenu').classList.remove('hidden');
+  const menu = document.getElementById('ingameMenu');
+  if (!menu) return;
+
+  const menuOverlay = document.getElementById('menuOverlay');
+  const introMenuOpen = menuOverlay && !menuOverlay.classList.contains('hidden');
+  const restartButton = document.getElementById('ingameRestartBtn');
+  const closeButton = document.getElementById('ingameMenuCloseX');
+  if (restartButton) restartButton.classList.toggle('hidden', !!introMenuOpen);
+  if (closeButton) {
+    closeButton.classList.toggle('hidden', !!introMenuOpen);
+    if (closeButton.parentElement) {
+      closeButton.parentElement.classList.toggle('hidden', !!introMenuOpen);
+    }
+  }
+
+  menu.classList.remove('hidden');
 }
 
 
@@ -6700,20 +6486,18 @@ window.hideMenu = hideMenu;
 /**
  * HYBRID Nest Simulator - i18n Localization Engine
  */
-let currentLang = 'sk';
-let translations = {};
+// [moved to nest-core.js] let currentLang = 'sk'; ... (12 lines)
 
-// Helper function to translate keys with parameter substitution
-function t(key, params = {}) {
-  let text = translations[currentLang]?.[key] || translations['en']?.[key] || key;
-  
-  // Replace placeholders like {step}, {count}, etc.
-  Object.keys(params).forEach(param => {
-    text = text.replace(new RegExp(`\\{${param}\\}`, 'g'), params[param]);
-  });
-  
-  return text;
-}
+// Looks up a bare noun/adjective form, e.g. wordForm('noun.egg', 3) -> "eggs".
+// Used to fill secondary counted words (eggWord, attackerWord, stepWord...)
+// embedded inside an otherwise-fixed translation template.
+// [moved to nest-core.js] function wordForm(prefix, n) { ... (3 lines)
+
+// Helper function to translate keys with parameter substitution.
+// If a `count` param is given (or an explicit pluralCount is passed), and a
+// `<key>_singular` / `_few` / `_many` variant exists, that variant is used
+// instead of the bare key.
+// [moved to nest-core.js] function t(key, params = {}, pluralCount = null) { ... (22 lines)
 
 // Replaces all static DOM element texts and titles
 function updateLanguage(newLang) {

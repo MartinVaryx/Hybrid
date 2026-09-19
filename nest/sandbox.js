@@ -712,7 +712,6 @@ function sandboxNewLevel() {
   sandboxUndoStack = [];
   sandboxRedoStack = [];
   sandboxResetHiddenScoutsPeek();
-  sandboxHiddenScoutPositions = [];
   recordSandboxHistory();
 }
 
@@ -1190,6 +1189,15 @@ function sandboxDrawPredatorsForConquest(count) {
   return count - remaining;
 }
 
+// "predátorka" (feminine) accusative-case declension after "o" + count,
+// e.g. "posilnený o 1 predátorku / o 3 predátorky / o 6 predátoriek".
+function sandboxPredatorAccWord(n) {
+  const a = Math.abs(n);
+  if (a === 1) return 'predátorku';
+  if (a >= 2 && a <= 4) return 'predátorky';
+  return 'predátoriek';
+}
+
 function sandboxForceConquest(fortId) {
   if (currentGameMode !== 'sandbox' || sandboxPaused) return;
   const fort = S.forts.find(f => f.id === fortId && f.alive);
@@ -1214,7 +1222,7 @@ function sandboxForceConquest(fortId) {
 
     log('[Sandbox] ' + t('sandbox.log_forced_conquest_reinforced', { id: fort.id, count: attackers }));
     renderMap();
-    sandboxSetStatus('Útok posilnený o ' + attackers + ' predátorov');
+    sandboxSetStatus('Útok posilnený o ' + attackers + ' ' + sandboxPredatorAccWord(attackers));
     return;
   }
 
@@ -1240,41 +1248,26 @@ function sandboxForceConquest(fortId) {
 
 let sandboxPeekedHiddenScoutIds = null;
 
-// Persistent positions for scouts currently in S.scoutsHidden.
-// These survive show/hide-all toggles.
-let sandboxHiddenScoutPositions = [];
+// Marking-scout waves (fortMarkScout events) that "Show All" temporarily
+// revealed. Tracked separately from sandboxPeekedHiddenScoutIds since these
+// are real, already-existing events (with their own groupSize/killed/
+// targetFortId) rather than stand-ins materialized from a generic hidden
+// pool. Map of eventId -> Set<slotId>, one entry per revealed wave, storing
+// only the individual scoutSlot ids THIS peek flipped from hidden to
+// revealed - so restoring only re-hides those, not every slot in the wave
+// (some may have already been legitimately scanned before the peek, and
+// those must stay revealed).
+let sandboxPeekedHiddenMarkingScoutIds = null;
 
-
-/*
- * Make sure every hidden scout has a permanent sandbox position.
- *
- * We only create positions for NEW hidden scouts. Existing positions
- * are never regenerated.
- */
-function sandboxEnsureHiddenScoutPositions() {
-  const hiddenCount = Math.max(0, Number(S.scoutsHidden || 0));
-
-  while (sandboxHiddenScoutPositions.length < hiddenCount) {
-    const temp = {
-      type: 'search',
-      status: 'pending',
-      outcome: null
-    };
-
-    assignEventCoords(temp);
-
-    sandboxHiddenScoutPositions.push({
-      x: temp.x,
-      y: temp.y
-    });
-  }
-
-  // If the hidden population decreased permanently, discard only the
-  // positions that no longer correspond to hidden scouts.
-  if (sandboxHiddenScoutPositions.length > hiddenCount) {
-    sandboxHiddenScoutPositions.length = hiddenCount;
-  }
-}
+// NOTE: there is deliberately no sandbox-only position store any more. The
+// real per-nest position array (nest.hiddenScoutPositions, from
+// ensureHiddenScoutPositions() in nest-core.js) is shared with the real
+// Scan action - a separate parallel array here (as this used to be) can
+// desync from it, permanently breaking Scan the moment nest.scoutsHidden
+// and nest.hiddenScoutPositions.length disagree (see ensureHiddenScoutPositions'
+// truncate-to-scoutsHidden safety net). Every function below borrows
+// straight from the real array and gives it back on restore, so the two can
+// never disagree.
 
 
 /* ---- INDIVIDUAL SCOUT: permanently hide this scout ---- */
@@ -1288,6 +1281,20 @@ function sandboxToggleScoutVisibility(eventId) {
   );
 
   if (!e) return;
+
+  /*
+   * Marking-scout waves (fortMarkScout) now track hidden/revealed state per
+   * individual scout (see scoutSlots in maybeMarkFortsFromSearch, nest-
+   * core.js) rather than one flag for the whole wave. Re-hiding one here
+   * means putting every one of its still-alive scouts back to hidden -
+   * identical to none of them ever having been scanned/revealed.
+   */
+  if (e.fortMarkScout) {
+    if (Array.isArray(e.scoutSlots)) e.scoutSlots.forEach(s => { s.hidden = true; });
+    e.hidden = true;
+    renderMap();
+    return;
+  }
 
   /*
    * If this scout was temporarily revealed by "Show All",
@@ -1321,20 +1328,21 @@ function sandboxToggleScoutVisibility(eventId) {
 
   /*
    * Normal scout:
-   * permanently hide it and return it to S.scoutsHidden.
+   * permanently hide it and return it to its own nest's real hidden pool -
+   * the same nest.hiddenScoutPositions/nest.scoutsHidden pair the real Scan
+   * action reads (see ensureHiddenScoutPositions in nest-core.js), not a
+   * sandbox-only stand-in, so this can never drift out of sync with it.
    */
+  const ownerNest = S.nests.find(n => n.id === e.nestId) || S.nest;
 
-  // Preserve its current map position.
-  sandboxHiddenScoutPositions.push({
-    x: e.x,
-    y: e.y
-  });
+  if (!Array.isArray(ownerNest.hiddenScoutPositions)) ownerNest.hiddenScoutPositions = [];
+  ownerNest.hiddenScoutPositions.push({ x: e.x, y: e.y });
 
   S.events = S.events.filter(
     ev => ev.id !== eventId
   );
 
-  S.scoutsHidden = (S.scoutsHidden || 0) + 1;
+  ownerNest.scoutsHidden = (ownerNest.scoutsHidden || 0) + 1;
 
   renderMap();
 }
@@ -1343,27 +1351,59 @@ function sandboxToggleScoutVisibility(eventId) {
 /* ---- RESET TEMPORARY SHOW-ALL ---- */
 
 function sandboxResetHiddenScoutsPeek() {
-  if (!sandboxPeekedHiddenScoutIds) return;
+  let didSomething = false;
 
-  const temporaryIds = sandboxPeekedHiddenScoutIds;
+  if (sandboxPeekedHiddenScoutIds) {
+    const temporaryIds = sandboxPeekedHiddenScoutIds;
 
-  // Remove only the temporary materialized scouts.
-  S.events = S.events.filter(
-    e => !temporaryIds.has(e.id)
-  );
+    // Each temporary event carries its owner nest's id and the position it
+    // was materialized from (see sandboxToggleAllHiddenScouts) - give both
+    // back to that nest's REAL pool instead of touching S.scoutsHidden
+    // (which is only an accessor onto the currently-active nest, and would
+    // silently do nothing/the wrong thing for any other nest's scouts).
+    S.events.forEach(e => {
+      if (!temporaryIds.has(e.id)) return;
+      const ownerNest = S.nests.find(n => n.id === e.nestId);
+      if (ownerNest) {
+        if (!Array.isArray(ownerNest.hiddenScoutPositions)) ownerNest.hiddenScoutPositions = [];
+        ownerNest.hiddenScoutPositions.push({ x: e.x, y: e.y });
+        ownerNest.scoutsHidden = (ownerNest.scoutsHidden || 0) + 1;
+      }
+    });
 
-  // The scouts return to S.scoutsHidden.
-  S.scoutsHidden =
-    (S.scoutsHidden || 0) + temporaryIds.size;
+    // Remove only the temporary materialized scouts.
+    S.events = S.events.filter(
+      e => !temporaryIds.has(e.id)
+    );
 
-  sandboxPeekedHiddenScoutIds = null;
+    sandboxPeekedHiddenScoutIds = null;
+    didSomething = true;
+  }
 
-  /*
-   * IMPORTANT:
-   * Do NOT regenerate sandboxHiddenScoutPositions here.
-   * Those positions belong to these hidden scouts and must survive
-   * the toggle.
-   */
+  if (sandboxPeekedHiddenMarkingScoutIds) {
+    const temporaryMarkingSlots = sandboxPeekedHiddenMarkingScoutIds;
+
+    // These are real, still-existing marking-scout wave events - just flip
+    // back to hidden the specific individual scoutSlots THIS peek revealed
+    // (not every slot in the wave - some may have already been legitimately
+    // scanned before the peek, and those should stay revealed), so
+    // groupSize/killed/targetFortId (and markingScoutCount bookkeeping in
+    // nest-core.js) are left completely untouched.
+    S.events.forEach(e => {
+      const revealedSlotIds = temporaryMarkingSlots.get(e.id);
+      if (!revealedSlotIds || !Array.isArray(e.scoutSlots)) return;
+      e.scoutSlots.forEach(s => {
+        if (revealedSlotIds.has(s.slot)) s.hidden = true;
+      });
+      e.hidden = isHiddenFortMarkScout(e);
+    });
+
+    sandboxPeekedHiddenMarkingScoutIds = null;
+    didSomething = true;
+  }
+
+  if (!didSomething) return;
+
   renderMap();
 }
 
@@ -1372,9 +1412,15 @@ function sandboxResetHiddenScoutsPeek() {
 
 function sandboxToggleAllHiddenScouts() {
 
-  /* SECOND PRESS — hide the temporary scouts again */
-  if (sandboxPeekedHiddenScoutIds) {
-    const count = sandboxPeekedHiddenScoutIds.size;
+  /* SECOND PRESS — hide the temporary scouts (and marking waves) again */
+  if (sandboxPeekedHiddenScoutIds || sandboxPeekedHiddenMarkingScoutIds) {
+    let markingSlotCount = 0;
+    if (sandboxPeekedHiddenMarkingScoutIds) {
+      sandboxPeekedHiddenMarkingScoutIds.forEach(slotSet => { markingSlotCount += slotSet.size; });
+    }
+    const count =
+      (sandboxPeekedHiddenScoutIds ? sandboxPeekedHiddenScoutIds.size : 0) +
+      markingSlotCount;
 
     sandboxResetHiddenScoutsPeek();
 
@@ -1386,55 +1432,90 @@ function sandboxToggleAllHiddenScouts() {
   }
 
 
-  const hiddenCount =
-    Math.max(0, Number(S.scoutsHidden || 0));
+  // Generic hidden scouts, per-nest - counted (and later borrowed) straight
+  // from each nest's own scoutsHidden/hiddenScoutPositions rather than the
+  // S.scoutsHidden accessor, which only ever reflects the currently-ACTIVE
+  // nest and would silently ignore every other nest's hidden scouts.
+  const hiddenCount = S.nests.reduce((total, nest) => total + Math.max(0, nest.scoutsHidden || 0), 0);
 
-  if (hiddenCount <= 0) {
+  // Marking-scout waves with at least one still-hidden individual scout,
+  // across every nest - see isHiddenFortMarkScout() in script.js.
+  const hiddenMarkingEvents = S.events.filter(
+    e => e.type === 'search' && e.fortMarkScout && e.status === 'pending' &&
+         Array.isArray(e.scoutSlots) && e.scoutSlots.some(s => s.hidden)
+  );
+
+  if (hiddenCount <= 0 && hiddenMarkingEvents.length <= 0) {
     sandboxSetStatus('Žiadni skrytí skauti');
     return;
   }
 
-
   /*
-   * Ensure the hidden pool has stable coordinates.
-   *
-   * This only creates positions for scouts that don't have one yet.
-   */
-  sandboxEnsureHiddenScoutPositions();
-
-
-  /*
-   * Materialize the hidden scouts temporarily.
+   * Materialize each nest's hidden scouts temporarily, borrowing their
+   * positions straight out of the REAL per-nest pool (nest.hiddenScoutPositions
+   * from ensureHiddenScoutPositions() in nest-core.js) and zeroing
+   * nest.scoutsHidden in lockstep, so the two always stay in sync - a real
+   * Scan click (which calls ensureHiddenScoutPositions() itself) can never
+   * see them disagree and truncate away position data that's just
+   * temporarily on loan. sandboxResetHiddenScoutsPeek() pushes both back
+   * when the peek ends.
    */
   sandboxPeekedHiddenScoutIds = new Set();
+  let materializedCount = 0;
 
-  for (let i = 0; i < hiddenCount; i++) {
+  S.nests.forEach(nest => {
+    ensureHiddenScoutPositions(nest);
+    const positions = nest.hiddenScoutPositions.splice(0, nest.scoutsHidden);
+    nest.scoutsHidden -= positions.length;
 
-    const pos = sandboxHiddenScoutPositions[i];
+    positions.forEach(pos => {
+      const e = {
+        id: nid(),
+        type: 'search',
+        status: 'pending',
+        outcome: null,
+        nestId: nest.id,
+        x: pos.x,
+        y: pos.y,
 
-    const e = {
-      id: nid(),
-      type: 'search',
-      status: 'pending',
-      outcome: null,
-      x: pos.x,
-      y: pos.y,
+        // Marker so we know this is only a temporary visual reveal.
+        _sandboxTemporaryHiddenReveal: true
+      };
 
-      // Marker so we know this is only a temporary visual reveal.
-      _sandboxTemporaryHiddenReveal: true
-    };
+      S.events.push(e);
+      sandboxPeekedHiddenScoutIds.add(e.id);
+      materializedCount += 1;
+    });
+  });
 
-    S.events.push(e);
-    sandboxPeekedHiddenScoutIds.add(e.id);
-  }
+  /*
+   * Marking-scout waves already exist as real events - revealing them for
+   * the peek just means flipping each still-hidden individual scoutSlot,
+   * same effect a successful scan would have on that slot. Map rendering
+   * then lays out one icon per revealed slot at its fixed ring position.
+   * Track exactly which slots THIS peek revealed per event (not the whole
+   * wave), so restoring only re-hides those - any slot already revealed by
+   * normal play beforehand is left alone.
+   */
+  sandboxPeekedHiddenMarkingScoutIds = new Map();
+  let revealedMarkingSlotCount = 0;
 
-  // They are now represented by temporary events.
-  S.scoutsHidden = 0;
+  hiddenMarkingEvents.forEach(e => {
+    const revealedSlotIds = new Set();
+    e.scoutSlots.forEach(s => {
+      if (!s.hidden) return;
+      s.hidden = false;
+      revealedSlotIds.add(s.slot);
+      revealedMarkingSlotCount += 1;
+    });
+    e.hidden = isHiddenFortMarkScout(e);
+    sandboxPeekedHiddenMarkingScoutIds.set(e.id, revealedSlotIds);
+  });
 
   renderMap();
 
   sandboxSetStatus(
-    `Zobrazení skrytí skauti (${hiddenCount})`
+    `Zobrazení skrytí skauti (${materializedCount + revealedMarkingSlotCount})`
   );
 }
 

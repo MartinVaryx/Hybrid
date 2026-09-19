@@ -37,9 +37,12 @@
     .map-icon.sandbox-draggable{cursor:grab;}
     .map-icon.sandbox-draggable.sandbox-dragging{cursor:grabbing;}
     .map-event.fort-event.sandbox-selected .fort-icon{filter:drop-shadow(0 0 6px #ffb74d);}
+    .toggle-btn{min-width:44px;font-weight:700;transition:background .15s,color .15s,border-color .15s;}
+    .toggle-btn[data-enabled="false"]{opacity:.6;}
+    .toggle-btn[data-enabled="true"]{background:#3a8f4d;border-color:#3a8f4d;color:#fff;opacity:1;}
     </style>
 </head>
-<body>
+<body class="page-loading">
 
 
     <header class="top" id="topBar">
@@ -68,6 +71,9 @@
             <div class="readout">
                 <div class="lbl" data-i18n="readout.insects">Hmyz</div>
                 <div class="val alert" id="insectsVal">150</div>
+            </div>
+            <div class="stat-container">
+                <span class="val amber" id="pointsVal"><strong>10</strong></span><span class="val black">/</span><span class="val amber" id="maxPointsVal"></span><span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>
             </div>
         </div>
 
@@ -144,19 +150,6 @@
 
     <div class="bottom" id="bottomBar">
         <div id="static-ctrls">
-            <div class="stat-container">
-                <span class="val amber" id="pointsVal"><strong>10</strong></span><span class="val black">/</span><span class="val amber" id="maxPointsVal"></span><span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>
-            </div>
-            <div class="btn-container">
-                <div>
-                    <span class="btn-cost"><span id="hireCostLbl" class="btn-cost-val">5</span><img src="../assets/logo_icon.png" alt="ap-icon" class="ap-icon"></span>
-                </div>
-                <button class="nest-btn control-btn" id="hire-btn" onclick="Hire()"
-                        data-i18n-title="map.hire_tooltip"
-                        title="Najať Hybrida (zvýši počet akčných bodov o 1).">
-                    <span class="btn-main">+</span>
-                </button>
-            </div>
 
             <div class="btn-container" >
                 <div>
@@ -180,6 +173,15 @@
                 </button>
             </div>
 
+            <div class="merchant-limit-wrap">
+                <div class="merchant-limit-title">OBCHOD</div>
+                <div class="merchant-limit-control">
+                    <button type="button" class="nest-btn merchant-limit-arrow" id="merchantLimitDown" title="Decrease merchant limit">▼</button>
+                    <input type="number" id="merchantLimitInput" class="merchant-limit-input" min="0" max="99" value="3">
+                    <button type="button" class="nest-btn merchant-limit-arrow" id="merchantLimitUp" title="Increase merchant limit">▲</button>
+                </div>
+            </div>
+
         </div>
 
         <div id="controls-containter">
@@ -192,6 +194,14 @@
         <div class="overlay-card">
             <button class="close-x" id="eventDetailCloseX">✕</button>
             <div id="eventDetailContent"></div>
+        </div>
+    </div>
+
+    <!-- FORT RESOURCES OVERLAY -->
+    <div class="overlay hidden" id="fortResourcesOverlay">
+        <div class="overlay-card">
+            <button class="close-x" id="fortResourcesCloseX">✕</button>
+            <div id="fortResourcesContent"></div>
         </div>
     </div>
 
@@ -247,7 +257,7 @@
                 <div class="field">
                     <label data-i18n="settings.lbl_eggs_per_food">Vajíčka na spotrebovanú potravu</label>
                     <input type="number" id="eggsPerFoodInput" min="0" max="50" value="5">
-                    <div class="hint" data-i18n="settings.hint_eggs_per_food">Každých tieto-koľko znesených vajíčok stojí 1 extra potravu. Nastavte na 0 pre vypnutie nákladov.</div>
+                    <div class="hint" data-i18n="settings.hint_eggs_per_food">Každých toľkoto znesených vajíčok stojí 1 extra porciu potravy. Nastav na 0 pre vypnutie nákladov.</div>
                 </div>
             </div>
 
@@ -353,6 +363,7 @@
                 </div>
             </div>
 
+
             <div class="settings-section" data-i18n="settings.sec_costs">Náklady na akcie hráča</div>
             <div class="setup-row">
                 <div class="field">
@@ -372,6 +383,13 @@
                 <div class="field">
                     <label data-i18n="settings.lbl_cost_kill_predator">Zabiť predátora (body)</label>
                     <input type="number" id="costKillPredatorInput" min="0" max="50" value="3">
+                </div>
+            </div>
+            <div class="setup-row">
+                <div class="field">
+                    <label data-i18n="settings.lbl_cost_kill_fort_attacker">Zabiť útočníka na pevnosť (body)</label>
+                    <input type="number" id="costKillFortAttackerInput" min="0" max="50" value="2">
+                    <div class="hint" data-i18n="settings.hint_cost_kill_fort_attacker">Lacnejšie ako zabiť predátora na voľnom priestranstve - útočiaci na pevnosť je už zahnaný do kúta jej obranou.</div>
                 </div>
             </div>
             <div class="setup-row">
@@ -418,23 +436,6 @@
                 
                 <!-- Population Chart -->
                 <div class="graph-wrap"><canvas id="popChart"></canvas></div>
-                <!-- Updated Nest Analytics Legend -->
-                <div class="graph-legend" style="display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; font-size:0.78rem;">
-                    <span style="display:inline-flex; align-items:center; gap:5px;">
-                        <i style="background:#7ea23c; width:12px; height:3px; display:inline-block;"></i> <span data-i18n="analytics.legend_humans_actual">Ľudia (Skutočnosť)</span>
-                    </span>
-                    <span style="display:inline-flex; align-items:center; gap:5px;">
-                        <i style="border-top:2px dashed #7ea23c; width:14px; display:inline-block;"></i> <span data-i18n="analytics.legend_humans_forecast">Prognóza ľudí (10 krokov)</span>
-                    </span>
-
-
-                    <span style="display:inline-flex; align-items:center; gap:5px; margin-left:10px;">
-                        <i style="background:#a8402c; width:12px; height:3px; display:inline-block;"></i> <span data-i18n="analytics.legend_insects_actual">Hmyz (Skutočnosť)</span>
-                    </span>
-                    <span style="display:inline-flex; align-items:center; gap:5px;">
-                        <i style="border-top:2px dashed #a8402c; width:14px; display:inline-block;"></i> <span data-i18n="analytics.legend_insects_forecast">Prognóza hmyzu (10 krokov)</span>
-                    </span>
-                </div>
             </div>
         </div>
     </div>
@@ -454,12 +455,8 @@
             <h2 id="menuTitle1" data-i18n="menu.title1">HYBRIDNÁ</h2>
             <h2 id="menuTitle2" data-i18n="menu.title2">VOJNA</h2>
         </div>
-        <div class="overlay-card" id="menu-card">
-            <button class="nest-btn menu-btn" id="campaignBtn" data-i18n="menu.campaign_btn">KAMPAŇ</button>
-            <button class="nest-btn menu-btn" id="sandboxBtn" data-i18n="menu.sandbox_btn">SANDBOX MÓD</button>
-            <button class="nest-btn menu-btn" id="menuSettingsBtn" data-i18n="menu.settings_btn">NASTAVENIA</button>
-            <button class="nest-btn menu-btn" id="aboutBtn" data-i18n="menu.about_btn">O HRE</button>
-        </div>
+        <button onclick="showMenu()" class="nest-btn" id="begin-btn">START</button>
+
         <div id="menu-logo">
             <img src="../assets/logo white.png" id="footer-logo" alt="HYBRID" style="height: 35px; align-self: flex-start;">
         </div>
@@ -500,11 +497,20 @@
             <button class="close-x" id="optionsCloseX">✕</button>
             <h2 class="left" data-i18n="options.title">NASTAVENIA</h2>
 
-            <label for="langSelect" data-i18n="settings.lang_label">Language / Jazyk:</label>
-            <select id="langSelect">
-                <option value="en">English</option>
-                <option value="sk">Slovenčina</option>
-            </select>
+            <div class="options-row">
+                <label class="options-label" for="langSelect" data-i18n="settings.lang_label">Language / Jazyk:</label>
+                <select id="langSelect">
+                    <option value="en">English</option>
+                    <option value="sk">Slovenčina</option>
+                </select>
+            </div>
+
+            <div class="options-row">
+                <label class="options-label" data-i18n="settings.lbl_auto_trade">Automatický obchod</label>
+                <button type="button" class="nest-btn toggle-btn" id="autoTradeToggleBtn" data-enabled="false" aria-pressed="false">✗</button>
+                <div class="hint" data-i18n="settings.hint_auto_trade">Umožní pevnostiam obchodovať aj bez vzájomného dopytu: kriticky nedostatkový zdroj (pod 70% želanej úrovne) sa dá kúpiť za 2:1 v akomkoľvek zdroji, ktorého má platiaca pevnosť nadbytok.</div>
+            </div>
+
         </div>
     </div>
 
@@ -512,7 +518,7 @@
     <div class="overlay hidden" id="campaignOverlay">
         <div class="overlay-card wide" id="campaign-card">
             <button class="close-x" id="campaignCloseX" onclick="closeCampaignMenu()">✕</button>
-            <p class="settings-note" data-i18n="campaign.note">Vyber si level alebo načítajte vlastný súbor mapy (.json).</p>
+            <p class="settings-note" data-i18n="campaign.note">Vyber si level alebo načítaj vlastný súbor mapy (.json).</p>
             
             <!-- Scrollable list: every campaign level as a row (thumbnail + start button + info) -->
             <div class="campaign-level-list" id="campaignLevelList">
@@ -563,7 +569,7 @@
         <div class="overlay-card wide">
             <button class="close-x" id="sbConditionsCloseX">✕</button>
             <h2 class="left">Podmienky</h2>
-            <p class="settings-note">Pridajte viacero podmienok. Keď sa splní ktorákoľvek z nich, hra sa skončí. Hniezdo zrútenie je vždy víťazstvo.</p>
+            <p class="settings-note">Pridajte viacero podmienok. Keď sa splní ktorákoľvek z nich, hra sa skončí. Zrútenie posledného hniezda vždy znamená víťazstvo.</p>
             <div class="conditions-list" id="sandboxConditionsList"></div>
             <div style="display:flex; justify-content:space-between; margin-top:18px; gap:10px; flex-wrap:wrap;">
                 <button class="nest-btn small" id="sbAddConditionBtn" type="button">+ Pridať podmienku</button>
@@ -610,7 +616,8 @@
             </div>
         </div>
     </div>
-
+    
+    <script src="nest-core.js"></script>
     <script src="script.js"></script>
 </body>
 </html>

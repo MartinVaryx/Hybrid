@@ -3,7 +3,8 @@
     --hybrid-black: #000000;
     --hybrid-red: #c62828;
     --hybrid-green: #2e7d32;
-    --hybrid-amber: #d97706;
+    --hybrid-amber: #ce931f;
+    --hybrid-yellow: #dede38;
     --text-dark: #222222;
     --border-heavy: 3px solid #000;
     --panel-bg: #a0d079;
@@ -32,6 +33,18 @@ body {
     align-items: center;
     height: 100vh;
     overflow: hidden;
+}
+
+body.page-loading > * {
+    visibility: hidden;
+}
+
+body.page-loading::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    z-index: 20000;
+    background: #000;
 }
 
 /* Top Logo Bar */
@@ -164,6 +177,117 @@ body {
     box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
 }
 
+/* Custom icon tooltip, shown when hovering an action's AP cost badge
+   (.btn-cost, built by buildCostBadgeEl()/costBadgeHTML() in script.js) or
+   a fort marker (its resource stock + net production "peek", see
+   buildFortPeekItems()).
+   A native title="" attribute can only ever show plain text, so it can't
+   render icons - and there wasn't room to show the resource-cost badges
+   inline next to the AP badge either, so BOTH now live only in here: the
+   AP cost first, then one icon+number per resource/requirement/loss-risk
+   the action involves (see costTooltipItems(), script.js) - icons only,
+   deliberately no words, separated from the AP entry by a thin divider.
+   The fort peek instead opts into one-row-per-resource (data-tooltip-
+   stacked - see #customTooltip.stacked below), each row's icon and current
+   stock followed by this step's signed net production.
+   This is a single shared floating element (built once by
+   initCustomTooltips()) repositioned next to the cursor via a delegated
+   mouseover/mousemove/mouseout listener on document - see there for which
+   elements opt in (anything with a data-tooltip-items attribute). White
+   background with black border/text/icons on purpose: the resource icons
+   themselves are black artwork, so they'd disappear against this app's
+   otherwise-dark UI. */
+#customTooltip {
+    position: fixed;
+    z-index: 500;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 10px;
+    background: #ffffff;
+    border: 2px solid #000000;
+    border-radius: 6px;
+    pointer-events: none;
+    box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
+}
+
+#customTooltip.visible {
+    display: flex;
+}
+
+.tooltip-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.tooltip-item img {
+    width: 20px;
+    height: 20px;
+    object-fit: contain;
+    flex: 0 0 auto;
+}
+
+.tooltip-item-value {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: #000000;
+}
+
+/* Set on a tooltip item's value (see costTooltipItems()/showCustomTooltip(),
+   script.js) when the fort the button acts on doesn't currently have
+   enough of that resource to actually afford the action - the button
+   itself is disabled in that case too (meetsFortActionRequirement()); this
+   is what shows the player WHICH of the icons above the button is the one
+   actually blocking it. */
+.tooltip-item-value-insufficient {
+    color: #d20000;
+}
+
+.tooltip-divider {
+    align-self: stretch;
+    width: 1px;
+    margin: 0 2px;
+    background: #000000;
+}
+
+/* Opt-in layout for a data-tooltip-stacked target (the fort marker's
+   resource peek - see buildFortPeekItems()/showCustomTooltip()): one item
+   per row instead of the default single flowing row, so each resource's
+   icon, current stock, and net production sit together on their own line
+   rather than as one long strip of icons. */
+#customTooltip.stacked {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 4px;
+}
+
+#customTooltip.stacked .tooltip-item {
+    justify-content: space-between;
+    gap: 10px;
+}
+
+/* This step's net production (estimateFortResourceNet(), nest-core.js) on
+   a peek row - pushed to the row's far end by the stacked layout's
+   space-between above. Neutral gray at exactly 0, green/red once signed so
+   a fort's trajectory reads at a glance without doing the subtraction
+   yourself. */
+.tooltip-item-net {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #666666;
+}
+
+.tooltip-item-net-positive {
+    color: #1a7a1a;
+}
+
+.tooltip-item-net-negative {
+    color: #d20000;
+}
+
 
 #controls-container{
     display: flex;
@@ -232,6 +356,13 @@ header.top {
     font-weight: 700;
 }
 
+.val.yellow { 
+    color: var(--hybrid-yellow); 
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 1.8rem;
+    font-weight: 700;
+}
+
 .val.black { 
     color: var(--hybrid-black); 
     font-family: 'IBM Plex Mono', monospace;
@@ -257,6 +388,14 @@ header.top {
     box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
 }
 
+.ap-small-icon{
+    height: 20px;
+    width: 20px;
+    border-radius: 50%;
+    object-fit: cover; /* Keeps image proportions intact */
+    box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+}
+
 .build-fort-icon {
   height: 25px;
   width: 25px;
@@ -267,14 +406,27 @@ header.top {
 }
 
 .btn-icon {
-  height: 36px;
-  width: 36px;
+  height: 40px;
+  width: 40px;
   padding: 0px;
   border: none;
   background: transparent;
   border-radius: 50%;
   object-fit: cover; /* Keeps image proportions intact */
   box-shadow: 0 0 2px 2px rgba(0, 0, 0, 0.85);
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.1s ease;
+}
+
+.plain-icon {
+    display: flex;
+    align-self: center;
+  height: 40px;
+  width: 50px;
+  padding: 0px;
+  border: none;
+  background: transparent;
+  object-fit: contain; /* Keeps image proportions intact */
   cursor: pointer;
   transition: transform 0.1s ease, opacity 0.1s ease;
 }
@@ -299,6 +451,15 @@ header.top {
 
 /* Press: slightly shrink */
 .btn-icon:active {
+  transform: scale(0.92);
+}
+
+.plain-icon:hover {
+  transform: scale(1.1);
+}
+
+/* Press: slightly shrink */
+.plain-icon:active {
   transform: scale(0.92);
 }
 
@@ -410,6 +571,16 @@ header.top {
     font-family: 'Oswald', sans-serif;
     font-size: 1.2rem;
     text-transform: uppercase;
+}
+
+.left{
+    color: white;
+}
+
+.options-label{
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 400;
 }
 
 .head-actions {
@@ -795,6 +966,40 @@ header.top {
     box-shadow: inset 0 0 0 3px var(--hybrid-amber);
 }
 
+.map-wrap.scan-placement-active {
+    cursor: url('/nest/assets/inspect_nest_icon.png') 23 23, crosshair;
+    box-shadow: inset 0 0 0 3px var(--hybrid-green);
+}
+
+.scan-ripple {
+    position: absolute;
+    width: 0;
+    height: 0;
+    border: 2px solid var(--hybrid-green);
+    border-radius: 50%;
+    background: rgba(46, 125, 50, 0.08);
+    pointer-events: none;
+    transform: translate(-50%, -50%);
+    z-index: 30;
+    animation: scan-ripple-expand 650ms ease-out forwards;
+}
+
+@keyframes scan-ripple-expand {
+    0% {
+        width: 0;
+        height: 0;
+        opacity: 0;
+    }
+    35% {
+        opacity: 0.85;
+    }
+    100% {
+        width: var(--scan-ripple-diameter);
+        height: var(--scan-ripple-diameter);
+        opacity: 0;
+    }
+}
+
 #build-fort-btn{
     padding: 5px;
 }
@@ -823,6 +1028,16 @@ header.top {
     pointer-events: none;
 }
 
+/* Fort-to-fort route overlay (static, dashed, drawn under the trail layer) */
+.route-layer {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 0;
+    pointer-events: none;
+}
+
 /* Pheromone trail overlay (purple, smoky, decaying) */
 .trail-layer {
     position: absolute;
@@ -843,18 +1058,30 @@ header.top {
     cursor: default;
 }
 
-.map-icon.nest-icon {
+/* The nest-event container (nestContainer in script.js) is the actual
+   click/hover target - it must match the icon's footprint exactly (7.5% /
+   20px min), not the generic .map-event sizing (5% / 16px, tuned for
+   search/hunt markers), or the clickable box balloons past the visible
+   icon and the pointer cursor "halos" around it. */
+.map-event.nest-event {
     width: 7.5%;
-    aspect-ratio: 1;
     min-width: 20px;
     min-height: 20px;
+}
+
+.map-icon.nest-icon {
+    position: static;
+    transform: none;
+    width: 100%;
+    height: 100%;
+    aspect-ratio: 1;
     z-index: 3;
     pointer-events: auto;
     cursor: pointer;
 }
 
 .map-icon.nest-icon:hover {
-    transform: translate(-50%, -50%) scale(1.12);
+    transform: scale(1.12);
 }
 
 /* 1. Scale up Fort Icons to 3x their base size */
@@ -963,6 +1190,21 @@ header.top {
     animation: fort-under-attack-pulse 1.4s ease-in-out infinite;
 }
 
+#begin-btn{
+    background: var(--hybrid-red);
+    color: #ffffff;
+    border: 2px solid #000000;
+    display: flex;
+    position: absolute;
+    font-size: 2rem !important;
+    padding: 10px 20px 10px 20px;
+    bottom: 10%;
+}
+
+#begin-btn:hover {
+    transform:  scale(1.03);
+}
+
 .map-icon.fort-icon.under-attack:hover {
     transform: translate(-50%, -50%) scale(1.1);
 }
@@ -1009,7 +1251,7 @@ header.top {
 
 /* Action buttons for the currently-selected map icon, rendered in #controls-containter */
 .map-action-btn {
-    padding: 8px 12px;
+    padding: 0px 0px;
     font-size: 1.1rem !important;
     min-width: 42px;
     display: inline-flex;
@@ -1124,6 +1366,14 @@ header.top {
     color: #ffffff;
 }
 
+.nest-btn:disabled,
+.control-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    box-shadow: none;
+    pointer-events: none;
+}
+
 .nest-btn.primary-btn {
     background: var(--hybrid-red);
 }
@@ -1152,6 +1402,8 @@ header.top {
     text-shadow: 4px 4px 2px black;   
     margin: 0 !important;
     align-self: flex-start;
+    opacity: 0;
+    animation: menu-title-fade-in 1.4s ease-out forwards;
 
 }
 
@@ -1164,6 +1416,13 @@ header.top {
     text-shadow: 4px 4px 5px black;  
     margin: -40px !important;
     align-self: flex-end;
+    opacity: 0;
+    animation: menu-title-fade-in 1.4s ease-out 0.8s forwards;
+}
+
+@keyframes menu-title-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
 }
 
 #menu-logo{
@@ -1212,7 +1471,7 @@ iframe {
 }
 
 .overlay-card {
-    background: var(--hybrid-green);
+    background:var(--hybrid-green);
     border: var(--border-heavy);
     border-radius: 10px;
     box-shadow: 8px 8px 0px rgba(0, 0, 0, 0.3);
@@ -1222,6 +1481,37 @@ iframe {
     max-height: 85vh;
     overflow-y: auto;
     position: relative;
+}
+
+#options-card{
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.options-row{
+    display: grid;
+    grid-template-columns: minmax(160px, 260px) minmax(90px, 160px) minmax(160px, 1fr);
+    align-items: center;
+    column-gap: 30px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.options-row:last-child{
+    border-bottom: none;
+}
+
+/* Buttons/selects sit at the start of their column instead of stretching
+   to fill it - only the hint column (1fr) is meant to actually use its
+   full width. */
+.options-row > select,
+.options-row > .toggle-btn{
+    justify-self: start;
+}
+
+.options-row .hint{
+    margin-top: 0;
 }
 
 #menu-card{
@@ -1249,9 +1539,9 @@ iframe {
 
 #menuOverlay{
     background-image: url("/nest/assets/menu.jpeg");
-    background-size: 110% auto;
-    background-position-y: 30%;
-    background-position-x: 140%;
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
 }
 
 
@@ -1265,6 +1555,7 @@ iframe {
 
 .overlay-card h3.detail-title {
     font-family: 'Oswald', sans-serif;
+    color: white;
     font-size: 1.4rem;
     text-transform: uppercase;
     margin-top: 0;
@@ -1273,9 +1564,9 @@ iframe {
 }
 
 .detail-desc {
-    font-size: 0.88rem;
+    font-size: 1.4rem;
     line-height: 1.35;
-    color: #333;
+    color: #fffefe;
 }
 
 .detail-meta {
@@ -1462,8 +1753,8 @@ iframe {
 }
 
 .hint {
-    font-size: 0.72rem;
-    color: #666666;
+    font-size: 1rem;
+    color: #ffffff;
     line-height: 1.25;
     margin-top: 2px;
 }
@@ -1695,6 +1986,157 @@ iframe {
     min-height: 40px ;
 }
 
+/* Fort resource panel - lives in its own overlay (#fortResourcesOverlay),
+   opened via the "RESOURCES" button that appears in the bottom bar when a
+   fort is selected (there isn't room to show this inline anymore now that
+   it has production/workers columns too). One row per resource type,
+   stacked in a single column: icon, stock/goal (with its free no-AP
+   up/down control - see adjustFortDesiredResource() in script.js),
+   this-step production (read-only display), and assigned workers (with
+   its own up/down control - see adjustFortWorkers()). A header row above
+   the list labels the three value columns; the icon column is unlabeled. */
+.fort-resources {
+    display: flex;
+    flex-direction: column;
+    row-gap: 10px;
+    min-width: 420px;
+}
+
+.fort-resource-row {
+    display: grid;
+    grid-template-columns: 32px minmax(110px, 1fr) 90px minmax(110px, 1fr);
+    align-items: center;
+    column-gap: 16px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.9rem;
+}
+
+.fort-resource-header {
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: rgb(255, 255, 255);
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.fort-resource-icon {
+    flex: 0 0 auto;
+    width: 25px;
+    height: 25px;
+    object-fit: contain;
+}
+
+.fort-resource-cell {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.fort-resource-production {
+    font-size: 1.2rem;
+    white-space: nowrap;
+    color: white;
+}
+
+/* Footer row showing unemployedPopulation() (nest-core.js) - see
+   renderFortResourcesOverlayContent(), script.js. Reuses the same 4-column
+   grid as every other .fort-resource-row so its value lands directly under
+   the per-type WORKERS values above it, with the label spanning the first
+   three (otherwise-empty) columns. */
+.fort-resource-summary {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.fort-resource-summary-label {
+    grid-column: 1 / span 2;
+    font-family: 'Oswald', sans-serif;
+    font-size: 1rem;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    color: rgb(255, 255, 255);
+}
+
+/* Icon+value pairs next to a .fort-resource-summary-label (see the hybrid
+   upkeep cost row in renderFortResourcesOverlayContent(), script.js) -
+   spans the row's remaining two grid columns (production + workers), wraps
+   if it ever has to. Reuses .fort-resource-icon for the icons themselves
+   so they match every other icon in this table. */
+.fort-resource-summary-values {
+    grid-column: 3 / span 2;
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.fort-resource-summary-value-pair {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    color: rgb(255, 255, 255);
+}
+
+.fort-resource-value {
+    min-width: 20px;
+    text-align: left;
+    white-space: nowrap;
+    font-size: 1.2rem;
+    color: white;
+}
+
+.fort-resource-workers-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+}
+/* Applied to a .fort-resource-value when the fort doesn't hold enough of
+   that resource for an action currently being considered (e.g. a fort
+   action button's cost check) - the accompanying action button should be
+   disabled at the same time, see script.js. Reuses the same red already
+   used for lossrisk-badge/danger-styled buttons elsewhere for visual
+   consistency. */
+.fort-resource-value.insufficient {
+    color: #ff4d4d;
+    font-weight: 700;
+}
+
+.fort-resource-arrows {
+    display: flex;
+    gap: 2px;
+    flex: 0 0 auto;
+}
+
+.fort-resource-arrow {
+    font-family: inherit;
+    font-size: 0.7rem;
+    line-height: 1;
+    width: 18px;
+    height: 18px;
+    padding: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgb(255, 255, 255);
+    border: 1px solid currentColor;
+    border-radius: 3px;
+    color: inherit;
+    cursor: pointer;
+}
+
+.fort-resource-arrow:hover:not(:disabled) {
+    background: rgba(255,255,255,0.2);
+}
+
+.fort-resource-arrow:disabled {
+    opacity: 0.35;
+    cursor: default;
+}
+
 #fortCapacityInput{
     font-family: 'IBM Plex Mono', monospace;
     font-size: 0.85rem;
@@ -1757,6 +2199,64 @@ iframe {
 #sbToggleHiddenScoutsBtn.sandbox-peeking {
     background: #2e7d32;
     color: #fff;
+}
+
+.nest-btn.toggle-btn{
+    border: 2px solid black;
+}
+
+#autoTradeToggleBtn{
+    border: 2px solid black;
+
+}
+
+.merchant-limit-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 136px;
+    margin-left: 8px;
+}
+
+.merchant-limit-title {
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+}
+
+.merchant-limit-control {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.merchant-limit-input {
+    width: 50px;
+    height: 36px;
+    padding: 2px 4px;
+    border: 3px solid var(--hybrid-black);
+    background: #fff;
+    color: var(--text-dark);
+    font-size: 1.15rem;
+    font-weight: 700;
+    font-family: inherit;
+    text-align: right;
+    border-radius: 4px;
+    box-sizing: border-box;
+}
+
+.merchant-limit-arrow {
+    min-width: 36px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
+    font-size: 1.35rem;
+    font-weight: 700;
+    line-height: 1;
 }
 
 .fort-attacker {
@@ -1855,6 +2355,12 @@ iframe {
 
     .side-by-side-row {
         grid-template-columns: 1fr;
+    }
+
+    .options-row {
+        grid-template-columns: 1fr;
+        row-gap: 6px;
+        align-items: start;
     }
 
     /* --- Menu overlay: move the button card to the left so it stops
